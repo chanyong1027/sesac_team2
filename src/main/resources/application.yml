@@ -2,18 +2,10 @@ spring:
   application:
     name: LLM_Ops
 
-  datasource:
-    driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/llm_ops
-    username: postgres
-    password: ${DB_PASSWORD}
-
   jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
     properties:
       hibernate:
         format_sql: true
         highlight_sql: true
         use_sql_comments: true
+    open-in-view: false
