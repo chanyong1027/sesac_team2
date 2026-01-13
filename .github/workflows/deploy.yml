@@ -18,7 +18,7 @@ env:
   ARTIFACT_NAME: app-jar
 
 jobs:
-  build-test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,7 +47,7 @@ jobs:
           retention-days: 3
 
   docker-build-push:
-    needs: build-test
+    needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
