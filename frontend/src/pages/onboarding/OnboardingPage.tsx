@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiClient, extractData, ApiClientError, isFieldErrorDetails } from '@/lib/api-client';
 import type { OnboardingStep, PromptTemplate, Provider, OnboardingWizardRequest } from '@/types';
+import { useWorkspace } from '@/hooks/useWorkspace';
 
 const wizardSchema = z.object({
   provider: z.string().min(1, 'Provider is required.'),
@@ -27,7 +28,9 @@ type WizardForm = z.infer<typeof wizardSchema>;
 const providers: Provider[] = ['OPENAI', 'ANTHROPIC', 'GOOGLE', 'AZURE_OPENAI', 'COHERE'];
 
 export default function OnboardingPage() {
-  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const { workspaceId: routeWorkspaceId } = useParams<{ workspaceId: string }>();
+  const { workspaceId: storedWorkspaceId } = useWorkspace();
+  const workspaceId = routeWorkspaceId || storedWorkspaceId || '';
 
   const { data: steps, isLoading: stepsLoading } = useQuery({
     queryKey: ['onboarding-tour'],
@@ -51,6 +54,9 @@ export default function OnboardingPage() {
 
   const applyTemplate = useMutation({
     mutationFn: async (payload: { templateId: string; promptKey: string; name: string }) => {
+      if (!workspaceId) {
+        throw new Error('Select a workspace before applying a template.');
+      }
       const response = await apiClient.post<{ id: string }>(
         `/workspaces/${workspaceId}/prompt-templates/${payload.templateId}/apply`,
         { promptKey: payload.promptKey, name: payload.name }
@@ -67,6 +73,9 @@ export default function OnboardingPage() {
 
   const runWizard = useMutation({
     mutationFn: async (payload: OnboardingWizardRequest) => {
+      if (!workspaceId) {
+        throw new Error('Select a workspace before running the wizard.');
+      }
       const response = await apiClient.post<{ success: boolean }>(
         `/workspaces/${workspaceId}/onboarding/wizard`,
         payload
@@ -192,11 +201,17 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex justify-end">
-                <Button type="submit" disabled={runWizard.isPending}>
+                <Button type="submit" disabled={runWizard.isPending || !workspaceId}>
                   {runWizard.isPending ? 'Running...' : 'Create and test'}
                 </Button>
               </div>
             </form>
+
+            {!workspaceId && (
+              <p className="mt-3 text-xs text-destructive">
+                Select a workspace to run the onboarding wizard.
+              </p>
+            )}
 
             <div className="mt-6">
               <h3 className="text-sm font-medium">Templates</h3>
@@ -216,13 +231,17 @@ export default function OnboardingPage() {
                           variant="outline"
                           size="sm"
                           className="mt-3"
-                          onClick={() =>
+                          onClick={() => {
+                            if (!workspaceId) {
+                              toast.error('Select a workspace before applying a template.');
+                              return;
+                            }
                             applyTemplate.mutate({
                               templateId: template.id,
                               promptKey: `${template.name.toLowerCase().replace(/\s+/g, '-')}-prompt`,
                               name: template.name,
-                            })
-                          }
+                            });
+                          }}
                         >
                           Apply template
                         </Button>
