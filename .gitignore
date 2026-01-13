@@ -39,3 +39,7 @@ out/
 ### Spring Boot ###
 application-local.yml
 application-prod.yml
+
+### Frontend ###
+frontend/node_modules/
+frontend/dist/
