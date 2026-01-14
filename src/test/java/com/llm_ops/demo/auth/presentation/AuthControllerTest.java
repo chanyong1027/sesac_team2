@@ -47,7 +47,7 @@ class AuthControllerTest {
                 "testuser");
 
         // when & then
-        mockMvc.perform(post("/console/auth/signup")
+        mockMvc.perform(post("/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
@@ -66,7 +66,7 @@ class AuthControllerTest {
                 "Test1234",
                 "firstuser");
 
-        mockMvc.perform(post("/console/auth/signup")
+        mockMvc.perform(post("/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(firstRequest)))
                 .andExpect(status().isCreated());
@@ -78,7 +78,7 @@ class AuthControllerTest {
                 "seconduser");
 
         // then
-        mockMvc.perform(post("/console/auth/signup")
+        mockMvc.perform(post("/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(duplicateRequest)))
                 .andDo(print())
@@ -96,7 +96,7 @@ class AuthControllerTest {
                 "testuser");
 
         // when & then
-        mockMvc.perform(post("/console/auth/signup")
+        mockMvc.perform(post("/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
@@ -104,7 +104,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("비밀번호 정책 위반 - 숫자 없음")
+    @DisplayName("비밀번호 정책 위반1 - 숫자 없음")
     void signUp_PasswordWithoutNumber() throws Exception {
         // given
         SignUpRequest request = new SignUpRequest(
@@ -113,7 +113,7 @@ class AuthControllerTest {
                 "testuser");
 
         // when & then
-        mockMvc.perform(post("/console/auth/signup")
+        mockMvc.perform(post("/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
@@ -121,7 +121,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("비밀번호 정책 위반 - 영문 없음")
+    @DisplayName("비밀번호 정책 위반2 - 영문 없음")
     void signUp_PasswordWithoutLetter() throws Exception {
         // given
         SignUpRequest request = new SignUpRequest(
@@ -130,7 +130,7 @@ class AuthControllerTest {
                 "testuser");
 
         // when & then
-        mockMvc.perform(post("/console/auth/signup")
+        mockMvc.perform(post("/auth/signup")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
