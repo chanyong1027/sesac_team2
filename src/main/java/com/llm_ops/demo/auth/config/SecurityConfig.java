@@ -21,8 +21,8 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 인증 없이 접근 가능한 경로
-                        .requestMatchers("/console/auth/**").permitAll()
-                        .requestMatchers("/actuator/health").permitAll() // 개발 중 서버 상태 체크 -> claude가 제시해줌
+                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers("/health").permitAll() // 개발 중 서버 상태 체크 -> claude가 제시해줌
 
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
