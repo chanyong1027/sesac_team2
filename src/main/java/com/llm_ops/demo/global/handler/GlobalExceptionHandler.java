@@ -1,8 +1,8 @@
-package global.handler;
+package com.llm_ops.demo.global.handler;
 
-import global.error.BusinessException;
-import global.error.ErrorCode;
-import global.error.ErrorResponse;
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.global.error.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;

@@ -1,4 +1,4 @@
-package global.error;
+package com.llm_ops.demo.global.error;
 
 public class BusinessException extends RuntimeException {
 
