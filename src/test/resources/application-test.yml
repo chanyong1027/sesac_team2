@@ -10,6 +10,11 @@ spring:
       ddl-auto: create-drop
     show-sql: true
 
+management:
+  endpoint:
+    health:
+      show-details: always
+
 logging:
   level:
     root: WARN

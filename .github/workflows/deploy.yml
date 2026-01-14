@@ -1,0 +1,131 @@
+name: CI-CD
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: cyhong8595/sesac_team
+  ARTIFACT_NAME: app-jar
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build & Test
+        run: ./gradlew clean build -Dspring.profiles.active=test
+
+      # ✅ jar를 다음 job으로 넘겨서 "중복 빌드" 제거
+      - name: Upload JAR artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: build/libs/*.jar
+          retention-days: 3
+
+  docker-build-push:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ✅ build-test에서 만든 jar를 그대로 받기
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: build/libs
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push (latest + sha)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-ec2:
+    needs: docker-build-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to EC2 (pin to sha tag)
+        uses: appleboy/ssh-action@v1
+        env:
+          SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+
+          # ✅ (권장) 호스트키 지문 검증: MITM 방지 + known_hosts 이슈 감소
+          # 설정 안 했으면 이 줄 삭제해도 동작은 함
+          #fingerprint: ${{ secrets.EC2_SSH_FINGERPRINT }}
+
+          # env로 넘긴 SHA를 원격에서 쓰려면 envs에 등록
+          envs: SHA
+
+          script: |
+            set -e
+            cd /opt/sesac
+
+            # ✅ latest 대신 sha 태그로 "정확히 어떤 버전인지" 고정 배포
+            sed -i "s/^APP_TAG=.*/APP_TAG=sha-${SHA}/" .env || echo "APP_TAG=sha-${SHA}" >> .env
+
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+            echo "Waiting for application to be healthy..."
+            for i in {1..30}; do
+              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+                echo "✅ Application is healthy!"
+                docker compose ps
+                docker compose logs --tail=50
+                docker image prune -af
+                exit 0
+              fi
+              echo "Retry $i/30..."
+              sleep 1
+            done
+            
+            echo "❌ Health check failed!"
+            docker compose logs --tail=100
+            exit 1
