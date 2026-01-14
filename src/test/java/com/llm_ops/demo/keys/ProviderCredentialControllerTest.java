@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -126,5 +127,73 @@ class ProviderCredentialControllerTest {
                 // then
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("C400"));
+    }
+
+    @Test
+    @DisplayName("Provider Key 목록 조회 시 apiKey가 포함되지 않는다")
+    void 프로바이더_키_목록을_조회하면_apiKey가_포함되지_않는다() throws Exception {
+        // given
+        mockMvc.perform(post("/workspaces/1/provider-credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider": "openai",
+                                  "apiKey": "test-key"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        // when
+        mockMvc.perform(get("/workspaces/1/provider-credentials"))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].provider").value("openai"))
+                .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$[0].apiKey").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Provider Key 목록 조회 시 필드가 정상 매핑된다")
+    void 프로바이더_키_목록을_조회한다() throws Exception {
+        // given
+        mockMvc.perform(post("/workspaces/1/provider-credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider": "openai",
+                                  "apiKey": "test-key"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        // when
+        mockMvc.perform(get("/workspaces/1/provider-credentials"))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].provider").value("openai"))
+                .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$[0].createdAt").isNotEmpty())
+                .andExpect(jsonPath("$[0].lastVerifiedAt").isEmpty());
+    }
+
+    @Test
+    @DisplayName("다른 워크스페이스의 Provider Key는 조회되지 않는다")
+    void 다른_워크스페이스면_프로바이더_키가_조회되지_않는다() throws Exception {
+        // given
+        mockMvc.perform(post("/workspaces/1/provider-credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "provider": "openai",
+                                  "apiKey": "test-key"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        // when
+        mockMvc.perform(get("/workspaces/2/provider-credentials"))
+                // then
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
     }
 }
