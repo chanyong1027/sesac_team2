@@ -72,7 +72,6 @@ public class ProviderKeyEncryptor {
             throw new IllegalStateException("Failed to decrypt provider key", e);
         }
     }
-
     private byte[] deriveKey(String secret) {
         try {
             // Derive a 256-bit key from the provided secret for AES-GCM.
