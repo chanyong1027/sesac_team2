@@ -1,12 +1,11 @@
-package com.llm_ops.demo.auth.application;
-
-import static com.llm_ops.demo.global.error.ErrorCode.INVALID_INPUT_VALUE;
+package com.llm_ops.demo.auth.service;
 
 import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.dto.response.SignUpResponse;
 import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -25,24 +24,24 @@ public class UserService {
         validateDuplicate(request);
 
         // 2. 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(request.passwordHash());
+        String encodedPassword = passwordEncoder.encode(request.password());
 
         // 3. User 엔티티 생성 및 저장
-        User user = User.of(request.userName(), encodedPassword, request.email());
+        User user = User.create(request.userName(), encodedPassword, request.email());
         User savedUser = userRepository.save(user);
 
         return new SignUpResponse
                 (
                         savedUser.getId(),
                         savedUser.getEmail(),
-                        savedUser.getUserName(),
+                        savedUser.getName(),
                         "회원가입이 완료되었습니다."
                 );
     }
 
     private void validateDuplicate(SignUpRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException(INVALID_INPUT_VALUE, "이미 사용 중인 이메일입니다.");
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 사용 중인 이메일입니다."); //C409 에러
         }
     }
 }
