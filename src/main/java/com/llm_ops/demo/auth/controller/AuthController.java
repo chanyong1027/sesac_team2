@@ -1,6 +1,6 @@
-package com.llm_ops.demo.auth.presentation;
+package com.llm_ops.demo.auth.controller;
 
-import com.llm_ops.demo.auth.application.UserService;
+import com.llm_ops.demo.auth.service.UserService;
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.dto.response.SignUpResponse;
 import jakarta.validation.Valid;
