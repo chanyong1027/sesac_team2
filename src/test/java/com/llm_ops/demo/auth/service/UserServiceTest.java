@@ -1,4 +1,4 @@
-package com.llm_ops.demo.auth.application;
+package com.llm_ops.demo.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -38,7 +38,7 @@ class UserServiceTest {
         // given
         SignUpRequest request = new SignUpRequest(
                 "test@example.com",
-                "Test1234",
+                "Test1234!",
                 "testuser");
 
         given(userRepository.existsByEmail(anyString())).willReturn(false);

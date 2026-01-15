@@ -1,4 +1,4 @@
-package com.llm_ops.demo.auth.presentation;
+package com.llm_ops.demo.auth.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
@@ -23,117 +23,134 @@ import tools.jackson.databind.ObjectMapper;
 @ActiveProfiles("test") // application-test.yml 사용 (H2)
 class AuthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+        @Autowired
+        private MockMvc mockMvc;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+        @Autowired
+        private ObjectMapper objectMapper;
 
-    @Autowired
-    private UserRepository userRepository;
+        @Autowired
+        private UserRepository userRepository;
 
-    @BeforeEach
-    void setUp() {
-        userRepository.deleteAll();
-    }
+        @BeforeEach
+        void setUp() {
+                userRepository.deleteAll();
+        }
 
-    @Test
-    @DisplayName("회원가입 성공 - 201 Created")
-    void signUp_Success() throws Exception {
-        // given
-        SignUpRequest request = new SignUpRequest(
-                "test@example.com",
-                "Test1234",
-                "testuser");
+        @Test
+        @DisplayName("회원가입 성공 - 201 Created")
+        void signUp_Success() throws Exception {
+                // given
+                SignUpRequest request = new SignUpRequest(
+                                "test@example.com",
+                                "Test1234!",
+                                "testuser");
 
-        // when & then
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.userName").value("testuser"))
-                .andExpect(jsonPath("$.email").value("test@example.com"))
-                .andExpect(jsonPath("$.message").value("회원가입이 완료되었습니다."));
-    }
+                // when & then
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.userName").value("testuser"))
+                                .andExpect(jsonPath("$.email").value("test@example.com"))
+                                .andExpect(jsonPath("$.message").value("회원가입이 완료되었습니다."));
+        }
 
-    @Test
-    @DisplayName("중복 이메일 회원가입 - 400 Bad Request")
-    void signUp_DuplicateEmail() throws Exception {
-        // given - 먼저 회원가입
-        SignUpRequest firstRequest = new SignUpRequest(
-                "duplicate@example.com",
-                "Test1234",
-                "firstuser");
+        @Test
+        @DisplayName("중복 이메일 회원가입 - 409 Conflict")
+        void signUp_DuplicateEmail() throws Exception {
+                // given - 먼저 회원가입
+                SignUpRequest firstRequest = new SignUpRequest(
+                                "duplicate@example.com",
+                                "Test1234!",
+                                "firstuser");
 
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(firstRequest)))
-                .andExpect(status().isCreated());
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(firstRequest)))
+                                .andExpect(status().isCreated());
 
-        // when - 같은 이메일로 다시 가입 시도
-        SignUpRequest duplicateRequest = new SignUpRequest(
-                "duplicate@example.com",
-                "Test1234",
-                "seconduser");
+                // when - 같은 이메일로 다시 가입 시도
+                SignUpRequest duplicateRequest = new SignUpRequest(
+                                "duplicate@example.com",
+                                "Test1234!",
+                                "seconduser");
 
-        // then
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(duplicateRequest)))
-                .andDo(print())
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("이미 사용 중인 이메일입니다."));
-    }
+                // then
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(duplicateRequest)))
+                                .andDo(print())
+                                .andExpect(status().isConflict())
+                                .andExpect(jsonPath("$.message").value("이미 사용 중인 이메일입니다."));
+        }
 
-    @Test
-    @DisplayName("유효성 검증 실패 - 비밀번호 8자 미만")
-    void signUp_ShortPassword() throws Exception {
-        // given
-        SignUpRequest request = new SignUpRequest(
-                "test@example.com",
-                "short1", // 8자 미만
-                "testuser");
+        @Test
+        @DisplayName("유효성 검증 실패 - 비밀번호 8자 미만")
+        void signUp_ShortPassword() throws Exception {
+                // given
+                SignUpRequest request = new SignUpRequest(
+                                "test@example.com",
+                                "short1", // 8자 미만
+                                "testuser");
 
-        // when & then
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
-    }
+                // when & then
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andExpect(status().isBadRequest());
+        }
 
-    @Test
-    @DisplayName("비밀번호 정책 위반1 - 숫자 없음")
-    void signUp_PasswordWithoutNumber() throws Exception {
-        // given
-        SignUpRequest request = new SignUpRequest(
-                "test@example.com",
-                "TestPassword", // 숫자 없음
-                "testuser");
+        @Test
+        @DisplayName("비밀번호 정책 위반1 - 숫자 없음")
+        void signUp_PasswordWithoutNumber() throws Exception {
+                // given
+                SignUpRequest request = new SignUpRequest(
+                                "test@example.com",
+                                "TestPassword", // 숫자 없음
+                                "testuser");
 
-        // when & then
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
-    }
+                // when & then
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andExpect(status().isBadRequest());
+        }
 
-    @Test
-    @DisplayName("비밀번호 정책 위반2 - 영문 없음")
-    void signUp_PasswordWithoutLetter() throws Exception {
-        // given
-        SignUpRequest request = new SignUpRequest(
-                "test@example.com",
-                "12345678", // 영문 없음
-                "testuser");
+        @Test
+        @DisplayName("비밀번호 정책 위반2 - 영문 없음")
+        void signUp_PasswordWithoutLetter() throws Exception {
+                // given
+                SignUpRequest request = new SignUpRequest(
+                                "test@example.com",
+                                "12345678", // 영문 없음
+                                "testuser");
 
-        // when & then
-        mockMvc.perform(post("/auth/signup")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
-    }
+                // when & then
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("비밀번호 정책 위반3 - 특수 기호 없음")
+        void signUp_PasswordWithoutSymbol() throws Exception {
+                // given
+                SignUpRequest request = new SignUpRequest(
+                                "test@example.com",
+                                "nosymbol123", // 특수 기호 없음
+                                "testuser");
+
+                // when & then
+                mockMvc.perform(post("/auth/signup")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andDo(print())
+                                .andExpect(status().isBadRequest());
+        }
 }
