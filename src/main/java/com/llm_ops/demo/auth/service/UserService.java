@@ -27,21 +27,19 @@ public class UserService {
         String encodedPassword = passwordEncoder.encode(request.password());
 
         // 3. User 엔티티 생성 및 저장
-        User user = User.create(request.userName(), encodedPassword, request.email());
+        User user = User.create(request.email(), encodedPassword, request.name());
         User savedUser = userRepository.save(user);
 
-        return new SignUpResponse
-                (
-                        savedUser.getId(),
-                        savedUser.getEmail(),
-                        savedUser.getName(),
-                        "회원가입이 완료되었습니다."
-                );
+        return new SignUpResponse(
+                savedUser.getId(),
+                savedUser.getEmail(),
+                savedUser.getName(),
+                "회원가입이 완료되었습니다.");
     }
 
     private void validateDuplicate(SignUpRequest request) {
         if (userRepository.existsByEmail(request.email())) {
-            throw new BusinessException(ErrorCode.CONFLICT, "이미 사용 중인 이메일입니다."); //C409 에러
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 사용 중인 이메일입니다."); // C409 에러
         }
     }
 }
