@@ -42,7 +42,7 @@ class ProviderCredentialControllerTest {
     @DisplayName("Provider Key 등록 성공")
     void 프로바이더_키를_등록한다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -68,7 +68,7 @@ class ProviderCredentialControllerTest {
     @DisplayName("Provider Key 중복 등록 시 409 반환")
     void 프로바이더_키가_중복되면_예외가_발생한다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -79,7 +79,7 @@ class ProviderCredentialControllerTest {
                 .andExpect(status().isCreated());
 
         // when
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -97,7 +97,7 @@ class ProviderCredentialControllerTest {
     void 지원하지_않는_프로바이더면_예외가_발생한다() throws Exception {
         // given
         // when
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -115,7 +115,7 @@ class ProviderCredentialControllerTest {
     void apiKey가_비어있으면_예외가_발생한다() throws Exception {
         // given
         // when
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/workspaces/{workspaceId}/provider-credentials")
+@RequestMapping("/api/v1/organizations/{orgId}/credentials")
 @RequiredArgsConstructor
 public class ProviderCredentialController {
 
@@ -22,11 +22,11 @@ public class ProviderCredentialController {
 
     @PostMapping
     public ResponseEntity<ProviderCredentialCreateResponse> create(
-            @PathVariable Long workspaceId,
+            @PathVariable Long orgId,
             @Valid @RequestBody ProviderCredentialCreateRequest request
     ) {
         ProviderCredentialCreateResponse response =
-                providerCredentialService.register(workspaceId, request);
+                providerCredentialService.register(orgId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

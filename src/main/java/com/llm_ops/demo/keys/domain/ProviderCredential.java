@@ -19,10 +19,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
-        name = "provider_credential",
+        name = "provider_credentials",
         uniqueConstraints = @UniqueConstraint(
-                name = "uq_provider_credential_workspace_provider",
-                columnNames = {"workspace_id", "provider"}
+                name = "uq_provider_credentials_org_provider",
+                columnNames = {"org_id", "provider"}
         )
 )
 @Getter
@@ -33,8 +33,8 @@ public class ProviderCredential {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "workspace_id", nullable = false)
-    private Long workspaceId;
+    @Column(name = "org_id", nullable = false)
+    private Long organizationId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "provider", nullable = false, length = 50)
@@ -59,24 +59,24 @@ public class ProviderCredential {
     private LocalDateTime updatedAt;
 
     private ProviderCredential(
-            Long workspaceId,
+            Long organizationId,
             ProviderType provider,
             String keyCiphertext,
             ProviderCredentialStatus status
     ) {
-        this.workspaceId = workspaceId;
+        this.organizationId = organizationId;
         this.provider = provider;
         this.keyCiphertext = keyCiphertext;
         this.status = status;
     }
 
     public static ProviderCredential create(
-            Long workspaceId,
+            Long organizationId,
             ProviderType provider,
             String keyCiphertext
     ) {
         return new ProviderCredential(
-                workspaceId,
+                organizationId,
                 provider,
                 keyCiphertext,
                 ProviderCredentialStatus.ACTIVE

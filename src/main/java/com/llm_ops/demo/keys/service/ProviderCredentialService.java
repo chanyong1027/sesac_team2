@@ -21,21 +21,21 @@ public class ProviderCredentialService {
 
     @Transactional
     public ProviderCredentialCreateResponse register(
-            Long workspaceId,
+            Long organizationId,
             ProviderCredentialCreateRequest request
     ) {
-        ProviderType providerType = ProviderType.from(request.getProvider());
+        ProviderType providerType = ProviderType.from(request.provider());
 
         // TODO: enforce OWNER-only access once auth is implemented.
-        // TODO: validate workspace existence once workspace domain is available.
+        // TODO: validate organization existence once organization domain is available.
 
-        if (providerCredentialRepository.existsByWorkspaceIdAndProvider(workspaceId, providerType)) {
+        if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
         }
 
-        String ciphertext = providerKeyEncryptor.encrypt(request.getApiKey());
+        String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         ProviderCredential credential = ProviderCredential.create(
-                workspaceId,
+                organizationId,
                 providerType,
                 ciphertext
         );

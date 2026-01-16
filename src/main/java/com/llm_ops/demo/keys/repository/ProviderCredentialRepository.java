@@ -5,5 +5,5 @@ import com.llm_ops.demo.keys.domain.ProviderType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ProviderCredentialRepository extends JpaRepository<ProviderCredential, Long> {
-    boolean existsByWorkspaceIdAndProvider(Long workspaceId, ProviderType provider);
+    boolean existsByOrganizationIdAndProvider(Long organizationId, ProviderType provider);
 }
