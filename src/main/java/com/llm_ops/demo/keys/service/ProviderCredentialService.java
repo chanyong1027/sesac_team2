@@ -29,9 +29,7 @@ public class ProviderCredentialService {
         // TODO: enforce OWNER-only access once auth is implemented.
         // TODO: validate organization existence once organization domain is available.
 
-        if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
-            throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
-        }
+        validateDuplicate(organizationId, providerType);
 
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         ProviderCredential credential = ProviderCredential.create(
@@ -42,5 +40,11 @@ public class ProviderCredentialService {
 
         ProviderCredential saved = providerCredentialRepository.save(credential);
         return ProviderCredentialCreateResponse.from(saved);
+    }
+
+    private void validateDuplicate(Long organizationId, ProviderType providerType) {
+        if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
+        }
     }
 }

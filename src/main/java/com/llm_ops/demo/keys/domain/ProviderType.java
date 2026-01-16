@@ -2,9 +2,11 @@ package com.llm_ops.demo.keys.domain;
 
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import lombok.Getter;
 
 import java.util.Arrays;
 
+@Getter
 public enum ProviderType {
     OPENAI("openai"),
     GEMINI("gemini");
@@ -13,10 +15,6 @@ public enum ProviderType {
 
     ProviderType(String value) {
         this.value = value;
-    }
-
-    public String getValue() {
-        return value;
     }
 
     public static ProviderType from(String raw) {
