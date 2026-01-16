@@ -1,0 +1,58 @@
+package global.error;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+public class ErrorResponse {
+
+    private final String code;
+    private final String message;
+    private final LocalDateTime timestamp;
+    private final Map<String, String> fieldErrors;
+
+    private ErrorResponse(
+            String code,
+            String message,
+            LocalDateTime timestamp,
+            Map<String, String> fieldErrors
+    ) {
+        this.code = code;
+        this.message = message;
+        this.timestamp = timestamp;
+        this.fieldErrors = fieldErrors;
+    }
+
+    public static ErrorResponse of(ErrorCode errorCode, String message) {
+        return new ErrorResponse(
+                errorCode.getCode(),
+                message != null ? message : errorCode.getDefaultMessage(),
+                LocalDateTime.now(),
+                null
+        );
+    }
+
+    public static ErrorResponse ofValidation(ErrorCode errorCode, Map<String, String> fieldErrors) {
+        return new ErrorResponse(
+                errorCode.getCode(),
+                errorCode.getDefaultMessage(),
+                LocalDateTime.now(),
+                fieldErrors
+        );
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public Map<String, String> getFieldErrors() {
+        return fieldErrors;
+    }
+}
