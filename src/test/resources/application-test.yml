@@ -10,6 +10,10 @@ spring:
       ddl-auto: create-drop
     show-sql: true
 
+jwt:
+  secret: test-secret-key-for-unit-testing-32chars
+  expiration-sec: 60
+
 management:
   endpoint:
     health:
