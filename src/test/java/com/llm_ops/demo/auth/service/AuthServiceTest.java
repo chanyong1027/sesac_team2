@@ -21,10 +21,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
-class UserServiceTest {
+class AuthServiceTest {
 
     @InjectMocks
-    private UserService userService;
+    private AuthService authService;
 
     @Mock
     private UserRepository userRepository;
@@ -53,7 +53,7 @@ class UserServiceTest {
         });
 
         // when
-        SignUpResponse response = userService.signUp(request);
+        SignUpResponse response = authService.signUp(request);
 
         // then
         assertThat(response.id()).isEqualTo(1L);
@@ -76,7 +76,7 @@ class UserServiceTest {
         given(userRepository.existsByEmail("duplicate@example.com")).willReturn(true);
 
         // when & then
-        assertThatThrownBy(() -> userService.signUp(request))
+        assertThatThrownBy(() -> authService.signUp(request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("이미 사용 중인 이메일입니다.");
     }
