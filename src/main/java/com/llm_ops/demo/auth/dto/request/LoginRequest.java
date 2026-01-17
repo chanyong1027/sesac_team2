@@ -1,2 +1,13 @@
-package com.llm_ops.demo.auth.dto.request;public class LoginRequest {
-}
+package com.llm_ops.demo.auth.dto.request;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public record LoginRequest(
+        @NotBlank
+        @Email
+        String email,
+
+        @NotBlank
+        String password
+) {}
