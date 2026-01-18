@@ -18,3 +18,5 @@ management:
 logging:
   level:
     root: WARN
+
+PROVIDER_KEY_ENC_KEY: test-secret
