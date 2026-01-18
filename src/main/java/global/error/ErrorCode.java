@@ -1,9 +1,7 @@
-package com.llm_ops.demo.global.error;
+package global.error;
 
-import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
-@Getter
 public enum ErrorCode {
 
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C400", "요청 값이 올바르지 않습니다."),
@@ -24,4 +22,15 @@ public enum ErrorCode {
         this.defaultMessage = defaultMessage;
     }
 
+    public HttpStatus getStatus() {
+        return status;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public String getDefaultMessage() {
+        return defaultMessage;
+    }
 }
