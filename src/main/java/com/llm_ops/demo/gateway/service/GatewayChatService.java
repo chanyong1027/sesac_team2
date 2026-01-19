@@ -3,6 +3,7 @@ package com.llm_ops.demo.gateway.service;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
+import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -26,6 +27,8 @@ import java.util.UUID;
 public class GatewayChatService {
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
+    private final GatewayChatProviderResolveService gatewayChatProviderResolveService;
+    private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final ChatModel chatModel;
 
     /**
@@ -43,8 +46,10 @@ public class GatewayChatService {
         // 2. 프롬프트 템플릿에 변수를 주입하여 최종 프롬프트를 생성합니다.
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
-        // 3. Spring AI의 ChatModel을 통해 LLM을 호출합니다.
-        ChatResponse response = chatModel.call(new Prompt(new UserMessage(prompt)));
+        // 3. 요청 시점에 조직별 API 키를 주입하여 LLM을 호출합니다.
+        ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
+        var chatOptions = gatewayChatOptionsCreateService.create(organizationId, providerType);
+        ChatResponse response = chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
 
         // 4. LLM 응답을 파싱하고 최종 응답 DTO를 구성합니다.
         String answer = response.getResult().getOutput().getText();

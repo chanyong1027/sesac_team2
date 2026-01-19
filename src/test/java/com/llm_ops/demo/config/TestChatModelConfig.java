@@ -15,10 +15,17 @@ import java.util.List;
 public class TestChatModelConfig {
 
     @Bean
-    ChatModel chatModel() {
-        return prompt -> new ChatResponse(
-                List.of(new Generation(new AssistantMessage(prompt.getContents())))
-        );
+    TestChatModelState testChatModelState() {
+        return new TestChatModelState();
+    }
+
+    @Bean
+    ChatModel chatModel(TestChatModelState testChatModelState) {
+        return prompt -> {
+            testChatModelState.record(prompt);
+            return new ChatResponse(
+                    List.of(new Generation(new AssistantMessage(prompt.getContents())))
+            );
+        };
     }
 }
-
