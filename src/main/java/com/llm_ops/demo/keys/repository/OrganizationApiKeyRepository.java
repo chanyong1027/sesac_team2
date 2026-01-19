@@ -20,6 +20,14 @@ public interface OrganizationApiKeyRepository extends JpaRepository<Organization
     boolean existsByOrganizationIdAndName(Long organizationId, String name);
 
     /**
+     * 지정된 prefix를 가진 API 키를 모두 조회합니다.
+     *
+     * @param keyPrefix 조회할 API 키 prefix
+     * @return prefix가 일치하는 API 키 엔티티 리스트
+     */
+    List<OrganizationApiKey> findAllByKeyPrefix(String keyPrefix);
+
+    /**
      * 지정된 조직에 속한 모든 API 키를 조회합니다.
      *
      * @param organizationId 조회할 조직의 ID
