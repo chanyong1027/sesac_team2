@@ -7,10 +7,13 @@ import com.llm_ops.demo.keys.domain.ProviderCredential;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateResponse;
+import com.llm_ops.demo.keys.dto.ProviderCredentialSummaryResponse;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -42,9 +45,19 @@ public class ProviderCredentialService {
         return ProviderCredentialCreateResponse.from(saved);
     }
 
+    @Transactional(readOnly = true)
+    public List<ProviderCredentialSummaryResponse> getProviderCredentials(Long organizationId) {
+        // TODO: enforce MEMBER+ access once auth is implemented.
+        // TODO: validate organization existence once organization domain is available.
+        return providerCredentialRepository.findAllByOrganizationId(organizationId).stream()
+                .map(ProviderCredentialSummaryResponse::from)
+                .toList();
+    }
+
     private void validateDuplicate(Long organizationId, ProviderType providerType) {
         if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
         }
     }
 }
+

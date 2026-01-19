@@ -17,6 +17,10 @@ public enum ProviderType {
         this.value = value;
     }
 
+    public String getValue() {
+        return value;
+    }
+
     public static ProviderType from(String raw) {
         return Arrays.stream(values())
                 .filter(provider -> provider.value.equalsIgnoreCase(raw))
