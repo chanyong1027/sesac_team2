@@ -30,18 +30,18 @@ public class ProviderKeyEncryptor {
 
     public String encrypt(String plaintext) {
         try {
-            byte[] iv = new byte[IV_LENGTH];
-            secureRandom.nextBytes(iv);
+            byte[] initializationVector = new byte[IV_LENGTH];
+            secureRandom.nextBytes(initializationVector);
 
             Cipher cipher = Cipher.getInstance(TRANSFORMATION);
             SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, iv);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, initializationVector);
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
 
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
-            byte[] combined = new byte[iv.length + ciphertext.length];
-            System.arraycopy(iv, 0, combined, 0, iv.length);
-            System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
+            byte[] combined = new byte[initializationVector.length + ciphertext.length];
+            System.arraycopy(initializationVector, 0, combined, 0, initializationVector.length);
+            System.arraycopy(ciphertext, 0, combined, initializationVector.length, ciphertext.length);
 
             return Base64.getEncoder().encodeToString(combined);
         } catch (Exception e) {
