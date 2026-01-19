@@ -7,13 +7,10 @@ import com.llm_ops.demo.keys.domain.ProviderCredential;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateResponse;
-import com.llm_ops.demo.keys.dto.ProviderCredentialSummaryResponse;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -24,21 +21,19 @@ public class ProviderCredentialService {
 
     @Transactional
     public ProviderCredentialCreateResponse register(
-            Long workspaceId,
+            Long organizationId,
             ProviderCredentialCreateRequest request
     ) {
-        ProviderType providerType = ProviderType.from(request.getProvider());
+        ProviderType providerType = ProviderType.from(request.provider());
 
         // TODO: enforce OWNER-only access once auth is implemented.
-        // TODO: validate workspace existence once workspace domain is available.
+        // TODO: validate organization existence once organization domain is available.
 
-        if (providerCredentialRepository.existsByWorkspaceIdAndProvider(workspaceId, providerType)) {
-            throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
-        }
+        validateDuplicate(organizationId, providerType);
 
-        String ciphertext = providerKeyEncryptor.encrypt(request.getApiKey());
+        String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         ProviderCredential credential = ProviderCredential.create(
-                workspaceId,
+                organizationId,
                 providerType,
                 ciphertext
         );
@@ -54,5 +49,9 @@ public class ProviderCredentialService {
         return providerCredentialRepository.findAllByWorkspaceId(workspaceId).stream()
                 .map(ProviderCredentialSummaryResponse::from)
                 .toList();
+    private void validateDuplicate(Long organizationId, ProviderType providerType) {
+        if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
+        }
     }
 }
