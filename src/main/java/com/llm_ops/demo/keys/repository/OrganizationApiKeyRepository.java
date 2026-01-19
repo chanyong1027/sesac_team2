@@ -27,4 +27,3 @@ public interface OrganizationApiKeyRepository extends JpaRepository<Organization
      */
     List<OrganizationApiKey> findAllByOrganizationId(Long organizationId);
 }
-
