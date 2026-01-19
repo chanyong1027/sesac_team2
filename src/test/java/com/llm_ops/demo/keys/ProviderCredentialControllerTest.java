@@ -43,7 +43,7 @@ class ProviderCredentialControllerTest {
     @DisplayName("Provider Key 등록 성공")
     void 프로바이더_키를_등록한다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -69,7 +69,7 @@ class ProviderCredentialControllerTest {
     @DisplayName("Provider Key 중복 등록 시 409 반환")
     void 프로바이더_키가_중복되면_예외가_발생한다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -80,7 +80,7 @@ class ProviderCredentialControllerTest {
                 .andExpect(status().isCreated());
 
         // when
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -98,7 +98,7 @@ class ProviderCredentialControllerTest {
     void 지원하지_않는_프로바이더면_예외가_발생한다() throws Exception {
         // given
         // when
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -116,7 +116,7 @@ class ProviderCredentialControllerTest {
     void apiKey가_비어있으면_예외가_발생한다() throws Exception {
         // given
         // when
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -133,7 +133,7 @@ class ProviderCredentialControllerTest {
     @DisplayName("Provider Key 목록 조회 시 apiKey가 포함되지 않는다")
     void 프로바이더_키_목록을_조회하면_apiKey가_포함되지_않는다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -144,7 +144,7 @@ class ProviderCredentialControllerTest {
                 .andExpect(status().isCreated());
 
         // when
-        mockMvc.perform(get("/workspaces/1/provider-credentials"))
+        mockMvc.perform(get("/api/v1/organizations/1/credentials"))
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].provider").value("openai"))
@@ -156,7 +156,7 @@ class ProviderCredentialControllerTest {
     @DisplayName("Provider Key 목록 조회 시 필드가 정상 매핑된다")
     void 프로바이더_키_목록을_조회한다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -167,7 +167,7 @@ class ProviderCredentialControllerTest {
                 .andExpect(status().isCreated());
 
         // when
-        mockMvc.perform(get("/workspaces/1/provider-credentials"))
+        mockMvc.perform(get("/api/v1/organizations/1/credentials"))
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].provider").value("openai"))
@@ -177,10 +177,10 @@ class ProviderCredentialControllerTest {
     }
 
     @Test
-    @DisplayName("다른 워크스페이스의 Provider Key는 조회되지 않는다")
-    void 다른_워크스페이스면_프로바이더_키가_조회되지_않는다() throws Exception {
+    @DisplayName("다른 조직의 Provider Key는 조회되지 않는다")
+    void 다른_조직이면_프로바이더_키가_조회되지_않는다() throws Exception {
         // given
-        mockMvc.perform(post("/workspaces/1/provider-credentials")
+        mockMvc.perform(post("/api/v1/organizations/1/credentials")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -191,7 +191,7 @@ class ProviderCredentialControllerTest {
                 .andExpect(status().isCreated());
 
         // when
-        mockMvc.perform(get("/workspaces/2/provider-credentials"))
+        mockMvc.perform(get("/api/v1/organizations/2/credentials"))
                 // then
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
