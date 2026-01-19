@@ -49,6 +49,30 @@ public class ProviderKeyEncryptor {
         }
     }
 
+    public String decrypt(String encoded) {
+        try {
+            byte[] combined = Base64.getDecoder().decode(encoded);
+            if (combined.length <= IV_LENGTH) {
+                throw new IllegalArgumentException("Invalid ciphertext");
+            }
+
+            byte[] initializationVector = new byte[IV_LENGTH];
+            byte[] ciphertext = new byte[combined.length - IV_LENGTH];
+            System.arraycopy(combined, 0, initializationVector, 0, IV_LENGTH);
+            System.arraycopy(combined, IV_LENGTH, ciphertext, 0, ciphertext.length);
+
+            Cipher cipher = Cipher.getInstance(TRANSFORMATION);
+            SecretKeySpec keySpec = new SecretKeySpec(keyBytes, "AES");
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(TAG_LENGTH_BITS, initializationVector);
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
+
+            byte[] plaintext = cipher.doFinal(ciphertext);
+            return new String(plaintext, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to decrypt provider key", e);
+        }
+    }
+
     private byte[] deriveKey(String secret) {
         try {
             // Derive a 256-bit key from the provided secret for AES-GCM.
