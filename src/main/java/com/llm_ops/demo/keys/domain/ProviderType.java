@@ -28,6 +28,7 @@ public enum ProviderType {
         }
 
         String normalized = raw.trim().toLowerCase(Locale.ROOT);
+        String normalized = raw.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
             case "openai" -> OPENAI;
             case "anthropic", "claude" -> ANTHROPIC;
