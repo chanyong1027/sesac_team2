@@ -1,11 +1,8 @@
-package com.llm_ops.demo.global.error;
-
-import lombok.Getter;
+package global.error;
 
 import java.time.LocalDateTime;
 import java.util.Map;
 
-@Getter
 public class ErrorResponse {
 
     private final String code;
@@ -43,4 +40,19 @@ public class ErrorResponse {
         );
     }
 
+    public String getCode() {
+        return code;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public LocalDateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public Map<String, String> getFieldErrors() {
+        return fieldErrors;
+    }
 }
