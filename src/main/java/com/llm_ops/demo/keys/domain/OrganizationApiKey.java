@@ -43,22 +43,40 @@ public class OrganizationApiKey {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /**
+     * 이 API 키를 소유한 조직의 ID
+     */
     @Column(name = "org_id", nullable = false)
     private Long organizationId;
 
+    /**
+     * 사용자가 키를 식별하기 위해 부여한 이름
+     */
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+    /**
+     * 실제 API 키의 SHA-256 해시 값. 인증에 사용됩니다.
+     */
     @Column(name = "key_hash", nullable = false, length = 64)
     private String keyHash;
 
+    /**
+     * 키의 앞 부분을 잘라낸 문자열. UI나 로그에서 키를 식별하는 용도로 사용됩니다.
+     */
     @Column(name = "key_prefix", nullable = false, length = 32)
     private String keyPrefix;
 
+    /**
+     * API 키의 현재 상태 (예: ACTIVE, INACTIVE)
+     */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private OrganizationApiKeyStatus status;
 
+    /**
+     * 이 키가 마지막으로 사용된 시간
+     */
     @Column(name = "last_used_at")
     private LocalDateTime lastUsedAt;
 
@@ -84,6 +102,15 @@ public class OrganizationApiKey {
         this.status = status;
     }
 
+    /**
+     * 새로운 OrganizationApiKey 엔티티를 생성합니다.
+     *
+     * @param organizationId 이 키를 소유할 조직의 ID
+     * @param name           키 식별용 이름
+     * @param keyHash        키의 SHA-256 해시 값
+     * @param keyPrefix      키의 접두사
+     * @return 활성(ACTIVE) 상태의 새로운 OrganizationApiKey 인스턴스
+     */
     public static OrganizationApiKey create(
             Long organizationId,
             String name,
