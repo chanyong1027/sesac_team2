@@ -60,7 +60,6 @@ public class ProviderCredentialService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
         return providerKeyEncryptor.decrypt(credential.getKeyCiphertext());
     }
-
     private void validateDuplicate(Long organizationId, ProviderType providerType) {
         if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
