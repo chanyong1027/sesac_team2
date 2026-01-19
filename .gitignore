@@ -47,3 +47,7 @@ application-prod.yml
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
+
+
+### ai ###
+.ai/
