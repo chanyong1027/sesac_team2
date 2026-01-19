@@ -4,6 +4,8 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import lombok.Getter;
 
+import java.util.Locale;
+
 @Getter
 public enum ProviderType {
     OPENAI("openai"),
@@ -25,7 +27,7 @@ public enum ProviderType {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 provider 입니다.");
         }
 
-        String normalized = raw.trim().toLowerCase();
+        String normalized = raw.trim().toLowerCase(Locale.ROOT);
         return switch (normalized) {
             case "openai" -> OPENAI;
             case "anthropic", "claude" -> ANTHROPIC;
