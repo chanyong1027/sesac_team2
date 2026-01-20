@@ -138,20 +138,5 @@ class WorkspaceInvitationControllerTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest());
         }
-
-        /*@Test
-        @DisplayName("X-User-Id 헤더 누락 시 실패")
-        void createInvitation_MissingUserIdHeader_Fails() throws Exception {
-            // given
-            Long workspaceId = 1L;
-            WorkspaceInviteCreateRequest request = new WorkspaceInviteCreateRequest(WorkspaceRole.MEMBER);
-
-            // when & then
-            mockMvc.perform(post("/api/v1/workspaces/{workspaceId}/invitation-links", workspaceId)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
-        }*/
     }
 }
