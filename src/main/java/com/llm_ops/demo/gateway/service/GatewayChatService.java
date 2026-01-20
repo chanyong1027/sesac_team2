@@ -12,7 +12,6 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.UUID;
@@ -56,7 +55,7 @@ public class GatewayChatService {
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
         String traceId = UUID.randomUUID().toString();
-        return GatewayChatResponse.create(
+        return GatewayChatResponse.from(
                 traceId,
                 answer,
                 false, // TODO: Failover 로직 구현 시 동적으로 설정 필요
