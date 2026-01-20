@@ -11,6 +11,5 @@ public interface ProviderCredentialRepository extends JpaRepository<ProviderCred
     boolean existsByOrganizationIdAndProvider(Long organizationId, ProviderType provider);
 
     Optional<ProviderCredential> findByOrganizationIdAndProvider(Long organizationId, ProviderType provider);
-
     List<ProviderCredential> findAllByOrganizationId(Long organizationId);
 }

@@ -128,7 +128,6 @@ class ProviderCredentialControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("C400"));
     }
-
     @Test
     @DisplayName("Provider Key 목록 조회 시 apiKey가 포함되지 않는다")
     void 프로바이더_키_목록을_조회하면_apiKey가_포함되지_않는다() throws Exception {
