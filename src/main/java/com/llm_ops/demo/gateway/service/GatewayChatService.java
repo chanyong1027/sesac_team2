@@ -51,7 +51,7 @@ public class GatewayChatService {
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
         String traceId = UUID.randomUUID().toString();
-        return new GatewayChatResponse(
+        return GatewayChatResponse.create(
                 traceId,
                 answer,
                 false, // TODO: Failover 로직 구현 시 동적으로 설정 필요

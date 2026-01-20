@@ -16,5 +16,13 @@ public record GatewayChatResponse(
         String usedModel,
         GatewayChatUsage usage
 ) {
+    public static GatewayChatResponse create(
+            String traceId,
+            String answer,
+            boolean isFailover,
+            String usedModel,
+            GatewayChatUsage usage
+    ) {
+        return new GatewayChatResponse(traceId, answer, isFailover, usedModel, usage);
+    }
 }
-
