@@ -37,4 +37,3 @@ public record OrganizationApiKeySummaryResponse(
         );
     }
 }
-
