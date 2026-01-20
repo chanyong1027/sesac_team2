@@ -36,6 +36,10 @@ out/
 ### VS Code ###
 .vscode/
 
+### Local AI Docs ###
+.ai/
+.DS_Store
+
 ### Spring Boot ###
 application-local.yml
 application-prod.yml
