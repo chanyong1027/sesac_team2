@@ -21,8 +21,8 @@ import java.time.LocalDateTime;
 @Table(
         name = "provider_credentials",
         uniqueConstraints = @UniqueConstraint(
-                name = "uq_provider_credentials_org_provider",
-                columnNames = {"org_id", "provider"}
+                name = "uq_provider_credentials_organization_provider",
+                columnNames = {"organization_id", "provider"}
         )
 )
 @Getter
@@ -33,7 +33,7 @@ public class ProviderCredential {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "org_id", nullable = false)
+    @Column(name = "organization_id", nullable = false)
     private Long organizationId;
 
     @Enumerated(EnumType.STRING)

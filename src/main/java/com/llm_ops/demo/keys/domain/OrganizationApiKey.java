@@ -26,8 +26,8 @@ import java.time.LocalDateTime;
         name = "organization_api_keys",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uq_organization_api_keys_org_name",
-                        columnNames = {"org_id", "name"}
+                        name = "uq_organization_api_keys_organization_name",
+                        columnNames = {"organization_id", "name"}
                 ),
                 @UniqueConstraint(
                         name = "uq_organization_api_keys_key_hash",
@@ -46,7 +46,7 @@ public class OrganizationApiKey {
     /**
      * 이 API 키를 소유한 조직의 ID
      */
-    @Column(name = "org_id", nullable = false)
+    @Column(name = "organization_id", nullable = false)
     private Long organizationId;
 
     /**
