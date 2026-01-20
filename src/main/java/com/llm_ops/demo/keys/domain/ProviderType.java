@@ -4,11 +4,12 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import lombok.Getter;
 
-import java.util.Arrays;
+import java.util.Locale;
 
 @Getter
 public enum ProviderType {
     OPENAI("openai"),
+    ANTHROPIC("anthropic"),
     GEMINI("gemini");
 
     private final String value;
@@ -22,12 +23,19 @@ public enum ProviderType {
     }
 
     public static ProviderType from(String raw) {
-        return Arrays.stream(values())
-                .filter(provider -> provider.value.equalsIgnoreCase(raw))
-                .findFirst()
-                .orElseThrow(() -> new BusinessException(
-                        ErrorCode.INVALID_INPUT_VALUE,
-                        "지원하지 않는 provider 입니다."
-                ));
+        if (raw == null || raw.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 provider 입니다.");
+        }
+
+        String normalized = raw.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "openai" -> OPENAI;
+            case "anthropic", "claude" -> ANTHROPIC;
+            case "gemini", "google" -> GEMINI;
+            default -> throw new BusinessException(
+                    ErrorCode.INVALID_INPUT_VALUE,
+                    "지원하지 않는 provider 입니다."
+            );
+        };
     }
 }
