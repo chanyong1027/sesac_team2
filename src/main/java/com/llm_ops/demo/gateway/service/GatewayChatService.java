@@ -35,7 +35,6 @@ public class GatewayChatService {
      * @param request 게이트웨이 채팅 요청 DTO
      * @return LLM의 답변 및 관련 메타데이터가 포함된 응답 DTO
      */
-    @Transactional(readOnly = true)
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
         // 1. API 키를 인증하여 조직 ID를 확인합니다.
         Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
