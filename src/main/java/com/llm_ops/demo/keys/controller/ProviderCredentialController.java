@@ -26,20 +26,20 @@ public class ProviderCredentialController {
 
     @PostMapping
     public ResponseEntity<ProviderCredentialCreateResponse> create(
-            @PathVariable Long orgId,
+            @PathVariable("orgId") Long organizationId,
             @Valid @RequestBody ProviderCredentialCreateRequest request
     ) {
         ProviderCredentialCreateResponse response =
-                providerCredentialService.register(orgId, request);
+                providerCredentialService.register(organizationId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @GetMapping
     public ResponseEntity<List<ProviderCredentialSummaryResponse>> getProviderCredentials(
-            @PathVariable Long orgId
+            @PathVariable("orgId") Long organizationId
     ) {
         return ResponseEntity.ok(
-                providerCredentialService.getProviderCredentials(orgId)
+                providerCredentialService.getProviderCredentials(organizationId)
         );
     }
 }
