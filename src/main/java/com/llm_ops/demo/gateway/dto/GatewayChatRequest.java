@@ -15,7 +15,6 @@ import java.util.Map;
 public record GatewayChatRequest(
         @NotNull Long workspaceId,
         @NotBlank String promptKey,
-        Map<String, String> variables
+        Map<String, @NotNull String> variables
 ) {
 }
-

@@ -105,4 +105,30 @@ class GatewayChatControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("C400"));
     }
+
+    @Test
+    @DisplayName("변수 값이 null이면 400 예외가 발생한다")
+    void 변수_값이_null이면_예외가_발생한다() throws Exception {
+        // given
+        OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
+                1L,
+                new OrganizationApiKeyCreateRequest("prod")
+        );
+
+        // when & then
+        mockMvc.perform(post("/v1/chat/completions")
+                        .header("X-API-Key", apiKeyResponse.apiKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "workspaceId": 1,
+                                  "promptKey": "hello {{name}}",
+                                  "variables": {
+                                    "name": null
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("C400"));
+    }
 }
