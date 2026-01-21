@@ -44,6 +44,12 @@ out/
 application-local.yml
 application-prod.yml
 
+### Local Env ###
+.env.local
+
+### Gradle Local ###
+.gradle-user-home/
+
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/

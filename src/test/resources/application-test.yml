@@ -25,3 +25,8 @@ logging:
     root: WARN
 
 PROVIDER_KEY_ENC_KEY: test-secret
+
+gateway:
+  prompt-providers:
+    - prompt-key: "hello {{name}}"
+      provider: openai
