@@ -1,6 +1,5 @@
 package com.llm_ops.demo.gateway.config;
 
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.beans.factory.annotation.Value;

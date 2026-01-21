@@ -1,33 +1,33 @@
 package com.llm_ops.demo.gateway.service;
 
+import com.google.genai.Client;
+import com.google.genai.types.GenerateContentResponse;
+import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
-import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
-import com.google.genai.Client;
-import com.google.genai.types.GenerateContentResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.metadata.ChatResponseMetadata;
-import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -139,7 +139,6 @@ public class GatewayChatService {
     }
 
     private ChatResponse callGemini(String prompt, String apiKey) {
-        // Gemini는 Google GenAI 클라이언트를 사용해 호출하고 Spring AI 응답 형식으로 변환합니다.
         Client client = Client.builder().apiKey(apiKey).build();
         String model = gatewayModelProperties.getModels().getGemini();
         if (model == null || model.isBlank()) {
