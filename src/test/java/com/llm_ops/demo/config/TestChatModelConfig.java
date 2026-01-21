@@ -19,8 +19,8 @@ public class TestChatModelConfig {
         return new TestChatModelState();
     }
 
-    @Bean
-    ChatModel chatModel(TestChatModelState testChatModelState) {
+    @Bean(name = "openAiChatModel")
+    ChatModel openAiChatModel(TestChatModelState testChatModelState) {
         return prompt -> {
             testChatModelState.record(prompt);
             return new ChatResponse(

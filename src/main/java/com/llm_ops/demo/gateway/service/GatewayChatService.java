@@ -13,14 +13,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -33,7 +34,7 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBean(OpenAiChatModel.class) // OpenAI ChatModel Bean이 있어야만 활성화됩니다 (테스트 환경 등에서 제어).
+@ConditionalOnBean(name = "openAiChatModel") // OpenAI ChatModel Bean이 있어야만 활성화됩니다 (테스트 환경 등에서 제어).
 public class GatewayChatService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -43,7 +44,8 @@ public class GatewayChatService {
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final ProviderCredentialService providerCredentialService;
     private final GatewayModelProperties gatewayModelProperties;
-    private final OpenAiChatModel chatModel;
+    @Qualifier("openAiChatModel")
+    private final ChatModel chatModel;
 
     /**
      * 인증된 사용자의 요청을 받아 LLM 응답을 생성하고 반환합니다.

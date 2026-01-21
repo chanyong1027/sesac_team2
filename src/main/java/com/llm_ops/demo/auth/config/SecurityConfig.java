@@ -10,9 +10,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * 프로덕션 및 개발 환경(로컬 프로필 제외)에서 활성화되는 Spring Security 설정입니다.
+ * JWT 기반 인증 및 인가 규칙을 정의하며, 로컬 환경의 완화된 설정과 분리됩니다.
+ */
 @Configuration
 @EnableWebSecurity
-@Profile("!local")
+@Profile("!local") // 'local' 프로필이 아닐 때만 이 SecurityConfig가 활성화됩니다.
 public class SecurityConfig {
 
     @Bean
