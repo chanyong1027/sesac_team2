@@ -4,12 +4,15 @@ import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
 import com.llm_ops.demo.gateway.config.GatewayModelProperties;
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -20,7 +23,6 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
@@ -34,7 +36,6 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBean(name = "openAiChatModel") // OpenAI ChatModel Bean이 있어야만 활성화됩니다 (테스트 환경 등에서 제어).
 public class GatewayChatService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -45,7 +46,7 @@ public class GatewayChatService {
     private final ProviderCredentialService providerCredentialService;
     private final GatewayModelProperties gatewayModelProperties;
     @Qualifier("openAiChatModel")
-    private final ChatModel chatModel;
+    private final ObjectProvider<ChatModel> openAiChatModelProvider;
 
     /**
      * 인증된 사용자의 요청을 받아 LLM 응답을 생성하고 반환합니다.
@@ -114,6 +115,10 @@ public class GatewayChatService {
     }
 
     private ChatResponse callOpenAi(String prompt, String apiKey) {
+        ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
+        if (chatModel == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
+        }
         String model = gatewayModelProperties.getModels().getOpenai();
         var chatOptions = gatewayChatOptionsCreateService.openAiOptions(apiKey);
         if (model != null && !model.isBlank()) {
