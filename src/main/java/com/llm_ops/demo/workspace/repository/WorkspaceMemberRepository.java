@@ -16,6 +16,14 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     Optional<WorkspaceMember> findByWorkspaceAndUser(Workspace workspace, User user);
 
+    @Query("SELECT wm FROM WorkspaceMember wm " +
+           "JOIN FETCH wm.workspace w " +
+           "JOIN FETCH w.organization o " +
+           "WHERE wm.user = :user " +
+           "AND o.status = com.llm_ops.demo.organization.domain.OrganizationStatus.ACTIVE " +
+           "ORDER BY w.createdAt DESC")
+    List<WorkspaceMember> findByUserWithWorkspaceAndOrganization(@Param("user") User user);
+
     List<WorkspaceMember> findByWorkspace(Workspace workspace);
 
     List<WorkspaceMember> findByUser(User user);
