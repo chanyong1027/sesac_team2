@@ -3,10 +3,14 @@ package com.llm_ops.demo.workspace.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
 
 import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteCreateRequest;
@@ -74,30 +78,24 @@ class WorkspaceInvitationControllerTest {
         }
 
         @Test
-        @DisplayName("OWNER 역할로 초대 링크 생성 성공")
-        void createInvitation_OwnerRole_Success() throws Exception {
+        @DisplayName("OWNER 역할로 초대 링크 생성 시 실패")
+        void createInvitation_OwnerRole_Fails() throws Exception {
             // given
             Long workspaceId = 1L;
             Long userId = 1L;
             WorkspaceInviteCreateRequest request = new WorkspaceInviteCreateRequest(WorkspaceRole.OWNER);
-            WorkspaceInviteCreateResponse response = new WorkspaceInviteCreateResponse(
-                "http://localhost:3000/invitations/accept?token=test-token-uuid",
-                "test-token-uuid",
-                WorkspaceRole.OWNER,
-                LocalDateTime.now().plusDays(7)
-            );
 
-            given(workspaceInvitationService.createInvitation(
-                eq(workspaceId), eq(userId), any(WorkspaceInviteCreateRequest.class))
-            ).willReturn(response);
+            willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "초대 링크로는 OWNER 역할을 부여할 수 없습니다."))
+                .given(workspaceInvitationService)
+                .createInvitation(eq(workspaceId), eq(userId), any(WorkspaceInviteCreateRequest.class));
 
             // when & then
             mockMvc.perform(post("/api/v1/workspaces/{workspaceId}/invitation-links", workspaceId)
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("OWNER"));
+                .andDo(print())
+                .andExpect(status().isBadRequest());
         }
     }
 

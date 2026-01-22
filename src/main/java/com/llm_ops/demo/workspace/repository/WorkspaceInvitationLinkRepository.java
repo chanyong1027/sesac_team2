@@ -30,4 +30,19 @@ public interface WorkspaceInvitationLinkRepository extends JpaRepository<Workspa
         @Param("workspace") Workspace workspace,
         @Param("now") LocalDateTime now
     );
+
+    /**
+     * 토큰으로 초대 링크 조회 (N+1 방지: workspace, organization 함께 로드)
+     * 초대 수락 시 사용 - workspace와 organization 정보가 모두 필요함
+     *
+     * @param token 초대 토큰
+     * @return 초대 링크 (workspace, organization 포함)
+     */
+    @Query("SELECT wil FROM WorkspaceInvitationLink wil " +
+           "JOIN FETCH wil.workspace w " +
+           "JOIN FETCH w.organization " +
+           "WHERE wil.token = :token")
+    Optional<WorkspaceInvitationLink> findByTokenWithWorkspaceAndOrganization(
+        @Param("token") String token
+    );
 }
