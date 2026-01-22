@@ -250,6 +250,28 @@ class WorkspaceInvitationServiceTest {
 
             verify(invitationLinkRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("OWNER 역할로 초대 링크 생성 시 예외가 발생한다")
+        void createInvitation_OwnerRole_ThrowsException() {
+            // given
+            Long workspaceId = 1L;
+            Long userId = 1L;
+            WorkspaceInviteCreateRequest request = new WorkspaceInviteCreateRequest(WorkspaceRole.OWNER);
+
+            given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                .willReturn(Optional.of(mockWorkspace));
+            given(workspaceMemberRepository.findByWorkspaceAndUser(mockWorkspace, mockUser))
+                .willReturn(Optional.of(mockOwnerMember));
+
+            // when & then
+            assertThatThrownBy(() -> workspaceInvitationService.createInvitation(workspaceId, userId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+
+            verify(invitationLinkRepository, never()).save(any());
+        }
     }
 
     private User createMockUser(Long id, String email, String name) throws Exception {
