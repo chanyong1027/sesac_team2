@@ -119,6 +119,7 @@ public class OrganizationMemberService {
     }
 
     private void deleteOrganizationMember(OrganizationMember member) {
+        //혹시 에러 나면 deleteById로 변경
         organizationMemberRepository.delete(member);
     }
 }

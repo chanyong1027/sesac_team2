@@ -24,7 +24,7 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
 
     long countByWorkspaceAndRole(Workspace workspace, WorkspaceRole role);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("DELETE FROM WorkspaceMember wm " +
            "WHERE wm.user = :user " +
            "AND wm.workspace.organization = :organization")
