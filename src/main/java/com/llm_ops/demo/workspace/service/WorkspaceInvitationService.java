@@ -7,6 +7,7 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceInvitationLink;
 import com.llm_ops.demo.workspace.domain.WorkspaceMember;
+import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteCreateResponse;
@@ -41,6 +42,7 @@ public class WorkspaceInvitationService {
         Workspace workspace = findActiveWorkspaceById(workspaceId);
 
         validateInvitationPermission(workspace, user);
+        validateInvitableRole(request.role());
 
         WorkspaceInvitationLink invitationLink = createAndSaveInvitationLink(workspace, request, user);
 
@@ -49,20 +51,26 @@ public class WorkspaceInvitationService {
 
     private User findUserById(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "사용자를 찾을 수 없습니다."));
     }
 
     private Workspace findActiveWorkspaceById(Long workspaceId) {
         return workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "활성화된 워크스페이스를 찾을 수 없습니다."));
     }
 
     private void validateInvitationPermission(Workspace workspace, User user) {
         WorkspaceMember member = workspaceMemberRepository.findByWorkspaceAndUser(workspace, user)
-            .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
+            .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 멤버가 아닙니다."));
 
         if (!member.isOwner()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN);
+            throw new BusinessException(ErrorCode.FORBIDDEN, "초대 링크 생성은 OWNER만 가능합니다.");
+        }
+    }
+
+    private void validateInvitableRole(WorkspaceRole role) {
+        if (role == WorkspaceRole.OWNER) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "초대 링크로는 OWNER 역할을 부여할 수 없습니다.");
         }
     }
 
