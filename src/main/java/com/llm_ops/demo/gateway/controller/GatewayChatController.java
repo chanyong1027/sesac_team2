@@ -5,7 +5,6 @@ import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.service.GatewayChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -21,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/v1/chat")
 @RequiredArgsConstructor
-@ConditionalOnBean(ChatModel.class) // ChatModel Bean이 있어야만 활성화됩니다.
+@ConditionalOnBean(name = "openAiChatModel") // OpenAI ChatModel Bean이 있어야만 활성화됩니다.
 public class GatewayChatController {
 
     private final GatewayChatService gatewayChatService;
