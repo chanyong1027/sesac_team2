@@ -9,8 +9,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class HealthController {
 
-    @GetMapping("/")
-    public Map<String, Object> home() {
+    @GetMapping("/health")
+    public Map<String, Object> health() {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("message", "LLM Ops Application is running!");

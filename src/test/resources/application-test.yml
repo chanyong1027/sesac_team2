@@ -9,6 +9,11 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.anthropic.AnthropicAutoConfiguration
+      - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
 
 jwt:
   secret: test-secret-key-for-unit-testing-32chars
@@ -22,3 +27,10 @@ management:
 logging:
   level:
     root: WARN
+
+PROVIDER_KEY_ENC_KEY: test-secret
+
+gateway:
+  prompt-providers:
+    - prompt-key: "hello {{name}}"
+      provider: openai
