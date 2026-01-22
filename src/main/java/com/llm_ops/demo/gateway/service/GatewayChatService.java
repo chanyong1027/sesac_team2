@@ -3,17 +3,31 @@ package com.llm_ops.demo.gateway.service;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
+import com.llm_ops.demo.gateway.config.GatewayModelProperties;
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
+import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.google.genai.Client;
+import com.google.genai.types.GenerateContentResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.ai.anthropic.AnthropicChatModel;
+import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -22,11 +36,17 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnBean(ChatModel.class) // ChatModel Bean이 있어야만 활성화됩니다 (테스트 환경 등에서 제어).
 public class GatewayChatService {
 
+    private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
-    private final ChatModel chatModel;
+    private final GatewayChatProviderResolveService gatewayChatProviderResolveService;
+    private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
+    private final ProviderCredentialService providerCredentialService;
+    private final GatewayModelProperties gatewayModelProperties;
+    @Qualifier("openAiChatModel")
+    private final ObjectProvider<ChatModel> openAiChatModelProvider;
 
     /**
      * 인증된 사용자의 요청을 받아 LLM 응답을 생성하고 반환합니다.
@@ -43,15 +63,21 @@ public class GatewayChatService {
         // 2. 프롬프트 템플릿에 변수를 주입하여 최종 프롬프트를 생성합니다.
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
-        // 3. Spring AI의 ChatModel을 통해 LLM을 호출합니다.
-        ChatResponse response = chatModel.call(new Prompt(new UserMessage(prompt)));
+        // 3. 요청 시점에 조직별 API 키를 주입하여 LLM을 호출합니다.
+        ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
+        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
+        ChatResponse response = switch (providerType) {
+            case OPENAI -> callOpenAi(prompt, providerApiKey);
+            case ANTHROPIC -> callAnthropic(prompt, providerApiKey);
+            case GEMINI -> callGemini(prompt, providerApiKey);
+        };
 
         // 4. LLM 응답을 파싱하고 최종 응답 DTO를 구성합니다.
         String answer = response.getResult().getOutput().getText();
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
         String traceId = UUID.randomUUID().toString();
-        return GatewayChatResponse.create(
+        return GatewayChatResponse.from(
                 traceId,
                 answer,
                 false, // TODO: Failover 로직 구현 시 동적으로 설정 필요
@@ -86,5 +112,71 @@ public class GatewayChatService {
         Long totalTokens = response.getMetadata().getUsage().getTotalTokens();
         // TODO: Cost calculation logic needs to be implemented.
         return new GatewayChatUsage(totalTokens, null);
+    }
+
+    private ChatResponse callOpenAi(String prompt, String apiKey) {
+        ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
+        if (chatModel == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
+        }
+        String model = gatewayModelProperties.getModels().getOpenai();
+        var chatOptions = gatewayChatOptionsCreateService.openAiOptions(apiKey);
+        if (model != null && !model.isBlank()) {
+            chatOptions.setModel(model);
+        }
+        return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
+    }
+
+    private ChatResponse callAnthropic(String prompt, String apiKey) {
+        AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
+        var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
+        String model = gatewayModelProperties.getModels().getAnthropic();
+        if (model != null && !model.isBlank()) {
+            chatOptions.setModel(model);
+        }
+        return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
+    }
+
+    private ChatResponse callGemini(String prompt, String apiKey) {
+        Client client = Client.builder().apiKey(apiKey).build();
+        String model = gatewayModelProperties.getModels().getGemini();
+        if (model == null || model.isBlank()) {
+            model = DEFAULT_GEMINI_MODEL;
+        }
+        GenerateContentResponse response = client.models.generateContent(
+                model,
+                prompt,
+                null
+        );
+        if (response == null) {
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                    .withModel(model)
+                    .build();
+            return new ChatResponse(
+                    List.of(new Generation(new AssistantMessage(""))),
+                    metadata
+            );
+        }
+
+        String answer = response.text();
+        String resolvedModel = response.modelVersion().orElse(model);
+
+        ChatResponseMetadata.Builder metadataBuilder = ChatResponseMetadata.builder()
+                .withModel(resolvedModel);
+
+        response.responseId().ifPresent(metadataBuilder::withId);
+
+        response.usageMetadata().ifPresent(usage -> {
+            Long promptTokens = usage.promptTokenCount().map(Integer::longValue).orElse(null);
+            Long completionTokens = usage.candidatesTokenCount().map(Integer::longValue).orElse(null);
+            Long totalTokens = usage.totalTokenCount().map(Integer::longValue).orElse(null);
+            metadataBuilder.withUsage(new DefaultUsage(promptTokens, completionTokens, totalTokens));
+        });
+
+        ChatResponseMetadata metadata = metadataBuilder.build();
+        return new ChatResponse(
+                List.of(new Generation(new AssistantMessage(answer))),
+                metadata
+        );
     }
 }

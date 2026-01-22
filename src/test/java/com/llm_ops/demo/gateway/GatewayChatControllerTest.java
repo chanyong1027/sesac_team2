@@ -2,8 +2,11 @@ package com.llm_ops.demo.gateway;
 
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
+import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
 import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
+import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
+import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -11,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
@@ -21,6 +25,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "PROVIDER_KEY_ENC_KEY=test-secret")
 class GatewayChatControllerTest {
 
     @Autowired
@@ -32,12 +37,19 @@ class GatewayChatControllerTest {
     @Autowired
     private OrganizationApiKeyRepository organizationApiKeyRepository;
 
+    @Autowired
+    private ProviderCredentialService providerCredentialService;
+
+    @Autowired
+    private ProviderCredentialRepository providerCredentialRepository;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         mockMvc = webAppContextSetup(context).build();
         organizationApiKeyRepository.deleteAll();
+        providerCredentialRepository.deleteAll();
     }
 
     @Test
@@ -47,6 +59,11 @@ class GatewayChatControllerTest {
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
                 1L,
                 new OrganizationApiKeyCreateRequest("prod")
+        );
+
+        providerCredentialService.register(
+                1L,
+                new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
         // when & then
@@ -91,6 +108,11 @@ class GatewayChatControllerTest {
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
                 1L,
                 new OrganizationApiKeyCreateRequest("prod")
+        );
+
+        providerCredentialService.register(
+                1L,
+                new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
         // when & then
