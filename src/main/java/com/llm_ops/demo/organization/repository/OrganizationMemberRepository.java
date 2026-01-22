@@ -7,6 +7,8 @@ import com.llm_ops.demo.organization.domain.OrganizationRole;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface OrganizationMemberRepository extends JpaRepository<OrganizationMember, Long> {
 
@@ -19,4 +21,9 @@ public interface OrganizationMemberRepository extends JpaRepository<Organization
     boolean existsByOrganizationAndUser(Organization organization, User user);
 
     long countByOrganizationAndRole(Organization organization, OrganizationRole role);
+
+    @Query("SELECT om FROM OrganizationMember om " +
+           "JOIN FETCH om.user " +
+           "WHERE om.organization = :organization")
+    List<OrganizationMember> findByOrganizationWithUser(@Param("organization") Organization organization);
 }

@@ -1,12 +1,16 @@
 package com.llm_ops.demo.workspace.repository;
 
 import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.organization.domain.Organization;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceMember;
 import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember, Long> {
 
@@ -19,4 +23,10 @@ public interface WorkspaceMemberRepository extends JpaRepository<WorkspaceMember
     boolean existsByWorkspaceAndUser(Workspace workspace, User user);
 
     long countByWorkspaceAndRole(Workspace workspace, WorkspaceRole role);
+
+    @Modifying
+    @Query("DELETE FROM WorkspaceMember wm " +
+           "WHERE wm.user = :user " +
+           "AND wm.workspace.organization = :organization")
+    void deleteByUserAndOrganization(@Param("user") User user, @Param("organization") Organization organization);
 }
