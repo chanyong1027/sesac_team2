@@ -11,7 +11,6 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -35,7 +34,6 @@ import java.util.UUID;
  * API 키 인증, 프롬프트 렌더링, Spring AI를 통한 LLM 호출을 총괄합니다.
  */
 @Service
-@RequiredArgsConstructor
 public class GatewayChatService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
@@ -45,8 +43,23 @@ public class GatewayChatService {
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final ProviderCredentialService providerCredentialService;
     private final GatewayModelProperties gatewayModelProperties;
-    @Qualifier("openAiChatModel")
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
+
+    public GatewayChatService(
+            OrganizationApiKeyAuthService organizationApiKeyAuthService,
+            GatewayChatProviderResolveService gatewayChatProviderResolveService,
+            GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
+            ProviderCredentialService providerCredentialService,
+            GatewayModelProperties gatewayModelProperties,
+            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider
+    ) {
+        this.organizationApiKeyAuthService = organizationApiKeyAuthService;
+        this.gatewayChatProviderResolveService = gatewayChatProviderResolveService;
+        this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
+        this.providerCredentialService = providerCredentialService;
+        this.gatewayModelProperties = gatewayModelProperties;
+        this.openAiChatModelProvider = openAiChatModelProvider;
+    }
 
     /**
      * 인증된 사용자의 요청을 받아 LLM 응답을 생성하고 반환합니다.
