@@ -1,0 +1,2 @@
+Hello RAG sample document.
+This is a simple text for extraction.
