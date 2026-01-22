@@ -63,6 +63,7 @@ public class GatewayChatService {
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
         // 3. 요청 시점에 조직별 API 키를 주입하여 LLM을 호출합니다.
+        // 요청 시점에 조직별 Provider와 API 키를 결정해 멀티테넌시 분리를 보장합니다.
         ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
         String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
         ChatResponse response = switch (providerType) {
@@ -133,6 +134,7 @@ public class GatewayChatService {
     }
 
     private ChatResponse callGemini(String prompt, String apiKey) {
+        // Gemini는 Google GenAI 클라이언트를 사용해 호출하고 Spring AI 응답 형식으로 변환합니다.
         Client client = Client.builder().apiKey(apiKey).build();
         String model = gatewayModelProperties.getModels().getGemini();
         if (model == null || model.isBlank()) {
