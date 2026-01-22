@@ -11,6 +11,7 @@ import com.llm_ops.demo.organization.repository.OrganizationMemberRepository;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceInvitationLink;
 import com.llm_ops.demo.workspace.domain.WorkspaceMember;
+import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteAcceptRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteAcceptResponse;
 import com.llm_ops.demo.workspace.repository.WorkspaceInvitationLinkRepository;
@@ -85,6 +86,10 @@ public class WorkspaceInvitationAcceptService {
 
         if (!invitation.getWorkspace().isActive()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "비활성화된 워크스페이스입니다.");
+        }
+
+        if (invitation.getRole() == WorkspaceRole.OWNER) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "초대 링크로는 OWNER 역할을 부여할 수 없습니다.");
         }
     }
 

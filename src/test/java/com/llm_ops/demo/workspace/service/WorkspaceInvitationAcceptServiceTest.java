@@ -241,6 +241,31 @@ class WorkspaceInvitationAcceptServiceTest {
                     assertThat(be.getErrorCode()).isEqualTo(ErrorCode.CONFLICT);
                 });
         }
+
+        @Test
+        @DisplayName("OWNER 역할 초대 수락 시 예외가 발생한다 (Defense in Depth)")
+        void accept_OwnerRole_ThrowsException() throws Exception {
+            // given
+            WorkspaceInvitationLink ownerInvitation = createInvitation(
+                workspace, WorkspaceRole.OWNER, LocalDateTime.now().plusDays(7)
+            );
+            String token = ownerInvitation.getToken();
+            WorkspaceInviteAcceptRequest request = new WorkspaceInviteAcceptRequest(token);
+
+            given(userRepository.findById(1L)).willReturn(Optional.of(user));
+            given(invitationLinkRepository.findByTokenWithWorkspaceAndOrganization(token))
+                .willReturn(Optional.of(ownerInvitation));
+
+            // when & then
+            assertThatThrownBy(() -> acceptService.accept(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> {
+                    BusinessException be = (BusinessException) ex;
+                    assertThat(be.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+                });
+
+            verify(workspaceMemberRepository, never()).save(any(WorkspaceMember.class));
+        }
     }
 
     // ========== Helper Methods ==========
