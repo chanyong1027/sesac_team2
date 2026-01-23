@@ -29,3 +29,17 @@ rag:
     min-chunk-length-to-embed: 80
     max-num-chunks: 10000
     keep-separator: true
+  embedding:
+    google-genai:
+      enabled: false
+      api-key:
+      model: text-embedding-004
+  vectorstore:
+    pgvector:
+      enabled: false
+      schema-name: public
+      table-name: doc_chunks
+      initialize-schema: false
+      distance-type: COSINE_DISTANCE
+      index-type: HNSW
+      max-document-batch-size: 10000
