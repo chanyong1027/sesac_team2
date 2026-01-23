@@ -253,4 +253,52 @@ class AuthControllerTest {
                                         .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 올바르지 않습니다."));
                 }
         }
+
+        // ==================== 로그아웃 테스트 ====================
+        @Nested
+        @DisplayName("로그아웃 테스트")
+        class LogoutTest {
+
+                @Test
+                @DisplayName("로그아웃 성공 - 200 OK")
+                void success() throws Exception {
+                        // given - 회원가입 & 로그인
+                        SignUpRequest signUpRequest = new SignUpRequest("logout@example.com", "Test1234!",
+                                        "logoutuser");
+                        mockMvc.perform(post("/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(signUpRequest)));
+
+                        String loginJson = """
+                                        {
+                                            "email": "logout@example.com",
+                                            "password": "Test1234!"
+                                        }
+                                        """;
+
+                        String responseBody = mockMvc.perform(post("/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(loginJson))
+                                        .andExpect(status().isOk())
+                                        .andReturn().getResponse().getContentAsString();
+
+                        // 응답에서 액세스 토큰 추출 (간단한 파싱)
+                        String accessToken = objectMapper.readTree(responseBody).path("data").path("accessToken")
+                                        .asText();
+
+                        // when - 로그아웃 요청
+                        mockMvc.perform(post("/auth/logout")
+                                        .header("Authorization", "Bearer " + accessToken))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"));
+
+                        // then - 로그아웃된 토큰으로 다시 요청 시 401/403 확인 (재로그아웃 시도)
+                        mockMvc.perform(post("/auth/logout")
+                                        .header("Authorization", "Bearer " + accessToken))
+                                        .andDo(print())
+                                        .andExpect(status().isForbidden()); // SecurityConfig에서 인증 실패 시 403 Forbidden 반환
+                                                                            // 예상 (기본 설정)
+                }
+        }
 }
