@@ -3,6 +3,8 @@ package com.llm_ops.demo.auth.config;
 import com.llm_ops.demo.auth.jwt.JwtAuthenticationFilter;
 import com.llm_ops.demo.auth.jwt.JwtTokenProvider;
 import com.llm_ops.demo.auth.service.TokenBlacklistService;
+import com.llm_ops.demo.auth.jwt.JwtAuthenticationEntryPoint;
+import com.llm_ops.demo.auth.jwt.JwtAccessDeniedHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,6 +29,8 @@ public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final TokenBlacklistService tokenBlacklistService;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -42,8 +46,13 @@ public class SecurityConfig {
                 // H2 Console을 위한 frameOptions 설정
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 // JWT 인증 필터 추가
+                // JWT 인증 필터 추가
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, tokenBlacklistService),
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                // 예외 처리 핸들러 등록
+                .exceptionHandling(conf -> conf
+                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                        .accessDeniedHandler(jwtAccessDeniedHandler));
 
         return http.build();
     }
