@@ -58,9 +58,9 @@ class AuthControllerTest {
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
                                         .andExpect(status().isCreated())
-                                        .andExpect(jsonPath("$.userName").value("testuser"))
-                                        .andExpect(jsonPath("$.email").value("test@example.com"))
-                                        .andExpect(jsonPath("$.message").value("회원가입이 완료되었습니다."));
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"))
+                                        .andExpect(jsonPath("$.data.userName").value("testuser"))
+                                        .andExpect(jsonPath("$.data.email").value("test@example.com"));
                 }
 
                 @Test
@@ -194,9 +194,10 @@ class AuthControllerTest {
                                         .content(loginJson))
                                         .andDo(print())
                                         .andExpect(status().isOk())
-                                        .andExpect(jsonPath("$.accessToken").exists())
-                                        .andExpect(jsonPath("$.tokenType").value("Bearer"))
-                                        .andExpect(jsonPath("$.expiresInSec").exists());
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"))
+                                        .andExpect(jsonPath("$.data.accessToken").exists())
+                                        .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                                        .andExpect(jsonPath("$.data.expiresInSec").exists());
                 }
 
                 @Test

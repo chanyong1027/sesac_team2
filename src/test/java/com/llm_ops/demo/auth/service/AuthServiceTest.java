@@ -15,6 +15,9 @@ import com.llm_ops.demo.auth.dto.response.SignUpResponse;
 import com.llm_ops.demo.auth.jwt.JwtTokenProvider;
 import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.auth.service.TokenBlacklistService;
+import com.llm_ops.demo.organization.repository.OrganizationMemberRepository;
+import java.util.Collections;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,6 +42,12 @@ class AuthServiceTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private OrganizationMemberRepository organizationMemberRepository;
+
+    @Mock
+    private TokenBlacklistService tokenBlacklistService;
 
     // ==================== 회원가입 테스트 ====================
     @Nested
@@ -106,10 +115,19 @@ class AuthServiceTest {
             LoginRequest request = new LoginRequest("test@example.com", "Test1234!");
 
             User mockUser = User.create("test@example.com", "encodedPassword", "testuser");
+            // mockUser에 id 설정 (리플렉션)
+            try {
+                var idField = User.class.getDeclaredField("id");
+                idField.setAccessible(true);
+                idField.set(mockUser, 1L);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
 
             given(userRepository.findByEmail("test@example.com")).willReturn(Optional.of(mockUser));
             given(passwordEncoder.matches("Test1234!", "encodedPassword")).willReturn(true);
-            given(jwtTokenProvider.createToken("test@example.com")).willReturn("mockJwtToken");
+            given(organizationMemberRepository.findByUser(mockUser)).willReturn(Collections.emptyList());
+            given(jwtTokenProvider.createToken(1L, null, null)).willReturn("mockJwtToken");
             given(jwtTokenProvider.getExpirationSec()).willReturn(900L);
 
             // when
@@ -150,6 +168,26 @@ class AuthServiceTest {
             assertThatThrownBy(() -> authService.login(request))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("이메일 또는 비밀번호가 올바르지 않습니다.");
+        }
+    }
+
+    // ==================== 로그아웃 테스트 ====================
+    @Nested
+    @DisplayName("로그아웃 테스트")
+    class LogoutTest {
+
+        @Test
+        @DisplayName("로그아웃 성공")
+        void success() {
+            // given
+            String token = "validToken";
+            given(jwtTokenProvider.getRemainingExpirationInMillis(token)).willReturn(1000L);
+
+            // when
+            authService.logout(token);
+
+            // then
+            verify(tokenBlacklistService).blacklistToken(anyString(), any(Long.class));
         }
     }
 }
