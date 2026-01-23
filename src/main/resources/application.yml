@@ -21,3 +21,11 @@ management:
 
 server:
   port: 8080
+
+rag:
+  chunking:
+    chunk-size: 500
+    min-chunk-size-chars: 200
+    min-chunk-length-to-embed: 80
+    max-num-chunks: 10000
+    keep-separator: true
