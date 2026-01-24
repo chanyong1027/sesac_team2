@@ -8,6 +8,8 @@ import com.llm_ops.demo.keys.domain.ProviderType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * GatewayChatRequest의 promptKey를 기반으로 사용할 LLM 프로바이더를 결정하는 서비스입니다.
  * 외부 설정(GatewayPromptProviderProperties)에 정의된 매핑 정보를 활용하여 동적으로 프로바이더를 라우팅합니다.
@@ -28,9 +30,14 @@ public class GatewayChatProviderResolveService {
      * @throws BusinessException promptKey에 대한 프로바이더 설정이 없거나 유효하지 않을 경우
      */
     public ProviderType resolve(Long organizationId, GatewayChatRequest request) {
-        String provider = gatewayPromptProviderProperties.getPromptProviders().stream()
-                .filter(mapping -> request.promptKey().equals(mapping.getPromptKey()))
-                .map(GatewayPromptProviderProperties.PromptProviderMapping::getProvider)
+        List<GatewayPromptProviderProperties.PromptProviderMapping> mappings = gatewayPromptProviderProperties.promptProviders();
+        if (mappings == null || mappings.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "promptKey에 대한 provider 설정이 없습니다.");
+        }
+
+        String provider = mappings.stream()
+                .filter(mapping -> request.promptKey().equals(mapping.promptKey()))
+                .map(GatewayPromptProviderProperties.PromptProviderMapping::provider)
                 .findFirst()
                 .orElse(null);
         if (provider == null || provider.isBlank()) {
