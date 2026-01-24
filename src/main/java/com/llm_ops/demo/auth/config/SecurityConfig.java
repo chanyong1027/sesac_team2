@@ -41,8 +41,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 인증 없이 접근 가능한 경로
-                        .requestMatchers("/auth/signup", "/auth/login").permitAll() // 로그인, 회원가입만 허용
-                        .requestMatchers("/health").permitAll() // 개발 중 서버 상태 체크 -> 클로드가 제시해줌
+                        .requestMatchers("/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/refresh")
+                        .permitAll()
+                        .requestMatchers("/health").permitAll()
                         // 그 외 모든 요청(로그아웃 포함)은 인증 필요
                         .anyRequest().authenticated())
                 // H2 Console을 위한 frameOptions 설정
