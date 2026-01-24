@@ -53,7 +53,7 @@ class AuthControllerTest {
                                         "testuser");
 
                         // when & then
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
@@ -72,7 +72,7 @@ class AuthControllerTest {
                                         "Test1234!",
                                         "firstuser");
 
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(firstRequest)))
                                         .andExpect(status().isCreated());
@@ -84,7 +84,7 @@ class AuthControllerTest {
                                         "seconduser");
 
                         // then
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(duplicateRequest)))
                                         .andDo(print())
@@ -102,7 +102,7 @@ class AuthControllerTest {
                                         "testuser");
 
                         // when & then
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
@@ -119,7 +119,7 @@ class AuthControllerTest {
                                         "testuser");
 
                         // when & then
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
@@ -136,7 +136,7 @@ class AuthControllerTest {
                                         "testuser");
 
                         // when & then
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
@@ -153,7 +153,7 @@ class AuthControllerTest {
                                         "testuser");
 
                         // when & then
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
@@ -175,7 +175,7 @@ class AuthControllerTest {
                                         "Test1234!",
                                         "loginuser");
 
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(signUpRequest)))
                                         .andExpect(status().isCreated());
@@ -189,7 +189,7 @@ class AuthControllerTest {
                                         """;
 
                         // then
-                        mockMvc.perform(post("/auth/login")
+                        mockMvc.perform(post("/api/v1/auth/login")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(loginJson))
                                         .andDo(print())
@@ -209,7 +209,7 @@ class AuthControllerTest {
                                         "Test1234!",
                                         "testuser");
 
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(signUpRequest)))
                                         .andExpect(status().isCreated());
@@ -223,7 +223,7 @@ class AuthControllerTest {
                                         """;
 
                         // then
-                        mockMvc.perform(post("/auth/login")
+                        mockMvc.perform(post("/api/v1/auth/login")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(loginJson))
                                         .andDo(print())
@@ -245,7 +245,7 @@ class AuthControllerTest {
                                         """;
 
                         // then
-                        mockMvc.perform(post("/auth/login")
+                        mockMvc.perform(post("/api/v1/auth/login")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(loginJson))
                                         .andDo(print())
@@ -265,7 +265,7 @@ class AuthControllerTest {
                         // given - 회원가입 & 로그인
                         SignUpRequest signUpRequest = new SignUpRequest("logout@example.com", "Test1234!",
                                         "logoutuser");
-                        mockMvc.perform(post("/auth/signup")
+                        mockMvc.perform(post("/api/v1/auth/signup")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(objectMapper.writeValueAsString(signUpRequest)));
 
@@ -276,7 +276,7 @@ class AuthControllerTest {
                                         }
                                         """;
 
-                        String responseBody = mockMvc.perform(post("/auth/login")
+                        String responseBody = mockMvc.perform(post("/api/v1/auth/login")
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content(loginJson))
                                         .andExpect(status().isOk())
@@ -287,7 +287,7 @@ class AuthControllerTest {
                                         .asText();
 
                         // when - 로그아웃 요청
-                        mockMvc.perform(post("/auth/logout")
+                        mockMvc.perform(post("/api/v1/auth/logout")
                                         .header("Authorization", "Bearer " + accessToken))
                                         .andDo(print())
                                         .andExpect(status().isOk())
@@ -296,7 +296,7 @@ class AuthControllerTest {
                         // then - 로그아웃된 토큰으로 다시 요청 시 401 확인 (재로그아웃 시도)
                         // 설명: 필터에서 블랙리스트 토큰을 감지하면 인증 정보를 설정하지 않으므로,
                         // SecurityConfig의 .anyRequest().authenticated()에 의해 401 Unauthorized가 발생합니다.
-                        mockMvc.perform(post("/auth/logout")
+                        mockMvc.perform(post("/api/v1/auth/logout")
                                         .header("Authorization", "Bearer " + accessToken))
                                         .andDo(print())
                                         .andExpect(status().isUnauthorized());
