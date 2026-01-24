@@ -1,3 +1,18 @@
+package com.llm_ops.demo.rag.service;
+
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 청킹된 문서를 벡터 스토어에 저장하는 서비스입니다.
  * RAG(Retrieval-Augmented Generation) 파이프라인의 핵심 구성 요소로,
