@@ -293,12 +293,13 @@ class AuthControllerTest {
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"));
 
-                        // then - 로그아웃된 토큰으로 다시 요청 시 401/403 확인 (재로그아웃 시도)
+                        // then - 로그아웃된 토큰으로 다시 요청 시 401 확인 (재로그아웃 시도)
+                        // 설명: 필터에서 블랙리스트 토큰을 감지하면 인증 정보를 설정하지 않으므로,
+                        // SecurityConfig의 .anyRequest().authenticated()에 의해 401 Unauthorized가 발생합니다.
                         mockMvc.perform(post("/auth/logout")
                                         .header("Authorization", "Bearer " + accessToken))
                                         .andDo(print())
-                                        .andExpect(status().isForbidden()); // SecurityConfig에서 인증 실패 시 403 Forbidden 반환
-                                                                            // 예상 (기본 설정)
+                                        .andExpect(status().isUnauthorized());
                 }
         }
 }
