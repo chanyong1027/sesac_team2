@@ -1,4 +1,4 @@
-package com.llm_ops.demo.global.response;
+package com.llm_ops.demo.auth.dto.response;
 
 /**
  * 공통 성공 응답 포맷
