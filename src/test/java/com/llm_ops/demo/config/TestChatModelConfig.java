@@ -24,7 +24,7 @@ public class TestChatModelConfig {
         return prompt -> {
             testChatModelState.record(prompt);
             return new ChatResponse(
-                    List.of(new Generation(new AssistantMessage(prompt.getContents())))
+                List.of(new Generation(new AssistantMessage(prompt.getContents())))
             );
         };
     }
