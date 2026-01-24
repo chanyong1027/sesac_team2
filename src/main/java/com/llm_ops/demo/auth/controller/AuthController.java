@@ -5,7 +5,7 @@ import com.llm_ops.demo.auth.dto.request.LoginRequest;
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.dto.response.LoginResponse;
 import com.llm_ops.demo.auth.dto.response.SignUpResponse;
-import com.llm_ops.demo.global.response.ApiResponse;
+import com.llm_ops.demo.auth.dto.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
