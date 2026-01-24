@@ -41,6 +41,7 @@ dependencies {
 	implementation 'org.springframework.ai:spring-ai-core'
 	implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter'
 	implementation 'org.springframework.ai:spring-ai-anthropic-spring-boot-starter'
+	implementation 'org.springframework.ai:spring-ai-tika-document-reader'
 	implementation 'com.google.genai:google-genai:1.35.0'
 
 	compileOnly 'org.projectlombok:lombok'
