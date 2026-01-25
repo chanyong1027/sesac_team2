@@ -6,9 +6,12 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.organization.domain.Organization;
 import com.llm_ops.demo.organization.domain.OrganizationMember;
+import com.llm_ops.demo.organization.domain.OrganizationRole;
 import com.llm_ops.demo.organization.domain.OrganizationStatus;
 import com.llm_ops.demo.organization.dto.OrganizationMemberRemoveResponse;
 import com.llm_ops.demo.organization.dto.OrganizationMemberResponse;
+import com.llm_ops.demo.organization.dto.OrganizationMemberRoleUpdateRequest;
+import com.llm_ops.demo.organization.dto.OrganizationMemberRoleUpdateResponse;
 import com.llm_ops.demo.organization.repository.OrganizationMemberRepository;
 import com.llm_ops.demo.organization.repository.OrganizationRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
@@ -59,6 +62,26 @@ public class OrganizationMemberService {
         deleteOrganizationMember(targetMember);
 
         return OrganizationMemberRemoveResponse.of(memberId);
+    }
+
+    @Transactional
+    public OrganizationMemberRoleUpdateResponse updateMemberRole(
+            Long organizationId,
+            Long memberId,
+            Long userId,
+            OrganizationMemberRoleUpdateRequest request
+    ) {
+        User user = findUserById(userId);
+        Organization organization = findActiveOrganizationById(organizationId);
+        validateOwnerPermission(organization, user);  // OWNER만 가능
+        OrganizationMember targetMember = findMemberById(memberId);
+        validateSameOrganization(targetMember, organization);
+        validateNotOwner(targetMember);  // OWNER 역할 변경 불가
+        validateNotSelf(targetMember, user);  // 본인 역할 변경 불가
+        validateNotToOwner(request.role());  // OWNER로 변경 불가
+        OrganizationRole previousRole = targetMember.getRole();
+        targetMember.changeRole(request.role());
+        return OrganizationMemberRoleUpdateResponse.from(memberId, previousRole, request.role());
     }
 
     private User findUserById(Long userId) {
@@ -121,5 +144,19 @@ public class OrganizationMemberService {
     private void deleteOrganizationMember(OrganizationMember member) {
         //혹시 에러 나면 deleteById로 변경
         organizationMemberRepository.delete(member);
+    }
+
+    private void validateOwnerPermission(Organization organization, User user) {
+        OrganizationMember member = organizationMemberRepository
+                .findByOrganizationAndUser(organization, user)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN));
+        if (!member.isOwner()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "OWNER만 역할을 변경할 수 있습니다.");
+        }
+    }
+    private void validateNotToOwner(OrganizationRole newRole) {
+        if (newRole == OrganizationRole.OWNER) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "OWNER 역할로 변경할 수 없습니다.");
+        }
     }
 }
