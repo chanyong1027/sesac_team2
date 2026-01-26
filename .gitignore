@@ -45,6 +45,7 @@ application-local.yml
 application-prod.yml
 
 ### Local Env ###
+.env
 .env.local
 
 ### Gradle Local ###
@@ -54,3 +55,7 @@ application-prod.yml
 frontend/node_modules/
 frontend/dist/
 SpringAI_Overview.md
+/frontend2
+
+# local study notes
+study/
