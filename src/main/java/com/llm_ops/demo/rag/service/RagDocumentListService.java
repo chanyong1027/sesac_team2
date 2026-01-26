@@ -1,0 +1,32 @@
+package com.llm_ops.demo.rag.service;
+
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.rag.domain.RagDocument;
+import com.llm_ops.demo.rag.domain.RagDocumentStatus;
+import com.llm_ops.demo.rag.repository.RagDocumentRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+public class RagDocumentListService {
+
+    private final RagDocumentRepository ragDocumentRepository;
+
+    public RagDocumentListService(RagDocumentRepository ragDocumentRepository) {
+        this.ragDocumentRepository = ragDocumentRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public List<RagDocument> findActiveDocuments(Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        return ragDocumentRepository.findAllByWorkspaceIdAndStatusOrderByCreatedAtDesc(
+                workspaceId,
+                RagDocumentStatus.ACTIVE
+        );
+    }
+}
