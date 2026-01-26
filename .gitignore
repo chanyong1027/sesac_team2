@@ -45,6 +45,7 @@ application-local.yml
 application-prod.yml
 
 ### Local Env ###
+.env
 .env.local
 
 ### Gradle Local ###
