@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -20,12 +21,15 @@ public class JwtTokenProvider {
     private static final String CLAIM_ORG_ROLE = "orgRole";
 
     private final long expirationSec;
+    private final long refreshExpirationSec;
     private final SecretKey key;
 
     public JwtTokenProvider(
             @Value("${jwt.secret}") String secret,
-            @Value("${jwt.expiration-sec}") long expirationSec) {
+            @Value("${jwt.expiration-sec}") long expirationSec,
+            @Value("${jwt.refresh-expiration-sec}") long refreshExpirationSec) {
         this.expirationSec = expirationSec;
+        this.refreshExpirationSec = refreshExpirationSec;
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
     }
 
@@ -82,9 +86,28 @@ public class JwtTokenProvider {
         return false;
     }
 
-    // 만료 정보 반환
+    // Access Token 만료 정보 반환
     public long getExpirationSec() {
         return expirationSec;
+    }
+
+    // Refresh Token 만료 정보 반환
+    public long getRefreshExpirationSec() {
+        return refreshExpirationSec;
+    }
+
+    // Refresh Token 생성 (userId만 포함)
+    public String createRefreshToken(Long userId) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + refreshExpirationSec * 1000);
+
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(String.valueOf(userId))
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
     }
 
     // 토큰의 남은 유효 시간(밀리초) 반환

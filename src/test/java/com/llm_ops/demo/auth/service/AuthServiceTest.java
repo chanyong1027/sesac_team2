@@ -49,6 +49,9 @@ class AuthServiceTest {
     @Mock
     private TokenBlacklistService tokenBlacklistService;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     // ==================== 회원가입 테스트 ====================
     @Nested
     @DisplayName("회원가입 테스트")
@@ -130,13 +133,21 @@ class AuthServiceTest {
             given(jwtTokenProvider.createToken(1L, null, null)).willReturn("mockJwtToken");
             given(jwtTokenProvider.getExpirationSec()).willReturn(900L);
 
+            // RefreshToken mocking
+            com.llm_ops.demo.auth.domain.RefreshToken mockRefreshToken = com.llm_ops.demo.auth.domain.RefreshToken
+                    .create("mockRefreshToken", 1L, java.time.Instant.now());
+            given(refreshTokenService.createAndSave(1L)).willReturn(mockRefreshToken);
+            given(jwtTokenProvider.getRefreshExpirationSec()).willReturn(1209600L);
+
             // when
             LoginResponse response = authService.login(request);
 
             // then
             assertThat(response.accessToken()).isEqualTo("mockJwtToken");
+            assertThat(response.refreshToken()).isEqualTo("mockRefreshToken");
             assertThat(response.tokenType()).isEqualTo("Bearer");
             assertThat(response.expiresInSec()).isEqualTo(900L);
+            assertThat(response.refreshExpiresInSec()).isEqualTo(1209600L);
         }
 
         @Test
@@ -182,12 +193,14 @@ class AuthServiceTest {
             // given
             String token = "validToken";
             given(jwtTokenProvider.getRemainingExpirationInMillis(token)).willReturn(1000L);
+            given(jwtTokenProvider.getUserIdFromToken(token)).willReturn(1L);
 
             // when
             authService.logout(token);
 
             // then
             verify(tokenBlacklistService).blacklistToken(anyString(), any(Long.class));
+            verify(refreshTokenService).deleteByUserId(any(Long.class));
         }
     }
 }
