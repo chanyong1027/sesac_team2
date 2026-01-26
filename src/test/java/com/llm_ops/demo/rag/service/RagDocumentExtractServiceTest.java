@@ -68,7 +68,7 @@ class RagDocumentExtractServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> {
                     BusinessException businessException = (BusinessException) exception;
-                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.INTERNAL_SERVER_ERROR);
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
                 });
     }
 }
