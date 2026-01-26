@@ -3,8 +3,10 @@ package com.llm_ops.demo.auth.controller;
 import com.llm_ops.demo.auth.service.AuthService;
 import com.llm_ops.demo.auth.dto.request.LoginRequest;
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
+import com.llm_ops.demo.auth.dto.request.TokenRefreshRequest;
 import com.llm_ops.demo.auth.dto.response.LoginResponse;
 import com.llm_ops.demo.auth.dto.response.SignUpResponse;
+import com.llm_ops.demo.auth.dto.response.TokenRefreshResponse;
 import com.llm_ops.demo.auth.dto.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -42,5 +44,12 @@ public class AuthController {
         }
         authService.logout(token);
         return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<TokenRefreshResponse>> refreshToken(
+            @Valid @RequestBody TokenRefreshRequest request) {
+        TokenRefreshResponse response = authService.refreshToken(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

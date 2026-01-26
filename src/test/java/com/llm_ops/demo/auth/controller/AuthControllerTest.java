@@ -302,4 +302,204 @@ class AuthControllerTest {
                                         .andExpect(status().isUnauthorized());
                 }
         }
+
+        // ==================== Refresh Token 테스트 ====================
+        @Nested
+        @DisplayName("Refresh Token 테스트")
+        class RefreshTokenTest {
+
+                @Test
+                @DisplayName("로그인 시 Refresh Token 발급 확인")
+                void loginReturnsRefreshToken() throws Exception {
+                        // given - 회원가입
+                        SignUpRequest signUpRequest = new SignUpRequest(
+                                        "refresh@example.com",
+                                        "Test1234!",
+                                        "refreshuser");
+
+                        mockMvc.perform(post("/api/v1/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(signUpRequest)))
+                                        .andExpect(status().isCreated());
+
+                        // when - 로그인
+                        String loginJson = """
+                                        {
+                                            "email": "refresh@example.com",
+                                            "password": "Test1234!"
+                                        }
+                                        """;
+
+                        // then - refreshToken이 응답에 포함되어야 함
+                        mockMvc.perform(post("/api/v1/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(loginJson))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.data.accessToken").exists())
+                                        .andExpect(jsonPath("$.data.refreshToken").exists())
+                                        .andExpect(jsonPath("$.data.refreshExpiresInSec").exists());
+                }
+
+                @Test
+                @DisplayName("토큰 갱신 성공 - RT Rotate")
+                void refreshTokenSuccess() throws Exception {
+                        // given - 회원가입 & 로그인
+                        SignUpRequest signUpRequest = new SignUpRequest(
+                                        "rotate@example.com",
+                                        "Test1234!",
+                                        "rotateuser");
+
+                        mockMvc.perform(post("/api/v1/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(signUpRequest)));
+
+                        String loginJson = """
+                                        {
+                                            "email": "rotate@example.com",
+                                            "password": "Test1234!"
+                                        }
+                                        """;
+
+                        String loginResponse = mockMvc.perform(post("/api/v1/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(loginJson))
+                                        .andReturn().getResponse().getContentAsString();
+
+                        String refreshToken = objectMapper.readTree(loginResponse)
+                                        .path("data").path("refreshToken").asText();
+
+                        // when - 토큰 갱신 요청
+                        String refreshJson = String.format("""
+                                        {
+                                            "refreshToken": "%s"
+                                        }
+                                        """, refreshToken);
+
+                        // then - 새 AT와 새 RT 발급
+                        mockMvc.perform(post("/api/v1/auth/refresh")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(refreshJson))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.data.accessToken").exists())
+                                        .andExpect(jsonPath("$.data.refreshToken").exists());
+                }
+
+                @Test
+                @DisplayName("RT Rotate - 이전 RT로 재시도 시 실패")
+                void oldRefreshTokenInvalidAfterRotate() throws Exception {
+                        // given - 회원가입 & 로그인
+                        SignUpRequest signUpRequest = new SignUpRequest(
+                                        "oldrt@example.com",
+                                        "Test1234!",
+                                        "oldrtuser");
+
+                        mockMvc.perform(post("/api/v1/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(signUpRequest)));
+
+                        String loginJson = """
+                                        {
+                                            "email": "oldrt@example.com",
+                                            "password": "Test1234!"
+                                        }
+                                        """;
+
+                        String loginResponse = mockMvc.perform(post("/api/v1/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(loginJson))
+                                        .andReturn().getResponse().getContentAsString();
+
+                        String oldRefreshToken = objectMapper.readTree(loginResponse)
+                                        .path("data").path("refreshToken").asText();
+
+                        // when - 첫 번째 갱신 (성공해야 함)
+                        String refreshJson = String.format("""
+                                        {
+                                            "refreshToken": "%s"
+                                        }
+                                        """, oldRefreshToken);
+
+                        mockMvc.perform(post("/api/v1/auth/refresh")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(refreshJson))
+                                        .andDo(print())
+                                        .andExpect(status().isOk());
+
+                        // then - 같은 RT로 다시 시도 (실패해야 함 - RT Rotate로 인해 삭제됨)
+                        mockMvc.perform(post("/api/v1/auth/refresh")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(refreshJson))
+                                        .andDo(print())
+                                        .andExpect(status().isUnauthorized());
+                }
+
+                @Test
+                @DisplayName("로그아웃 후 RT로 갱신 시도 실패")
+                void refreshTokenInvalidAfterLogout() throws Exception {
+                        // given - 회원가입 & 로그인
+                        SignUpRequest signUpRequest = new SignUpRequest(
+                                        "logoutrt@example.com",
+                                        "Test1234!",
+                                        "logoutrtuser");
+
+                        mockMvc.perform(post("/api/v1/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(signUpRequest)));
+
+                        String loginJson = """
+                                        {
+                                            "email": "logoutrt@example.com",
+                                            "password": "Test1234!"
+                                        }
+                                        """;
+
+                        String loginResponse = mockMvc.perform(post("/api/v1/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(loginJson))
+                                        .andReturn().getResponse().getContentAsString();
+
+                        String accessToken = objectMapper.readTree(loginResponse)
+                                        .path("data").path("accessToken").asText();
+                        String refreshToken = objectMapper.readTree(loginResponse)
+                                        .path("data").path("refreshToken").asText();
+
+                        // when - 로그아웃
+                        mockMvc.perform(post("/api/v1/auth/logout")
+                                        .header("Authorization", "Bearer " + accessToken))
+                                        .andExpect(status().isOk());
+
+                        // then - 로그아웃 후 RT로 갱신 시도 (실패해야 함)
+                        String refreshJson = String.format("""
+                                        {
+                                            "refreshToken": "%s"
+                                        }
+                                        """, refreshToken);
+
+                        mockMvc.perform(post("/api/v1/auth/refresh")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(refreshJson))
+                                        .andDo(print())
+                                        .andExpect(status().isUnauthorized());
+                }
+
+                @Test
+                @DisplayName("유효하지 않은 RT로 갱신 시도 실패")
+                void invalidRefreshTokenFails() throws Exception {
+                        // given - 잘못된 RT
+                        String refreshJson = """
+                                        {
+                                            "refreshToken": "invalid-refresh-token"
+                                        }
+                                        """;
+
+                        // then - 401 Unauthorized
+                        mockMvc.perform(post("/api/v1/auth/refresh")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(refreshJson))
+                                        .andDo(print())
+                                        .andExpect(status().isUnauthorized());
+                }
+        }
 }
