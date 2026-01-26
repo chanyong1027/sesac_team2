@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.InputStream;
@@ -46,5 +47,16 @@ public class S3ApiClient {
 
         s3Client.putObject(requestBuilder.build(), RequestBody.fromInputStream(inputStream, contentLength));
         return key;
+    }
+
+    public void deleteDocument(String key) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(key)
+                .build();
+        s3Client.deleteObject(request);
     }
 }
