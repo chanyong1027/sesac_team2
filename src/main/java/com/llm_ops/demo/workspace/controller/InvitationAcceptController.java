@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,13 +27,13 @@ public class InvitationAcceptController {
     /**
      * 초대 수락
      *
-     * @param userId 수락하는 사용자 ID (임시 인증 헤더)
+     * @param userId 수락하는 사용자 ID (JWT 인증)
      * @param request 초대 토큰
      * @return 가입된 조직/워크스페이스 정보
      */
     @PostMapping("/accept")
     public ResponseEntity<WorkspaceInviteAcceptResponse> acceptInvitation(
-        @RequestHeader("X-User-Id") Long userId,
+        @AuthenticationPrincipal Long userId,
         @Valid @RequestBody WorkspaceInviteAcceptRequest request
     ) {
         WorkspaceInviteAcceptResponse response = invitationAcceptService.accept(userId, request);
