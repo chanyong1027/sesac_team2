@@ -24,17 +24,17 @@ public class User {
     private Long id;
 
     @Column(unique = true, nullable = false, length = 50)
-    private String email; //로그인 아이디
+    private String email; // 로그인 아이디
 
     @Column(nullable = false, length = 50)
-    private String name;  // 이름
+    private String name; // 이름
 
-    @Column(nullable = false, length = 100) //여기도 마찬가지로 해싱된 결과를 고려하여 길이 늘리기
-    private String password;  // 암호화된 비밀번호
+    @Column(nullable = false, length = 100) // 여기도 마찬가지로 해싱된 결과를 고려하여 길이 늘리기
+    private String password; // 암호화된 비밀번호
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    private Status status;  // 접근 범위 권한인가?
+    private Status status; // 접근 범위 권한인가?
 
     @CreationTimestamp
     private LocalDateTime createdAt;
@@ -46,7 +46,7 @@ public class User {
         this.email = email;
         this.password = passwordHash;
         this.name = name;
-        this.status = Status.ACTIVATE;
+        this.status = Status.ACTIVE;
         this.createdAt = LocalDateTime.now();
     }
 

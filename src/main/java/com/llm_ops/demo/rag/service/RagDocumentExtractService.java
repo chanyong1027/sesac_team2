@@ -40,7 +40,7 @@ public class RagDocumentExtractService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "문서 리소스가 필요합니다.");
         }
         if (!resource.exists() || !resource.isReadable()) {
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "문서 파일을 읽을 수 없습니다.");
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "문서 파일이 존재하지 않거나 읽을 수 없습니다.");
         }
     }
 
