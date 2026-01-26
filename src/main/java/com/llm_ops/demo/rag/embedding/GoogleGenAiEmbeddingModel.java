@@ -1,5 +1,21 @@
+package com.llm_ops.demo.rag.embedding;
+
+import com.google.genai.Client;
+import com.google.genai.types.ContentEmbedding;
+import com.google.genai.types.EmbedContentConfig;
+import com.google.genai.types.EmbedContentResponse;
+import com.llm_ops.demo.rag.config.RagEmbeddingProperties;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.embedding.AbstractEmbeddingModel;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * Google GenAI 서비스의 임베딩 모델을 Spring AI의 {@link EmbeddingModel} 인터페이스에 맞게 구현한 클래스입니다.
+ * Google GenAI 서비스의 임베딩 모델을 Spring AI의 {@link org.springframework.ai.embedding.EmbeddingModel} 인터페이스에 맞게 구현한 클래스입니다.
  * 이 클래스를 통해 Google GenAI를 RAG 파이프라인의 임베딩 생성기로 활용할 수 있습니다.
  */
 public class GoogleGenAiEmbeddingModel extends AbstractEmbeddingModel {
