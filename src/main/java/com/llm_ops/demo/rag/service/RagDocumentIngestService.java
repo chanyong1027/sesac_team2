@@ -28,9 +28,9 @@ public class RagDocumentIngestService {
         this.ragDocumentVectorStoreSaveService = ragDocumentVectorStoreSaveService;
     }
 
-    public int ingest(Long workspaceId, Long documentId, Resource resource) {
+    public int ingest(Long workspaceId, Long documentId, String documentName, Resource resource) {
         List<Document> extracted = ragDocumentExtractService.extract(workspaceId, resource);
-        List<Document> chunks = ragDocumentChunkService.chunk(extracted, documentId);
+        List<Document> chunks = ragDocumentChunkService.chunk(extracted, documentId, documentName);
         return ragDocumentVectorStoreSaveService.save(workspaceId, documentId, chunks);
     }
 }

@@ -38,7 +38,7 @@ class RagDocumentChunkServiceTest {
         Document document = new Document(content, Map.of("workspace_id", 1L));
 
         // when
-        List<Document> chunks = ragDocumentChunkService.chunk(List.of(document), null);
+        List<Document> chunks = ragDocumentChunkService.chunk(List.of(document), null, null);
 
         // then
         assertThat(chunks).isNotEmpty();
@@ -55,11 +55,26 @@ class RagDocumentChunkServiceTest {
         Long documentId = 10L;
 
         // when
-        List<Document> chunks = ragDocumentChunkService.chunk(List.of(document), documentId);
+        List<Document> chunks = ragDocumentChunkService.chunk(List.of(document), documentId, "sample.txt");
 
         // then
         assertThat(chunks).isNotEmpty();
         assertThat(chunks.get(0).getMetadata()).containsEntry("document_id", documentId);
+    }
+
+    @Test
+    @DisplayName("documentName이 있으면 메타데이터에 포함된다")
+    void documentName이_있으면_메타데이터에_포함된다() {
+        // given
+        String content = "hello ".repeat(20);
+        Document document = new Document(content, Map.of("workspace_id", 1L));
+
+        // when
+        List<Document> chunks = ragDocumentChunkService.chunk(List.of(document), null, "sample.txt");
+
+        // then
+        assertThat(chunks).isNotEmpty();
+        assertThat(chunks.get(0).getMetadata()).containsEntry("document_name", "sample.txt");
     }
 
     @Test
@@ -69,7 +84,7 @@ class RagDocumentChunkServiceTest {
         List<Document> documents = List.of();
 
         // when & then
-        assertThatThrownBy(() -> ragDocumentChunkService.chunk(documents, null))
+        assertThatThrownBy(() -> ragDocumentChunkService.chunk(documents, null, null))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> {
                     BusinessException businessException = (BusinessException) exception;

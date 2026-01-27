@@ -49,15 +49,16 @@ class RagDocumentIngestServiceTest {
         Long workspaceId = 1L;
         Long documentId = 10L;
         Resource resource = new ClassPathResource("rag/sample.txt");
+        String documentName = "sample.txt";
         List<Document> extracted = List.of(new Document("hello", java.util.Map.of("workspace_id", workspaceId)));
         List<Document> chunks = List.of(new Document("chunk", java.util.Map.of("workspace_id", workspaceId)));
 
         when(ragDocumentExtractService.extract(workspaceId, resource)).thenReturn(extracted);
-        when(ragDocumentChunkService.chunk(extracted, documentId)).thenReturn(chunks);
+        when(ragDocumentChunkService.chunk(extracted, documentId, documentName)).thenReturn(chunks);
         when(ragDocumentVectorStoreSaveService.save(workspaceId, documentId, chunks)).thenReturn(chunks.size());
 
         // when
-        int savedCount = ragDocumentIngestService.ingest(workspaceId, documentId, resource);
+        int savedCount = ragDocumentIngestService.ingest(workspaceId, documentId, documentName, resource);
 
         // then
         assertThat(savedCount).isEqualTo(chunks.size());

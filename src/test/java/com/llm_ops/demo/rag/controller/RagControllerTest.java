@@ -43,7 +43,7 @@ class RagControllerTest {
         Long userId = 1L;
         String query = "환불 정책";
         RagSearchResponse response = new RagSearchResponse(List.of(
-            new ChunkDetailResponse("환불은 7일 이내 가능합니다.", 0.87, "policy.md")
+            new ChunkDetailResponse("환불은 7일 이내 가능합니다.", 0.87, 10L, "policy.md")
         ));
 
         given(ragSearchService.search(workspaceId, query, null, null)).willReturn(response);

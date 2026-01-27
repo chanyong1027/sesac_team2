@@ -66,7 +66,7 @@ public class DocumentController {
         RagDocument document = ragDocumentCreateService.create(workspaceId, fileName, fileUrl);
         RagDocumentIngestService ingestService = ragDocumentIngestServiceProvider.getIfAvailable();
         if (ingestService != null) {
-            ingestService.ingest(workspaceId, document.getId(), file.getResource());
+            ingestService.ingest(workspaceId, document.getId(), document.getFileName(), file.getResource());
         }
 
         return ResponseEntity.ok(DocumentUploadResponse.from(document));
