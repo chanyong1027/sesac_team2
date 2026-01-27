@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteAcceptRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteAcceptResponse;
@@ -18,15 +19,18 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
-@ActiveProfiles("test")
+@WebMvcTest(InvitationAcceptController.class)
+@AutoConfigureMockMvc
+@ActiveProfiles({"test", "mock-auth"})
+@Import(TestSecurityConfig.class)
 class InvitationAcceptControllerTest {
 
     @Autowired
@@ -50,27 +54,26 @@ class InvitationAcceptControllerTest {
             String token = "valid-token-uuid";
             WorkspaceInviteAcceptRequest request = new WorkspaceInviteAcceptRequest(token);
             WorkspaceInviteAcceptResponse response = new WorkspaceInviteAcceptResponse(
-                1L,
-                "테스트조직",
-                1L,
-                "프로덕션",
-                WorkspaceRole.MEMBER
-            );
+                    1L,
+                    "테스트조직",
+                    1L,
+                    "프로덕션",
+                    WorkspaceRole.MEMBER);
 
             given(invitationAcceptService.accept(eq(userId), any(WorkspaceInviteAcceptRequest.class)))
-                .willReturn(response);
+                    .willReturn(response);
 
             // when & then
             mockMvc.perform(post("/api/v1/invitations/accept")
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.organizationId").value(1L))
-                .andExpect(jsonPath("$.organizationName").value("테스트조직"))
-                .andExpect(jsonPath("$.workspaceId").value(1L))
-                .andExpect(jsonPath("$.workspaceName").value("프로덕션"))
-                .andExpect(jsonPath("$.role").value("MEMBER"));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.organizationId").value(1L))
+                    .andExpect(jsonPath("$.organizationName").value("테스트조직"))
+                    .andExpect(jsonPath("$.workspaceId").value(1L))
+                    .andExpect(jsonPath("$.workspaceName").value("프로덕션"))
+                    .andExpect(jsonPath("$.role").value("MEMBER"));
         }
 
         @Test
@@ -81,23 +84,22 @@ class InvitationAcceptControllerTest {
             String token = "valid-token-uuid";
             WorkspaceInviteAcceptRequest request = new WorkspaceInviteAcceptRequest(token);
             WorkspaceInviteAcceptResponse response = new WorkspaceInviteAcceptResponse(
-                1L,
-                "테스트조직",
-                1L,
-                "프로덕션",
-                WorkspaceRole.OWNER
-            );
+                    1L,
+                    "테스트조직",
+                    1L,
+                    "프로덕션",
+                    WorkspaceRole.OWNER);
 
             given(invitationAcceptService.accept(eq(userId), any(WorkspaceInviteAcceptRequest.class)))
-                .willReturn(response);
+                    .willReturn(response);
 
             // when & then
             mockMvc.perform(post("/api/v1/invitations/accept")
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("OWNER"));
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.role").value("OWNER"));
         }
     }
 
@@ -117,8 +119,8 @@ class InvitationAcceptControllerTest {
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
         }
 
         @Test
@@ -133,8 +135,8 @@ class InvitationAcceptControllerTest {
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
         }
     }
 }
