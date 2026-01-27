@@ -28,6 +28,7 @@ repositories {
 dependencyManagement {
 	imports {
 		mavenBom "org.springframework.ai:spring-ai-bom:1.0.0-M5"
+		mavenBom "software.amazon.awssdk:bom:2.25.61"
 	}
 }
 
@@ -44,6 +45,7 @@ dependencies {
 	implementation 'org.springframework.ai:spring-ai-pgvector-store'
 	implementation 'org.springframework.ai:spring-ai-tika-document-reader'
 	implementation 'com.google.genai:google-genai:1.35.0'
+	implementation 'software.amazon.awssdk:s3'
 
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
