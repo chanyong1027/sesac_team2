@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateRequest;
@@ -21,17 +23,19 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
-@ActiveProfiles("test")
+@WebMvcTest(WorkspaceController.class)
+@AutoConfigureMockMvc
+@ActiveProfiles({"test", "mock-auth"})
+@Import(TestSecurityConfig.class)
 class WorkspaceControllerTest {
 
     @Autowired
@@ -54,25 +58,24 @@ class WorkspaceControllerTest {
         Long userId = 1L;
         WorkspaceCreateRequest request = new WorkspaceCreateRequest("production", "프로덕션 환경");
         WorkspaceCreateResponse response = new WorkspaceCreateResponse(
-            1L,
-            "production",
-            "프로덕션 환경",
-            WorkspaceStatus.ACTIVE
-        );
+                1L,
+                "production",
+                "프로덕션 환경",
+                WorkspaceStatus.ACTIVE);
 
         given(workspaceService.create(eq(orgId), eq(userId), any(WorkspaceCreateRequest.class)))
-            .willReturn(response);
+                .willReturn(response);
 
         // when & then
         mockMvc.perform(post("/api/v1/organizations/{orgId}/workspaces", orgId)
                 .header("X-User-Id", userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(1L))
-            .andExpect(jsonPath("$.name").value("production"))
-            .andExpect(jsonPath("$.displayName").value("프로덕션 환경"))
-            .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.name").value("production"))
+                .andExpect(jsonPath("$.displayName").value("프로덕션 환경"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
     @Test
@@ -88,8 +91,8 @@ class WorkspaceControllerTest {
                 .header("X-User-Id", userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andDo(print())
-            .andExpect(status().isBadRequest());
+                .andDo(print())
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -105,8 +108,8 @@ class WorkspaceControllerTest {
                 .header("X-User-Id", userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andDo(print())
-            .andExpect(status().isBadRequest());
+                .andDo(print())
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -122,8 +125,8 @@ class WorkspaceControllerTest {
                 .header("X-User-Id", userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andDo(print())
-            .andExpect(status().isBadRequest());
+                .andDo(print())
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -132,29 +135,26 @@ class WorkspaceControllerTest {
         // given
         Long userId = 1L;
         List<WorkspaceSummaryResponse> response = List.of(
-            new WorkspaceSummaryResponse(
-                1L, 1L, "테스트 조직", "production", "프로덕션",
-                WorkspaceStatus.ACTIVE, WorkspaceRole.OWNER, LocalDateTime.now()
-            ),
-            new WorkspaceSummaryResponse(
-                2L, 1L, "테스트 조직", "staging", "스테이징",
-                WorkspaceStatus.ACTIVE, WorkspaceRole.MEMBER, LocalDateTime.now()
-            )
-        );
+                new WorkspaceSummaryResponse(
+                        1L, 1L, "테스트 조직", "production", "프로덕션",
+                        WorkspaceStatus.ACTIVE, WorkspaceRole.OWNER, LocalDateTime.now()),
+                new WorkspaceSummaryResponse(
+                        2L, 1L, "테스트 조직", "staging", "스테이징",
+                        WorkspaceStatus.ACTIVE, WorkspaceRole.MEMBER, LocalDateTime.now()));
 
         given(workspaceListService.getMyWorkspaces(userId)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/workspaces")
                 .header("X-User-Id", userId))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$").isArray())
-            .andExpect(jsonPath("$.length()").value(2))
-            .andExpect(jsonPath("$[0].name").value("production"))
-            .andExpect(jsonPath("$[0].myRole").value("OWNER"))
-            .andExpect(jsonPath("$[0].organizationName").value("테스트 조직"))
-            .andExpect(jsonPath("$[1].name").value("staging"))
-            .andExpect(jsonPath("$[1].myRole").value("MEMBER"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].name").value("production"))
+                .andExpect(jsonPath("$[0].myRole").value("OWNER"))
+                .andExpect(jsonPath("$[0].organizationName").value("테스트 조직"))
+                .andExpect(jsonPath("$[1].name").value("staging"))
+                .andExpect(jsonPath("$[1].myRole").value("MEMBER"));
     }
 
     @Test
@@ -168,8 +168,8 @@ class WorkspaceControllerTest {
         // when & then
         mockMvc.perform(get("/api/v1/workspaces")
                 .header("X-User-Id", userId))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$").isArray())
-            .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
     }
 }
