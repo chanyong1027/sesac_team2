@@ -52,30 +52,35 @@ public class PromptService {
         validateWorkspaceMembership(workspace, user);
 
         return promptRepository.findByWorkspaceAndStatusOrderByCreatedAtDesc(workspace, PromptStatus.ACTIVE)
-            .stream()
-            .map(PromptSummaryResponse::from)
-            .toList();
+                .stream()
+                .map(PromptSummaryResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public PromptDetailResponse getDetail(Long promptId, Long userId) {
+    public PromptDetailResponse getDetail(Long workspaceId, Long promptId, Long userId) {
         User user = findUserById(userId);
+        Workspace workspace = findActiveWorkspace(workspaceId);
         Prompt prompt = findActivePrompt(promptId);
 
-        validateWorkspaceMembership(prompt.getWorkspace(), user);
+        validatePromptBelongsToWorkspace(prompt, workspace);
+        validateWorkspaceMembership(workspace, user);
 
         return PromptDetailResponse.from(prompt);
     }
 
     @Transactional
-    public PromptDetailResponse update(Long promptId, Long userId, PromptUpdateRequest request) {
+    public PromptDetailResponse update(Long workspaceId, Long promptId, Long userId, PromptUpdateRequest request) {
         User user = findUserById(userId);
+        Workspace workspace = findActiveWorkspace(workspaceId);
         Prompt prompt = findActivePrompt(promptId);
 
-        validateWorkspaceMembership(prompt.getWorkspace(), user);
+        validatePromptBelongsToWorkspace(prompt, workspace);
+        validateWorkspaceMembership(workspace, user);
+        validatePromptKeyFormat(request.promptKey());
 
         if (request.promptKey() != null && !request.promptKey().equals(prompt.getPromptKey())) {
-            validateDuplicatePromptKey(prompt.getWorkspace(), request.promptKey());
+            validateDuplicatePromptKey(workspace, request.promptKey());
         }
 
         prompt.update(request.promptKey(), request.description());
@@ -84,28 +89,30 @@ public class PromptService {
     }
 
     @Transactional
-    public void delete(Long promptId, Long userId) {
+    public void delete(Long workspaceId, Long promptId, Long userId) {
         User user = findUserById(userId);
+        Workspace workspace = findActiveWorkspace(workspaceId);
         Prompt prompt = findActivePrompt(promptId);
 
-        validateWorkspaceMembership(prompt.getWorkspace(), user);
+        validatePromptBelongsToWorkspace(prompt, workspace);
+        validateWorkspaceMembership(workspace, user);
 
         prompt.archive();
     }
 
     private User findUserById(Long userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     }
 
-    private Workspace findActiveWorkspace(Long wsId) {
-        return workspaceRepository.findByIdAndStatus(wsId, WorkspaceStatus.ACTIVE)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+    private Workspace findActiveWorkspace(Long workspaceId) {
+        return workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     }
 
     private Prompt findActivePrompt(Long promptId) {
         return promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
     }
 
     private void validateWorkspaceMembership(Workspace workspace, User user) {
@@ -118,6 +125,18 @@ public class PromptService {
     private void validateDuplicatePromptKey(Workspace workspace, String promptKey) {
         if (promptRepository.existsByWorkspaceAndPromptKey(workspace, promptKey)) {
             throw new BusinessException(ErrorCode.CONFLICT);
+        }
+    }
+
+    private void validatePromptBelongsToWorkspace(Prompt prompt, Workspace workspace) {
+        if (!prompt.getWorkspace().getId().equals(workspace.getId())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+    }
+
+    private void validatePromptKeyFormat(String promptKey) {
+        if (promptKey != null && promptKey.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }
 }

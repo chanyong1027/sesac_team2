@@ -69,11 +69,11 @@ class PromptServiceTest {
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
             given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
-                .willReturn(Optional.of(mockWorkspace));
+                    .willReturn(Optional.of(mockWorkspace));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
             given(promptRepository.existsByWorkspaceAndPromptKey(mockWorkspace, "chat-bot"))
-                .willReturn(false);
+                    .willReturn(false);
             given(promptRepository.save(any(Prompt.class))).willAnswer(invocation -> {
                 Prompt prompt = invocation.getArgument(0);
                 setId(prompt, 1L);
@@ -104,8 +104,8 @@ class PromptServiceTest {
 
             // when & then
             assertThatThrownBy(() -> promptService.create(workspaceId, userId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
 
             verify(promptRepository, never()).save(any());
         }
@@ -122,12 +122,12 @@ class PromptServiceTest {
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
             given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
-                .willReturn(Optional.empty());
+                    .willReturn(Optional.empty());
 
             // when & then
             assertThatThrownBy(() -> promptService.create(workspaceId, userId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
 
             verify(promptRepository, never()).save(any());
         }
@@ -145,14 +145,14 @@ class PromptServiceTest {
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
             given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
-                .willReturn(Optional.of(mockWorkspace));
+                    .willReturn(Optional.of(mockWorkspace));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(false);
+                    .willReturn(false);
 
             // when & then
             assertThatThrownBy(() -> promptService.create(workspaceId, userId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
 
             verify(promptRepository, never()).save(any());
         }
@@ -170,16 +170,16 @@ class PromptServiceTest {
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
             given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
-                .willReturn(Optional.of(mockWorkspace));
+                    .willReturn(Optional.of(mockWorkspace));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
             given(promptRepository.existsByWorkspaceAndPromptKey(mockWorkspace, "chat-bot"))
-                .willReturn(true);
+                    .willReturn(true);
 
             // when & then
             assertThatThrownBy(() -> promptService.create(workspaceId, userId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
 
             verify(promptRepository, never()).save(any());
         }
@@ -203,11 +203,11 @@ class PromptServiceTest {
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
             given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
-                .willReturn(Optional.of(mockWorkspace));
+                    .willReturn(Optional.of(mockWorkspace));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
             given(promptRepository.findByWorkspaceAndStatusOrderByCreatedAtDesc(mockWorkspace, PromptStatus.ACTIVE))
-                .willReturn(List.of(mockPrompt1, mockPrompt2));
+                    .willReturn(List.of(mockPrompt1, mockPrompt2));
 
             // when
             List<PromptSummaryResponse> response = promptService.getList(workspaceId, userId);
@@ -230,14 +230,14 @@ class PromptServiceTest {
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
             given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
-                .willReturn(Optional.of(mockWorkspace));
+                    .willReturn(Optional.of(mockWorkspace));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(false);
+                    .willReturn(false);
 
             // when & then
             assertThatThrownBy(() -> promptService.getList(workspaceId, userId))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
         }
     }
 
@@ -249,69 +249,79 @@ class PromptServiceTest {
         @DisplayName("프롬프트 상세 정보를 조회한다")
         void getDetail_Success() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇 프롬프트");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
 
             // when
-            PromptDetailResponse response = promptService.getDetail(promptId, userId);
+            PromptDetailResponse response = promptService.getDetail(workspaceId, promptId, userId);
 
             // then
             assertThat(response.id()).isEqualTo(promptId);
             assertThat(response.promptKey()).isEqualTo("chat-bot");
             assertThat(response.description()).isEqualTo("챗봇 프롬프트");
-            assertThat(response.workspaceId()).isEqualTo(1L);
+            assertThat(response.workspaceId()).isEqualTo(workspaceId);
         }
 
         @Test
         @DisplayName("존재하지 않는 프롬프트 조회 시 예외가 발생한다")
         void getDetail_PromptNotFound_ThrowsException() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 999L;
             Long userId = 1L;
 
             User mockUser = createMockUser(userId);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.empty());
+                    .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> promptService.getDetail(promptId, userId))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+            assertThatThrownBy(() -> promptService.getDetail(workspaceId, promptId, userId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
         }
 
         @Test
         @DisplayName("워크스페이스 멤버가 아닌 사용자가 조회 시 예외가 발생한다")
         void getDetail_NotWorkspaceMember_ThrowsException() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(false);
+                    .willReturn(false);
 
             // when & then
-            assertThatThrownBy(() -> promptService.getDetail(promptId, userId))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+            assertThatThrownBy(() -> promptService.getDetail(workspaceId, promptId, userId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
         }
     }
 
@@ -323,24 +333,27 @@ class PromptServiceTest {
         @DisplayName("프롬프트를 수정한다")
         void update_Success() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
             PromptUpdateRequest request = new PromptUpdateRequest("updated-key", "수정된 설명");
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
             given(promptRepository.existsByWorkspaceAndPromptKey(mockWorkspace, "updated-key"))
-                .willReturn(false);
+                    .willReturn(false);
 
             // when
-            PromptDetailResponse response = promptService.update(promptId, userId, request);
+            PromptDetailResponse response = promptService.update(workspaceId, promptId, userId, request);
 
             // then
             assertThat(response.promptKey()).isEqualTo("updated-key");
@@ -351,48 +364,54 @@ class PromptServiceTest {
         @DisplayName("수정 시 promptKey가 중복되면 예외가 발생한다")
         void update_DuplicatePromptKey_ThrowsException() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
             PromptUpdateRequest request = new PromptUpdateRequest("existing-key", "설명");
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
             given(promptRepository.existsByWorkspaceAndPromptKey(mockWorkspace, "existing-key"))
-                .willReturn(true);
+                    .willReturn(true);
 
             // when & then
-            assertThatThrownBy(() -> promptService.update(promptId, userId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
+            assertThatThrownBy(() -> promptService.update(workspaceId, promptId, userId, request))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
         }
 
         @Test
         @DisplayName("동일한 promptKey로 수정 시에는 중복 검사를 하지 않는다")
         void update_SamePromptKey_NoConflict() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
             PromptUpdateRequest request = new PromptUpdateRequest("chat-bot", "수정된 설명만");
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
 
             // when
-            PromptDetailResponse response = promptService.update(promptId, userId, request);
+            PromptDetailResponse response = promptService.update(workspaceId, promptId, userId, request);
 
             // then
             assertThat(response.description()).isEqualTo("수정된 설명만");
@@ -408,21 +427,24 @@ class PromptServiceTest {
         @DisplayName("프롬프트를 삭제(archive)한다")
         void delete_Success() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(true);
+                    .willReturn(true);
 
             // when
-            promptService.delete(promptId, userId);
+            promptService.delete(workspaceId, promptId, userId);
 
             // then
             assertThat(mockPrompt.getStatus()).isEqualTo(PromptStatus.ARCHIVED);
@@ -433,42 +455,49 @@ class PromptServiceTest {
         @DisplayName("존재하지 않는 프롬프트 삭제 시 예외가 발생한다")
         void delete_PromptNotFound_ThrowsException() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 999L;
             Long userId = 1L;
 
             User mockUser = createMockUser(userId);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.empty());
+                    .willReturn(Optional.empty());
 
             // when & then
-            assertThatThrownBy(() -> promptService.delete(promptId, userId))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+            assertThatThrownBy(() -> promptService.delete(workspaceId, promptId, userId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
         }
 
         @Test
         @DisplayName("워크스페이스 멤버가 아닌 사용자가 삭제 시 예외가 발생한다")
         void delete_NotWorkspaceMember_ThrowsException() throws Exception {
             // given
+            Long workspaceId = 1L;
             Long promptId = 1L;
             Long userId = 1L;
 
             User mockUser = createMockUser(userId);
-            Workspace mockWorkspace = createMockWorkspace(1L, mockUser);
+            Workspace mockWorkspace = createMockWorkspace(workspaceId, mockUser);
             Prompt mockPrompt = createMockPrompt(promptId, mockWorkspace, "chat-bot", "챗봇");
 
             given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+            given(workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE))
+                    .willReturn(Optional.of(mockWorkspace));
             given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
-                .willReturn(Optional.of(mockPrompt));
+                    .willReturn(Optional.of(mockPrompt));
             given(workspaceMemberRepository.existsByWorkspaceAndUser(mockWorkspace, mockUser))
-                .willReturn(false);
+                    .willReturn(false);
 
             // when & then
-            assertThatThrownBy(() -> promptService.delete(promptId, userId))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+            assertThatThrownBy(() -> promptService.delete(workspaceId, promptId, userId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
         }
     }
 
@@ -486,7 +515,8 @@ class PromptServiceTest {
         return workspace;
     }
 
-    private Prompt createMockPrompt(Long id, Workspace workspace, String promptKey, String description) throws Exception {
+    private Prompt createMockPrompt(Long id, Workspace workspace, String promptKey, String description)
+            throws Exception {
         Prompt prompt = Prompt.create(workspace, promptKey, description);
         setId(prompt, id);
         return prompt;
