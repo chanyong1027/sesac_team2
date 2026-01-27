@@ -1,6 +1,10 @@
 package com.llm_ops.demo.rag.storage;
 
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.config.StorageS3Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -17,6 +21,7 @@ import java.util.Map;
 @ConditionalOnBean(S3Client.class)
 public class S3ApiClient {
 
+    private static final Logger log = LoggerFactory.getLogger(S3ApiClient.class);
     private final S3Client s3Client;
     private final StorageS3Properties properties;
     private final S3KeyGenerator keyGenerator;
@@ -44,7 +49,12 @@ public class S3ApiClient {
             requestBuilder.metadata(metadata);
         }
 
-        s3Client.putObject(requestBuilder.build(), RequestBody.fromInputStream(inputStream, contentLength));
-        return key;
+        try {
+            s3Client.putObject(requestBuilder.build(), RequestBody.fromInputStream(inputStream, contentLength));
+            return key;
+        } catch (Exception ex) {
+            log.error("S3 upload failed. workspaceId={}, key={}, size={}", workspaceId, key, contentLength, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 업로드에 실패했습니다.");
+        }
     }
 }

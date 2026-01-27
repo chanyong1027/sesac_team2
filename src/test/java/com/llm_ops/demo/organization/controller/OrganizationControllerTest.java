@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.organization.domain.OrganizationStatus;
 import com.llm_ops.demo.organization.dto.OrganizationCreateRequest;
 import com.llm_ops.demo.organization.dto.OrganizationCreateResponse;
@@ -15,17 +17,19 @@ import com.llm_ops.demo.organization.service.OrganizationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
-@ActiveProfiles("test")
+@WebMvcTest(OrganizationController.class)
+@AutoConfigureMockMvc
+@ActiveProfiles({"test", "mock-auth"})
+@Import(TestSecurityConfig.class)
 class OrganizationControllerTest {
 
     @Autowired
@@ -44,23 +48,22 @@ class OrganizationControllerTest {
         Long userId = 1L;
         OrganizationCreateRequest request = new OrganizationCreateRequest("테스트 조직");
         OrganizationCreateResponse response = new OrganizationCreateResponse(
-            1L,
-            "테스트 조직",
-            OrganizationStatus.ACTIVE
-        );
+                1L,
+                "테스트 조직",
+                OrganizationStatus.ACTIVE);
 
         given(organizationService.create(eq(userId), any(OrganizationCreateRequest.class)))
-            .willReturn(response);
+                .willReturn(response);
 
         // when & then
         mockMvc.perform(post("/api/v1/organizations")
                 .header("X-User-Id", userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(1L))
-            .andExpect(jsonPath("$.name").value("테스트 조직"))
-            .andExpect(jsonPath("$.status").value("ACTIVE"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.name").value("테스트 조직"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
     @Test
@@ -75,7 +78,7 @@ class OrganizationControllerTest {
                 .header("X-User-Id", userId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-            .andDo(print())
-            .andExpect(status().isBadRequest());
+                .andDo(print())
+                .andExpect(status().isBadRequest());
     }
 }

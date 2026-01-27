@@ -9,7 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,7 +23,7 @@ public class WorkspaceInvitationController {
     @PostMapping("/{workspaceId}/invitation-links")
     public ResponseEntity<WorkspaceInviteCreateResponse> createInvitation(
         @PathVariable Long workspaceId,
-        @RequestHeader("X-User-Id") Long userId,
+        @AuthenticationPrincipal Long userId,
         @Valid @RequestBody WorkspaceInviteCreateRequest request
     ) {
         WorkspaceInviteCreateResponse response = workspaceInvitationService.createInvitation(
