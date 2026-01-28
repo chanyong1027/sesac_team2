@@ -1,7 +1,5 @@
 package com.llm_ops.demo.rag.controller;
 
-import com.llm_ops.demo.auth.domain.User;
-import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
@@ -14,15 +12,14 @@ import com.llm_ops.demo.rag.service.RagDocumentIngestService;
 import com.llm_ops.demo.rag.service.RagDocumentListService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreDeleteService;
 import com.llm_ops.demo.rag.storage.S3ApiClient;
-import com.llm_ops.demo.workspace.domain.Workspace;
-import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
-import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
-import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -30,6 +27,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,6 +43,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(prefix = "storage.s3", name = "enabled", havingValue = "true")
+@Validated
 public class DocumentController {
 
     private final S3ApiClient s3ApiClient;
@@ -53,18 +52,16 @@ public class DocumentController {
     private final RagDocumentDeleteService ragDocumentDeleteService;
     private final ObjectProvider<RagDocumentIngestService> ragDocumentIngestServiceProvider;
     private final ObjectProvider<RagDocumentVectorStoreDeleteService> ragDocumentVectorStoreDeleteServiceProvider;
-    private final UserRepository userRepository;
-    private final WorkspaceRepository workspaceRepository;
-    private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final WorkspaceAccessService workspaceAccessService;
 
     @PostMapping(value = "/workspaces/{workspaceId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DocumentUploadResponse> uploadDocument(
-        @PathVariable Long workspaceId,
+        @PathVariable @NotNull @Positive Long workspaceId,
         @RequestPart("file") MultipartFile file,
-        @RequestHeader("X-User-Id") Long userId
+        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
     ) {
         validateFile(file);
-        validateWorkspaceAccess(workspaceId, userId);
+        workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
 
         String fileUrl = null;
         try {
@@ -93,10 +90,10 @@ public class DocumentController {
 
     @GetMapping("/workspaces/{workspaceId}/documents")
     public ResponseEntity<List<DocumentResponse>> getDocuments(
-        @PathVariable Long workspaceId,
-        @RequestHeader("X-User-Id") Long userId
+        @PathVariable @NotNull @Positive Long workspaceId,
+        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
     ) {
-        validateWorkspaceAccess(workspaceId, userId);
+        workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
         
         List<DocumentResponse> response = ragDocumentListService.findActiveDocuments(workspaceId).stream()
                 .map(DocumentResponse::from)
@@ -106,11 +103,11 @@ public class DocumentController {
 
     @DeleteMapping("/workspaces/{workspaceId}/documents/{documentId}")
     public ResponseEntity<DocumentDeleteResponse> deleteDocument(
-        @PathVariable Long workspaceId,
-        @PathVariable Long documentId,
-        @RequestHeader("X-User-Id") Long userId
+        @PathVariable @NotNull @Positive Long workspaceId,
+        @PathVariable @NotNull @Positive Long documentId,
+        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
     ) {
-        validateWorkspaceAccess(workspaceId, userId);
+        workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
         
         RagDocument deleted = ragDocumentDeleteService.delete(workspaceId, documentId);
         s3ApiClient.deleteDocument(deleted.getFileUrl());
@@ -122,19 +119,6 @@ public class DocumentController {
         }
 
         return ResponseEntity.ok(DocumentDeleteResponse.of(documentId, "삭제되었습니다."));
-    }
-
-    private void validateWorkspaceAccess(Long workspaceId, Long userId) {
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-
-        Workspace workspace = workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "활성화된 워크스페이스를 찾을 수 없습니다."));
-
-        boolean isMember = workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user);
-        if (!isMember) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 멤버가 아닙니다.");
-        }
     }
 
     private void validateFile(MultipartFile file) {

@@ -18,6 +18,7 @@ import com.llm_ops.demo.rag.service.RagDocumentIngestService;
 import com.llm_ops.demo.rag.service.RagDocumentListService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreDeleteService;
 import com.llm_ops.demo.rag.storage.S3ApiClient;
+import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -59,6 +60,9 @@ class DocumentControllerTest {
 
     @MockitoBean
     private RagDocumentVectorStoreDeleteService ragDocumentVectorStoreDeleteService;
+
+    @MockitoBean
+    private WorkspaceAccessService workspaceAccessService;
 
     @Test
     @DisplayName("문서 업로드 API 성공")
