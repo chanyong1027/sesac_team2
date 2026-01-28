@@ -1,0 +1,52 @@
+package com.llm_ops.demo.prompt.domain;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.UpdateTimestamp;
+
+@Entity
+@Table(name = "prompt_releases")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class PromptRelease {
+
+    @Id
+    @Column(name = "prompt_id")
+    private Long promptId;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @MapsId
+    @JoinColumn(name = "prompt_id")
+    private Prompt prompt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "active_version_id", nullable = false)
+    private PromptVersion activeVersion;
+
+    @UpdateTimestamp
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    public static PromptRelease create(Prompt prompt, PromptVersion activeVersion) {
+        PromptRelease release = new PromptRelease();
+        release.prompt = prompt;
+        release.promptId = prompt.getId();
+        release.activeVersion = activeVersion;
+        return release;
+    }
+
+    public void changeActiveVersion(PromptVersion newVersion) {
+        this.activeVersion = newVersion;
+    }
+}
