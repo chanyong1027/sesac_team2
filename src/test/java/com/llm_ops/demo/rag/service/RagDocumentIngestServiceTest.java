@@ -33,6 +33,9 @@ class RagDocumentIngestServiceTest {
     private RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
 
     @MockBean
+    private RagSearchService ragSearchService;
+
+    @MockBean
     private RagDocumentChunkService ragDocumentChunkService;
 
     @MockBean

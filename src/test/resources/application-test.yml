@@ -52,3 +52,9 @@ gateway:
   prompt-providers:
     - prompt-key: "hello {{name}}"
       provider: openai
+    - prompt-key: "환불 정책을 알려줘"
+      provider: openai
+    - prompt-key: "질문: {{question}}"
+      provider: openai
+    - prompt-key: "상품 A의 가격은 얼마인가요?"
+      provider: openai

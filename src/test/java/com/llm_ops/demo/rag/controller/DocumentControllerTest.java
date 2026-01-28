@@ -133,14 +133,15 @@ class DocumentControllerTest {
     @DisplayName("문서 삭제 API 성공")
     void deleteDocument_Success() throws Exception {
         // given
+        Long workspaceId = 1L;
         Long documentId = 10L;
         Long userId = 1L;
-        RagDocument document = RagDocument.create(1L, "sample.txt", "workspaces/1/documents/sample.txt");
+        RagDocument document = RagDocument.create(workspaceId, "sample.txt", "workspaces/1/documents/sample.txt");
         ReflectionTestUtils.setField(document, "id", documentId);
-        given(ragDocumentDeleteService.deleteByDocumentId(documentId)).willReturn(document);
+        given(ragDocumentDeleteService.delete(workspaceId, documentId)).willReturn(document);
 
         // when & then
-        mockMvc.perform(delete("/api/v1/documents/{documentId}", documentId)
+        mockMvc.perform(delete("/api/v1/workspaces/{workspaceId}/documents/{documentId}", workspaceId, documentId)
                 .header("X-User-Id", userId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.documentId").value(documentId))
