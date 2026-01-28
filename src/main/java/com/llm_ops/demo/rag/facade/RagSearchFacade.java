@@ -27,8 +27,18 @@ public class RagSearchFacade {
     private final UserRepository userRepository;
 
     public RagSearchResponse search(Long workspaceId, Long userId, String query) {
+        validateIds(workspaceId, userId);
         validateWorkspaceAccess(workspaceId, userId);
         return ragSearchService.search(workspaceId, query);
+    }
+
+    private void validateIds(Long workspaceId, Long userId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userId가 필요합니다.");
+        }
     }
 
     private void validateWorkspaceAccess(Long workspaceId, Long userId) {
