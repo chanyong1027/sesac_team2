@@ -40,9 +40,9 @@ rag:
       schema-name: public
       table-name: doc_chunks
       initialize-schema: false
-      distance-type: COSINE_DISTANCE
-      index-type: HNSW
-      max-document-batch-size: 10000
+    distance-type: COSINE_DISTANCE
+    index-type: HNSW
+    max-document-batch-size: 10000
   search:
     top-k: 5
     similarity-threshold: 0.0

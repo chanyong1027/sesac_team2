@@ -5,17 +5,15 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
 import com.llm_ops.demo.rag.domain.RagDocumentStatus;
 import com.llm_ops.demo.rag.repository.RagDocumentRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RagDocumentDeleteService {
 
     private final RagDocumentRepository ragDocumentRepository;
-
-    public RagDocumentDeleteService(RagDocumentRepository ragDocumentRepository) {
-        this.ragDocumentRepository = ragDocumentRepository;
-    }
 
     @Transactional
     public RagDocument delete(Long workspaceId, Long documentId) {

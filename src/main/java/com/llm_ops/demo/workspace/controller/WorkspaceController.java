@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,7 +27,7 @@ public class WorkspaceController {
 
     @GetMapping("/workspaces")
     public ResponseEntity<List<WorkspaceSummaryResponse>> getMyWorkspaces(
-        @RequestHeader("X-User-Id") Long userId
+        @AuthenticationPrincipal Long userId
     ) {
         List<WorkspaceSummaryResponse> response = workspaceListService.getMyWorkspaces(userId);
         return ResponseEntity.ok(response);
@@ -36,7 +36,7 @@ public class WorkspaceController {
     @PostMapping("/organizations/{orgId}/workspaces")
     public ResponseEntity<WorkspaceCreateResponse> createWorkspace(
         @PathVariable Long orgId,
-        @RequestHeader("X-User-Id") Long userId,
+        @AuthenticationPrincipal Long userId,
         @Valid @RequestBody WorkspaceCreateRequest request
     ) {
         WorkspaceCreateResponse response = workspaceService.create(orgId, userId, request);
