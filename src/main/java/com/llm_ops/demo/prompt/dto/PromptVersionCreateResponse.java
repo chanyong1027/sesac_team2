@@ -9,6 +9,12 @@ public record PromptVersionCreateResponse(
     Integer versionNo,
     LocalDateTime createdAt
 ) {
+    /**
+     * Create a PromptVersionCreateResponse DTO from a PromptVersion domain object.
+     *
+     * @param version the domain PromptVersion to convert
+     * @return a PromptVersionCreateResponse populated with id, promptId, versionNo, and createdAt from the given domain object
+     */
     public static PromptVersionCreateResponse from(PromptVersion version) {
         return new PromptVersionCreateResponse(
             version.getId(),

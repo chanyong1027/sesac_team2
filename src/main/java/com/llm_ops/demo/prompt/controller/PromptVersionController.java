@@ -25,6 +25,14 @@ public class PromptVersionController {
 
     private final PromptVersionService promptVersionService;
 
+    /**
+     * Create a new version for the specified prompt.
+     *
+     * @param promptId the ID of the parent prompt
+     * @param userId   the authenticated user's ID performing the operation
+     * @param request  the payload containing data for the new prompt version; validated before processing
+     * @return the created PromptVersionCreateResponse containing the new version's details
+     */
     @PostMapping
     public ResponseEntity<PromptVersionCreateResponse> createVersion(
             @PathVariable Long promptId,
@@ -34,6 +42,14 @@ public class PromptVersionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /**
+     * Retrieve details for a specific prompt version.
+     *
+     * @param promptId  ID of the parent prompt
+     * @param versionId ID of the prompt version to retrieve
+     * @param userId    authenticated user's ID (used for access control or personalization)
+     * @return a ResponseEntity whose body is a PromptVersionDetailResponse with the requested version's details
+     */
     @GetMapping("/{versionId}")
     public ResponseEntity<PromptVersionDetailResponse> getVersion(
             @PathVariable Long promptId,
@@ -43,6 +59,13 @@ public class PromptVersionController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Retrieve summaries of all versions for the specified prompt.
+     *
+     * @param promptId the ID of the parent prompt whose versions are being listed
+     * @param userId the authenticated user's ID (used for access control and personalization)
+     * @return a list of PromptVersionSummaryResponse objects describing each version
+     */
     @GetMapping
     public ResponseEntity<List<PromptVersionSummaryResponse>> getVersions(
             @PathVariable Long promptId,

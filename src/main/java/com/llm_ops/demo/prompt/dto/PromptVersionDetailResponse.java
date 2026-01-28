@@ -18,6 +18,13 @@ public record PromptVersionDetailResponse(
     Long createdBy,
     LocalDateTime createdAt
 ) {
+    /**
+     * Create a PromptVersionDetailResponse from a PromptVersion entity.
+     *
+     * @param version the source PromptVersion whose properties will be mapped
+     * @return a PromptVersionDetailResponse containing id, promptId, versionNo, title, provider, model,
+     *         systemPrompt, userTemplate, modelConfig, createdBy, and createdAt copied from the given version
+     */
     public static PromptVersionDetailResponse from(PromptVersion version) {
         return new PromptVersionDetailResponse(
             version.getId(),

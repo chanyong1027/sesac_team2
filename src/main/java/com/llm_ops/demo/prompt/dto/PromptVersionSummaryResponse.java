@@ -13,6 +13,12 @@ public record PromptVersionSummaryResponse(
     Long createdBy,
     LocalDateTime createdAt
 ) {
+    /**
+     * Create a PromptVersionSummaryResponse DTO from a PromptVersion domain object.
+     *
+     * @param version the source PromptVersion to convert
+     * @return a PromptVersionSummaryResponse containing id, versionNo, title, provider, model, creator id, and createdAt
+     */
     public static PromptVersionSummaryResponse from(PromptVersion version) {
         return new PromptVersionSummaryResponse(
             version.getId(),
