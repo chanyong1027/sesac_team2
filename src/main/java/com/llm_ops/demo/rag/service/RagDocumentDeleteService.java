@@ -18,8 +18,8 @@ public class RagDocumentDeleteService {
     }
 
     @Transactional
-    public void delete(Long workspaceId, Long documentId) {
-        deleteInternal(workspaceId, documentId);
+    public RagDocument delete(Long workspaceId, Long documentId) {
+        return deleteInternal(workspaceId, documentId);
     }
 
     private void validateInput(Long workspaceId, Long documentId) {

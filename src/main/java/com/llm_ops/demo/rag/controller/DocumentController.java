@@ -1,5 +1,7 @@
 package com.llm_ops.demo.rag.controller;
 
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
@@ -12,12 +14,17 @@ import com.llm_ops.demo.rag.service.RagDocumentIngestService;
 import com.llm_ops.demo.rag.service.RagDocumentListService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreDeleteService;
 import com.llm_ops.demo.rag.storage.S3ApiClient;
+import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
+import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
@@ -36,6 +43,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
+@Slf4j
 @ConditionalOnProperty(prefix = "storage.s3", name = "enabled", havingValue = "true")
 public class DocumentController {
 
@@ -45,6 +53,9 @@ public class DocumentController {
     private final RagDocumentDeleteService ragDocumentDeleteService;
     private final ObjectProvider<RagDocumentIngestService> ragDocumentIngestServiceProvider;
     private final ObjectProvider<RagDocumentVectorStoreDeleteService> ragDocumentVectorStoreDeleteServiceProvider;
+    private final UserRepository userRepository;
+    private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceMemberRepository workspaceMemberRepository;
 
     @PostMapping(value = "/workspaces/{workspaceId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DocumentUploadResponse> uploadDocument(
@@ -52,24 +63,32 @@ public class DocumentController {
         @RequestPart("file") MultipartFile file,
         @RequestHeader("X-User-Id") Long userId
     ) {
-        if (workspaceId == null || workspaceId <= 0) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
-        }
-        if (file == null || file.isEmpty()) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 파일이 필요합니다.");
-        }
+        validateFile(file);
+        validateWorkspaceAccess(workspaceId, userId);
 
-        String originalFilename = file.getOriginalFilename();
-        String fileName = StringUtils.hasText(originalFilename) ? originalFilename : "file";
-        String fileUrl = uploadToS3(workspaceId, fileName, file);
+        String fileUrl = null;
+        try {
+            String originalFilename = file.getOriginalFilename();
+            String fileName = StringUtils.hasText(originalFilename) ? originalFilename : "file";
+            fileUrl = uploadToS3(workspaceId, fileName, file);
 
-        RagDocument document = ragDocumentCreateService.create(workspaceId, fileName, fileUrl);
-        RagDocumentIngestService ingestService = ragDocumentIngestServiceProvider.getIfAvailable();
-        if (ingestService != null) {
-            ingestService.ingest(workspaceId, document.getId(), file.getResource());
+            RagDocument document = ragDocumentCreateService.create(workspaceId, fileName, fileUrl);
+            RagDocumentIngestService ingestService = ragDocumentIngestServiceProvider.getIfAvailable();
+            if (ingestService != null) {
+                ingestService.ingest(workspaceId, document.getId(), file.getResource());
+            }
+
+            return ResponseEntity.ok(DocumentUploadResponse.from(document));
+        } catch (Exception e) {
+            if (fileUrl != null) {
+                try {
+                    s3ApiClient.deleteDocument(fileUrl);
+                } catch (Exception cleanupEx) {
+                    log.error("S3 cleanup failed for {}", fileUrl, cleanupEx);
+                }
+            }
+            throw e;
         }
-
-        return ResponseEntity.ok(DocumentUploadResponse.from(document));
     }
 
     @GetMapping("/workspaces/{workspaceId}/documents")
@@ -77,18 +96,23 @@ public class DocumentController {
         @PathVariable Long workspaceId,
         @RequestHeader("X-User-Id") Long userId
     ) {
+        validateWorkspaceAccess(workspaceId, userId);
+        
         List<DocumentResponse> response = ragDocumentListService.findActiveDocuments(workspaceId).stream()
                 .map(DocumentResponse::from)
                 .toList();
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/documents/{documentId}")
+    @DeleteMapping("/workspaces/{workspaceId}/documents/{documentId}")
     public ResponseEntity<DocumentDeleteResponse> deleteDocument(
+        @PathVariable Long workspaceId,
         @PathVariable Long documentId,
         @RequestHeader("X-User-Id") Long userId
     ) {
-        RagDocument deleted = ragDocumentDeleteService.deleteByDocumentId(documentId);
+        validateWorkspaceAccess(workspaceId, userId);
+        
+        RagDocument deleted = ragDocumentDeleteService.delete(workspaceId, documentId);
         s3ApiClient.deleteDocument(deleted.getFileUrl());
 
         RagDocumentVectorStoreDeleteService vectorStoreDeleteService =
@@ -98,6 +122,25 @@ public class DocumentController {
         }
 
         return ResponseEntity.ok(DocumentDeleteResponse.of(documentId, "삭제되었습니다."));
+    }
+
+    private void validateWorkspaceAccess(Long workspaceId, Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+
+        Workspace workspace = workspaceRepository.findByIdAndStatus(workspaceId, WorkspaceStatus.ACTIVE)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "활성화된 워크스페이스를 찾을 수 없습니다."));
+
+        boolean isMember = workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user);
+        if (!isMember) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 멤버가 아닙니다.");
+        }
+    }
+
+    private void validateFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "업로드할 파일이 필요합니다.");
+        }
     }
 
     private String uploadToS3(Long workspaceId, String fileName, MultipartFile file) {
