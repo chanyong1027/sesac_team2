@@ -18,10 +18,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 class AuthControllerTest {
 
         @Autowired
@@ -288,7 +290,8 @@ class AuthControllerTest {
 
                         // when - 로그아웃 요청
                         mockMvc.perform(post("/api/v1/auth/logout")
-                                        .header("Authorization", "Bearer " + accessToken))
+                                        .header("Authorization", "Bearer " + accessToken)
+                                        .header("X-User-Id", 1L))
                                         .andDo(print())
                                         .andExpect(status().isOk())
                                         .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"));

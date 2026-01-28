@@ -5,21 +5,39 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
 import com.llm_ops.demo.rag.domain.RagDocumentStatus;
 import com.llm_ops.demo.rag.repository.RagDocumentRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class RagDocumentDeleteService {
 
     private final RagDocumentRepository ragDocumentRepository;
 
-    public RagDocumentDeleteService(RagDocumentRepository ragDocumentRepository) {
-        this.ragDocumentRepository = ragDocumentRepository;
+    @Transactional
+    public RagDocument delete(Long workspaceId, Long documentId) {
+        RagDocument document = getDocument(workspaceId, documentId);
+        return delete(document);
+    }
+
+    @Transactional(readOnly = true)
+    public RagDocument getDocument(Long workspaceId, Long documentId) {
+        validateInput(workspaceId, documentId);
+        return ragDocumentRepository.findByIdAndWorkspaceId(documentId, workspaceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "문서를 찾을 수 없습니다."));
     }
 
     @Transactional
-    public void delete(Long workspaceId, Long documentId) {
-        deleteInternal(workspaceId, documentId);
+    public RagDocument delete(RagDocument document) {
+        if (document == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "document가 필요합니다.");
+        }
+        if (document.getStatus() == RagDocumentStatus.DELETED) {
+            return document;
+        }
+        document.markDeleted();
+        return ragDocumentRepository.save(document);
     }
 
     private void validateInput(Long workspaceId, Long documentId) {
@@ -29,36 +47,5 @@ public class RagDocumentDeleteService {
         if (documentId == null || documentId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "documentId가 필요합니다.");
         }
-    }
-
-    @Transactional
-    public RagDocument deleteByDocumentId(Long documentId) {
-        if (documentId == null || documentId <= 0) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "documentId가 필요합니다.");
-        }
-
-        RagDocument document = ragDocumentRepository.findById(documentId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "문서를 찾을 수 없습니다."));
-
-        if (document.getStatus() == RagDocumentStatus.DELETED) {
-            return document;
-        }
-
-        document.markDeleted();
-        return ragDocumentRepository.save(document);
-    }
-
-    private RagDocument deleteInternal(Long workspaceId, Long documentId) {
-        validateInput(workspaceId, documentId);
-
-        RagDocument document = ragDocumentRepository.findByIdAndWorkspaceId(documentId, workspaceId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "문서를 찾을 수 없습니다."));
-
-        if (document.getStatus() == RagDocumentStatus.DELETED) {
-            return document;
-        }
-
-        document.markDeleted();
-        return ragDocumentRepository.save(document);
     }
 }

@@ -40,8 +40,7 @@ class OrganizationApiKeyAuthServiceTest {
         Long organizationId = 1L;
         OrganizationApiKeyCreateResponse response = organizationApiKeyCreateService.create(
                 organizationId,
-                new OrganizationApiKeyCreateRequest("prod")
-        );
+                new OrganizationApiKeyCreateRequest("prod"));
 
         // when
         Long resolvedOrganizationId = organizationApiKeyAuthService.resolveOrganizationId(response.apiKey());
@@ -63,4 +62,3 @@ class OrganizationApiKeyAuthServiceTest {
                 });
     }
 }
-

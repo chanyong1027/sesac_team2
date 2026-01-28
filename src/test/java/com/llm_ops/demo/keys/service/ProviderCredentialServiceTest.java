@@ -41,14 +41,12 @@ class ProviderCredentialServiceTest {
 
         providerCredentialService.register(
                 organizationId,
-                new ProviderCredentialCreateRequest("openai", apiKey)
-        );
+                new ProviderCredentialCreateRequest("openai", apiKey));
 
         // when
         String decryptedApiKey = providerCredentialService.getDecryptedApiKey(
                 organizationId,
-                ProviderType.OPENAI
-        );
+                ProviderType.OPENAI);
 
         // then
         assertThat(decryptedApiKey).isEqualTo(apiKey);
@@ -63,8 +61,7 @@ class ProviderCredentialServiceTest {
         // when & then
         assertThatThrownBy(() -> providerCredentialService.getDecryptedApiKey(
                 organizationId,
-                ProviderType.OPENAI
-        ))
+                ProviderType.OPENAI))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(exception -> {
                     BusinessException businessException = (BusinessException) exception;
@@ -72,4 +69,3 @@ class ProviderCredentialServiceTest {
                 });
     }
 }
-

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.verify;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -18,6 +19,7 @@ import com.llm_ops.demo.rag.service.RagDocumentIngestService;
 import com.llm_ops.demo.rag.service.RagDocumentListService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreDeleteService;
 import com.llm_ops.demo.rag.storage.S3ApiClient;
+import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +29,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -60,6 +64,13 @@ class DocumentControllerTest {
     @MockitoBean
     private RagDocumentVectorStoreDeleteService ragDocumentVectorStoreDeleteService;
 
+    @MockitoBean
+    private WorkspaceAccessService workspaceAccessService;
+
+    private Authentication createAuth(Long userId) {
+        return new UsernamePasswordAuthenticationToken(userId, null, List.of());
+    }
+
     @Test
     @DisplayName("문서 업로드 API 성공")
     void uploadDocument_Success() throws Exception {
@@ -90,7 +101,7 @@ class DocumentControllerTest {
         // when & then
         mockMvc.perform(multipart("/api/v1/workspaces/{workspaceId}/documents", workspaceId)
                 .file(file)
-                .header("X-User-Id", userId))
+                .with(authentication(createAuth(userId))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.documentId").value(10L))
             .andExpect(jsonPath("$.status").value("ACTIVE"));
@@ -115,7 +126,7 @@ class DocumentControllerTest {
 
         // when & then
         mockMvc.perform(get("/api/v1/workspaces/{workspaceId}/documents", workspaceId)
-                .header("X-User-Id", userId))
+                .with(authentication(createAuth(userId))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(1L))
             .andExpect(jsonPath("$[0].fileName").value("a.txt"))
@@ -129,15 +140,17 @@ class DocumentControllerTest {
     @DisplayName("문서 삭제 API 성공")
     void deleteDocument_Success() throws Exception {
         // given
+        Long workspaceId = 1L;
         Long documentId = 10L;
         Long userId = 1L;
-        RagDocument document = RagDocument.create(1L, "sample.txt", "workspaces/1/documents/sample.txt");
+        RagDocument document = RagDocument.create(workspaceId, "sample.txt", "workspaces/1/documents/sample.txt");
         ReflectionTestUtils.setField(document, "id", documentId);
-        given(ragDocumentDeleteService.deleteByDocumentId(documentId)).willReturn(document);
+        given(ragDocumentDeleteService.getDocument(workspaceId, documentId)).willReturn(document);
+        given(ragDocumentDeleteService.delete(document)).willReturn(document);
 
         // when & then
-        mockMvc.perform(delete("/api/v1/documents/{documentId}", documentId)
-                .header("X-User-Id", userId))
+        mockMvc.perform(delete("/api/v1/workspaces/{workspaceId}/documents/{documentId}", workspaceId, documentId)
+                .with(authentication(createAuth(userId))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.documentId").value(documentId))
             .andExpect(jsonPath("$.message").value("삭제되었습니다."));
