@@ -16,12 +16,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
-@ActiveProfiles("test")
 class RagDocumentExtractServiceTest {
 
-    @Autowired
-    private RagDocumentExtractService ragDocumentExtractService;
+    private final RagDocumentExtractService ragDocumentExtractService = new RagDocumentExtractService();
 
     @Test
     @DisplayName("문서에서 텍스트를 추출한다")

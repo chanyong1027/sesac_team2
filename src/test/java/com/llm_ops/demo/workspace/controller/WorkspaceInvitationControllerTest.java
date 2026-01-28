@@ -9,9 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
-
 import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteCreateResponse;
@@ -21,17 +22,19 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-@SpringBootTest
-@AutoConfigureMockMvc(addFilters = false)
-@ActiveProfiles("test")
+@WebMvcTest(WorkspaceInvitationController.class)
+@AutoConfigureMockMvc
+@ActiveProfiles({"test", "mock-auth"})
+@Import(TestSecurityConfig.class)
 class WorkspaceInvitationControllerTest {
 
     @Autowired
@@ -55,26 +58,24 @@ class WorkspaceInvitationControllerTest {
             Long userId = 1L;
             WorkspaceInviteCreateRequest request = new WorkspaceInviteCreateRequest(WorkspaceRole.MEMBER);
             WorkspaceInviteCreateResponse response = new WorkspaceInviteCreateResponse(
-                "http://localhost:3000/invitations/accept?token=test-token-uuid",
-                "test-token-uuid",
-                WorkspaceRole.MEMBER,
-                LocalDateTime.now().plusDays(7)
-            );
+                    "http://localhost:3000/invitations/accept?token=test-token-uuid",
+                    "test-token-uuid",
+                    WorkspaceRole.MEMBER,
+                    LocalDateTime.now().plusDays(7));
 
             given(workspaceInvitationService.createInvitation(
-                eq(workspaceId), eq(userId), any(WorkspaceInviteCreateRequest.class))
-            ).willReturn(response);
+                    eq(workspaceId), eq(userId), any(WorkspaceInviteCreateRequest.class))).willReturn(response);
 
             // when & then
             mockMvc.perform(post("/api/v1/workspaces/{workspaceId}/invitation-links", workspaceId)
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.invitationUrl").value(response.invitationUrl()))
-                .andExpect(jsonPath("$.token").value(response.token()))
-                .andExpect(jsonPath("$.role").value("MEMBER"))
-                .andExpect(jsonPath("$.expiredAt").exists());
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.invitationUrl").value(response.invitationUrl()))
+                    .andExpect(jsonPath("$.token").value(response.token()))
+                    .andExpect(jsonPath("$.role").value("MEMBER"))
+                    .andExpect(jsonPath("$.expiredAt").exists());
         }
 
         @Test
@@ -86,16 +87,16 @@ class WorkspaceInvitationControllerTest {
             WorkspaceInviteCreateRequest request = new WorkspaceInviteCreateRequest(WorkspaceRole.OWNER);
 
             willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "초대 링크로는 OWNER 역할을 부여할 수 없습니다."))
-                .given(workspaceInvitationService)
-                .createInvitation(eq(workspaceId), eq(userId), any(WorkspaceInviteCreateRequest.class));
+                    .given(workspaceInvitationService)
+                    .createInvitation(eq(workspaceId), eq(userId), any(WorkspaceInviteCreateRequest.class));
 
             // when & then
             mockMvc.perform(post("/api/v1/workspaces/{workspaceId}/invitation-links", workspaceId)
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
         }
     }
 
@@ -116,8 +117,8 @@ class WorkspaceInvitationControllerTest {
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
         }
 
         @Test
@@ -133,8 +134,8 @@ class WorkspaceInvitationControllerTest {
                     .header("X-User-Id", userId)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(requestBody))
-                .andDo(print())
-                .andExpect(status().isBadRequest());
+                    .andDo(print())
+                    .andExpect(status().isBadRequest());
         }
     }
 }
