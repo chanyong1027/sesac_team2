@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -58,7 +58,7 @@ public class DocumentController {
     public ResponseEntity<DocumentUploadResponse> uploadDocument(
         @PathVariable @NotNull @Positive Long workspaceId,
         @RequestPart("file") MultipartFile file,
-        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
+        @AuthenticationPrincipal Long userId
     ) {
         validateFile(file);
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
@@ -103,7 +103,7 @@ public class DocumentController {
     @GetMapping("/workspaces/{workspaceId}/documents")
     public ResponseEntity<List<DocumentResponse>> getDocuments(
         @PathVariable @NotNull @Positive Long workspaceId,
-        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
+        @AuthenticationPrincipal Long userId
     ) {
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
         
@@ -117,7 +117,7 @@ public class DocumentController {
     public ResponseEntity<DocumentDeleteResponse> deleteDocument(
         @PathVariable @NotNull @Positive Long workspaceId,
         @PathVariable @NotNull @Positive Long documentId,
-        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
+        @AuthenticationPrincipal Long userId
     ) {
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
 
