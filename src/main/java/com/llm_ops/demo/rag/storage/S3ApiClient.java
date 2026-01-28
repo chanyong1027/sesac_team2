@@ -22,7 +22,6 @@ import java.util.Map;
 public class S3ApiClient {
 
     private static final Logger log = LoggerFactory.getLogger(S3ApiClient.class);
-
     private final S3Client s3Client;
     private final StorageS3Properties properties;
     private final S3KeyGenerator keyGenerator;
