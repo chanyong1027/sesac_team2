@@ -4,6 +4,7 @@ import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.facade.RagSearchFacade;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/workspaces/{workspaceId}/rag")
 @RequiredArgsConstructor
 @Validated
+@ConditionalOnBean(RagSearchFacade.class)
 @ConditionalOnProperty(prefix = "rag.vectorstore.pgvector", name = "enabled", havingValue = "true")
 public class RagController {
 
