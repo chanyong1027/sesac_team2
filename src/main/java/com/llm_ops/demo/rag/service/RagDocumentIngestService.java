@@ -23,7 +23,7 @@ public class RagDocumentIngestService {
     private final RagDocumentChunkService ragDocumentChunkService;
     private final RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
 
-    public int ingest(Long workspaceId, Long documentId, Resource resource) {
+    public int ingest(Long workspaceId, Long documentId, String documentName, Resource resource) {
         long startNs = System.nanoTime();
         String stage = "start";
         try {
@@ -42,12 +42,13 @@ public class RagDocumentIngestService {
 
             stage = "chunk";
             long chunkStartNs = System.nanoTime();
-            List<Document> chunks = ragDocumentChunkService.chunk(extracted, documentId);
+            List<Document> chunks = ragDocumentChunkService.chunk(extracted, documentId, documentName);
             long chunkMs = (System.nanoTime() - chunkStartNs) / 1_000_000;
             log.info(
-                    "RAG ingest chunk done workspaceId={} documentId={} chunkCount={} tookMs={}",
+                    "RAG ingest chunk done workspaceId={} documentId={} documentName={} chunkCount={} tookMs={}",
                     workspaceId,
                     documentId,
+                    documentName,
                     chunks.size(),
                     chunkMs
             );
