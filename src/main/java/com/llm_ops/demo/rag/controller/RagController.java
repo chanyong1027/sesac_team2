@@ -3,6 +3,8 @@ package com.llm_ops.demo.rag.controller;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.facade.RagSearchFacade;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -27,9 +29,9 @@ public class RagController {
 
     @GetMapping("/search")
     public ResponseEntity<RagSearchResponse> search(
-        @PathVariable Long workspaceId,
+        @PathVariable @NotNull @Positive Long workspaceId,
         @RequestParam @NotBlank String query,
-        @RequestHeader("X-User-Id") Long userId
+        @RequestHeader("X-User-Id") @NotNull @Positive Long userId
     ) {
         RagSearchResponse response = ragSearchFacade.search(workspaceId, userId, query);
         return ResponseEntity.ok(response);
