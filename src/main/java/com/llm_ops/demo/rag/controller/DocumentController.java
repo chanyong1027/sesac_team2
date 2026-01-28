@@ -64,24 +64,36 @@ public class DocumentController {
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
 
         String fileUrl = null;
+        RagDocument createdDocument = null;
         try {
             String originalFilename = file.getOriginalFilename();
             String fileName = StringUtils.hasText(originalFilename) ? originalFilename : "file";
             fileUrl = uploadToS3(workspaceId, fileName, file);
 
-            RagDocument document = ragDocumentCreateService.create(workspaceId, fileName, fileUrl);
+            createdDocument = ragDocumentCreateService.create(workspaceId, fileName, fileUrl);
             RagDocumentIngestService ingestService = ragDocumentIngestServiceProvider.getIfAvailable();
             if (ingestService != null) {
-                ingestService.ingest(workspaceId, document.getId(), file.getResource());
+                ingestService.ingest(workspaceId, createdDocument.getId(), file.getResource());
             }
 
-            return ResponseEntity.ok(DocumentUploadResponse.from(document));
+            return ResponseEntity.ok(DocumentUploadResponse.from(createdDocument));
         } catch (Exception e) {
             if (fileUrl != null) {
                 try {
                     s3ApiClient.deleteDocument(fileUrl);
+                    log.info("S3 cleanup succeeded for {}", fileUrl);
                 } catch (Exception cleanupEx) {
                     log.error("S3 cleanup failed for {}", fileUrl, cleanupEx);
+                }
+            }
+            if (createdDocument != null) {
+                try {
+                    ragDocumentDeleteService.delete(createdDocument);
+                    log.info("Document cleanup succeeded for workspaceId={}, documentId={}",
+                            workspaceId, createdDocument.getId());
+                } catch (Exception cleanupEx) {
+                    log.error("Document cleanup failed for workspaceId={}, documentId={}",
+                            workspaceId, createdDocument.getId(), cleanupEx);
                 }
             }
             throw e;
@@ -108,9 +120,10 @@ public class DocumentController {
         @RequestHeader("X-User-Id") @NotNull @Positive Long userId
     ) {
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
-        
-        RagDocument deleted = ragDocumentDeleteService.delete(workspaceId, documentId);
-        s3ApiClient.deleteDocument(deleted.getFileUrl());
+
+        RagDocument target = ragDocumentDeleteService.getDocument(workspaceId, documentId);
+        s3ApiClient.deleteDocument(target.getFileUrl());
+        RagDocument deleted = ragDocumentDeleteService.delete(target);
 
         RagDocumentVectorStoreDeleteService vectorStoreDeleteService =
                 ragDocumentVectorStoreDeleteServiceProvider.getIfAvailable();

@@ -9,6 +9,7 @@ import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreSaveService;
+import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,9 @@ class RagControllerTest {
 
     @MockitoBean
     private RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
+
+    @MockitoBean
+    private WorkspaceAccessService workspaceAccessService;
 
     @Test
     @DisplayName("RAG 검색 API 성공")

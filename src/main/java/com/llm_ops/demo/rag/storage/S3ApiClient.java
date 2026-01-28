@@ -67,6 +67,11 @@ public class S3ApiClient {
                 .bucket(properties.getBucket())
                 .key(key)
                 .build();
-        s3Client.deleteObject(request);
+        try {
+            s3Client.deleteObject(request);
+        } catch (Exception ex) {
+            log.error("S3 delete failed. key={}", key, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 삭제에 실패했습니다.");
+        }
     }
 }

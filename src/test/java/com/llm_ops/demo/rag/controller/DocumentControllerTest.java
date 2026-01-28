@@ -138,7 +138,8 @@ class DocumentControllerTest {
         Long userId = 1L;
         RagDocument document = RagDocument.create(workspaceId, "sample.txt", "workspaces/1/documents/sample.txt");
         ReflectionTestUtils.setField(document, "id", documentId);
-        given(ragDocumentDeleteService.delete(workspaceId, documentId)).willReturn(document);
+        given(ragDocumentDeleteService.getDocument(workspaceId, documentId)).willReturn(document);
+        given(ragDocumentDeleteService.delete(document)).willReturn(document);
 
         // when & then
         mockMvc.perform(delete("/api/v1/workspaces/{workspaceId}/documents/{documentId}", workspaceId, documentId)
