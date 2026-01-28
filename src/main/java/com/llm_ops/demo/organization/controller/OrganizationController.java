@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,7 +21,7 @@ public class OrganizationController {
 
     @PostMapping
     public ResponseEntity<OrganizationCreateResponse> createOrganization(
-        @RequestHeader("X-User-Id") Long userId,
+        @AuthenticationPrincipal Long userId,
         @Valid @RequestBody OrganizationCreateRequest request
     ) {
         OrganizationCreateResponse response = organizationService.create(userId, request);

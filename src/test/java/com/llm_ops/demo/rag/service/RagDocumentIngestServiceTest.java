@@ -1,5 +1,6 @@
 package com.llm_ops.demo.rag.service;
 
+import com.llm_ops.demo.config.TestVectorStoreConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.autoconfigure.vectorstore.pgvector.PgVectorStoreAutoConfiguration;
@@ -13,8 +14,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import com.llm_ops.demo.config.TestVectorStoreConfig;
 
 import java.util.List;
 
