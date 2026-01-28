@@ -8,10 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 청킹된 문서를 벡터 스토어에 저장하는 서비스입니다.
@@ -38,7 +35,7 @@ public class RagDocumentVectorStoreSaveService {
 
     /**
      * 청킹된 문서 목록을 받아서 벡터 스토어에 저장합니다.
-     * 각 문서 청크에는 검색 필터링을 위한 메타데이터(workspaceId, documentId)가 추가됩니다.
+     * 각 문서 청크에는 검색 필터링을 위한 메타데이터(workspaceId, documentId)가 포함되어야 합니다.
      *
      * @param workspaceId 문서가 속한 워크스페이스의 ID (멀티테넌시 격리용)
      * @param documentId  원본 문서의 ID (선택 사항, 추후 필수 예정)
@@ -47,15 +44,10 @@ public class RagDocumentVectorStoreSaveService {
      * @throws BusinessException 입력 값이 유효하지 않을 경우
      */
     public int save(Long workspaceId, Long documentId, List<Document> chunks) {
-        validateInput(workspaceId, documentId, chunks); // 입력 유효성 검증
-
-        List<Document> enriched = new ArrayList<>();
-        for (Document document : chunks) {
-            enriched.add(applyMetadata(document, workspaceId, documentId)); // 문서에 메타데이터 추가
-        }
-
-        vectorStore.add(enriched); // 벡터 스토어에 문서 저장
-        return enriched.size();
+        validateInput(workspaceId, documentId, chunks);
+        validateChunkMetadata(workspaceId, documentId, chunks);
+        vectorStore.add(chunks);
+        return chunks.size();
     }
 
     /**
@@ -73,23 +65,18 @@ public class RagDocumentVectorStoreSaveService {
         }
     }
 
-    /**
-     * 문서 청크에 워크스페이스 ID와 문서 ID 메타데이터를 추가합니다.
-     * 이 메타데이터는 RAG 검색 시 필터링 조건으로 사용됩니다.
-     */
-    private Document applyMetadata(Document document, Long workspaceId, Long documentId) {
-        Map<String, Object> metadata = new HashMap<>(document.getMetadata());
-        metadata.put(METADATA_WORKSPACE_ID, workspaceId); // 워크스페이스 ID 추가 (tenant isolation)
-        if (documentId != null) {
-            metadata.put(METADATA_DOCUMENT_ID, documentId); // 문서 ID 추가
+    private void validateChunkMetadata(Long workspaceId, Long documentId, List<Document> chunks) {
+        for (Document document : chunks) {
+            Object workspaceMeta = document.getMetadata().get(METADATA_WORKSPACE_ID);
+            if (!(workspaceMeta instanceof Number) || ((Number) workspaceMeta).longValue() != workspaceId) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "청크 메타데이터 workspace_id가 누락되었거나 올바르지 않습니다.");
+            }
+            if (documentId != null) {
+                Object documentMeta = document.getMetadata().get(METADATA_DOCUMENT_ID);
+                if (!(documentMeta instanceof Number) || ((Number) documentMeta).longValue() != documentId) {
+                    throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "청크 메타데이터 document_id가 누락되었거나 올바르지 않습니다.");
+                }
+            }
         }
-
-        Document enriched = document.mutate() // 기존 문서 객체에 메타데이터를 추가하여 새로운 문서 객체 생성
-                .metadata(metadata)
-                .build();
-        if (document.getContentFormatter() != null) {
-            enriched.setContentFormatter(document.getContentFormatter()); // 기존 포맷터 유지
-        }
-        return enriched;
     }
 }
