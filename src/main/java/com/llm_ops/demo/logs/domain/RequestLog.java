@@ -4,6 +4,8 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -11,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -23,26 +26,25 @@ import org.hibernate.annotations.CreationTimestamp;
  * Gateway에서 LLM 호출 후 토큰 사용량, 비용, 지연시간 등을 기록한다.
  */
 @Entity
+// 쿼리 튜닝 - 인덱스 최적화
 @Table(name = "request_logs", indexes = {
-        // 인덱싱 이유
-        // trace_id : trace_id로 조회하는 경우가 많음
-        // workspace_id : workspace_id로 조회하는 경우가 많음
-        // created_at : created_at으로 조회하는 경우가 많음
         @Index(name = "idx_request_logs_trace_id", columnList = "trace_id"),
-        @Index(name = "idx_request_logs_workspace_id", columnList = "workspace_id"),
-        @Index(name = "idx_request_logs_created_at", columnList = "created_at")
+        // 복합 인덱스로 변경
+        @Index(name = "idx_workspace_created", columnList = "workspace_id, created_at DESC")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RequestLog {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
     /**
      * 요청 추적을 위한 고유 식별자 (UUID).
      * 분산 환경에서 충돌 없이 생성 가능하며, 시스템 전 구간 추적에 사용된다.
      */
-    @Id
-    @Column(name = "trace_id", columnDefinition = "uuid", updatable = false, nullable = false)
     // updatable = false : 트랜잭션이 종료되면 변경 불가능
+    @Column(name = "trace_id", columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID traceId;
 
     /**
@@ -105,11 +107,14 @@ public class RequestLog {
     private LocalDateTime createdAt;
 
     @Builder
-    public RequestLog(UUID traceId, Workspace workspace, Long promptVersionId,
+    private RequestLog(UUID traceId, Workspace workspace, Long promptVersionId,
             Integer totalTokens, BigDecimal estimatedCost, Integer latencyMs,
             Integer statusCode, String errorCode) {
-        this.traceId = traceId;
-        this.workspace = workspace;
+        // 필수 파라미터 검증 - build() 시점에 즉시 실패
+        this.traceId = Objects.requireNonNull(traceId, "traceId는 필수입니다");
+        this.workspace = Objects.requireNonNull(workspace, "workspace는 필수입니다");
+
+        // 선택적 파라미터
         this.promptVersionId = promptVersionId;
         this.totalTokens = totalTokens;
         this.estimatedCost = estimatedCost;
