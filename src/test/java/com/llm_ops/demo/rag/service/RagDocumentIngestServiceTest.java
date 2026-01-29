@@ -1,5 +1,6 @@
 package com.llm_ops.demo.rag.service;
 
+import com.llm_ops.demo.config.TestVectorStoreConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.autoconfigure.vectorstore.pgvector.PgVectorStoreAutoConfiguration;
@@ -7,6 +8,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
@@ -25,6 +27,7 @@ import static org.mockito.Mockito.when;
 @ActiveProfiles("test")
 @TestPropertySource(properties = "rag.vectorstore.pgvector.enabled=true")
 @ImportAutoConfiguration(exclude = PgVectorStoreAutoConfiguration.class)
+@Import(TestVectorStoreConfig.class)
 class RagDocumentIngestServiceTest {
 
     @Autowired
