@@ -6,6 +6,7 @@ import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,9 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private RagSearchService ragSearchService;
+
+    @Mock
+    private WorkspaceRepository workspaceRepository;
 
     @InjectMocks
     private GatewayChatService gatewayChatService;
