@@ -1,12 +1,13 @@
 package com.llm_ops.demo.prompt.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
 import java.time.LocalDateTime;
 
 public record PromptVersionSummaryResponse(
     Long id,
-    Integer versionNo,
+    @JsonProperty("versionNumber") Integer versionNo,
     String title,
     ProviderType provider,
     String model,
