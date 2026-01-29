@@ -16,4 +16,6 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     List<Workspace> findByOrganizationAndStatus(Organization organization, WorkspaceStatus status);
 
     boolean existsByOrganizationAndName(Organization organization, String name);
+
+    boolean existsByIdAndOrganizationIdAndStatus(Long id, Long organizationId, WorkspaceStatus status);
 }

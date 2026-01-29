@@ -69,7 +69,8 @@ class GatewayChatServiceTest {
                 GatewayChatRequest request = new GatewayChatRequest(
                                 1L,
                                 "hello {{name}}",
-                                Map.of("name", "lumina"));
+                                Map.of("name", "lumina"),
+                                false);
 
                 // when
                 var chatResponse = gatewayChatService.chat(response.apiKey(), request);

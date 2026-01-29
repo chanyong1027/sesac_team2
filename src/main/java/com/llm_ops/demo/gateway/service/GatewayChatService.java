@@ -11,6 +11,11 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
+import com.llm_ops.demo.rag.dto.RagSearchResponse;
+import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -22,12 +27,14 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -37,6 +44,17 @@ import java.util.UUID;
 public class GatewayChatService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final int MAX_RAG_CHUNKS = 10;
+    private static final int MAX_RAG_CHARS = 4000;
+    private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
+    private static final String RAG_CONTEXT_TEMPLATE = """
+            다음은 질문과 관련된 참고 문서입니다:
+            
+            %s
+            
+            위 문서를 참고하여 다음 질문에 답변해주세요:
+            
+            """;
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
     private final GatewayChatProviderResolveService gatewayChatProviderResolveService;
@@ -44,6 +62,8 @@ public class GatewayChatService {
     private final ProviderCredentialService providerCredentialService;
     private final GatewayModelProperties gatewayModelProperties;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
+    private final RagSearchService ragSearchService;
+    private final WorkspaceRepository workspaceRepository;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -51,7 +71,9 @@ public class GatewayChatService {
             GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
             ProviderCredentialService providerCredentialService,
             GatewayModelProperties gatewayModelProperties,
-            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider
+            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
+            @Autowired(required = false) RagSearchService ragSearchService,
+            WorkspaceRepository workspaceRepository
     ) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatProviderResolveService = gatewayChatProviderResolveService;
@@ -59,6 +81,8 @@ public class GatewayChatService {
         this.providerCredentialService = providerCredentialService;
         this.gatewayModelProperties = gatewayModelProperties;
         this.openAiChatModelProvider = openAiChatModelProvider;
+        this.ragSearchService = ragSearchService;
+        this.workspaceRepository = workspaceRepository;
     }
 
     /**
@@ -69,15 +93,15 @@ public class GatewayChatService {
      * @return LLM의 답변 및 관련 메타데이터가 포함된 응답 DTO
      */
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
-        // 1. API 키를 인증하여 조직 ID를 확인합니다.
         Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
-        // TODO: Validate workspaceId belongs to organizationId once workspace domain is available.
 
-        // 2. 프롬프트 템플릿에 변수를 주입하여 최종 프롬프트를 생성합니다.
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
-        // 3. 요청 시점에 조직별 API 키를 주입하여 LLM을 호출합니다.
-        // 요청 시점에 조직별 Provider와 API 키를 결정해 멀티테넌시 분리를 보장합니다.
+        if (request.isRagEnabled()) {
+            validateWorkspaceOwnership(organizationId, request.workspaceId());
+            prompt = enrichPromptWithRagContext(request.workspaceId(), prompt);
+        }
+
         ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
         String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
         ChatResponse response = switch (providerType) {
@@ -86,7 +110,6 @@ public class GatewayChatService {
             case GEMINI -> callGemini(prompt, providerApiKey);
         };
 
-        // 4. LLM 응답을 파싱하고 최종 응답 DTO를 구성합니다.
         String answer = response.getResult().getOutput().getText();
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
@@ -94,10 +117,93 @@ public class GatewayChatService {
         return GatewayChatResponse.from(
                 traceId,
                 answer,
-                false, // TODO: Failover 로직 구현 시 동적으로 설정 필요
+                false,
                 usedModel,
                 extractUsage(response)
         );
+    }
+
+    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
+                workspaceId,
+                organizationId,
+                WorkspaceStatus.ACTIVE
+        );
+        if (!exists) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
+        }
+    }
+
+    private String enrichPromptWithRagContext(Long workspaceId, String originalPrompt) {
+        if (ragSearchService == null) {
+            return originalPrompt;
+        }
+
+        RagSearchResponse ragResponse = ragSearchService.search(workspaceId, originalPrompt);
+        if (ragResponse.chunks() == null || ragResponse.chunks().isEmpty()) {
+            return originalPrompt;
+        }
+
+        String context = buildRagContext(ragResponse.chunks());
+
+        return String.format(RAG_CONTEXT_TEMPLATE, context) + originalPrompt;
+    }
+
+    private String buildRagContext(List<ChunkDetailResponse> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int count = 0;
+        int totalChars = 0;
+        boolean truncated = false;
+
+        for (ChunkDetailResponse chunk : chunks) {
+            if (count >= MAX_RAG_CHUNKS) {
+                truncated = true;
+                break;
+            }
+            if (chunk == null || chunk.content() == null || chunk.content().isBlank()) {
+                continue;
+            }
+
+            String content = chunk.content();
+            int remaining = MAX_RAG_CHARS - totalChars;
+            if (remaining <= 0) {
+                truncated = true;
+                break;
+            }
+
+            if (content.length() > remaining) {
+                content = content.substring(0, remaining);
+                truncated = true;
+            }
+
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(content);
+            totalChars += content.length();
+            count++;
+
+            if (totalChars >= MAX_RAG_CHARS) {
+                truncated = true;
+                break;
+            }
+        }
+
+        if (truncated) {
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(RAG_TRUNCATED_MARKER);
+        }
+
+        return builder.toString();
     }
 
     /**
