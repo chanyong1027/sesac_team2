@@ -1,7 +1,6 @@
 package com.llm_ops.demo.rag.controller;
 
 import static org.mockito.BDDMockito.given;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,7 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.test.context.TestSecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -38,10 +37,6 @@ class RagControllerTest {
     @MockitoBean
     private RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
 
-    private Authentication createAuth(Long userId) {
-        return new UsernamePasswordAuthenticationToken(userId, null, List.of());
-    }
-
     @Test
     @DisplayName("RAG 검색 API 성공")
     void search_Success() throws Exception {
@@ -56,12 +51,18 @@ class RagControllerTest {
         given(ragSearchFacade.search(workspaceId, userId, query)).willReturn(response);
 
         // when & then
-        mockMvc.perform(get("/api/v1/workspaces/{workspaceId}/rag/search", workspaceId)
-                .with(authentication(createAuth(userId)))
-                .param("query", query))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.chunks[0].content").value("환불은 7일 이내 가능합니다."))
-            .andExpect(jsonPath("$.chunks[0].score").value(0.87))
-            .andExpect(jsonPath("$.chunks[0].documentName").value("policy.md"));
+        TestSecurityContextHolder.setAuthentication(
+            new UsernamePasswordAuthenticationToken(userId, null, List.of())
+        );
+        try {
+            mockMvc.perform(get("/api/v1/workspaces/{workspaceId}/rag/search", workspaceId)
+                    .param("query", query))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.chunks[0].content").value("환불은 7일 이내 가능합니다."))
+                .andExpect(jsonPath("$.chunks[0].score").value(0.87))
+                .andExpect(jsonPath("$.chunks[0].documentName").value("policy.md"));
+        } finally {
+            TestSecurityContextHolder.clearContext();
+        }
     }
 }
