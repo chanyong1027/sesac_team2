@@ -7,6 +7,12 @@ import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.organization.domain.Organization;
+import com.llm_ops.demo.organization.repository.OrganizationRepository;
+import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,22 +51,42 @@ class ChatCompletionE2ETest {
     @Autowired
     private ProviderCredentialRepository providerCredentialRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
     private MockMvc mockMvc;
     private OrganizationApiKeyCreateResponse apiKeyResponse;
+    private Long organizationId;
+    private Long workspaceId;
 
     @BeforeEach
     void setUp() {
         mockMvc = webAppContextSetup(context).build();
         organizationApiKeyRepository.deleteAll();
         providerCredentialRepository.deleteAll();
+        workspaceRepository.deleteAll();
+        organizationRepository.deleteAll();
+        userRepository.deleteAll();
+
+        User creator = userRepository.save(User.create("e2e@example.com", "password", "tester"));
+        Organization organization = organizationRepository.save(Organization.create("테스트 조직", creator));
+        Workspace workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
+        organizationId = organization.getId();
+        workspaceId = workspace.getId();
 
         apiKeyResponse = organizationApiKeyCreateService.create(
-                1L,
+                organizationId,
                 new OrganizationApiKeyCreateRequest("prod")
         );
 
         providerCredentialService.register(
-                1L,
+                organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
     }
@@ -69,6 +95,9 @@ class ChatCompletionE2ETest {
     void tearDown() {
         organizationApiKeyRepository.deleteAll();
         providerCredentialRepository.deleteAll();
+        workspaceRepository.deleteAll();
+        organizationRepository.deleteAll();
+        userRepository.deleteAll();
     }
 
     @Test
@@ -77,15 +106,15 @@ class ChatCompletionE2ETest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "hello {{name}}",
                                   "variables": {
                                     "name": "lumina"
                                   }
                                 }
-                                """))
+                                """, workspaceId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value("hello lumina"))
                 .andExpect(jsonPath("$.traceId").isString())
@@ -98,15 +127,15 @@ class ChatCompletionE2ETest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "hello {{name}}",
                                   "variables": {
                                     "name": "lumina"
                                   }
                                 }
-                                """))
+                                """, workspaceId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value("hello lumina"))
                 .andExpect(jsonPath("$.traceId").isString())
@@ -118,12 +147,12 @@ class ChatCompletionE2ETest {
     void 인증_실패_401() throws Exception {
         mockMvc.perform(post("/v1/chat/completions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "hello"
                                 }
-                                """))
+                                """, workspaceId)))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -148,15 +177,15 @@ class ChatCompletionE2ETest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "hello {{name}}",
                                   "variables": {
                                     "name": "test"
                                   }
                                 }
-                                """))
+                                """, workspaceId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value("hello test"))
                 .andExpect(jsonPath("$.traceId").isString())
@@ -169,15 +198,15 @@ class ChatCompletionE2ETest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "hello {{name}}",
                                   "variables": {
                                     "name": null
                                   }
                                 }
-                                """))
+                                """, workspaceId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("C400"));
     }

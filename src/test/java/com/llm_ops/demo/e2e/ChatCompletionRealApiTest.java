@@ -9,6 +9,12 @@ import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.organization.domain.Organization;
+import com.llm_ops.demo.organization.repository.OrganizationRepository;
+import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,9 +46,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfEnvironmentVariable(named = "GATEWAY_REAL_API_TEST", matches = "true")
 class ChatCompletionRealApiTest {
 
-    private static final Long WORKSPACE_ID = 1L;
-    private static final Long ORGANIZATION_ID = 1L;
-
     @Autowired
     private GatewayChatService gatewayChatService;
 
@@ -58,10 +61,31 @@ class ChatCompletionRealApiTest {
     @Autowired
     private ProviderCredentialRepository providerCredentialRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    private Long organizationId;
+    private Long workspaceId;
+
     @BeforeEach
     void setUp() {
         organizationApiKeyRepository.deleteAll();
         providerCredentialRepository.deleteAll();
+        workspaceRepository.deleteAll();
+        organizationRepository.deleteAll();
+        userRepository.deleteAll();
+
+        User creator = userRepository.save(User.create("realapi@example.com", "password", "tester"));
+        Organization organization = organizationRepository.save(Organization.create("테스트 조직", creator));
+        Workspace workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
+        organizationId = organization.getId();
+        workspaceId = workspace.getId();
     }
 
     @Test
@@ -69,18 +93,18 @@ class ChatCompletionRealApiTest {
     void 실제_OpenAI_API_호출_테스트() {
         // given
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                ORGANIZATION_ID,
+                organizationId,
                 new OrganizationApiKeyCreateRequest("prod")
         );
 
         String openaiApiKey = System.getenv("OPENAI_API_KEY");
         providerCredentialService.register(
-                ORGANIZATION_ID,
+                organizationId,
                 new ProviderCredentialCreateRequest("openai", openaiApiKey)
         );
 
         GatewayChatRequest request = new GatewayChatRequest(
-                WORKSPACE_ID,
+                workspaceId,
                 "안녕하세요. 당신은 누구입니까?",
                 Map.of(),
                 false
