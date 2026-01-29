@@ -26,7 +26,7 @@ import org.springframework.test.context.ActiveProfiles;
  * <h2>테스트 목적</h2>
  * <ul>
  * <li>JPA 엔티티 매핑이 정상적으로 동작하는지 확인</li>
- * <li>UUID PK 저장 및 조회가 정상적으로 동작하는지 확인</li>
+ * <li>Long PK 저장 및 조회가 정상적으로 동작하는지 확인</li>
  * <li>Workspace와의 연관관계 매핑이 정상인지 확인</li>
  * </ul>
  */
@@ -97,8 +97,8 @@ class RequestLogRepositoryTest {
     class FindByIdTest {
 
         @Test
-        @DisplayName("존재하는_traceId로_조회하면_해당_로그가_반환된다")
-        void 존재하는_traceId로_조회하면_해당_로그가_반환된다() {
+        @DisplayName("존재하는_id로_조회하면_해당_로그가_반환된다")
+        void 존재하는_id로_조회하면_해당_로그가_반환된다() {
             // given: 로그 저장
             UUID traceId = UUID.randomUUID();
             RequestLog requestLog = RequestLog.builder()
@@ -108,10 +108,10 @@ class RequestLogRepositoryTest {
                     .latencyMs(200)
                     .statusCode(200)
                     .build();
-            requestLogRepository.save(requestLog);
+            RequestLog saved = requestLogRepository.save(requestLog);
 
-            // when: traceId로 조회
-            Optional<RequestLog> found = requestLogRepository.findById(traceId);
+            // when: id로 조회
+            Optional<RequestLog> found = requestLogRepository.findById(saved.getId());
 
             // then: 조회 결과 검증
             assertThat(found).isPresent();
@@ -120,10 +120,10 @@ class RequestLogRepositoryTest {
         }
 
         @Test
-        @DisplayName("존재하지_않는_traceId로_조회하면_빈_Optional이_반환된다")
-        void 존재하지_않는_traceId로_조회하면_빈_Optional이_반환된다() {
-            // given: 존재하지 않는 UUID
-            UUID nonExistentId = UUID.randomUUID();
+        @DisplayName("존재하지_않는_id로_조회하면_빈_Optional이_반환된다")
+        void 존재하지_않는_id로_조회하면_빈_Optional이_반환된다() {
+            // given: 존재하지 않는 ID
+            Long nonExistentId = 999999L;
 
             // when: 조회
             Optional<RequestLog> found = requestLogRepository.findById(nonExistentId);
