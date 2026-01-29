@@ -27,6 +27,10 @@ public class RagSearchService {
         this.ragSearchProperties = ragSearchProperties;
     }
 
+    public RagSearchResponse search(Long workspaceId, String query) {
+        return search(workspaceId, query, null, null);
+    }
+
     public RagSearchResponse search(Long workspaceId, String query, Integer topK, Double similarityThreshold) {
         validateInput(workspaceId, query, topK, similarityThreshold);
 

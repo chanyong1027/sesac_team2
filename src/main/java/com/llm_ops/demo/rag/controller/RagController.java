@@ -1,9 +1,12 @@
 package com.llm_ops.demo.rag.controller;
 
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
-import com.llm_ops.demo.rag.service.RagSearchService;
-import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
+import com.llm_ops.demo.rag.facade.RagSearchFacade;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,21 +20,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/workspaces/{workspaceId}/rag")
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "rag.vectorstore.pgvector", name = "enabled", havingValue = "true")
 @Validated
+@ConditionalOnBean(RagSearchFacade.class)
+@ConditionalOnProperty(prefix = "rag.vectorstore.pgvector", name = "enabled", havingValue = "true")
 public class RagController {
 
-    private final RagSearchService ragSearchService;
-    private final WorkspaceAccessService workspaceAccessService;
+    private final RagSearchFacade ragSearchFacade;
 
     @GetMapping("/search")
     public ResponseEntity<RagSearchResponse> search(
-        @PathVariable Long workspaceId,
-        @RequestParam String query,
-        @AuthenticationPrincipal Long userId
+        @PathVariable @NotNull @Positive Long workspaceId,
+        @RequestParam @NotBlank String query,
+        @AuthenticationPrincipal @NotNull @Positive Long userId
     ) {
-        workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
-        RagSearchResponse response = ragSearchService.search(workspaceId, query, null, null);
+        RagSearchResponse response = ragSearchFacade.search(workspaceId, userId, query);
         return ResponseEntity.ok(response);
     }
 }
