@@ -44,6 +44,9 @@ import java.util.stream.Collectors;
 public class GatewayChatService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final int MAX_RAG_CHUNKS = 10;
+    private static final int MAX_RAG_CHARS = 4000;
+    private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
     private static final String RAG_CONTEXT_TEMPLATE = """
             다음은 질문과 관련된 참고 문서입니다:
             
@@ -144,11 +147,63 @@ public class GatewayChatService {
             return originalPrompt;
         }
 
-        String context = ragResponse.chunks().stream()
-                .map(ChunkDetailResponse::content)
-                .collect(Collectors.joining("\n\n---\n\n"));
+        String context = buildRagContext(ragResponse.chunks());
 
         return String.format(RAG_CONTEXT_TEMPLATE, context) + originalPrompt;
+    }
+
+    private String buildRagContext(List<ChunkDetailResponse> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int count = 0;
+        int totalChars = 0;
+        boolean truncated = false;
+
+        for (ChunkDetailResponse chunk : chunks) {
+            if (count >= MAX_RAG_CHUNKS) {
+                truncated = true;
+                break;
+            }
+            if (chunk == null || chunk.content() == null || chunk.content().isBlank()) {
+                continue;
+            }
+
+            String content = chunk.content();
+            int remaining = MAX_RAG_CHARS - totalChars;
+            if (remaining <= 0) {
+                truncated = true;
+                break;
+            }
+
+            if (content.length() > remaining) {
+                content = content.substring(0, remaining);
+                truncated = true;
+            }
+
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(content);
+            totalChars += content.length();
+            count++;
+
+            if (totalChars >= MAX_RAG_CHARS) {
+                truncated = true;
+                break;
+            }
+        }
+
+        if (truncated) {
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(RAG_TRUNCATED_MARKER);
+        }
+
+        return builder.toString();
     }
 
     /**
