@@ -59,7 +59,7 @@ public class PromptVersion {
     @Column(name = "user_template", columnDefinition = "TEXT")
     private String userTemplate;
 
-    @Column(name = "model_config", columnDefinition = "jsonb")
+    @Column(name = "model_config")
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> modelConfig;
 

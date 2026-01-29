@@ -34,7 +34,14 @@ class RagDocumentVectorStoreSaveServiceTest {
         // given
         Long workspaceId = 1L;
         Long documentId = 10L;
-        Document chunk = new Document("hello", Map.of("chunk_index", 0));
+        Document chunk = new Document(
+                "hello",
+                Map.of(
+                        "chunk_index", 0,
+                        "workspace_id", workspaceId,
+                        "document_id", documentId
+                )
+        );
 
         // when
         int savedCount = ragDocumentVectorStoreSaveService.save(workspaceId, documentId, List.of(chunk));
