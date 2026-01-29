@@ -1,10 +1,18 @@
 package com.llm_ops.demo.rag.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.llm_ops.demo.config.TestVectorStoreConfig;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.autoconfigure.vectorstore.pgvector.PgVectorStoreAutoConfiguration;
 import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -13,15 +21,6 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -35,6 +34,9 @@ class RagDocumentIngestServiceTest {
 
     @MockBean
     private RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
+
+    @MockBean
+    private RagSearchService ragSearchService;
 
     @MockBean
     private RagDocumentChunkService ragDocumentChunkService;

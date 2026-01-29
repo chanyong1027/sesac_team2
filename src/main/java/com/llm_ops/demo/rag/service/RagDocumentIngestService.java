@@ -1,5 +1,6 @@
 package com.llm_ops.demo.rag.service;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -7,8 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 /**
  * 문서 업로드 이후 RAG 인게스트 파이프라인(추출 → 청킹 → 벡터 저장)을 수행합니다.
