@@ -16,6 +16,18 @@ public class RagDocumentDeleteService {
     private final RagDocumentRepository ragDocumentRepository;
 
     @Transactional
+    public RagDocument markDeleting(Long workspaceId, Long documentId) {
+        validateInput(workspaceId, documentId);
+        RagDocument document = ragDocumentRepository.findByIdAndWorkspaceId(documentId, workspaceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "문서를 찾을 수 없습니다."));
+        if (document.getStatus() == RagDocumentStatus.DELETED) {
+            return document;
+        }
+        document.markDeleting();
+        return ragDocumentRepository.save(document);
+    }
+
+    @Transactional
     public RagDocument delete(Long workspaceId, Long documentId) {
         validateInput(workspaceId, documentId);
         RagDocument document = ragDocumentRepository.findByIdAndWorkspaceId(documentId, workspaceId)
