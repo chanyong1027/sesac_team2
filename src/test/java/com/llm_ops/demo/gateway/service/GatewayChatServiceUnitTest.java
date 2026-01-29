@@ -180,8 +180,8 @@ class GatewayChatServiceUnitTest {
             Long workspaceId = 1L;
             String originalPrompt = "오늘 날씨 어때?";
             List<ChunkDetailResponse> chunks = List.of(
-                    new ChunkDetailResponse("서울의 오늘 날씨는 맑음입니다.", 0.95, "weather.txt"),
-                    new ChunkDetailResponse("기온은 25도입니다.", 0.90, "weather.txt")
+                    new ChunkDetailResponse("서울의 오늘 날씨는 맑음입니다.", 0.95, null, "weather.txt"),
+                    new ChunkDetailResponse("기온은 25도입니다.", 0.90, null, "weather.txt")
             );
             when(ragSearchService.search(anyLong(), anyString()))
                     .thenReturn(new RagSearchResponse(chunks));
