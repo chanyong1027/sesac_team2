@@ -55,7 +55,7 @@ class RagDocumentIngestServiceTest {
         List<Document> chunks = List.of(new Document("chunk", java.util.Map.of("workspace_id", workspaceId)));
 
         when(ragDocumentExtractService.extract(workspaceId, resource)).thenReturn(extracted);
-        when(ragDocumentChunkService.chunk(extracted, documentId)).thenReturn(chunks);
+        when(ragDocumentChunkService.chunk(extracted, documentId, "sample.txt")).thenReturn(chunks);
         when(ragDocumentVectorStoreSaveService.save(workspaceId, documentId, chunks)).thenReturn(chunks.size());
 
         // when

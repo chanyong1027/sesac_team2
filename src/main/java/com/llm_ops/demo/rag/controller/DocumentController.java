@@ -88,7 +88,7 @@ public class DocumentController {
             }
             if (createdDocument != null) {
                 try {
-                    ragDocumentDeleteService.delete(createdDocument);
+                    ragDocumentDeleteService.delete(workspaceId, createdDocument.getId());
                     log.info("Document cleanup succeeded for workspaceId={}, documentId={}",
                             workspaceId, createdDocument.getId());
                 } catch (Exception cleanupEx) {
@@ -121,9 +121,17 @@ public class DocumentController {
     ) {
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
 
-        RagDocument target = ragDocumentDeleteService.getDocument(workspaceId, documentId);
-        s3ApiClient.deleteDocument(target.getFileUrl());
-        RagDocument deleted = ragDocumentDeleteService.delete(target);
+        RagDocument deleting = ragDocumentDeleteService.markDeleting(workspaceId, documentId);
+        s3ApiClient.deleteDocument(deleting.getFileUrl());
+
+        RagDocument deleted;
+        try {
+            deleted = ragDocumentDeleteService.delete(workspaceId, documentId);
+        } catch (Exception ex) {
+            log.error("Document delete failed after S3 delete. workspaceId={}, documentId={}",
+                    workspaceId, documentId, ex);
+            throw ex;
+        }
 
         RagDocumentVectorStoreDeleteService vectorStoreDeleteService =
                 ragDocumentVectorStoreDeleteServiceProvider.getIfAvailable();

@@ -7,6 +7,7 @@ import java.util.Map;
 public record ChunkDetailResponse(
         String content,
         Double score,
+        Long documentId,
         String documentName
 ) {
 
@@ -15,6 +16,7 @@ public record ChunkDetailResponse(
         return new ChunkDetailResponse(
                 document.getContent(),
                 document.getScore(),
+                resolveDocumentId(metadata),
                 resolveDocumentName(metadata)
         );
     }
@@ -25,6 +27,24 @@ public record ChunkDetailResponse(
         }
         Object value = pickFirst(metadata, "document_name", "file_name", "resourceName", "filename");
         return value != null ? value.toString() : null;
+    }
+
+    private static Long resolveDocumentId(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return null;
+        }
+        Object value = pickFirst(metadata, "document_id");
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private static Object pickFirst(Map<String, Object> metadata, String... keys) {

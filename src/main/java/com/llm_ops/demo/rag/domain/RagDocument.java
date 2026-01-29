@@ -69,4 +69,11 @@ public class RagDocument {
         }
         this.status = RagDocumentStatus.DELETED;
     }
+
+    public void markDeleting() {
+        if (this.status == RagDocumentStatus.DELETED) {
+            return;
+        }
+        this.status = RagDocumentStatus.DELETING;
+    }
 }

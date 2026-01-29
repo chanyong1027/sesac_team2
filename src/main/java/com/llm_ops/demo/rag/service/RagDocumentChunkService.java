@@ -20,6 +20,7 @@ public class RagDocumentChunkService {
     private static final String METADATA_CHUNK_INDEX = "chunk_index";
     private static final String METADATA_CHUNK_TOTAL = "chunk_total";
     private static final String METADATA_DOCUMENT_ID = "document_id";
+    private static final String METADATA_DOCUMENT_NAME = "document_name";
 
     private final TokenTextSplitter tokenTextSplitter;
 
@@ -34,7 +35,7 @@ public class RagDocumentChunkService {
      * @param documentId 문서 마스터 ID (현재는 optional, 추후 필수 예정)
      * @return 청크 단위로 분할된 문서 목록
      */
-    public List<Document> chunk(List<Document> documents, Long documentId) {
+    public List<Document> chunk(List<Document> documents, Long documentId, String documentName) {
         validateInput(documents, documentId);
 
         List<Document> results = new ArrayList<>();
@@ -43,7 +44,7 @@ public class RagDocumentChunkService {
             int total = chunks.size();
             for (int index = 0; index < total; index++) {
                 Document chunk = chunks.get(index);
-                results.add(applyChunkMetadata(chunk, index, total, documentId));
+                results.add(applyChunkMetadata(chunk, index, total, documentId, documentName));
             }
         }
 
@@ -62,12 +63,15 @@ public class RagDocumentChunkService {
         }
     }
 
-    private Document applyChunkMetadata(Document document, int chunkIndex, int chunkTotal, Long documentId) {
+    private Document applyChunkMetadata(Document document, int chunkIndex, int chunkTotal, Long documentId, String documentName) {
         Map<String, Object> metadata = new HashMap<>(document.getMetadata());
         metadata.put(METADATA_CHUNK_INDEX, chunkIndex);
         metadata.put(METADATA_CHUNK_TOTAL, chunkTotal);
         if (documentId != null) {
             metadata.put(METADATA_DOCUMENT_ID, documentId);
+        }
+        if (documentName != null && !documentName.isBlank()) {
+            metadata.put(METADATA_DOCUMENT_NAME, documentName);
         }
         Document chunk = new Document(document.getContent(), metadata);
         chunk.setContentFormatter(document.getContentFormatter());

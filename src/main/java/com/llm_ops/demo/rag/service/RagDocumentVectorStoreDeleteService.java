@@ -36,6 +36,9 @@ public class RagDocumentVectorStoreDeleteService {
     }
 
     private void validateIdentifier(String identifier, String fieldName) {
+        if (identifier == null || identifier.trim().isEmpty()) {
+            throw new IllegalArgumentException(fieldName + " must not be null or empty");
+        }
         if (!identifier.matches("^[a-zA-Z0-9_]+$")) {
             throw new IllegalArgumentException(
                 fieldName + " contains invalid characters: " + identifier

@@ -145,8 +145,8 @@ class DocumentControllerTest {
         Long userId = 1L;
         RagDocument document = RagDocument.create(workspaceId, "sample.txt", "workspaces/1/documents/sample.txt");
         ReflectionTestUtils.setField(document, "id", documentId);
-        given(ragDocumentDeleteService.getDocument(workspaceId, documentId)).willReturn(document);
-        given(ragDocumentDeleteService.delete(document)).willReturn(document);
+        given(ragDocumentDeleteService.markDeleting(workspaceId, documentId)).willReturn(document);
+        given(ragDocumentDeleteService.delete(workspaceId, documentId)).willReturn(document);
 
         // when & then
         mockMvc.perform(delete("/api/v1/workspaces/{workspaceId}/documents/{documentId}", workspaceId, documentId)
@@ -156,6 +156,7 @@ class DocumentControllerTest {
             .andExpect(jsonPath("$.message").value("삭제되었습니다."));
 
         verify(s3ApiClient).deleteDocument("workspaces/1/documents/sample.txt");
+        verify(ragDocumentDeleteService).markDeleting(workspaceId, documentId);
         verify(ragDocumentVectorStoreDeleteService).deleteByDocumentId(documentId);
     }
 }

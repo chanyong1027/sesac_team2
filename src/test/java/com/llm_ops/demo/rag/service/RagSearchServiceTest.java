@@ -39,7 +39,7 @@ class RagSearchServiceTest {
 
         Document document = Document.builder()
                 .content("hello")
-                .metadata(Map.of("document_name", "sample.pdf"))
+                .metadata(Map.of("document_name", "sample.pdf", "document_id", 10L))
                 .score(0.87)
                 .build();
         when(vectorStore.similaritySearch(org.mockito.ArgumentMatchers.any(SearchRequest.class)))
@@ -52,6 +52,7 @@ class RagSearchServiceTest {
         assertThat(response.chunks()).hasSize(1);
         assertThat(response.chunks().get(0).content()).isEqualTo("hello");
         assertThat(response.chunks().get(0).score()).isEqualTo(0.87);
+        assertThat(response.chunks().get(0).documentId()).isEqualTo(10L);
         assertThat(response.chunks().get(0).documentName()).isEqualTo("sample.pdf");
 
         ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
