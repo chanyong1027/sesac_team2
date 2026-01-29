@@ -15,6 +15,7 @@ import com.llm_ops.demo.prompt.domain.ChangeType;
 import com.llm_ops.demo.prompt.dto.PromptReleaseHistoryResponse;
 import com.llm_ops.demo.prompt.dto.PromptReleaseRequest;
 import com.llm_ops.demo.prompt.dto.PromptReleaseResponse;
+import com.llm_ops.demo.prompt.dto.PromptRollbackRequest;
 import com.llm_ops.demo.prompt.service.PromptReleaseService;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -152,5 +153,67 @@ class PromptReleaseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("롤백 API 성공")
+    void rollback_Success() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        Long targetVersionId = 1L;
+        PromptRollbackRequest request = new PromptRollbackRequest(targetVersionId, "버그 발견으로 롤백");
+
+        PromptReleaseResponse response = new PromptReleaseResponse(
+                promptId, targetVersionId, 1, LocalDateTime.now()
+        );
+
+        given(promptReleaseService.rollback(eq(promptId), eq(userId), any(PromptRollbackRequest.class)))
+                .willReturn(response);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/prompts/{promptId}/rollback", promptId)
+                        .header("X-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.promptId").value(promptId))
+                .andExpect(jsonPath("$.activeVersionId").value(targetVersionId))
+                .andExpect(jsonPath("$.activeVersionNo").value(1));
+    }
+
+    @Test
+    @DisplayName("롤백 시 버전 ID 누락하면 검증 실패")
+    void rollback_NullVersionId_ValidationFails() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        PromptRollbackRequest request = new PromptRollbackRequest(null, "롤백");
+
+        // when & then
+        mockMvc.perform(post("/api/v1/prompts/{promptId}/rollback", promptId)
+                        .header("X-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("롤백 시 사유 길이 초과하면 검증 실패")
+    void rollback_ReasonTooLong_ValidationFails() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        String longReason = "a".repeat(501);
+        PromptRollbackRequest request = new PromptRollbackRequest(1L, longReason);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/prompts/{promptId}/rollback", promptId)
+                        .header("X-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
     }
 }

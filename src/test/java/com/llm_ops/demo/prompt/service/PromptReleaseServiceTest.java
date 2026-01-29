@@ -22,6 +22,7 @@ import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.dto.PromptReleaseHistoryResponse;
 import com.llm_ops.demo.prompt.dto.PromptReleaseRequest;
 import com.llm_ops.demo.prompt.dto.PromptReleaseResponse;
+import com.llm_ops.demo.prompt.dto.PromptRollbackRequest;
 import com.llm_ops.demo.prompt.repository.PromptReleaseHistoryRepository;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import com.llm_ops.demo.prompt.repository.PromptRepository;
@@ -251,6 +252,99 @@ class PromptReleaseServiceTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
 
         verify(promptReleaseRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("이전 버전으로 롤백한다")
+    void rollback_Success() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long currentVersionId = 2L;
+        Long targetVersionId = 1L;
+        Long userId = 1L;
+        PromptRollbackRequest request = new PromptRollbackRequest(targetVersionId, "버그 발견으로 롤백");
+
+        User user = createMockUser(userId);
+        Workspace workspace = createMockWorkspace(1L, user);
+        Prompt prompt = createMockPrompt(promptId, workspace);
+        PromptVersion currentVersion = createMockVersion(currentVersionId, prompt, user, 2);
+        PromptVersion targetVersion = createMockVersion(targetVersionId, prompt, user, 1);
+        PromptRelease existingRelease = PromptRelease.create(prompt, currentVersion);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
+                .willReturn(Optional.of(prompt));
+        given(workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user))
+                .willReturn(true);
+        given(promptReleaseRepository.findByPromptId(promptId)).willReturn(Optional.of(existingRelease));
+        given(promptVersionRepository.findById(targetVersionId)).willReturn(Optional.of(targetVersion));
+
+        // when
+        PromptReleaseResponse response = promptReleaseService.rollback(promptId, userId, request);
+
+        // then
+        assertThat(response.activeVersionId()).isEqualTo(targetVersionId);
+        assertThat(response.activeVersionNo()).isEqualTo(1);
+
+        verify(promptReleaseHistoryRepository).save(any(PromptReleaseHistory.class));
+    }
+
+    @Test
+    @DisplayName("릴리스가 없으면 롤백할 수 없다")
+    void rollback_NoRelease_ThrowsException() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        PromptRollbackRequest request = new PromptRollbackRequest(1L, "롤백");
+
+        User user = createMockUser(userId);
+        Workspace workspace = createMockWorkspace(1L, user);
+        Prompt prompt = createMockPrompt(promptId, workspace);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
+                .willReturn(Optional.of(prompt));
+        given(workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user))
+                .willReturn(true);
+        given(promptReleaseRepository.findByPromptId(promptId)).willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> promptReleaseService.rollback(promptId, userId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+
+        verify(promptReleaseHistoryRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("같은 버전으로 롤백하면 예외가 발생한다")
+    void rollback_SameVersion_ThrowsException() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long versionId = 1L;
+        Long userId = 1L;
+        PromptRollbackRequest request = new PromptRollbackRequest(versionId, "같은 버전 롤백");
+
+        User user = createMockUser(userId);
+        Workspace workspace = createMockWorkspace(1L, user);
+        Prompt prompt = createMockPrompt(promptId, workspace);
+        PromptVersion version = createMockVersion(versionId, prompt, user, 1);
+        PromptRelease existingRelease = PromptRelease.create(prompt, version);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
+                .willReturn(Optional.of(prompt));
+        given(workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user))
+                .willReturn(true);
+        given(promptReleaseRepository.findByPromptId(promptId)).willReturn(Optional.of(existingRelease));
+        given(promptVersionRepository.findById(versionId)).willReturn(Optional.of(version));
+
+        // when & then
+        assertThatThrownBy(() -> promptReleaseService.rollback(promptId, userId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CONFLICT);
+
+        verify(promptReleaseHistoryRepository, never()).save(any());
     }
 
     private User createMockUser(Long id) throws Exception {

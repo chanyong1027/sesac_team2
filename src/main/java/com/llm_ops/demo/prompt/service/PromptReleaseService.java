@@ -13,6 +13,7 @@ import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.dto.PromptReleaseHistoryResponse;
 import com.llm_ops.demo.prompt.dto.PromptReleaseRequest;
 import com.llm_ops.demo.prompt.dto.PromptReleaseResponse;
+import com.llm_ops.demo.prompt.dto.PromptRollbackRequest;
 import com.llm_ops.demo.prompt.repository.PromptReleaseHistoryRepository;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import com.llm_ops.demo.prompt.repository.PromptRepository;
@@ -42,9 +43,23 @@ public class PromptReleaseService {
         validateWorkspaceMembership(prompt, user);
 
         PromptVersion newVersion = findVersionBelongsToPrompt(prompt, request.versionId());
-        PromptRelease release = createOrUpdateRelease(prompt, newVersion, user, request.reason());
 
-        return PromptReleaseResponse.from(release);
+        return createOrUpdateRelease(prompt, newVersion, user, request.reason(), ChangeType.RELEASE);
+    }
+
+    @Transactional
+    public PromptReleaseResponse rollback(Long promptId, Long userId, PromptRollbackRequest request) {
+        User user = findUser(userId);
+        Prompt prompt = findActivePrompt(promptId);
+
+        validateWorkspaceMembership(prompt, user);
+
+        PromptRelease existingRelease = findExistingRelease(promptId);
+        PromptVersion targetVersion = findVersionBelongsToPrompt(prompt, request.versionId());
+
+        validateVersionChange(existingRelease.getActiveVersion(), targetVersion);
+
+        return doChangeActiveVersion(existingRelease, targetVersion, user, request.reason(), ChangeType.ROLLBACK);
     }
 
     @Transactional(readOnly = true)
@@ -73,32 +88,43 @@ public class PromptReleaseService {
         return PromptReleaseResponse.from(release);
     }
 
-    private PromptRelease createOrUpdateRelease(Prompt prompt, PromptVersion newVersion, User user, String reason) {
+    private PromptReleaseResponse createOrUpdateRelease(Prompt prompt, PromptVersion newVersion, User user,
+                                                          String reason, ChangeType changeType) {
         return promptReleaseRepository.findByPromptId(prompt.getId())
-                .map(existing -> updateExistingRelease(existing, newVersion, user, reason))
+                .map(existing -> {
+                    validateVersionChange(existing.getActiveVersion(), newVersion);
+                    return doChangeActiveVersion(existing, newVersion, user, reason, changeType);
+                })
                 .orElseGet(() -> createFirstRelease(prompt, newVersion, user, reason));
     }
 
-    private PromptRelease updateExistingRelease(PromptRelease existing, PromptVersion newVersion, User user, String reason) {
-        PromptVersion oldVersion = existing.getActiveVersion();
+    private PromptReleaseResponse doChangeActiveVersion(PromptRelease release, PromptVersion newVersion,
+                                                         User user, String reason, ChangeType changeType) {
+        PromptVersion oldVersion = release.getActiveVersion();
+        release.changeActiveVersion(newVersion);
+        recordHistory(release.getPrompt(), oldVersion, newVersion, changeType, reason, user);
 
-        if (oldVersion.getId().equals(newVersion.getId())) {
-            throw new BusinessException(ErrorCode.CONFLICT, "이미 해당 버전이 활성화되어 있습니다.");
-        }
-
-        existing.changeActiveVersion(newVersion);
-        recordHistory(existing.getPrompt(), oldVersion, newVersion, ChangeType.RELEASE, reason, user);
-
-        return existing;
+        return PromptReleaseResponse.from(release);
     }
 
-    private PromptRelease createFirstRelease(Prompt prompt, PromptVersion newVersion, User user, String reason) {
+    private void validateVersionChange(PromptVersion currentVersion, PromptVersion targetVersion) {
+        if (currentVersion.getId().equals(targetVersion.getId())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 해당 버전이 활성화되어 있습니다.");
+        }
+    }
+
+    private PromptRelease findExistingRelease(Long promptId) {
+        return promptReleaseRepository.findByPromptId(promptId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리스된 버전이 없어 롤백할 수 없습니다."));
+    }
+
+    private PromptReleaseResponse createFirstRelease(Prompt prompt, PromptVersion newVersion, User user, String reason) {
         PromptRelease release = PromptRelease.create(prompt, newVersion);
         promptReleaseRepository.save(release);
 
         recordHistory(prompt, null, newVersion, ChangeType.RELEASE, reason, user);
 
-        return release;
+        return PromptReleaseResponse.from(release);
     }
 
     private void recordHistory(Prompt prompt, PromptVersion fromVersion, PromptVersion toVersion,

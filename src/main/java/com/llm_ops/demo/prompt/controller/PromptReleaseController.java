@@ -3,6 +3,7 @@ package com.llm_ops.demo.prompt.controller;
 import com.llm_ops.demo.prompt.dto.PromptReleaseHistoryResponse;
 import com.llm_ops.demo.prompt.dto.PromptReleaseRequest;
 import com.llm_ops.demo.prompt.dto.PromptReleaseResponse;
+import com.llm_ops.demo.prompt.dto.PromptRollbackRequest;
 import com.llm_ops.demo.prompt.service.PromptReleaseService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -45,6 +46,15 @@ public class PromptReleaseController {
             @PathVariable Long promptId,
             @AuthenticationPrincipal Long userId) {
         PromptReleaseResponse response = promptReleaseService.getCurrentRelease(promptId, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/rollback")
+    public ResponseEntity<PromptReleaseResponse> rollback(
+            @PathVariable Long promptId,
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody PromptRollbackRequest request) {
+        PromptReleaseResponse response = promptReleaseService.rollback(promptId, userId, request);
         return ResponseEntity.ok(response);
     }
 }
