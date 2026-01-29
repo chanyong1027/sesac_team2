@@ -5,11 +5,10 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
 import com.llm_ops.demo.rag.domain.RagDocumentStatus;
 import com.llm_ops.demo.rag.repository.RagDocumentRepository;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
