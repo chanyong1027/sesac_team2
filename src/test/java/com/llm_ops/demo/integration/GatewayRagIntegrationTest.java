@@ -28,6 +28,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
@@ -41,7 +42,10 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@TestPropertySource(properties = "PROVIDER_KEY_ENC_KEY=test-secret")
+@TestPropertySource(properties = {
+        "PROVIDER_KEY_ENC_KEY=test-secret",
+        "rag.vectorstore.pgvector.enabled=true"
+})
 @DisplayName("Gateway-RAG 통합 테스트")
 class GatewayRagIntegrationTest {
 
@@ -127,6 +131,7 @@ class GatewayRagIntegrationTest {
                                 """, workspaceId)))
                 // then
                 .andExpect(status().isOk());
+        assertThat(testVectorStoreState.getLastQuery()).isNull();
     }
 
     @Test
@@ -163,6 +168,8 @@ class GatewayRagIntegrationTest {
                                 """, workspaceId)))
                 // then
                 .andExpect(status().isOk());
+        assertThat(testVectorStoreState.getLastQuery()).isNotNull()
+                .contains("환불 정책");
     }
 
     @Test
@@ -228,5 +235,6 @@ class GatewayRagIntegrationTest {
                                 """, workspaceId)))
                 // then
                 .andExpect(status().isOk());
+        assertThat(testVectorStoreState.getLastQuery()).isNull();
     }
 }
