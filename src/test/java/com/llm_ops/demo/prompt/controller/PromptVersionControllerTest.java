@@ -76,7 +76,7 @@ class PromptVersionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1L))
                 .andExpect(jsonPath("$.promptId").value(promptId))
-                .andExpect(jsonPath("$.versionNo").value(1));
+                .andExpect(jsonPath("$.versionNumber").value(1));
     }
 
     @Test
@@ -177,7 +177,7 @@ class PromptVersionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(versionId))
                 .andExpect(jsonPath("$.promptId").value(promptId))
-                .andExpect(jsonPath("$.versionNo").value(1))
+                .andExpect(jsonPath("$.versionNumber").value(1))
                 .andExpect(jsonPath("$.provider").value("OPENAI"))
                 .andExpect(jsonPath("$.model").value("gpt-4"))
                 .andExpect(jsonPath("$.systemPrompt").value("You are a helpful assistant."));
@@ -203,8 +203,8 @@ class PromptVersionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].versionNo").value(2))
-                .andExpect(jsonPath("$[1].versionNo").value(1));
+                .andExpect(jsonPath("$[0].versionNumber").value(2))
+                .andExpect(jsonPath("$[1].versionNumber").value(1));
     }
 
     @Test
