@@ -14,6 +14,8 @@ import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -58,6 +60,7 @@ public class GatewayChatService {
     private final GatewayModelProperties gatewayModelProperties;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
+    private final WorkspaceRepository workspaceRepository;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -66,7 +69,8 @@ public class GatewayChatService {
             ProviderCredentialService providerCredentialService,
             GatewayModelProperties gatewayModelProperties,
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
-            @Autowired(required = false) RagSearchService ragSearchService
+            @Autowired(required = false) RagSearchService ragSearchService,
+            WorkspaceRepository workspaceRepository
     ) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatProviderResolveService = gatewayChatProviderResolveService;
@@ -75,6 +79,7 @@ public class GatewayChatService {
         this.gatewayModelProperties = gatewayModelProperties;
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
+        this.workspaceRepository = workspaceRepository;
     }
 
     /**
@@ -90,6 +95,7 @@ public class GatewayChatService {
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
         if (request.isRagEnabled()) {
+            validateWorkspaceOwnership(organizationId, request.workspaceId());
             prompt = enrichPromptWithRagContext(request.workspaceId(), prompt);
         }
 
@@ -112,6 +118,20 @@ public class GatewayChatService {
                 usedModel,
                 extractUsage(response)
         );
+    }
+
+    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
+                workspaceId,
+                organizationId,
+                WorkspaceStatus.ACTIVE
+        );
+        if (!exists) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
+        }
     }
 
     private String enrichPromptWithRagContext(Long workspaceId, String originalPrompt) {
