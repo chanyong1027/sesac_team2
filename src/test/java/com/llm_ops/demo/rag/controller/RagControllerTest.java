@@ -8,9 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
-import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.rag.facade.RagSearchFacade;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreSaveService;
-import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,8 +18,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,13 +33,10 @@ class RagControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private RagSearchService ragSearchService;
+    private RagSearchFacade ragSearchFacade;
 
     @MockitoBean
     private RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
-
-    @MockitoBean
-    private WorkspaceAccessService workspaceAccessService;
 
     private Authentication createAuth(Long userId) {
         return new UsernamePasswordAuthenticationToken(userId, null, List.of());
@@ -57,7 +53,7 @@ class RagControllerTest {
             new ChunkDetailResponse("환불은 7일 이내 가능합니다.", 0.87, "policy.md")
         ));
 
-        given(ragSearchService.search(workspaceId, query, null, null)).willReturn(response);
+        given(ragSearchFacade.search(workspaceId, userId, query)).willReturn(response);
 
         // when & then
         mockMvc.perform(get("/api/v1/workspaces/{workspaceId}/rag/search", workspaceId)
