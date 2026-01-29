@@ -66,6 +66,7 @@ class RagControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.chunks[0].content").value("환불은 7일 이내 가능합니다."))
             .andExpect(jsonPath("$.chunks[0].score").value(0.87))
+            .andExpect(jsonPath("$.chunks[0].documentId").value(10L))
             .andExpect(jsonPath("$.chunks[0].documentName").value("policy.md"));
     }
 }

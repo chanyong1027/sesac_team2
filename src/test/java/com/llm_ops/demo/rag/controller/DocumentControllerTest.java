@@ -106,7 +106,7 @@ class DocumentControllerTest {
             .andExpect(jsonPath("$.documentId").value(10L))
             .andExpect(jsonPath("$.status").value("ACTIVE"));
 
-        verify(ragDocumentIngestService).ingest(eq(workspaceId), eq(10L), eq("sample.txt"), any(org.springframework.core.io.Resource.class));
+        verify(ragDocumentIngestService).ingest(eq(workspaceId), eq(10L), any(org.springframework.core.io.Resource.class));
     }
 
     @Test
