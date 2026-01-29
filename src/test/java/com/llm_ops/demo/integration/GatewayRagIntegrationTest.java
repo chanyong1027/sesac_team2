@@ -8,6 +8,12 @@ import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.organization.domain.Organization;
+import com.llm_ops.demo.organization.repository.OrganizationRepository;
+import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,16 +61,36 @@ class GatewayRagIntegrationTest {
     private ProviderCredentialRepository providerCredentialRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
     private TestVectorStoreState testVectorStoreState;
 
     private MockMvc mockMvc;
+    private Long organizationId;
+    private Long workspaceId;
 
     @BeforeEach
     void setUp() {
         mockMvc = webAppContextSetup(context).build();
         organizationApiKeyRepository.deleteAll();
         providerCredentialRepository.deleteAll();
+        workspaceRepository.deleteAll();
+        organizationRepository.deleteAll();
+        userRepository.deleteAll();
         testVectorStoreState.clear();
+
+        User creator = userRepository.save(User.create("test@example.com", "password", "tester"));
+        Organization organization = organizationRepository.save(Organization.create("테스트 조직", creator));
+        Workspace workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
+        organizationId = organization.getId();
+        workspaceId = workspace.getId();
     }
 
     @Test
@@ -78,12 +104,12 @@ class GatewayRagIntegrationTest {
         testVectorStoreState.addDocument(refundPolicyDoc);
 
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                1L,
+                organizationId,
                 new OrganizationApiKeyCreateRequest("prod")
         );
 
         providerCredentialService.register(
-                1L,
+                organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
@@ -91,14 +117,14 @@ class GatewayRagIntegrationTest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "환불 정책을 알려줘",
                                   "variables": {},
                                   "ragEnabled": false
                                 }
-                                """))
+                                """, workspaceId)))
                 // then
                 .andExpect(status().isOk());
     }
@@ -109,17 +135,17 @@ class GatewayRagIntegrationTest {
         // given
         Document refundPolicyDoc = new Document(
                 "환불 정책은 7일 이내 요청 가능합니다.",
-                Map.of("id", "refund-policy-001", "workspace_id", 1L)
+                Map.of("id", "refund-policy-001", "workspace_id", workspaceId)
         );
         testVectorStoreState.addDocument(refundPolicyDoc);
 
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                1L,
+                organizationId,
                 new OrganizationApiKeyCreateRequest("prod")
         );
 
         providerCredentialService.register(
-                1L,
+                organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
@@ -127,14 +153,14 @@ class GatewayRagIntegrationTest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "환불 정책을 알려줘",
                                   "variables": {},
                                   "ragEnabled": true
                                 }
-                                """))
+                                """, workspaceId)))
                 // then
                 .andExpect(status().isOk());
     }
@@ -144,12 +170,12 @@ class GatewayRagIntegrationTest {
     void gateway_renders_prompt_variables() throws Exception {
         // given: API 키 및 Provider 설정
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                1L,
+                organizationId,
                 new OrganizationApiKeyCreateRequest("prod")
         );
 
         providerCredentialService.register(
-                1L,
+                organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
@@ -157,15 +183,15 @@ class GatewayRagIntegrationTest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "질문: {{question}}",
                                   "variables": {
                                     "question": "안녕하세요"
                                   }
                                 }
-                                """))
+                                """, workspaceId)))
                 // then: 프롬프트 렌더링은 정상 작동
                 .andExpect(status().isOk());
     }
@@ -180,12 +206,12 @@ class GatewayRagIntegrationTest {
         ));
 
         OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                1L,
+                organizationId,
                 new OrganizationApiKeyCreateRequest("prod")
         );
 
         providerCredentialService.register(
-                1L,
+                organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
@@ -193,13 +219,13 @@ class GatewayRagIntegrationTest {
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .content(String.format("""
                                 {
-                                  "workspaceId": 1,
+                                  "workspaceId": %d,
                                   "promptKey": "상품 A의 가격은 얼마인가요?",
                                   "variables": {}
                                 }
-                                """))
+                                """, workspaceId)))
                 // then
                 .andExpect(status().isOk());
     }
