@@ -17,8 +17,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.test.context.TestSecurityContextHolder;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -45,7 +45,7 @@ class RagControllerTest {
         Long userId = 1L;
         String query = "환불 정책";
         RagSearchResponse response = new RagSearchResponse(List.of(
-            new ChunkDetailResponse("환불은 7일 이내 가능합니다.", 0.87, "policy.md")
+            new ChunkDetailResponse("환불은 7일 이내 가능합니다.", 0.87, 10L, "policy.md")
         ));
 
         given(ragSearchFacade.search(workspaceId, userId, query)).willReturn(response);
@@ -60,6 +60,7 @@ class RagControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.chunks[0].content").value("환불은 7일 이내 가능합니다."))
                 .andExpect(jsonPath("$.chunks[0].score").value(0.87))
+                .andExpect(jsonPath("$.chunks[0].documentId").value(10L))
                 .andExpect(jsonPath("$.chunks[0].documentName").value("policy.md"));
         } finally {
             TestSecurityContextHolder.clearContext();
