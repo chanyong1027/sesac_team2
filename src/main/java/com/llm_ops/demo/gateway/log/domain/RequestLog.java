@@ -185,6 +185,20 @@ public class RequestLog {
         this.totalTokens = totalTokens;
     }
 
+    public void fillRagMetrics(
+            Integer ragLatencyMs,
+            Integer ragChunksCount,
+            Integer ragContextChars,
+            Boolean ragContextTruncated,
+            String ragContextHash
+    ) {
+        this.ragLatencyMs = ragLatencyMs;
+        this.ragChunksCount = ragChunksCount;
+        this.ragContextChars = ragContextChars;
+        this.ragContextTruncated = ragContextTruncated;
+        this.ragContextHash = ragContextHash;
+    }
+
     public RequestLogStatus getStatus() {
         return status;
     }

@@ -45,7 +45,12 @@ class RequestLogWriterTest {
                 false,
                 5,
                 7,
-                12
+                12,
+                50,
+                2,
+                1234,
+                true,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         ));
 
         RequestLog saved = requestLogRepository.findById(requestId).orElseThrow();
@@ -55,6 +60,12 @@ class RequestLogWriterTest {
         assertThat(saved.getProvider()).isEqualTo("openai");
         assertThat(saved.getTotalTokens()).isEqualTo(12);
         assertThat(saved.getFinishedAt()).isNotNull();
+
+        assertThat(saved.getRagLatencyMs()).isEqualTo(50);
+        assertThat(saved.getRagChunksCount()).isEqualTo(2);
+        assertThat(saved.getRagContextChars()).isEqualTo(1234);
+        assertThat(saved.getRagContextTruncated()).isTrue();
+        assertThat(saved.getRagContextHash()).isEqualTo("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     }
 
     @Test
@@ -82,7 +93,12 @@ class RequestLogWriterTest {
                 null,
                 "UPSTREAM_5XX",
                 "bad gateway",
-                "UPSTREAM_5XX"
+                "UPSTREAM_5XX",
+                77,
+                0,
+                0,
+                false,
+                null
         ));
 
         RequestLog saved = requestLogRepository.findById(requestId).orElseThrow();
@@ -91,5 +107,11 @@ class RequestLogWriterTest {
         assertThat(saved.getErrorCode()).isEqualTo("UPSTREAM_5XX");
         assertThat(saved.getFailReason()).isEqualTo("UPSTREAM_5XX");
         assertThat(saved.getFinishedAt()).isNotNull();
+
+        assertThat(saved.getRagLatencyMs()).isEqualTo(77);
+        assertThat(saved.getRagChunksCount()).isEqualTo(0);
+        assertThat(saved.getRagContextChars()).isEqualTo(0);
+        assertThat(saved.getRagContextTruncated()).isFalse();
+        assertThat(saved.getRagContextHash()).isNull();
     }
 }
