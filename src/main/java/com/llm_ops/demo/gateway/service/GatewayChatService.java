@@ -6,6 +6,7 @@ import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
+import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
@@ -43,6 +44,8 @@ import java.util.stream.Collectors;
 @Service
 public class GatewayChatService {
 
+    private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
+    private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
     private static final int MAX_RAG_CHUNKS = 10;
     private static final int MAX_RAG_CHARS = 4000;
@@ -64,6 +67,7 @@ public class GatewayChatService {
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
     private final WorkspaceRepository workspaceRepository;
+    private final RequestLogWriter requestLogWriter;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -73,7 +77,8 @@ public class GatewayChatService {
             GatewayModelProperties gatewayModelProperties,
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
-            WorkspaceRepository workspaceRepository
+            WorkspaceRepository workspaceRepository,
+            RequestLogWriter requestLogWriter
     ) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatProviderResolveService = gatewayChatProviderResolveService;
@@ -83,6 +88,7 @@ public class GatewayChatService {
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
         this.workspaceRepository = workspaceRepository;
+        this.requestLogWriter = requestLogWriter;
     }
 
     /**
@@ -94,6 +100,18 @@ public class GatewayChatService {
      */
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
         Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
+
+        String traceId = UUID.randomUUID().toString();
+        requestLogWriter.start(new RequestLogWriter.StartRequest(
+                null,
+                traceId,
+                organizationId,
+                request.workspaceId(),
+                GATEWAY_CHAT_COMPLETIONS_PATH,
+                GATEWAY_HTTP_METHOD,
+                request.promptKey(),
+                request.isRagEnabled()
+        ));
 
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
@@ -112,8 +130,6 @@ public class GatewayChatService {
 
         String answer = response.getResult().getOutput().getText();
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
-
-        String traceId = UUID.randomUUID().toString();
         return GatewayChatResponse.from(
                 traceId,
                 answer,
