@@ -3,6 +3,8 @@ package com.llm_ops.demo.gateway.service;
 import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.config.TestChatModelState;
+import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
@@ -87,7 +89,11 @@ class GatewayChatServiceTest {
                 assertThat(chatResponse.usage().totalTokens()).isEqualTo(0L);
                 assertThat(chatResponse.traceId()).isNotBlank();
 
-                assertThat(requestLogRepository.findByTraceId(chatResponse.traceId())).isPresent();
+                RequestLog requestLog = requestLogRepository.findByTraceId(chatResponse.traceId()).orElseThrow();
+                assertThat(requestLog.getStatus()).isEqualTo(RequestLogStatus.SUCCESS);
+                assertThat(requestLog.getHttpStatus()).isEqualTo(200);
+                assertThat(requestLog.getLatencyMs()).isNotNull();
+                assertThat(requestLog.getFinishedAt()).isNotNull();
 
                 var lastPrompt = testChatModelState.getLastPrompt();
                 assertThat(lastPrompt).isNotNull();

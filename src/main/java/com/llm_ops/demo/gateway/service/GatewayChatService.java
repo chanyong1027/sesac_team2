@@ -101,8 +101,10 @@ public class GatewayChatService {
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
         Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
 
+        long startedAtNanos = System.nanoTime();
+
         String traceId = UUID.randomUUID().toString();
-        requestLogWriter.start(new RequestLogWriter.StartRequest(
+        UUID requestId = requestLogWriter.start(new RequestLogWriter.StartRequest(
                 null,
                 traceId,
                 organizationId,
@@ -130,13 +132,62 @@ public class GatewayChatService {
 
         String answer = response.getResult().getOutput().getText();
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
+
+        GatewayChatUsage usage = extractUsage(response);
+
+        requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
+                200,
+                toLatencyMs(startedAtNanos),
+                providerType.name().toLowerCase(),
+                resolveRequestedModel(providerType),
+                usedModel,
+                false,
+                null,
+                null,
+                safeToInteger(usage != null ? usage.totalTokens() : null)
+        ));
+
         return GatewayChatResponse.from(
                 traceId,
                 answer,
                 false,
                 usedModel,
-                extractUsage(response)
+                usage
         );
+    }
+
+    private static Integer toLatencyMs(long startedAtNanos) {
+        long elapsedNanos = System.nanoTime() - startedAtNanos;
+        if (elapsedNanos <= 0) {
+            return 0;
+        }
+        long elapsedMs = elapsedNanos / 1_000_000L;
+        return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+    }
+
+    private static Integer safeToInteger(Long value) {
+        if (value == null) {
+            return null;
+        }
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (value < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return value.intValue();
+    }
+
+    private String resolveRequestedModel(ProviderType providerType) {
+        String model = switch (providerType) {
+            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
+            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
+            case GEMINI -> gatewayModelProperties.getModels().getGemini();
+        };
+        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
+            return DEFAULT_GEMINI_MODEL;
+        }
+        return (model == null || model.isBlank()) ? null : model;
     }
 
     private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
