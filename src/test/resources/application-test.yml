@@ -9,6 +9,9 @@ spring:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
+
+  flyway:
+    enabled: false
   
   # CI 환경에서 환경변수 없이도 실행되도록 더미 값 설정
   ai:

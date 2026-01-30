@@ -39,6 +39,7 @@ out/
 ### Local AI Docs ###
 .ai/
 .DS_Store
+.sisyphus/
 
 ### Spring Boot ###
 application-local.yml

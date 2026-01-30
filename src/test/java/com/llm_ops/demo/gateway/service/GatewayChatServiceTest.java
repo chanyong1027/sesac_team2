@@ -3,6 +3,9 @@ package com.llm_ops.demo.gateway.service;
 import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.config.TestChatModelState;
+import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
+import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
@@ -46,12 +49,16 @@ class GatewayChatServiceTest {
         private ProviderCredentialRepository providerCredentialRepository;
 
         @Autowired
+        private RequestLogRepository requestLogRepository;
+
+        @Autowired
         private TestChatModelState testChatModelState;
 
         @BeforeEach
         void setUp() {
                 organizationApiKeyRepository.deleteAll();
                 providerCredentialRepository.deleteAll();
+                requestLogRepository.deleteAll();
         }
 
         @Test
@@ -69,7 +76,8 @@ class GatewayChatServiceTest {
                 GatewayChatRequest request = new GatewayChatRequest(
                                 1L,
                                 "hello {{name}}",
-                                Map.of("name", "lumina"));
+                                Map.of("name", "lumina"),
+                                false);
 
                 // when
                 var chatResponse = gatewayChatService.chat(response.apiKey(), request);
@@ -80,6 +88,12 @@ class GatewayChatServiceTest {
                 assertThat(chatResponse.usage()).isNotNull();
                 assertThat(chatResponse.usage().totalTokens()).isEqualTo(0L);
                 assertThat(chatResponse.traceId()).isNotBlank();
+
+                RequestLog requestLog = requestLogRepository.findByTraceId(chatResponse.traceId()).orElseThrow();
+                assertThat(requestLog.getStatus()).isEqualTo(RequestLogStatus.SUCCESS);
+                assertThat(requestLog.getHttpStatus()).isEqualTo(200);
+                assertThat(requestLog.getLatencyMs()).isNotNull();
+                assertThat(requestLog.getFinishedAt()).isNotNull();
 
                 var lastPrompt = testChatModelState.getLastPrompt();
                 assertThat(lastPrompt).isNotNull();
