@@ -1,6 +1,7 @@
 package com.llm_ops.demo.gateway.service;
 
 import com.llm_ops.demo.gateway.config.GatewayModelProperties;
+import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
@@ -58,6 +59,9 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private RequestLogWriter requestLogWriter;
 
     @InjectMocks
     private GatewayChatService gatewayChatService;
