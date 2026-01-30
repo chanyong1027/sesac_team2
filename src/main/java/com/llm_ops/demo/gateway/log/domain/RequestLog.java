@@ -139,6 +139,8 @@ public class RequestLog {
             String traceId,
             Long organizationId,
             Long workspaceId,
+            Long apiKeyId,
+            String apiKeyPrefix,
             String requestPath,
             String httpMethod,
             String promptKey,
@@ -149,6 +151,8 @@ public class RequestLog {
         requestLog.traceId = traceId;
         requestLog.organizationId = organizationId;
         requestLog.workspaceId = workspaceId;
+        requestLog.apiKeyId = apiKeyId;
+        requestLog.apiKeyPrefix = apiKeyPrefix;
         requestLog.requestPath = requestPath;
         requestLog.httpMethod = httpMethod;
         requestLog.promptKey = promptKey;

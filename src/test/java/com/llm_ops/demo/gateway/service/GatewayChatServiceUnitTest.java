@@ -256,7 +256,8 @@ class GatewayChatServiceUnitTest {
             GatewayModelProperties.Models models = new GatewayModelProperties.Models();
             models.setOpenai("gpt-4o-mini");
 
-            when(organizationApiKeyAuthService.resolveOrganizationId(apiKey)).thenReturn(organizationId);
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey))
+                    .thenReturn(new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "prefix"));
             when(requestLogWriter.start(any())).thenReturn(requestId);
             when(workspaceRepository.existsByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE)).thenReturn(true);
             when(ragSearchService.search(eq(workspaceId), anyString())).thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
