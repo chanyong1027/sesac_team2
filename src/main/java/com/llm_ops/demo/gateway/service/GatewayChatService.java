@@ -368,24 +368,23 @@ public class GatewayChatService {
         }
     }
 
-    private String enrichPromptWithRagContext(Long workspaceId, String originalPrompt) {
-        if (ragSearchService == null) {
-            return originalPrompt;
+    private static class RagContextResult {
+        private final String context;
+        private final int chunksIncluded;
+        private final int contextChars;
+        private final boolean truncated;
+
+        private RagContextResult(String context, int chunksIncluded, int contextChars, boolean truncated) {
+            this.context = context;
+            this.chunksIncluded = chunksIncluded;
+            this.contextChars = contextChars;
+            this.truncated = truncated;
         }
-
-        RagSearchResponse ragResponse = ragSearchService.search(workspaceId, originalPrompt);
-        if (ragResponse.chunks() == null || ragResponse.chunks().isEmpty()) {
-            return originalPrompt;
-        }
-
-        String context = buildRagContext(ragResponse.chunks());
-
-        return String.format(RAG_CONTEXT_TEMPLATE, context) + originalPrompt;
     }
 
-    private String buildRagContext(List<ChunkDetailResponse> chunks) {
+    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks) {
         if (chunks == null || chunks.isEmpty()) {
-            return "";
+            return new RagContextResult("", 0, 0, false);
         }
 
         StringBuilder builder = new StringBuilder();
@@ -434,7 +433,24 @@ public class GatewayChatService {
             builder.append(RAG_TRUNCATED_MARKER);
         }
 
-        return builder.toString();
+        return new RagContextResult(builder.toString(), count, totalChars, truncated);
+    }
+
+    private static String sha256HexOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
     /**
      * 프롬프트 키(템플릿)와 변수 맵을 사용하여 최종 프롬프트 문자열을 생성(렌더링)합니다.
