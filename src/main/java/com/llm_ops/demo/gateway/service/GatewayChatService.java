@@ -6,11 +6,17 @@ import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
+import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
+import com.llm_ops.demo.rag.dto.RagSearchResponse;
+import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -22,12 +28,16 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -36,7 +46,20 @@ import java.util.UUID;
 @Service
 public class GatewayChatService {
 
+    private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
+    private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final int MAX_RAG_CHUNKS = 10;
+    private static final int MAX_RAG_CHARS = 4000;
+    private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
+    private static final String RAG_CONTEXT_TEMPLATE = """
+            다음은 질문과 관련된 참고 문서입니다:
+            
+            %s
+            
+            위 문서를 참고하여 다음 질문에 답변해주세요:
+            
+            """;
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
     private final GatewayChatProviderResolveService gatewayChatProviderResolveService;
@@ -44,6 +67,9 @@ public class GatewayChatService {
     private final ProviderCredentialService providerCredentialService;
     private final GatewayModelProperties gatewayModelProperties;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
+    private final RagSearchService ragSearchService;
+    private final WorkspaceRepository workspaceRepository;
+    private final RequestLogWriter requestLogWriter;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -51,7 +77,10 @@ public class GatewayChatService {
             GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
             ProviderCredentialService providerCredentialService,
             GatewayModelProperties gatewayModelProperties,
-            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider
+            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
+            @Autowired(required = false) RagSearchService ragSearchService,
+            WorkspaceRepository workspaceRepository,
+            RequestLogWriter requestLogWriter
     ) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatProviderResolveService = gatewayChatProviderResolveService;
@@ -59,6 +88,9 @@ public class GatewayChatService {
         this.providerCredentialService = providerCredentialService;
         this.gatewayModelProperties = gatewayModelProperties;
         this.openAiChatModelProvider = openAiChatModelProvider;
+        this.ragSearchService = ragSearchService;
+        this.workspaceRepository = workspaceRepository;
+        this.requestLogWriter = requestLogWriter;
     }
 
     /**
@@ -69,35 +101,271 @@ public class GatewayChatService {
      * @return LLM의 답변 및 관련 메타데이터가 포함된 응답 DTO
      */
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
-        // 1. API 키를 인증하여 조직 ID를 확인합니다.
-        Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
-        // TODO: Validate workspaceId belongs to organizationId once workspace domain is available.
+        OrganizationApiKeyAuthService.AuthResult authResult = organizationApiKeyAuthService.resolveAuthResult(apiKey);
+        Long organizationId = authResult.organizationId();
 
-        // 2. 프롬프트 템플릿에 변수를 주입하여 최종 프롬프트를 생성합니다.
-        String prompt = renderPrompt(request.promptKey(), request.variables());
-
-        // 3. 요청 시점에 조직별 API 키를 주입하여 LLM을 호출합니다.
-        // 요청 시점에 조직별 Provider와 API 키를 결정해 멀티테넌시 분리를 보장합니다.
-        ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
-        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-        ChatResponse response = switch (providerType) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey);
-            case GEMINI -> callGemini(prompt, providerApiKey);
-        };
-
-        // 4. LLM 응답을 파싱하고 최종 응답 DTO를 구성합니다.
-        String answer = response.getResult().getOutput().getText();
-        String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
+        long startedAtNanos = System.nanoTime();
 
         String traceId = UUID.randomUUID().toString();
-        return GatewayChatResponse.from(
+        UUID requestId = requestLogWriter.start(new RequestLogWriter.StartRequest(
+                null,
                 traceId,
-                answer,
-                false, // TODO: Failover 로직 구현 시 동적으로 설정 필요
-                usedModel,
-                extractUsage(response)
+                organizationId,
+                request.workspaceId(),
+                authResult.apiKeyId(),
+                authResult.apiKeyPrefix(),
+                GATEWAY_CHAT_COMPLETIONS_PATH,
+                GATEWAY_HTTP_METHOD,
+                request.promptKey(),
+                request.isRagEnabled()
+        ));
+
+        Integer ragLatencyMs = null;
+        Integer ragChunksCount = null;
+        Integer ragContextChars = null;
+        Boolean ragContextTruncated = null;
+        String ragContextHash = null;
+
+        try {
+            String prompt = renderPrompt(request.promptKey(), request.variables());
+
+            if (request.isRagEnabled()) {
+                validateWorkspaceOwnership(organizationId, request.workspaceId());
+
+                ragChunksCount = 0;
+                ragContextChars = 0;
+                ragContextTruncated = false;
+                ragLatencyMs = 0;
+
+                if (ragSearchService != null) {
+                    long ragStartedAtNanos = System.nanoTime();
+                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), prompt);
+                    ragLatencyMs = toLatencyMs(ragStartedAtNanos);
+
+                    if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
+                        RagContextResult result = buildRagContextWithMetrics(ragResponse.chunks());
+                        ragChunksCount = result.chunksIncluded;
+                        ragContextChars = result.contextChars;
+                        ragContextTruncated = result.truncated;
+                        ragContextHash = sha256HexOrNull(result.context);
+                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context) + prompt;
+                    }
+                }
+            }
+
+            ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
+            String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
+            ChatResponse response = switch (providerType) {
+                case OPENAI -> callOpenAi(prompt, providerApiKey);
+                case ANTHROPIC -> callAnthropic(prompt, providerApiKey);
+                case GEMINI -> callGemini(prompt, providerApiKey);
+            };
+
+            String answer = response.getResult().getOutput().getText();
+            String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
+
+            GatewayChatUsage usage = extractUsage(response);
+
+            requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
+                    200,
+                    toLatencyMs(startedAtNanos),
+                    providerType.name().toLowerCase(),
+                    resolveRequestedModel(providerType),
+                    usedModel,
+                    false,
+                    null,
+                    null,
+                    safeToInteger(usage != null ? usage.totalTokens() : null),
+                    ragLatencyMs,
+                    ragChunksCount,
+                    ragContextChars,
+                    ragContextTruncated,
+                    ragContextHash
+            ));
+
+            return GatewayChatResponse.from(
+                    traceId,
+                    answer,
+                    false,
+                    usedModel,
+                    usage
+            );
+        } catch (BusinessException e) {
+            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                    e.getErrorCode().getStatus().value(),
+                    toLatencyMs(startedAtNanos),
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    e.getErrorCode().name(),
+                    e.getMessage(),
+                    "BUSINESS_EXCEPTION",
+                    ragLatencyMs,
+                    ragChunksCount,
+                    ragContextChars,
+                    ragContextTruncated,
+                    ragContextHash
+            ));
+            throw e;
+        } catch (Exception e) {
+            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                    ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
+                    toLatencyMs(startedAtNanos),
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    ErrorCode.INTERNAL_SERVER_ERROR.name(),
+                    "Unhandled exception",
+                    "UNHANDLED_EXCEPTION",
+                    ragLatencyMs,
+                    ragChunksCount,
+                    ragContextChars,
+                    ragContextTruncated,
+                    ragContextHash
+            ));
+            throw e;
+        }
+    }
+
+    private static Integer toLatencyMs(long startedAtNanos) {
+        long elapsedNanos = System.nanoTime() - startedAtNanos;
+        if (elapsedNanos <= 0) {
+            return 0;
+        }
+        long elapsedMs = elapsedNanos / 1_000_000L;
+        return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+    }
+
+    private static Integer safeToInteger(Long value) {
+        if (value == null) {
+            return null;
+        }
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (value < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return value.intValue();
+    }
+
+    private String resolveRequestedModel(ProviderType providerType) {
+        String model = switch (providerType) {
+            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
+            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
+            case GEMINI -> gatewayModelProperties.getModels().getGemini();
+        };
+        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
+            return DEFAULT_GEMINI_MODEL;
+        }
+        return (model == null || model.isBlank()) ? null : model;
+    }
+
+    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
+                workspaceId,
+                organizationId,
+                WorkspaceStatus.ACTIVE
         );
+        if (!exists) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
+        }
+    }
+
+    private static class RagContextResult {
+        private final String context;
+        private final int chunksIncluded;
+        private final int contextChars;
+        private final boolean truncated;
+
+        private RagContextResult(String context, int chunksIncluded, int contextChars, boolean truncated) {
+            this.context = context;
+            this.chunksIncluded = chunksIncluded;
+            this.contextChars = contextChars;
+            this.truncated = truncated;
+        }
+    }
+
+    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return new RagContextResult("", 0, 0, false);
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int count = 0;
+        int totalChars = 0;
+        boolean truncated = false;
+
+        for (ChunkDetailResponse chunk : chunks) {
+            if (count >= MAX_RAG_CHUNKS) {
+                truncated = true;
+                break;
+            }
+            if (chunk == null || chunk.content() == null || chunk.content().isBlank()) {
+                continue;
+            }
+
+            String content = chunk.content();
+            int remaining = MAX_RAG_CHARS - totalChars;
+            if (remaining <= 0) {
+                truncated = true;
+                break;
+            }
+
+            if (content.length() > remaining) {
+                content = content.substring(0, remaining);
+                truncated = true;
+            }
+
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(content);
+            totalChars += content.length();
+            count++;
+
+            if (totalChars >= MAX_RAG_CHARS) {
+                truncated = true;
+                break;
+            }
+        }
+
+        if (truncated) {
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(RAG_TRUNCATED_MARKER);
+        }
+
+        return new RagContextResult(builder.toString(), count, totalChars, truncated);
+    }
+
+    private static String sha256HexOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
