@@ -3,6 +3,7 @@ package com.llm_ops.demo.gateway.service;
 import com.llm_ops.demo.config.TestSecurityConfig;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.config.TestChatModelState;
+import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
@@ -46,12 +47,16 @@ class GatewayChatServiceTest {
         private ProviderCredentialRepository providerCredentialRepository;
 
         @Autowired
+        private RequestLogRepository requestLogRepository;
+
+        @Autowired
         private TestChatModelState testChatModelState;
 
         @BeforeEach
         void setUp() {
                 organizationApiKeyRepository.deleteAll();
                 providerCredentialRepository.deleteAll();
+                requestLogRepository.deleteAll();
         }
 
         @Test
@@ -81,6 +86,8 @@ class GatewayChatServiceTest {
                 assertThat(chatResponse.usage()).isNotNull();
                 assertThat(chatResponse.usage().totalTokens()).isEqualTo(0L);
                 assertThat(chatResponse.traceId()).isNotBlank();
+
+                assertThat(requestLogRepository.findByTraceId(chatResponse.traceId())).isPresent();
 
                 var lastPrompt = testChatModelState.getLastPrompt();
                 assertThat(lastPrompt).isNotNull();
