@@ -32,6 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -114,12 +116,38 @@ public class GatewayChatService {
                 request.promptKey(),
                 request.isRagEnabled()
         ));
+
+        Integer ragLatencyMs = null;
+        Integer ragChunksCount = null;
+        Integer ragContextChars = null;
+        Boolean ragContextTruncated = null;
+        String ragContextHash = null;
+
         try {
             String prompt = renderPrompt(request.promptKey(), request.variables());
 
             if (request.isRagEnabled()) {
                 validateWorkspaceOwnership(organizationId, request.workspaceId());
-                prompt = enrichPromptWithRagContext(request.workspaceId(), prompt);
+
+                ragChunksCount = 0;
+                ragContextChars = 0;
+                ragContextTruncated = false;
+                ragLatencyMs = 0;
+
+                if (ragSearchService != null) {
+                    long ragStartedAtNanos = System.nanoTime();
+                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), prompt);
+                    ragLatencyMs = toLatencyMs(ragStartedAtNanos);
+
+                    if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
+                        RagContextResult result = buildRagContextWithMetrics(ragResponse.chunks());
+                        ragChunksCount = result.chunksIncluded;
+                        ragContextChars = result.contextChars;
+                        ragContextTruncated = result.truncated;
+                        ragContextHash = sha256HexOrNull(result.context);
+                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context) + prompt;
+                    }
+                }
             }
 
             ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
@@ -144,7 +172,12 @@ public class GatewayChatService {
                     false,
                     null,
                     null,
-                    safeToInteger(usage != null ? usage.totalTokens() : null)
+                    safeToInteger(usage != null ? usage.totalTokens() : null),
+                    ragLatencyMs,
+                    ragChunksCount,
+                    ragContextChars,
+                    ragContextTruncated,
+                    ragContextHash
             ));
 
             return GatewayChatResponse.from(
@@ -167,7 +200,12 @@ public class GatewayChatService {
                     null,
                     e.getErrorCode().name(),
                     e.getMessage(),
-                    "BUSINESS_EXCEPTION"
+                    "BUSINESS_EXCEPTION",
+                    ragLatencyMs,
+                    ragChunksCount,
+                    ragContextChars,
+                    ragContextTruncated,
+                    ragContextHash
             ));
             throw e;
         } catch (Exception e) {
@@ -183,7 +221,12 @@ public class GatewayChatService {
                     null,
                     ErrorCode.INTERNAL_SERVER_ERROR.name(),
                     "Unhandled exception",
-                    "UNHANDLED_EXCEPTION"
+                    "UNHANDLED_EXCEPTION",
+                    ragLatencyMs,
+                    ragChunksCount,
+                    ragContextChars,
+                    ragContextTruncated,
+                    ragContextHash
             ));
             throw e;
         }
@@ -237,24 +280,23 @@ public class GatewayChatService {
         }
     }
 
-    private String enrichPromptWithRagContext(Long workspaceId, String originalPrompt) {
-        if (ragSearchService == null) {
-            return originalPrompt;
+    private static class RagContextResult {
+        private final String context;
+        private final int chunksIncluded;
+        private final int contextChars;
+        private final boolean truncated;
+
+        private RagContextResult(String context, int chunksIncluded, int contextChars, boolean truncated) {
+            this.context = context;
+            this.chunksIncluded = chunksIncluded;
+            this.contextChars = contextChars;
+            this.truncated = truncated;
         }
-
-        RagSearchResponse ragResponse = ragSearchService.search(workspaceId, originalPrompt);
-        if (ragResponse.chunks() == null || ragResponse.chunks().isEmpty()) {
-            return originalPrompt;
-        }
-
-        String context = buildRagContext(ragResponse.chunks());
-
-        return String.format(RAG_CONTEXT_TEMPLATE, context) + originalPrompt;
     }
 
-    private String buildRagContext(List<ChunkDetailResponse> chunks) {
+    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks) {
         if (chunks == null || chunks.isEmpty()) {
-            return "";
+            return new RagContextResult("", 0, 0, false);
         }
 
         StringBuilder builder = new StringBuilder();
@@ -303,7 +345,24 @@ public class GatewayChatService {
             builder.append(RAG_TRUNCATED_MARKER);
         }
 
-        return builder.toString();
+        return new RagContextResult(builder.toString(), count, totalChars, truncated);
+    }
+
+    private static String sha256HexOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
