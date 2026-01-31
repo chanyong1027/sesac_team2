@@ -11,10 +11,15 @@ import java.util.Map;
  * @param workspaceId 이 요청이 속한 워크스페이스의 ID
  * @param promptKey   사용할 프롬프트를 식별하는 고유 키 (예: "customer_support_bot")
  * @param variables   프롬프트 템플릿에 주입될 변수들의 맵 (예: {{question}} -> "오늘 날씨 어때?")
+ * @param ragEnabled  RAG 검색 활성화 여부 (기본값: false). true일 경우 사용자 질문으로 관련 문서를 검색하여 컨텍스트로 주입합니다.
  */
 public record GatewayChatRequest(
         @NotNull Long workspaceId,
         @NotBlank String promptKey,
-        Map<String, @NotNull String> variables
+        Map<String, @NotNull String> variables,
+        Boolean ragEnabled
 ) {
+    public boolean isRagEnabled() {
+        return ragEnabled != null && ragEnabled;
+    }
 }
