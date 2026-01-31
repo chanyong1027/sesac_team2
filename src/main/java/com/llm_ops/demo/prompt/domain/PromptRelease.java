@@ -39,6 +39,10 @@ public class PromptRelease {
     private LocalDateTime updatedAt;
 
     public static PromptRelease create(Prompt prompt, PromptVersion activeVersion) {
+        if (prompt == null || activeVersion == null) {
+            throw new IllegalArgumentException("Prompt와 ActiveVersion은 필수입니다.");
+        }
+
         PromptRelease release = new PromptRelease();
         release.prompt = prompt;
         release.promptId = prompt.getId();
@@ -47,6 +51,10 @@ public class PromptRelease {
     }
 
     public void changeActiveVersion(PromptVersion newVersion) {
+        if (newVersion == null) {
+            throw new IllegalArgumentException("새로운 버전이 null일 수 없습니다.");
+        }
+
         this.activeVersion = newVersion;
     }
 }
