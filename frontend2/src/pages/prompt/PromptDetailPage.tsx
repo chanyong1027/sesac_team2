@@ -70,7 +70,7 @@ export function PromptDetailPage() {
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <Link
-                    to={`${basePath}`}
+                    to={`${basePath}/prompts`}
                     className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors w-fit"
                 >
                     <ArrowLeft size={16} className="mr-1" />
