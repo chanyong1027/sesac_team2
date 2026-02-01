@@ -57,6 +57,7 @@ public class WorkspaceInvitationAcceptService {
 
         validateInvitation(invitation);
         validateNotAlreadyMember(invitation.getWorkspace(), user);
+        validateSingleOrganizationMembership(invitation.getWorkspace().getOrganization(), user);
 
         addWorkspaceMember(invitation, user);
         addOrganizationMemberIfNotExists(invitation.getWorkspace().getOrganization(), user);
@@ -97,6 +98,19 @@ public class WorkspaceInvitationAcceptService {
         boolean alreadyMember = workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user);
         if (alreadyMember) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 워크스페이스 멤버입니다.");
+        }
+    }
+
+    private void validateSingleOrganizationMembership(Organization organization, User user) {
+        var memberships = organizationMemberRepository.findByUser(user);
+        if (memberships.isEmpty()) {
+            return;
+        }
+
+        boolean belongsToTargetOrg = memberships.stream()
+                .anyMatch(member -> member.getOrganization().getId().equals(organization.getId()));
+        if (!belongsToTargetOrg) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 다른 조직에 속해 있습니다.");
         }
     }
 

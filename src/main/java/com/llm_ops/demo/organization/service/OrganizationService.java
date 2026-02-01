@@ -30,6 +30,10 @@ public class OrganizationService {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
+        if (!organizationMemberRepository.findByUser(user).isEmpty()) {
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 조직에 속해 있습니다.");
+        }
+
         validateDuplicateName(user, request.name());
 
         Organization organization = Organization.create(request.name(), user);
