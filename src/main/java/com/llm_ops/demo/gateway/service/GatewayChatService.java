@@ -83,7 +83,7 @@ public class GatewayChatService {
             @Autowired(required = false) RagSearchService ragSearchService,
             WorkspaceRepository workspaceRepository,
             RequestLogWriter requestLogWriter,
-            PromptRepository promptRepository,
+        PromptRepository promptRepository,
             PromptReleaseRepository promptReleaseRepository) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
