@@ -21,9 +21,10 @@ import type { PromptDetailResponse, PromptVersionSummaryResponse } from '@/types
 type TabType = 'overview' | 'versions' | 'release' | 'playground';
 
 export function PromptDetailPage() {
-    const { id: workspaceIdStr, promptId: promptIdStr } = useParams<{ id: string; promptId: string }>();
+    const { orgId, workspaceId: workspaceIdStr, promptId: promptIdStr } = useParams<{ orgId: string; workspaceId: string; promptId: string }>();
     const workspaceId = Number(workspaceIdStr);
     const promptId = Number(promptIdStr);
+    const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
     const [activeTab, setActiveTab] = useState<TabType>('overview');
 
@@ -45,7 +46,7 @@ export function PromptDetailPage() {
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <Link
-                    to={`/workspaces/${workspaceId}/prompts`}
+                    to={`${basePath}/prompts`}
                     className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors w-fit"
                 >
                     <ArrowLeft size={16} className="mr-1" />

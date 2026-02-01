@@ -13,8 +13,13 @@ export function InvitationAcceptPage() {
   const acceptMutation = useMutation({
     mutationFn: () => workspaceApi.acceptInvitation({ token: token! }),
     onSuccess: (response) => {
-      const { workspaceId } = response.data;
-      navigate(`/workspaces/${workspaceId}`);
+      const payload = (response.data as any).data ?? response.data;
+      const { workspaceId, organizationId } = payload;
+      if (organizationId) {
+        navigate(`/orgs/${organizationId}/workspaces/${workspaceId}`);
+      } else {
+        navigate(`/workspaces/${workspaceId}`);
+      }
     },
   });
 

@@ -167,8 +167,12 @@ export function LoginPage() {
           const acceptResponse = await workspaceApi.acceptInvitation({
             token: pendingToken,
           });
-          const { workspaceId } = acceptResponse.data.data;
-          navigate(`/workspaces/${workspaceId}`);
+          const { workspaceId, organizationId } = acceptResponse.data.data;
+          if (organizationId) {
+            navigate(`/orgs/${organizationId}/workspaces/${workspaceId}`);
+          } else {
+            navigate(`/workspaces/${workspaceId}`);
+          }
           return;
         } catch (error) {
           console.error('초대 수락 실패:', error);

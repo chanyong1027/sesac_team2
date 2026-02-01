@@ -15,8 +15,8 @@ import {
 import type { DocumentResponse, RagDocumentStatus } from '@/types/api.types';
 
 export function DocumentListPage() {
-    const { id } = useParams<{ id: string }>();
-    const workspaceId = Number(id);
+    const { workspaceId: workspaceIdParam } = useParams<{ workspaceId: string }>();
+    const workspaceId = Number(workspaceIdParam);
     const [searchQuery, setSearchQuery] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const queryClient = useQueryClient();

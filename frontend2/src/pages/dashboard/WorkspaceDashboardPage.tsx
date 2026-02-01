@@ -16,8 +16,9 @@ import {
 } from 'lucide-react';
 
 export function WorkspaceDashboardPage() {
-    const { id } = useParams<{ id: string }>();
-    const workspaceId = Number(id);
+    const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
+    const workspaceId = Number(workspaceIdParam);
+    const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
     // 워크스페이스 정보 조회 (캐시 활용)
     const { data: workspaces, isLoading: isWorkspaceLoading } = useWorkspaces();
@@ -65,14 +66,14 @@ export function WorkspaceDashboardPage() {
                     label="총 프롬프트"
                     value={prompts?.length.toString() || "0"}
                     trend={prompts ? `최근 ${recentPrompts.length}건 활동` : "-"}
-                    to={`/workspaces/${id}/prompts`}
+                    to={`${basePath}/prompts`}
                 />
                 <StatCard
                     icon={<FileText className="text-blue-600" />}
                     label="RAG 문서"
                     value={documents?.length.toString() || "0"}
                     trend={documents?.length ? "연동 완료" : "준비 중"}
-                    to={`/workspaces/${id}/documents`}
+                    to={`${basePath}/documents`}
                 />
                 <StatCard
                     icon={<Activity className="text-emerald-600" />}
@@ -91,21 +92,21 @@ export function WorkspaceDashboardPage() {
                         <h2 className="text-lg font-medium text-gray-900 mb-4">빠른 작업</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <QuickActionButton
-                                to={`/workspaces/${id}/prompts/new`}
+                                to={`${basePath}/prompts/new`}
                                 icon={<Plus size={20} />}
                                 label="프롬프트 생성"
                                 description="새 템플릿 만들기"
                                 color="indigo"
                             />
                             <QuickActionButton
-                                to={`/workspaces/${id}/documents`}
+                                to={`${basePath}/documents`}
                                 icon={<FileText size={20} />}
                                 label="문서 업로드"
                                 description="지식 베이스 추가"
                                 color="blue"
                             />
                             <QuickActionButton
-                                to={`/workspaces/${id}/playground`}
+                                to={`${basePath}/playground`}
                                 icon={<Play size={20} />}
                                 label="Playground"
                                 description="프롬프트 테스트"
@@ -118,7 +119,7 @@ export function WorkspaceDashboardPage() {
                     <section>
                         <div className="flex items-center justify-between mb-4">
                             <h2 className="text-lg font-medium text-gray-900">최근 프롬프트</h2>
-                            <Link to={`/workspaces/${id}/prompts`} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+                            <Link to={`${basePath}/prompts`} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
                                 모두 보기 <ArrowRight size={14} />
                             </Link>
                         </div>
@@ -157,12 +158,12 @@ export function WorkspaceDashboardPage() {
                             <CheckListItem
                                 checked={!!prompts && prompts.length > 0}
                                 label="첫 번째 프롬프트 만들기"
-                                action={(!prompts || prompts.length === 0) && <Link to={`/workspaces/${id}/prompts/new`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
+                                action={(!prompts || prompts.length === 0) && <Link to={`${basePath}/prompts/new`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
                             />
                             <CheckListItem
                                 checked={!!documents && documents.length > 0}
                                 label="지식 데이터 업로드"
-                                action={(!documents || documents.length === 0) && <Link to={`/workspaces/${id}/documents`} className="text-xs text-indigo-600 font-medium hover:underline">업로드</Link>}
+                                action={(!documents || documents.length === 0) && <Link to={`${basePath}/documents`} className="text-xs text-indigo-600 font-medium hover:underline">업로드</Link>}
                             />
                             <CheckListItem
                                 checked={false}

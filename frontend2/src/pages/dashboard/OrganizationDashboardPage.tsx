@@ -168,7 +168,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummaryResponse }) {
             <div className="px-6 py-4 border-t border-gray-50 bg-gray-50/50 rounded-b-xl flex items-center justify-between group-hover:bg-indigo-50/30 transition-colors">
                 <span className="text-xs font-medium text-gray-500">대시보드 이동</span>
                 <Link
-                    to={`/workspaces/${workspace.id}`}
+                    to={`/orgs/${workspace.organizationId}/workspaces/${workspace.id}`}
                     className="text-indigo-600 hover:text-indigo-700 p-1 rounded-full hover:bg-indigo-100 transition-colors"
                 >
                     <ArrowRight size={18} />

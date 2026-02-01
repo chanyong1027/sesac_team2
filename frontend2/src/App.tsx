@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LandingPage_v3 } from '@/pages/LandingPage_v3';
 import { LandingPage_v2 } from '@/pages/LandingPage_v2';
@@ -21,6 +22,8 @@ import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
 import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
 import { SettingsProviderKeysPage } from '@/pages/settings/SettingsProviderKeysPage';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { useOrganizationStore } from '@/features/organization/store/organizationStore';
+import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,11 +34,56 @@ const queryClient = new QueryClient({
   },
 });
 
-const DashboardLayoutWrapper = () => (
-  <DashboardLayout>
-    <Outlet />
-  </DashboardLayout>
-);
+const OrgScopedDashboardLayout = () => {
+  const { orgId } = useParams<{ orgId: string }>();
+  const { currentOrgId, setCurrentOrgId } = useOrganizationStore();
+
+  useEffect(() => {
+    if (!orgId) return;
+    const parsedOrgId = Number(orgId);
+    if (!Number.isNaN(parsedOrgId) && parsedOrgId !== currentOrgId) {
+      setCurrentOrgId(parsedOrgId);
+    }
+  }, [orgId, currentOrgId, setCurrentOrgId]);
+
+  return (
+    <DashboardLayout>
+      <Outlet />
+    </DashboardLayout>
+  );
+};
+
+function NavigateToOrgDashboard() {
+  const { currentOrgId } = useOrganizationStore();
+  const { data: workspaces, isLoading } = useWorkspaces();
+  const orgId = currentOrgId ?? workspaces?.[0]?.organizationId;
+
+  if (isLoading || !orgId) {
+    return <div className="p-6 text-gray-500">조직 정보를 불러오는 중...</div>;
+  }
+
+  return <Navigate to={`/orgs/${orgId}/dashboard`} replace />;
+}
+
+function LegacyWorkspaceRedirect() {
+  const { workspaceId } = useParams<{ workspaceId: string }>();
+  const location = useLocation();
+  const { data: workspaces, isLoading } = useWorkspaces();
+  const parsedWorkspaceId = Number(workspaceId);
+  const workspace = workspaces?.find((ws) => ws.id === parsedWorkspaceId);
+
+  if (isLoading) {
+    return <div className="p-6 text-gray-500">워크스페이스 정보를 불러오는 중...</div>;
+  }
+
+  if (!workspace || Number.isNaN(parsedWorkspaceId)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const suffix = location.pathname.replace(`/workspaces/${workspaceId}`, '');
+  const target = `/orgs/${workspace.organizationId}/workspaces/${parsedWorkspaceId}${suffix}${location.search}`;
+  return <Navigate to={target} replace />;
+}
 
 function App() {
   return (
@@ -53,18 +101,20 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route element={<DashboardLayoutWrapper />}>
-              <Route path="/dashboard" element={<OrganizationDashboardPage />} />
-              <Route path="/workspaces/:id" element={<WorkspaceDashboardPage />} />
-              <Route path="/workspaces/:id/prompts" element={<PromptListPage />} />
-              <Route path="/workspaces/:id/prompts/new" element={<PromptCreatePage />} />
-              <Route path="/workspaces/:id/prompts/:promptId" element={<PromptDetailPage />} />
-              <Route path="/workspaces/:id/documents" element={<DocumentListPage />} />
+            <Route path="/dashboard" element={<NavigateToOrgDashboard />} />
+            <Route path="/workspaces/:workspaceId/*" element={<LegacyWorkspaceRedirect />} />
+            <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
+              <Route path="dashboard" element={<OrganizationDashboardPage />} />
+              <Route path="workspaces/:workspaceId" element={<WorkspaceDashboardPage />} />
+              <Route path="workspaces/:workspaceId/prompts" element={<PromptListPage />} />
+              <Route path="workspaces/:workspaceId/prompts/new" element={<PromptCreatePage />} />
+              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<PromptDetailPage />} />
+              <Route path="workspaces/:workspaceId/documents" element={<DocumentListPage />} />
 
               {/* Settings Routes (Integrated) */}
-              <Route path="/settings/members" element={<SettingsMembersPage />} />
-              <Route path="/settings/api-keys" element={<SettingsApiKeysPage />} />
-              <Route path="/settings/provider-keys" element={<SettingsProviderKeysPage />} />
+              <Route path="settings/members" element={<SettingsMembersPage />} />
+              <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
+              <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
             </Route>
           </Route>
         </Routes>
