@@ -9,7 +9,8 @@ import type {
     PromptVersionCreateResponse,
     PromptVersionSummaryResponse,
     PromptVersionDetailResponse,
-    ApiResponse
+    PromptReleaseResponse,
+    PromptReleaseRequest
 } from '@/types/api.types';
 
 export const promptApi = {
@@ -48,4 +49,13 @@ export const promptApi = {
     // 버전 생성
     createVersion: (promptId: number, data: PromptVersionCreateRequest) =>
         api.post<PromptVersionCreateResponse>(`/prompts/${promptId}/versions`, data),
+
+    // =================================================================
+    // Prompt Release
+    // =================================================================
+    getRelease: (promptId: number) =>
+        api.get<PromptReleaseResponse>(`/prompts/${promptId}/release`),
+
+    releasePrompt: (promptId: number, data: PromptReleaseRequest) =>
+        api.post<PromptReleaseResponse>(`/prompts/${promptId}/release`, data),
 };

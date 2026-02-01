@@ -239,6 +239,21 @@ export interface PromptUpdateRequest {
 }
 
 // ========================================
+// Prompt Release
+// ========================================
+export interface PromptReleaseResponse {
+  promptId: number;
+  activeVersionId: number;
+  activeVersionNo: number;
+  releasedAt: string;
+}
+
+export interface PromptReleaseRequest {
+  versionId: number;
+  reason?: string;
+}
+
+// ========================================
 // Prompt Version
 // ========================================
 export type ProviderType = 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | 'CLOVA'; // Add more as needed

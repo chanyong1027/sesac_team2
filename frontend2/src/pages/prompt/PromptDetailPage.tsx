@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
 import { promptApi } from '@/api/prompt.api';
+import { organizationApi } from '@/api/organization.api';
+import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import {
     ArrowLeft,
     MessageSquare,
@@ -15,7 +18,7 @@ import {
     Save,
     RotateCcw
 } from 'lucide-react';
-import type { PromptDetailResponse, PromptVersionSummaryResponse } from '@/types/api.types';
+import type { PromptDetailResponse, PromptReleaseResponse, PromptVersionSummaryResponse, ProviderType } from '@/types/api.types';
 
 // 탭 정의
 type TabType = 'overview' | 'versions' | 'release' | 'playground';
@@ -38,6 +41,27 @@ export function PromptDetailPage() {
         enabled: !!workspaceId && !!promptId,
     });
 
+    const {
+        data: release,
+        isLoading: isReleaseLoading,
+        isError: isReleaseError,
+    } = useQuery({
+        queryKey: ['promptRelease', promptId],
+        queryFn: async () => {
+            try {
+                const response = await promptApi.getRelease(promptId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
+        enabled: !!promptId,
+        retry: false,
+    });
+
     if (isPromptLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
     if (!prompt) return <div className="p-8 text-gray-500">프롬프트를 찾을 수 없습니다.</div>;
 
@@ -46,11 +70,11 @@ export function PromptDetailPage() {
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <Link
-                    to={`${basePath}/prompts`}
+                    to={`${basePath}`}
                     className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors w-fit"
                 >
                     <ArrowLeft size={16} className="mr-1" />
-                    목록으로 돌아가기
+                    워크스페이스로 돌아가기
                 </Link>
 
                 <div className="flex items-start justify-between">
@@ -103,9 +127,16 @@ export function PromptDetailPage() {
 
             {/* Tab Content */}
             <div className="min-h-[400px]">
-                {activeTab === 'overview' && <OverviewTab prompt={prompt} />}
+                {activeTab === 'overview' && (
+                    <OverviewTab
+                        prompt={prompt}
+                        release={release ?? null}
+                        isReleaseLoading={isReleaseLoading}
+                        isReleaseError={isReleaseError}
+                    />
+                )}
                 {activeTab === 'versions' && <VersionsTab promptId={promptId} />}
-                {activeTab === 'release' && <ReleaseTab />}
+                {activeTab === 'release' && <ReleaseTab promptId={promptId} />}
                 {activeTab === 'playground' && <PlaygroundTab />}
             </div>
         </div>
@@ -131,7 +162,17 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 
 // --- Tab Components ---
 
-function OverviewTab({ prompt }: { prompt: PromptDetailResponse }) {
+function OverviewTab({
+    prompt,
+    release,
+    isReleaseLoading,
+    isReleaseError,
+}: {
+    prompt: PromptDetailResponse;
+    release: PromptReleaseResponse | null;
+    isReleaseLoading: boolean;
+    isReleaseError: boolean;
+}) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -159,33 +200,180 @@ function OverviewTab({ prompt }: { prompt: PromptDetailResponse }) {
 
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">최신 배포 상태</h3>
-                {/* 배포 정보는 아직 API에 없음. 추후 연동 필요 */}
                 <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
-                        <CheckCircle2 size={24} />
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${release ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-500'}`}>
+                        {release ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
                     </div>
                     <div>
                         <p className="text-sm text-gray-500">현재 서비스 중인 버전</p>
-                        <p className="text-2xl font-bold text-gray-900">-</p>
+                        {isReleaseLoading ? (
+                            <p className="text-2xl font-bold text-gray-900">불러오는 중...</p>
+                        ) : (
+                            <p className="text-2xl font-bold text-gray-900">
+                                {release ? `v${release.activeVersionNo}` : '릴리즈 없음'}
+                            </p>
+                        )}
                     </div>
                 </div>
                 <div className="space-y-2 text-sm">
                     <div className="flex justify-between py-2 border-b border-gray-100">
                         <span className="text-gray-500">배포 일시</span>
-                        <span className="text-gray-900">-</span>
+                        <span className="text-gray-900">
+                            {release ? new Date(release.releasedAt).toLocaleString('ko-KR') : '-'}
+                        </span>
                     </div>
                 </div>
+                {isReleaseError && (
+                    <p className="mt-4 text-xs text-rose-600">
+                        릴리즈 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
+                    </p>
+                )}
+                {!isReleaseLoading && !release && !isReleaseError && (
+                    <p className="mt-4 text-xs text-amber-600">
+                        릴리즈된 버전이 없습니다. 버전 탭에서 새 버전을 만든 뒤 릴리즈 탭에서 배포 버전을 선택하세요.
+                    </p>
+                )}
             </div>
         </div>
     );
 }
 
 function VersionsTab({ promptId }: { promptId: number }) {
+    const queryClient = useQueryClient();
+    const { currentOrgId } = useOrganizationStore();
+    const { orgId } = useParams<{ orgId: string }>();
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [detailVersionId, setDetailVersionId] = useState<number | null>(null);
+    const [form, setForm] = useState({
+        title: '',
+        provider: 'OPENAI' as ProviderType,
+        model: '',
+        systemPrompt: '',
+        userTemplate: '',
+        modelConfig: '',
+    });
+    const [configError, setConfigError] = useState<string | null>(null);
+    const presets = [
+        {
+            label: 'CS-Bot 기본',
+            data: {
+                title: 'CS-Bot 기본 응답',
+                provider: 'OPENAI' as const,
+                model: 'gpt-4o-mini',
+                systemPrompt: '너는 고객 문의를 친절하고 간결하게 안내하는 CS 챗봇이다.',
+                userTemplate: '사용자 질문: {{question}}\n답변:',
+                modelConfig: '{"temperature":0.2,"topP":0.9,"maxTokens":512}',
+            },
+        },
+        {
+            label: 'FAQ 요약',
+            data: {
+                title: 'FAQ 요약 응답',
+                provider: 'ANTHROPIC' as const,
+                model: 'claude-3-5-sonnet',
+                systemPrompt: 'FAQ를 근거로 핵심만 요약해 답변한다.',
+                userTemplate: '질문: {{question}}\nFAQ:\n{{context}}\n요약 답변:',
+                modelConfig: '{"temperature":0.1,"topP":0.8,"maxTokens":400}',
+            },
+        },
+        {
+            label: 'RAG 응답',
+            data: {
+                title: 'RAG 기반 응답',
+                provider: 'GEMINI' as const,
+                model: 'gemini-2.0-flash',
+                systemPrompt: '문서 컨텍스트를 근거로 답하고, 모르면 모른다고 말한다.',
+                userTemplate: '컨텍스트:\n{{context}}\n질문: {{question}}\n답변:',
+                modelConfig: '{"temperature":0.3,"topP":0.9,"maxTokens":600}',
+            },
+        },
+    ];
+    const providerLabel: Record<string, string> = {
+        OPENAI: 'OpenAI',
+        ANTHROPIC: 'Anthropic',
+        GEMINI: 'Gemini',
+    };
+    const normalizeProviderKey = (raw: string) => {
+        const normalized = raw.trim().toLowerCase();
+        if (normalized === 'google') return 'GEMINI';
+        if (normalized === 'claude') return 'ANTHROPIC';
+        return normalized.toUpperCase();
+    };
+
+    const { data: credentials, isLoading: isCredsLoading } = useQuery({
+        queryKey: ['provider-credentials', currentOrgId],
+        queryFn: async () => {
+            if (!currentOrgId) return [];
+            const response = await organizationApi.getCredentials(currentOrgId);
+            return response.data;
+        },
+        enabled: !!currentOrgId,
+    });
+
+    const availableProviders = Array.from(
+        new Set((credentials || []).map((cred) => normalizeProviderKey(cred.provider)))
+    ).filter((provider) => providerLabel[provider]);
+
+    const filteredPresets = presets.filter((preset) => availableProviders.includes(preset.data.provider));
+
+    useEffect(() => {
+        if (!availableProviders.length) return;
+        if (!availableProviders.includes(form.provider)) {
+            setForm((prev) => ({ ...prev, provider: availableProviders[0] as ProviderType }));
+        }
+    }, [availableProviders, form.provider]);
+
     const { data: versions, isLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
         queryFn: async () => {
             const response = await promptApi.getVersions(promptId);
             return response.data;
+        },
+    });
+    const { data: versionDetail, isLoading: isDetailLoading } = useQuery({
+        queryKey: ['promptVersionDetail', promptId, detailVersionId],
+        queryFn: async () => {
+            if (!detailVersionId) return null;
+            const response = await promptApi.getVersion(promptId, detailVersionId);
+            return response.data;
+        },
+        enabled: !!detailVersionId,
+    });
+
+    const createMutation = useMutation({
+        mutationFn: async () => {
+            let parsedConfig: Record<string, any> | undefined = undefined;
+            if (form.modelConfig.trim()) {
+                try {
+                    parsedConfig = JSON.parse(form.modelConfig);
+                    setConfigError(null);
+                } catch (error) {
+                    setConfigError('modelConfig는 올바른 JSON 형식이어야 합니다.');
+                    throw error;
+                }
+            }
+
+            return promptApi.createVersion(promptId, {
+                title: form.title.trim(),
+                provider: form.provider,
+                model: form.model.trim(),
+                systemPrompt: form.systemPrompt.trim() || undefined,
+                userTemplate: form.userTemplate.trim() || undefined,
+                modelConfig: parsedConfig,
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['promptVersions', promptId] });
+            setIsCreateOpen(false);
+            setForm({
+                title: '',
+                provider: 'OPENAI',
+                model: '',
+                systemPrompt: '',
+                userTemplate: '',
+                modelConfig: '',
+            });
+            setConfigError(null);
         },
     });
 
@@ -195,7 +383,10 @@ function VersionsTab({ promptId }: { promptId: number }) {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
                 <h3 className="font-medium text-gray-900">버전 히스토리</h3>
-                <button className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                <button
+                    onClick={() => setIsCreateOpen(true)}
+                    className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
                     + 새 버전 생성
                 </button>
             </div>
@@ -222,7 +413,10 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 </div>
                             </div>
                             <div>
-                                <button className="text-gray-400 hover:text-indigo-600 p-2 border border-gray-200 rounded-lg hover:border-indigo-200 transition-colors text-xs font-medium">
+                                <button
+                                    onClick={() => setDetailVersionId(ver.id)}
+                                    className="text-gray-400 hover:text-indigo-600 p-2 border border-gray-200 rounded-lg hover:border-indigo-200 transition-colors text-xs font-medium"
+                                >
                                     상세 보기
                                 </button>
                             </div>
@@ -234,11 +428,269 @@ function VersionsTab({ promptId }: { promptId: number }) {
                     </div>
                 )}
             </div>
+
+            {isCreateOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        onClick={() => setIsCreateOpen(false)}
+                    />
+                    <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900">
+                        <div className="p-6 border-b border-gray-100">
+                            <h4 className="text-lg font-semibold text-gray-900">새 버전 생성</h4>
+                            <p className="text-sm text-gray-500 mt-1">
+                                버전은 테스트/개발용 시나리오를 관리하고, 릴리즈 탭에서 배포 버전을 선택합니다.
+                            </p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {!isCredsLoading && availableProviders.length === 0 && (
+                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                                    등록된 Provider 키가 없습니다. 먼저 Provider 키를 등록해주세요.
+                                    <div className="mt-2">
+                                        <Link
+                                            to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'}
+                                            className="text-amber-800 font-semibold hover:underline"
+                                        >
+                                            Provider 키 등록하러 가기
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {filteredPresets.map((preset) => (
+                                    <button
+                                        key={preset.label}
+                                        type="button"
+                                        onClick={() => {
+                                            setForm({
+                                                ...form,
+                                                ...preset.data,
+                                            });
+                                            setConfigError(null);
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                                    >
+                                        예시 적용: {preset.label}
+                                    </button>
+                                ))}
+                                {!filteredPresets.length && (
+                                    <span className="text-xs text-gray-400">
+                                        등록된 Provider 기준으로 사용할 수 있는 예시가 없습니다.
+                                    </span>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
+                                <input
+                                    type="text"
+                                    value={form.title}
+                                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    placeholder="예: 2026-02-01 실험용"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+                                    <select
+                                        value={form.provider}
+                                        onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        disabled={availableProviders.length === 0}
+                                    >
+                                        {availableProviders.length === 0 && (
+                                            <option value="">등록된 Provider 없음</option>
+                                        )}
+                                        {availableProviders.map((provider) => (
+                                            <option key={provider} value={provider}>
+                                                {providerLabel[provider] || provider}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                                    <input
+                                        type="text"
+                                        value={form.model}
+                                        onChange={(e) => setForm({ ...form, model: e.target.value })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        placeholder="예: gpt-4o-mini / claude-3-5-sonnet / gemini-2.0-flash"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                                <textarea
+                                    value={form.systemPrompt}
+                                    onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
+                                    rows={3}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                                    placeholder="시스템 프롬프트를 입력하세요."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">User Template</label>
+                                <textarea
+                                    value={form.userTemplate}
+                                    onChange={(e) => setForm({ ...form, userTemplate: e.target.value })}
+                                    rows={4}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                                    placeholder="사용자 입력 템플릿을 입력하세요."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Model Config (JSON)</label>
+                                <textarea
+                                    value={form.modelConfig}
+                                    onChange={(e) => setForm({ ...form, modelConfig: e.target.value })}
+                                    rows={3}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-xs resize-none"
+                                    placeholder='예: {"temperature":0.2,"topP":0.9}'
+                                />
+                                <p className="mt-1 text-xs text-gray-400">JSON 형식으로 입력하세요. 비워두면 기본값이 사용됩니다.</p>
+                                {configError && (
+                                    <p className="mt-1 text-xs text-rose-600">{configError}</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsCreateOpen(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={() => createMutation.mutate()}
+                                disabled={!form.model.trim() || createMutation.isPending || availableProviders.length === 0}
+                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                            >
+                                {createMutation.isPending ? '생성 중...' : '버전 생성'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {detailVersionId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div
+                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        onClick={() => setDetailVersionId(null)}
+                    />
+                    <div className="relative w-full max-w-3xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900">
+                        <div className="p-6 border-b border-gray-100 flex items-start justify-between">
+                            <div>
+                                <h4 className="text-lg font-semibold text-gray-900">버전 상세</h4>
+                                <p className="text-sm text-gray-500 mt-1">버전의 설정과 템플릿을 확인합니다.</p>
+                            </div>
+                            <button
+                                onClick={() => setDetailVersionId(null)}
+                                className="text-gray-400 hover:text-gray-600"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {isDetailLoading || !versionDetail ? (
+                                <div className="text-sm text-gray-500">버전 정보를 불러오는 중...</div>
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <div className="text-xs text-gray-500">Version</div>
+                                            <div className="text-sm font-semibold text-gray-900">v{versionDetail.versionNumber}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">Provider / Model</div>
+                                            <div className="text-sm font-semibold text-gray-900">
+                                                {versionDetail.provider} / {versionDetail.model}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">Title</div>
+                                            <div className="text-sm text-gray-900">{versionDetail.title || '-'}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">Created At</div>
+                                            <div className="text-sm text-gray-900">{new Date(versionDetail.createdAt).toLocaleString()}</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500 mb-2">System Prompt</div>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                            {versionDetail.systemPrompt || '-'}
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500 mb-2">User Template</div>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                            {versionDetail.userTemplate || '-'}
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500 mb-2">Model Config</div>
+                                        <pre className="whitespace-pre-wrap text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                            {versionDetail.modelConfig ? JSON.stringify(versionDetail.modelConfig, null, 2) : '-'}
+                                        </pre>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <div className="p-6 border-t border-gray-100 flex justify-end">
+                            <button
+                                onClick={() => setDetailVersionId(null)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
-function ReleaseTab() {
+function ReleaseTab({ promptId }: { promptId: number }) {
+    const queryClient = useQueryClient();
+    const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
+    const [releaseReason, setReleaseReason] = useState('');
+    const [releaseMessage, setReleaseMessage] = useState<string | null>(null);
+    const [releaseError, setReleaseError] = useState<string | null>(null);
+
+    const { data: versions, isLoading: isVersionsLoading } = useQuery({
+        queryKey: ['promptVersions', promptId],
+        queryFn: async () => {
+            const response = await promptApi.getVersions(promptId);
+            return response.data;
+        },
+    });
+
+    const releaseMutation = useMutation({
+        mutationFn: async () => {
+            if (!selectedVersionId) {
+                throw new Error('버전을 선택해주세요.');
+            }
+            return promptApi.releasePrompt(promptId, {
+                versionId: selectedVersionId,
+                reason: releaseReason.trim() || undefined,
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
+            setReleaseReason('');
+            setReleaseMessage('배포가 완료되었습니다.');
+            setReleaseError(null);
+        },
+        onError: (error) => {
+            console.error('Release failed:', error);
+            setReleaseError('배포에 실패했습니다. 잠시 후 다시 시도해주세요.');
+            setReleaseMessage(null);
+        },
+    });
+
     return (
         <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
@@ -253,15 +705,59 @@ function ReleaseTab() {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             배포할 버전 선택
                         </label>
-                        <select className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" disabled>
-                            <option>버전 목록을 불러오는 중...</option>
+                        <select
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={selectedVersionId ?? ''}
+                            onChange={(e) => setSelectedVersionId(Number(e.target.value) || null)}
+                            disabled={isVersionsLoading || !versions?.length}
+                        >
+                            <option value="">
+                                {isVersionsLoading
+                                    ? '버전 목록을 불러오는 중...'
+                                    : versions?.length
+                                        ? '배포할 버전을 선택하세요'
+                                        : '등록된 버전이 없습니다'}
+                            </option>
+                            {versions?.map((ver) => (
+                                <option key={ver.id} value={ver.id}>
+                                    v{ver.versionNumber} · {ver.title || ver.model} ({ver.provider}/{ver.model})
+                                </option>
+                            ))}
                         </select>
+                        <p className="mt-2 text-xs text-gray-400">
+                            배포할 버전을 선택하면 현재 서비스 버전이 즉시 변경됩니다.
+                        </p>
+                        {!isVersionsLoading && !versions?.length && (
+                            <p className="mt-2 text-xs text-amber-600">
+                                배포할 버전이 없습니다. 먼저 버전을 생성해주세요.
+                            </p>
+                        )}
                     </div>
-                    <button className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50" disabled>
+                    <button
+                        onClick={() => releaseMutation.mutate()}
+                        disabled={!selectedVersionId || releaseMutation.isPending}
+                        className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
                         <Rocket size={18} />
-                        배포하기
+                        {releaseMutation.isPending ? '배포 중...' : '배포하기'}
                     </button>
                 </div>
+
+                <div className="mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">배포 사유 (선택)</label>
+                    <input
+                        value={releaseReason}
+                        onChange={(e) => setReleaseReason(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                        placeholder="예: 최신 FAQ 반영"
+                    />
+                </div>
+                {releaseMessage && (
+                    <p className="mt-3 text-sm text-emerald-600">{releaseMessage}</p>
+                )}
+                {releaseError && (
+                    <p className="mt-3 text-sm text-rose-600">{releaseError}</p>
+                )}
             </div>
         </div>
     );
