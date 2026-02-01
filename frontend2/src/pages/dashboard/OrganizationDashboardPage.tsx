@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
+import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { organizationApi } from '@/api/organization.api';
 import { CreateOrganizationModal } from '@/features/organization/components/CreateOrganizationModal';
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export function OrganizationDashboardPage() {
-    const { data: workspaces, isLoading } = useWorkspaces();
+    const { data: workspaces, isLoading } = useOrganizationWorkspaces();
     const { currentOrgId } = useOrganizationStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
 

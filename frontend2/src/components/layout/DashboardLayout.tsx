@@ -1,7 +1,7 @@
 import { type ReactNode, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store';
-import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
+import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import {
   LayoutDashboard,
@@ -67,7 +67,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
 function Sidebar({ isOpen, onCreateOrg, orgId }: { isOpen: boolean; onCreateOrg: () => void; orgId: number | null }) {
   const location = useLocation();
-  const { data: workspaces } = useWorkspaces();
+  const { data: workspaces } = useOrganizationWorkspaces(orgId ?? undefined);
   const resolvedOrgId = orgId ?? workspaces?.[0]?.organizationId ?? null;
   const basePath = resolvedOrgId ? `/orgs/${resolvedOrgId}` : '';
   const dashboardPath = resolvedOrgId ? `${basePath}/dashboard` : '/dashboard';

@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
+import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
 import {
@@ -21,7 +21,7 @@ export function WorkspaceDashboardPage() {
     const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
     // 워크스페이스 정보 조회 (캐시 활용)
-    const { data: workspaces, isLoading: isWorkspaceLoading } = useWorkspaces();
+    const { data: workspaces, isLoading: isWorkspaceLoading } = useOrganizationWorkspaces(orgId ? Number(orgId) : undefined);
     const workspace = workspaces?.find(w => w.id === workspaceId);
 
     // 프롬프트 목록 조회 (통계용)
