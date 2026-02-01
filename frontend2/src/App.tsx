@@ -9,7 +9,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { OrganizationDashboardPage } from '@/pages/dashboard/OrganizationDashboardPage';
 import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
-import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
+import { PromptListPage } from '@/pages/prompt/PromptListPage';
 import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
 import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
 import { DocumentListPage } from '@/pages/document/DocumentListPage';
@@ -64,7 +64,6 @@ function NavigateToOrgDashboard() {
   if (!orgId) {
     return <Navigate to="/onboarding" replace />;
   }
-
   return <Navigate to={`/orgs/${orgId}/dashboard`} replace />;
 }
 
@@ -110,7 +109,7 @@ function App() {
             <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
               <Route path="dashboard" element={<OrganizationDashboardPage />} />
               <Route path="workspaces/:workspaceId" element={<WorkspaceDashboardPage />} />
-              <Route path="workspaces/:workspaceId/prompts" element={<PromptEntryPage />} />
+              <Route path="workspaces/:workspaceId/prompts" element={<PromptListPage />} />
               <Route path="workspaces/:workspaceId/prompts/new" element={<PromptCreatePage />} />
               <Route path="workspaces/:workspaceId/prompts/:promptId" element={<PromptDetailPage />} />
               <Route path="workspaces/:workspaceId/documents" element={<DocumentListPage />} />
@@ -119,7 +118,6 @@ function App() {
               <Route path="settings/members" element={<SettingsMembersPage />} />
               <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
               <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
-
               {/* Statistics Dashboard */}
               <Route path="stats" element={<DashboardPage />} />
             </Route>
