@@ -57,4 +57,20 @@ public class PromptRelease {
 
         this.activeVersion = newVersion;
     }
+
+    public Long getPromptId() {
+        return promptId;
+    }
+
+    public Prompt getPrompt() {
+        return prompt;
+    }
+
+    public PromptVersion getActiveVersion() {
+        return activeVersion;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }

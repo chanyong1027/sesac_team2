@@ -2,7 +2,6 @@ package com.llm_ops.demo.gateway.service;
 
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
-import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
@@ -12,9 +11,15 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.prompt.domain.PromptRelease;
+import com.llm_ops.demo.prompt.domain.PromptStatus;
+import com.llm_ops.demo.prompt.domain.PromptVersion;
+import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
+import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.springframework.ai.anthropic.AnthropicChatModel;
@@ -37,7 +42,6 @@ import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -62,35 +66,35 @@ public class GatewayChatService {
             """;
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
-    private final GatewayChatProviderResolveService gatewayChatProviderResolveService;
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final ProviderCredentialService providerCredentialService;
-    private final GatewayModelProperties gatewayModelProperties;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
     private final WorkspaceRepository workspaceRepository;
     private final RequestLogWriter requestLogWriter;
+    private final PromptRepository promptRepository;
+    private final PromptReleaseRepository promptReleaseRepository;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
-            GatewayChatProviderResolveService gatewayChatProviderResolveService,
             GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
             ProviderCredentialService providerCredentialService,
-            GatewayModelProperties gatewayModelProperties,
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
             WorkspaceRepository workspaceRepository,
-            RequestLogWriter requestLogWriter
+            RequestLogWriter requestLogWriter,
+            PromptRepository promptRepository,
+            PromptReleaseRepository promptReleaseRepository
     ) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
-        this.gatewayChatProviderResolveService = gatewayChatProviderResolveService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.providerCredentialService = providerCredentialService;
-        this.gatewayModelProperties = gatewayModelProperties;
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
         this.workspaceRepository = workspaceRepository;
         this.requestLogWriter = requestLogWriter;
+        this.promptRepository = promptRepository;
+        this.promptReleaseRepository = promptReleaseRepository;
     }
 
     /**
@@ -127,11 +131,17 @@ public class GatewayChatService {
         String ragContextHash = null;
 
         try {
-            String prompt = renderPrompt(request.promptKey(), request.variables());
+            Workspace workspace = findWorkspace(organizationId, request.workspaceId());
+            PromptVersion activeVersion = resolveActiveVersion(workspace, request.promptKey());
+
+            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()), request.variables());
+            String renderedSystemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
+
+            String prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
+                    ? renderedUserPrompt
+                    : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
 
             if (request.isRagEnabled()) {
-                validateWorkspaceOwnership(organizationId, request.workspaceId());
-
                 ragChunksCount = 0;
                 ragContextChars = 0;
                 ragContextTruncated = false;
@@ -139,7 +149,7 @@ public class GatewayChatService {
 
                 if (ragSearchService != null) {
                     long ragStartedAtNanos = System.nanoTime();
-                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), prompt);
+                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), renderedUserPrompt);
                     ragLatencyMs = toLatencyMs(ragStartedAtNanos);
 
                     if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
@@ -153,12 +163,13 @@ public class GatewayChatService {
                 }
             }
 
-            ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
+            ProviderType providerType = activeVersion.getProvider();
+            String requestedModel = activeVersion.getModel();
             String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
             ChatResponse response = switch (providerType) {
-                case OPENAI -> callOpenAi(prompt, providerApiKey);
-                case ANTHROPIC -> callAnthropic(prompt, providerApiKey);
-                case GEMINI -> callGemini(prompt, providerApiKey);
+                case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
+                case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
+                case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
             };
 
             String answer = response.getResult().getOutput().getText();
@@ -170,7 +181,7 @@ public class GatewayChatService {
                     200,
                     toLatencyMs(startedAtNanos),
                     providerType.name().toLowerCase(),
-                    resolveRequestedModel(providerType),
+                    requestedModel,
                     usedModel,
                     false,
                     null,
@@ -342,30 +353,36 @@ public class GatewayChatService {
         return value.intValue();
     }
 
-    private String resolveRequestedModel(ProviderType providerType) {
-        String model = switch (providerType) {
-            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
-            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
-            case GEMINI -> gatewayModelProperties.getModels().getGemini();
-        };
-        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
-            return DEFAULT_GEMINI_MODEL;
-        }
-        return (model == null || model.isBlank()) ? null : model;
-    }
-
-    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
+    private Workspace findWorkspace(Long organizationId, Long workspaceId) {
         if (workspaceId == null || workspaceId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
         }
-        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
-                workspaceId,
-                organizationId,
-                WorkspaceStatus.ACTIVE
-        );
-        if (!exists) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
+        return workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다."));
+    }
+
+    private PromptVersion resolveActiveVersion(Workspace workspace, String promptKey) {
+        com.llm_ops.demo.prompt.domain.Prompt promptEntity =
+                promptRepository.findByWorkspaceAndPromptKeyAndStatus(workspace, promptKey, PromptStatus.ACTIVE)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "프롬프트를 찾을 수 없습니다."));
+        PromptRelease release = promptReleaseRepository.findByPromptId(promptEntity.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다."));
+        return release.getActiveVersion();
+    }
+
+    private String resolveUserTemplate(PromptVersion version, String fallbackPromptKey) {
+        if (version == null) {
+            return fallbackPromptKey;
         }
+        String template = version.getUserTemplate();
+        return (template == null || template.isBlank()) ? fallbackPromptKey : template;
+    }
+
+    private String renderOptionalTemplate(String template, Map<String, String> variables) {
+        if (template == null || template.isBlank()) {
+            return null;
+        }
+        return renderPrompt(template, variables);
     }
 
     private static class RagContextResult {
@@ -480,32 +497,30 @@ public class GatewayChatService {
         return new GatewayChatUsage(totalTokens, null);
     }
 
-    private ChatResponse callOpenAi(String prompt, String apiKey) {
+    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride) {
         ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
         if (chatModel == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
         }
-        String model = gatewayModelProperties.getModels().getOpenai();
         var chatOptions = gatewayChatOptionsCreateService.openAiOptions(apiKey);
-        if (model != null && !model.isBlank()) {
-            chatOptions.setModel(model);
+        if (modelOverride != null && !modelOverride.isBlank()) {
+            chatOptions.setModel(modelOverride);
         }
         return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 
-    private ChatResponse callAnthropic(String prompt, String apiKey) {
+    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride) {
         AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
         var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
-        String model = gatewayModelProperties.getModels().getAnthropic();
-        if (model != null && !model.isBlank()) {
-            chatOptions.setModel(model);
+        if (modelOverride != null && !modelOverride.isBlank()) {
+            chatOptions.setModel(modelOverride);
         }
         return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 
-    private ChatResponse callGemini(String prompt, String apiKey) {
+    private ChatResponse callGemini(String prompt, String apiKey, String modelOverride) {
         Client client = Client.builder().apiKey(apiKey).build();
-        String model = gatewayModelProperties.getModels().getGemini();
+        String model = modelOverride;
         if (model == null || model.isBlank()) {
             model = DEFAULT_GEMINI_MODEL;
         }

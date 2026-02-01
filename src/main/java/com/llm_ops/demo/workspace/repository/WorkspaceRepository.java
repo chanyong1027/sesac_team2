@@ -11,6 +11,8 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     Optional<Workspace> findByIdAndStatus(Long id, WorkspaceStatus status);
 
+    Optional<Workspace> findByIdAndOrganizationIdAndStatus(Long id, Long organizationId, WorkspaceStatus status);
+
     List<Workspace> findByOrganization(Organization organization);
 
     List<Workspace> findByOrganizationAndStatus(Organization organization, WorkspaceStatus status);
