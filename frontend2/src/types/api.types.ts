@@ -292,7 +292,6 @@ export interface PromptRollbackRequest {
   targetVersionId: number;
   reason?: string;
 }
-
 // ========================================
 // Prompt Version
 // ========================================

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -242,11 +242,6 @@ function VersionsTab({ promptId }: { promptId: number }) {
     const queryClient = useQueryClient();
     const { currentOrgId } = useOrganizationStore();
     const { orgId } = useParams<{ orgId: string }>();
-    const parsedOrgId = orgId ? Number(orgId) : undefined;
-    const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
-        ? parsedOrgId
-        : currentOrgId;
-    const isResolvedOrgId = typeof resolvedOrgId === 'number' && !Number.isNaN(resolvedOrgId);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [detailVersionId, setDetailVersionId] = useState<number | null>(null);
     const [form, setForm] = useState({
@@ -306,25 +301,13 @@ function VersionsTab({ promptId }: { promptId: number }) {
     };
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
-        queryKey: ['provider-credentials', resolvedOrgId],
+        queryKey: ['provider-credentials', currentOrgId],
         queryFn: async () => {
-            if (!isResolvedOrgId) return [];
-            const response = await organizationApi.getCredentials(resolvedOrgId);
+            if (!currentOrgId) return [];
+            const response = await organizationApi.getCredentials(currentOrgId);
             return response.data;
         },
-        enabled: isResolvedOrgId,
-    });
-
-    const {
-        data: modelAllowlist,
-        isLoading: isAllowlistLoading,
-        isError: isAllowlistError,
-    } = useQuery({
-        queryKey: ['model-allowlist'],
-        queryFn: async () => {
-            const response = await promptApi.getModelAllowlist();
-            return response.data;
-        },
+        enabled: !!currentOrgId,
     });
 
     const availableProviders = Array.from(
@@ -333,24 +316,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
 
     const filteredPresets = presets.filter((preset) => availableProviders.includes(preset.data.provider));
 
-    const providerModels = useMemo(() => {
-        if (!modelAllowlist) return [];
-        return modelAllowlist[form.provider] ?? [];
-    }, [modelAllowlist, form.provider]);
-
     useEffect(() => {
         if (!availableProviders.length) return;
         if (!availableProviders.includes(form.provider)) {
             setForm((prev) => ({ ...prev, provider: availableProviders[0] as ProviderType }));
         }
     }, [availableProviders, form.provider]);
-
-    useEffect(() => {
-        if (!providerModels.length) return;
-        if (!providerModels.includes(form.model)) {
-            setForm((prev) => ({ ...prev, model: providerModels[0] }));
-        }
-    }, [providerModels, form.model]);
 
     const { data: versions, isLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
@@ -520,9 +491,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
                                     <select
-                                        id="prompt-provider"
                                         value={form.provider}
                                         onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
@@ -539,27 +509,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                                    <select
-                                        id="prompt-model"
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                                    <input
+                                        type="text"
                                         value={form.model}
                                         onChange={(e) => setForm({ ...form, model: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                        disabled={isAllowlistLoading || isAllowlistError || providerModels.length === 0}
-                                    >
-                                        {isAllowlistLoading && <option value="">모델 목록 불러오는 중...</option>}
-                                        {!isAllowlistLoading && providerModels.length === 0 && (
-                                            <option value="">사용 가능한 모델 없음</option>
-                                        )}
-                                        {providerModels.map((model) => (
-                                            <option key={model} value={model}>
-                                                {model}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {isAllowlistError && (
-                                        <p className="mt-1 text-xs text-rose-600">모델 목록을 불러오지 못했습니다.</p>
-                                    )}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        placeholder="예: gpt-4o-mini / claude-3-5-sonnet / gemini-2.0-flash"
+                                    />
                                 </div>
                             </div>
                             <div>
@@ -606,14 +563,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </button>
                             <button
                                 onClick={() => createMutation.mutate()}
-                                disabled={
-                                    !form.model.trim() ||
-                                    createMutation.isPending ||
-                                    availableProviders.length === 0 ||
-                                    isAllowlistLoading ||
-                                    isAllowlistError ||
-                                    providerModels.length === 0
-                                }
+                                disabled={!form.model.trim() || createMutation.isPending || availableProviders.length === 0}
                                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                             >
                                 {createMutation.isPending ? '생성 중...' : '버전 생성'}
@@ -730,7 +680,6 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
-            queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] }); // Add this line
             setReleaseReason('');
             setReleaseMessage('배포가 완료되었습니다.');
             setReleaseError(null);
@@ -810,417 +759,66 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                     <p className="mt-3 text-sm text-rose-600">{releaseError}</p>
                 )}
             </div>
-
-            {/* Release History */}
-            <ReleaseHistoryList promptId={promptId} activeVersionId={versions?.find(v => v.id === selectedVersionId)?.id} />
-        </div>
-    );
-}
-
-function ReleaseHistoryList({ promptId, activeVersionId }: { promptId: number; activeVersionId?: number }) {
-    const queryClient = useQueryClient();
-    const [rollbackTargetId, setRollbackTargetId] = useState<number | null>(null);
-    const [rollbackReason, setRollbackReason] = useState('');
-    const [rollbackError, setRollbackError] = useState<string | null>(null);
-
-    const { data: history, isLoading } = useQuery({
-        queryKey: ['promptReleaseHistory', promptId],
-        queryFn: async () => {
-            const response = await promptApi.getReleaseHistory(promptId);
-            return response.data;
-        },
-    });
-
-    const rollbackMutation = useMutation({
-        mutationFn: async () => {
-            if (!rollbackTargetId) return;
-            return promptApi.rollbackPrompt(promptId, {
-                targetVersionId: rollbackTargetId,
-                reason: rollbackReason.trim() || undefined,
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] });
-            queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
-            setRollbackTargetId(null);
-            setRollbackReason('');
-            setRollbackError(null);
-        },
-        onError: (error) => {
-            console.error('Rollback failed:', error);
-            setRollbackError('롤백에 실패했습니다. 잠시 후 다시 시도해주세요.');
-        },
-    });
-
-    if (isLoading) return <div className="text-gray-500">배포 이력을 불러오는 중...</div>;
-
-    return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="font-medium text-gray-900">배포 이력</h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm whitespace-nowrap">
-                    <thead className="uppercase tracking-wider border-b border-gray-200 bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">Version</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">Released At</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">Reason</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">By</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {history && history.length > 0 ? (
-                            history.map((item, index) => {
-                                const isLatest = index === 0;
-                                return (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-gray-900">
-                                            v{item.toVersionNo ?? '?'}
-                                            {isLatest && (
-                                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                    Active
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-500">
-                                            {new Date(item.createdAt).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-500">
-                                            {item.reason || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-500">
-                                            {item.changedByName}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            {!isLatest && (
-                                                <button
-                                                    onClick={() => setRollbackTargetId(item.toVersionId)}
-                                                    className="text-indigo-600 hover:text-indigo-900 font-medium text-xs flex items-center justify-end gap-1 ml-auto"
-                                                >
-                                                    <RotateCcw size={14} />
-                                                    Rollback
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        ) : (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                                    배포 이력이 없습니다.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Rollback Modal */}
-            {rollbackTargetId && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div
-                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        onClick={() => setRollbackTargetId(null)}
-                    />
-                    <div className="relative w-full max-w-md mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900 p-6">
-                        <h4 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
-                            <RotateCcw size={20} className="text-amber-500" />
-                            버전 롤백 확인
-                        </h4>
-                        <p className="text-sm text-gray-600 mb-4">
-                            이전 버전으로 롤백하시겠습니까? 롤백은 새로운 배포 이력으로 기록되며, 즉시 반영됩니다.
-                        </p>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">롤백 사유</label>
-                            <input
-                                value={rollbackReason}
-                                onChange={(e) => setRollbackReason(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="예: 이전 버전이 더 안정적임"
-                            />
-                        </div>
-
-                        {rollbackError && (
-                            <p className="mb-4 text-sm text-rose-600 bg-rose-50 p-2 rounded">
-                                {rollbackError}
-                            </p>
-                        )}
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setRollbackTargetId(null)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={() => rollbackMutation.mutate()}
-                                disabled={rollbackMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
-                            >
-                                {rollbackMutation.isPending ? '처리 중...' : '롤백 실행'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
 
 function PlaygroundTab() {
-    const { orgId, workspaceId: workspaceIdStr, promptId: promptIdStr } = useParams<{ orgId: string; workspaceId: string; promptId: string }>();
-    const promptId = Number(promptIdStr);
-    const workspaceId = Number(workspaceIdStr);
-    const { currentOrgId } = useOrganizationStore();
-    const parsedOrgId = orgId ? Number(orgId) : undefined;
-    const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
-        ? parsedOrgId
-        : currentOrgId;
-
-    const [selectedApiKey, setSelectedApiKey] = useState<string>('');
-    const [apiKeyInputType, setApiKeyInputType] = useState<'select' | 'manual'>('select');
-    const [manualApiKey, setManualApiKey] = useState('');
-
-    // Gateway Request State
-    const [inputVariables, setInputVariables] = useState<Record<string, string>>({});
-    const [ragEnabled, setRagEnabled] = useState(false);
-    const [gatewayResponse, setGatewayResponse] = useState<any>(null);
-    const [chatHistory, setChatHistory] = useState<{ role: string; content: string }[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // Fetch Prompt Key
-    const { data: prompt } = useQuery({
-        queryKey: ['prompt', workspaceId, promptId],
-        queryFn: async () => {
-            const response = await promptApi.getPrompt(workspaceId, promptId);
-            return response.data;
-        },
-        enabled: !!workspaceId && !!promptId,
-    });
-
-    // Fetch API Keys
-    const { data: apiKeys } = useQuery({
-        queryKey: ['organizationApiKeys', resolvedOrgId],
-        queryFn: async () => {
-            if (!resolvedOrgId) return [];
-            const response = await organizationApi.getApiKeys(resolvedOrgId);
-            return response.data;
-        },
-        enabled: !!resolvedOrgId,
-    });
-
-    useEffect(() => {
-        if (apiKeys && apiKeys.length > 0 && apiKeyInputType === 'select' && !selectedApiKey) {
-            // Select the first active key by default
-            const firstActive = apiKeys.find(k => k.status === 'ACTIVE');
-            if (firstActive) setSelectedApiKey(firstActive.keyPrefix + '...'); // We can't get full key, but we need a valid key for request.
-            // Actually, we can't use the prefix for the request. The user must copy/paste a full key OR we need to trust the backend to allow test calls.
-            // Wait, for SECURITY, the backend typically doesn't return the full key again.
-            // Challenge: How to test without the full key if the user forgot it?
-            // Solution: For now, we MUST ask the user to input the key MANUALLY or we provide a way to "Test with Internal Auth" if supported.
-            // STRICT REQUIREMENT: "User issued API key".
-            // So we can only list the keys for reference, but the user MUST input the FULL key manually if we don't store it.
-            // However, usually "Playground" implies easy testing. 
-            // Let's assume for this "Gateway Simulation", the user MUST provide the FULL key.
-            // I will make the default 'manual' entry, but show a dropdown of "Active Keys" just to show we know them, 
-            // but we can't fill the value because we don't have it.
-            // Oh, wait. If I am the developer, I might have the key.
-            // Let's adjust: Default to Manual Input.
-            setApiKeyInputType('manual');
-        }
-    }, [apiKeys]);
-
-    const handleRun = async () => {
-        if (!manualApiKey.trim()) {
-            setError('API Key를 입력해주세요.');
-            return;
-        }
-        if (!prompt?.promptKey) {
-            setError('프롬프트 정보를 불러올 수 없습니다.');
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        setGatewayResponse(null);
-
-        // Prepare variables (assuming single 'question' variable for now, or parsing from UI if we add variable builder)
-        // For simplicity, we'll treat the main textarea as the 'question' variable, or a JSON input?
-        // Let's use a simple JSON input for variables to be flexible, or just a "question" field.
-        // Given previous conversation context ("test case"), let's provide a "User Input" text area and map it to 'question' variable (common pattern).
-        const variables = {
-            ...inputVariables
-        };
-
-        try {
-            // Gateway API Call
-            const response = await axios.post('http://localhost:8080/v1/chat/completions', {
-                workspaceId: workspaceId,
-                promptKey: prompt.promptKey,
-                variables: variables,
-                ragEnabled: ragEnabled
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': manualApiKey.trim()
-                }
-            });
-
-            setGatewayResponse(response.data);
-            if (response.data.answer) {
-                setChatHistory(prev => [...prev,
-                { role: 'user', content: variables.question || JSON.stringify(variables) },
-                { role: 'assistant', content: response.data.answer }
-                ]);
-            }
-        } catch (err: any) {
-            console.error(err);
-            setError(err.response?.data?.message || 'Gateway 요청에 실패했습니다.');
-            setGatewayResponse(err.response?.data || { error: 'Unknown error' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     return (
-        <div className="h-[600px] flex gap-6">
-            {/* Left Panel: Configuration & Input */}
-            <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2">
-
-                {/* 1. API Key Config */}
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                        Authentication
+        <div className="h-[600px] flex gap-4">
+            {/* Left: Settings & Prompt */}
+            <div className="w-1/2 flex flex-col gap-4">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col">
+                    <h3 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+                        <span>System Prompt</span>
+                        <div className="flex gap-2">
+                            <select className="text-xs border border-gray-300 rounded px-2 py-1">
+                                <option>GPT-4</option>
+                                <option>GPT-3.5-Turbo</option>
+                                <option>Claude-3-Opus</option>
+                            </select>
+                            <button className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1">
+                                <Save size={12} /> 저장
+                            </button>
+                        </div>
                     </h3>
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Organization API Key</label>
-                            <input
-                                type="password"
-                                value={manualApiKey}
-                                onChange={(e) => setManualApiKey(e.target.value)}
-                                placeholder="sk-org-..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                            <p className="mt-1 text-xs text-gray-400">
-                                Settings &gt; API Keys에서 발급받은 키를 입력하세요.
-                            </p>
-                        </div>
-                    </div>
+                    <textarea
+                        className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        defaultValue="You are a helpful customer support assistant. Always be polite and concise."
+                    />
                 </div>
-
-                {/* 2. Request Config */}
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-1">
-                    <h3 className="font-medium text-gray-900 mb-3">Request Parameters</h3>
-
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm text-gray-700 font-medium">RAG (Retrieval)</label>
-                            <button
-                                onClick={() => setRagEnabled(!ragEnabled)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${ragEnabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ragEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                            </button>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Variable: question</label>
-                            <textarea
-                                value={inputVariables.question || ''}
-                                onChange={(e) => setInputVariables({ ...inputVariables, question: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-24"
-                                placeholder="질문을 입력하세요..."
-                            />
-                        </div>
-
-                        {/* Additional variables can be added here if needed */}
-
-                        <div className="pt-2">
-                            <button
-                                onClick={handleRun}
-                                disabled={isLoading || !manualApiKey}
-                                className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {isLoading ? <Clock size={16} className="animate-spin" /> : <Play size={16} />}
-                                Run Request
-                            </button>
-                        </div>
-
-                        {error && (
-                            <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg break-all">
-                                {error}
-                            </div>
-                        )}
-                    </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm h-1/3 flex flex-col">
+                    <h3 className="font-medium text-gray-900 mb-3">User Input (Test Case)</h3>
+                    <textarea
+                        className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        placeholder="테스트할 사용자 입력을 입력하세요..."
+                        defaultValue="환불 규정이 어떻게 되나요?"
+                    />
                 </div>
             </div>
 
-            {/* Right Panel: Response & Logs */}
-            <div className="w-2/3 flex flex-col gap-4">
-                {/* Response Visualizer */}
-                <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                        <h3 className="font-medium text-gray-900">Chat Preview</h3>
-                        {gatewayResponse && (
-                            <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-50 rounded border border-green-100">
-                                200 OK
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50">
-                        {chatHistory.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                                <p>요청을 보내면 여기에 대화 내용이 표시됩니다.</p>
-                            </div>
-                        ) : (
-                            chatHistory.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${msg.role === 'user'
-                                        ? 'bg-indigo-600 text-white rounded-br-none'
-                                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
-                                        }`}>
-                                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                        {isLoading && (
-                            <div className="flex justify-start">
-                                <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
-                                    <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+            {/* Right: Output */}
+            <div className="w-1/2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center rounded-t-xl">
+                    <h3 className="font-medium text-gray-900">Output</h3>
+                    <button className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                        <Play size={14} /> Run
+                    </button>
+                </div>
+                <div className="flex-1 p-4 overflow-auto">
+                    <div className="prose prose-sm max-w-none">
+                        <p>저희 서비스의 환불 규정은 다음과 같습니다:</p>
+                        <ul>
+                            <li>구매 후 7일 이내: 전액 환불 가능 (단, 미사용 시)</li>
+                            <li>구매 후 7일 ~ 30일: 결제 금액의 50% 환불</li>
+                            <li>30일 이후: 환불 불가</li>
+                        </ul>
+                        <p>추가적인 문의사항은 고객센터(1588-0000)로 연락 주시면 상세히 안내해 드리겠습니다.</p>
                     </div>
                 </div>
-
-                {/* Raw JSON Response */}
-                <div className="h-1/3 bg-gray-900 rounded-xl border border-gray-800 shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-2 border-b border-gray-800 bg-gray-950 flex justify-between items-center px-4">
-                        <h3 className="text-xs font-mono text-gray-400">Raw JSON Response</h3>
-                        {gatewayResponse && (
-                            <div className="flex gap-3 text-xs text-gray-500 font-mono">
-                                {gatewayResponse.traceId && <span>Trace: {gatewayResponse.traceId.substring(0, 8)}...</span>}
-                                <span>Tokens: {gatewayResponse.usage?.totalTokens || '-'}</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex-1 p-4 overflow-auto">
-                        <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">
-                            {gatewayResponse ? JSON.stringify(gatewayResponse, null, 2) : <span className="text-gray-600">// Waiting for response...</span>}
-                        </pre>
-                    </div>
+                <div className="p-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between bg-gray-50 rounded-b-xl">
+                    <span>Latency: 1.2s</span>
+                    <span>Tokens: 154 / 4096</span>
                 </div>
             </div>
         </div>
