@@ -25,6 +25,13 @@ public class OrganizationApiKeyAuthService {
 
     private final OrganizationApiKeyRepository organizationApiKeyRepository;
 
+    public record AuthResult(
+            Long organizationId,
+            Long apiKeyId,
+            String apiKeyPrefix
+    ) {
+    }
+
     /**
      * 전달된 API 키의 유효성을 검증하고, 키에 연결된 조직(Organization)의 ID를 반환합니다.
      * <p>
@@ -40,6 +47,11 @@ public class OrganizationApiKeyAuthService {
      */
     @Transactional(readOnly = true)
     public Long resolveOrganizationId(String apiKey) {
+        return resolveAuthResult(apiKey).organizationId();
+    }
+
+    @Transactional(readOnly = true)
+    public AuthResult resolveAuthResult(String apiKey) {
         if (apiKey == null || apiKey.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHENTICATED, "API Key가 필요합니다.");
         }
@@ -48,12 +60,17 @@ public class OrganizationApiKeyAuthService {
         String keyHash = sha256Hex(apiKey);
 
         List<OrganizationApiKey> candidates = organizationApiKeyRepository.findAllByKeyPrefix(keyPrefix);
-        return candidates.stream()
+        OrganizationApiKey matched = candidates.stream()
                 .filter(apiKeyEntity -> apiKeyEntity.getStatus() == OrganizationApiKeyStatus.ACTIVE)
                 .filter(apiKeyEntity -> apiKeyEntity.getKeyHash().equals(keyHash))
                 .findFirst()
-                .map(OrganizationApiKey::getOrganizationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHENTICATED, "유효하지 않은 API Key 입니다."));
+
+        return new AuthResult(
+                matched.getOrganizationId(),
+                matched.getId(),
+                matched.getKeyPrefix()
+        );
     }
 
     /**
@@ -73,4 +90,3 @@ public class OrganizationApiKeyAuthService {
         }
     }
 }
-

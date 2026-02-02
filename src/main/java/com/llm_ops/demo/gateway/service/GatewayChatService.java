@@ -99,7 +99,8 @@ public class GatewayChatService {
      * @return LLM의 답변 및 관련 메타데이터가 포함된 응답 DTO
      */
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
-        Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
+        OrganizationApiKeyAuthService.AuthResult authResult = organizationApiKeyAuthService.resolveAuthResult(apiKey);
+        Long organizationId = authResult.organizationId();
 
         long startedAtNanos = System.nanoTime();
 
@@ -109,12 +110,13 @@ public class GatewayChatService {
                 traceId,
                 organizationId,
                 request.workspaceId(),
+                authResult.apiKeyId(),
+                authResult.apiKeyPrefix(),
                 GATEWAY_CHAT_COMPLETIONS_PATH,
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
                 request.isRagEnabled()
         ));
-
         String prompt = renderPrompt(request.promptKey(), request.variables());
 
         if (request.isRagEnabled()) {
@@ -132,7 +134,6 @@ public class GatewayChatService {
 
         String answer = response.getResult().getOutput().getText();
         String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
-
         GatewayChatUsage usage = extractUsage(response);
 
         requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
@@ -146,7 +147,6 @@ public class GatewayChatService {
                 null,
                 safeToInteger(usage != null ? usage.totalTokens() : null)
         ));
-
         return GatewayChatResponse.from(
                 traceId,
                 answer,
@@ -155,7 +155,6 @@ public class GatewayChatService {
                 usage
         );
     }
-
     private static Integer toLatencyMs(long startedAtNanos) {
         long elapsedNanos = System.nanoTime() - startedAtNanos;
         if (elapsedNanos <= 0) {
@@ -189,7 +188,6 @@ public class GatewayChatService {
         }
         return (model == null || model.isBlank()) ? null : model;
     }
-
     private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
         if (workspaceId == null || workspaceId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");

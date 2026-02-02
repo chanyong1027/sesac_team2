@@ -195,3 +195,106 @@ export interface GatewayChatUsage {
   totalTokens: number;
   estimatedCost: number;
 }
+
+// ========================================
+// Prompt
+// ========================================
+export type PromptStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+
+export interface PromptCreateRequest {
+  promptKey: string;
+  description: string;
+}
+
+export interface PromptCreateResponse {
+  id: number;
+  promptKey: string;
+  description: string;
+  status: PromptStatus;
+  createdAt: string;
+}
+
+export interface PromptSummaryResponse {
+  id: number;
+  promptKey: string;
+  description: string;
+  status: PromptStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptDetailResponse {
+  id: number;
+  workspaceId: number;
+  promptKey: string;
+  description: string;
+  status: PromptStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptUpdateRequest {
+  description?: string;
+  status?: PromptStatus;
+}
+
+// ========================================
+// Prompt Version
+// ========================================
+export type ProviderType = 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | 'CLOVA'; // Add more as needed
+
+export interface PromptVersionSummaryResponse {
+  id: number;
+  versionNumber: number;
+  title: string;
+  provider: ProviderType;
+  model: string;
+  createdBy: number;
+  createdAt: string;
+}
+
+export interface PromptVersionDetailResponse {
+  id: number;
+  promptId: number;
+  versionNumber: number;
+  title: string;
+  provider: ProviderType;
+  model: string;
+  systemPrompt: string;
+  userTemplate: string;
+  modelConfig: Record<string, any>;
+  createdBy: number;
+  createdAt: string;
+}
+
+export interface PromptVersionCreateRequest {
+  title: string;
+  provider: ProviderType;
+  model: string;
+  systemPrompt?: string;
+  userTemplate?: string;
+  modelConfig?: Record<string, any>;
+}
+
+export interface PromptVersionCreateResponse {
+  id: number;
+  versionNumber: number;
+  createdAt: string;
+}
+
+// ========================================
+// Document (RAG)
+// ========================================
+export type RagDocumentStatus = 'WAITING' | 'PROCESSED' | 'FAILED';
+
+export interface DocumentResponse {
+  id: number;
+  fileName: string;
+  status: RagDocumentStatus;
+  createdAt: string;
+}
+
+export interface DocumentUploadResponse {
+  documentId: number;
+  status: RagDocumentStatus;
+}
