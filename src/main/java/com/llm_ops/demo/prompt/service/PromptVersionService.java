@@ -27,6 +27,7 @@ public class PromptVersionService {
     private final PromptRepository promptRepository;
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+    private final PromptModelAllowlistService promptModelAllowlistService;
 
     @Transactional
     public PromptVersionCreateResponse create(Long promptId, Long userId, PromptVersionCreateRequest request) {
@@ -34,6 +35,7 @@ public class PromptVersionService {
         Prompt prompt = findActivePrompt(promptId);
 
         validateWorkspaceMembership(prompt, user);
+        promptModelAllowlistService.validateModel(request.provider(), request.model());
 
         int nextVersionNo = calculateNextVersionNo(prompt);
         PromptVersion version = buildVersion(prompt, nextVersionNo, request, user);
