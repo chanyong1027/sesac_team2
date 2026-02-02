@@ -290,7 +290,7 @@ class GatewayChatServiceUnitTest {
 
             PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
             when(release.getActiveVersion()).thenReturn(activeVersion);
-            when(promptReleaseRepository.findByPromptId(100L)).thenReturn(Optional.of(release));
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
 
             when(ragSearchService.search(eq(workspaceId), anyString())).thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
             when(providerCredentialService.getDecryptedApiKey(eq(organizationId), eq(ProviderType.OPENAI))).thenReturn("provider-key");

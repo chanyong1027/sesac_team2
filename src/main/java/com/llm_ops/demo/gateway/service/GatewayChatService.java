@@ -365,7 +365,7 @@ public class GatewayChatService {
         com.llm_ops.demo.prompt.domain.Prompt promptEntity =
                 promptRepository.findByWorkspaceAndPromptKeyAndStatus(workspace, promptKey, PromptStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "프롬프트를 찾을 수 없습니다."));
-        PromptRelease release = promptReleaseRepository.findByPromptId(promptEntity.getId())
+        PromptRelease release = promptReleaseRepository.findWithActiveVersionByPromptId(promptEntity.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다."));
         return release.getActiveVersion();
     }
