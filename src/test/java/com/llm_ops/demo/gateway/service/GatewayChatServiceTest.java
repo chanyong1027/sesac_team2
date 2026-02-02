@@ -102,7 +102,6 @@ class GatewayChatServiceTest {
 
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
-
                 var lastPrompt = testChatModelState.getLastPrompt();
                 assertThat(lastPrompt).isNotNull();
                 assertThat(lastPrompt.getOptions()).isInstanceOf(OpenAiChatOptions.class);
@@ -120,7 +119,6 @@ class GatewayChatServiceTest {
                                 new OrganizationApiKeyCreateRequest("prod"));
 
                 OrganizationApiKey apiKeyEntity = organizationApiKeyRepository.findAll().get(0);
-
                 GatewayChatRequest request = new GatewayChatRequest(
                                 9999L,
                                 "hello",
@@ -141,7 +139,6 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getErrorCode()).isEqualTo("FORBIDDEN");
                 assertThat(requestLog.getFailReason()).isEqualTo("BUSINESS_EXCEPTION");
                 assertThat(requestLog.getFinishedAt()).isNotNull();
-
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
         }

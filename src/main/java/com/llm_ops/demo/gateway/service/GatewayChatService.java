@@ -235,54 +235,6 @@ public class GatewayChatService {
         }
     }
 
-    private static Integer toLatencyMs(long startedAtNanos) {
-        long elapsedNanos = System.nanoTime() - startedAtNanos;
-        if (elapsedNanos <= 0) {
-            return 0;
-        }
-        long elapsedMs = elapsedNanos / 1_000_000L;
-        return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
-    }
-
-    private static Integer safeToInteger(Long value) {
-        if (value == null) {
-            return null;
-        }
-        if (value > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        if (value < Integer.MIN_VALUE) {
-            return Integer.MIN_VALUE;
-        }
-        return value.intValue();
-    }
-
-    private String resolveRequestedModel(ProviderType providerType) {
-        String model = switch (providerType) {
-            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
-            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
-            case GEMINI -> gatewayModelProperties.getModels().getGemini();
-        };
-        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
-            return DEFAULT_GEMINI_MODEL;
-        }
-        return (model == null || model.isBlank()) ? null : model;
-    }
-
-    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
-        if (workspaceId == null || workspaceId <= 0) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
-        }
-        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
-                workspaceId,
-                organizationId,
-                WorkspaceStatus.ACTIVE
-        );
-        if (!exists) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
-        }
-    }
-
     private static class RagContextResult {
         private final String context;
         private final int chunksIncluded;
@@ -368,6 +320,122 @@ public class GatewayChatService {
         }
     }
 
+    private static Integer toLatencyMs(long startedAtNanos) {
+        long elapsedNanos = System.nanoTime() - startedAtNanos;
+        if (elapsedNanos <= 0) {
+            return 0;
+        }
+        long elapsedMs = elapsedNanos / 1_000_000L;
+        return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+    }
+
+    private static Integer safeToInteger(Long value) {
+        if (value == null) {
+            return null;
+        }
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (value < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return value.intValue();
+    }
+
+    private String resolveRequestedModel(ProviderType providerType) {
+        String model = switch (providerType) {
+            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
+            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
+            case GEMINI -> gatewayModelProperties.getModels().getGemini();
+        };
+        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
+            return DEFAULT_GEMINI_MODEL;
+        }
+        return (model == null || model.isBlank()) ? null : model;
+    }
+
+    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
+                workspaceId,
+                organizationId,
+                WorkspaceStatus.ACTIVE
+        );
+        if (!exists) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
+        }
+    }
+
+    private String enrichPromptWithRagContext(Long workspaceId, String originalPrompt) {
+        if (ragSearchService == null) {
+            return originalPrompt;
+        }
+
+        RagSearchResponse ragResponse = ragSearchService.search(workspaceId, originalPrompt);
+        if (ragResponse.chunks() == null || ragResponse.chunks().isEmpty()) {
+            return originalPrompt;
+        }
+
+        String context = buildRagContext(ragResponse.chunks());
+
+        return String.format(RAG_CONTEXT_TEMPLATE, context) + originalPrompt;
+    }
+
+    private String buildRagContext(List<ChunkDetailResponse> chunks) {
+        if (chunks == null || chunks.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        int count = 0;
+        int totalChars = 0;
+        boolean truncated = false;
+
+        for (ChunkDetailResponse chunk : chunks) {
+            if (count >= MAX_RAG_CHUNKS) {
+                truncated = true;
+                break;
+            }
+            if (chunk == null || chunk.content() == null || chunk.content().isBlank()) {
+                continue;
+            }
+
+            String content = chunk.content();
+            int remaining = MAX_RAG_CHARS - totalChars;
+            if (remaining <= 0) {
+                truncated = true;
+                break;
+            }
+
+            if (content.length() > remaining) {
+                content = content.substring(0, remaining);
+                truncated = true;
+            }
+
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(content);
+            totalChars += content.length();
+            count++;
+
+            if (totalChars >= MAX_RAG_CHARS) {
+                truncated = true;
+                break;
+            }
+        }
+
+        if (truncated) {
+            if (builder.length() > 0) {
+                builder.append("\n\n---\n\n");
+            }
+            builder.append(RAG_TRUNCATED_MARKER);
+        }
+
+        return builder.toString();
+    }
     /**
      * 프롬프트 키(템플릿)와 변수 맵을 사용하여 최종 프롬프트 문자열을 생성(렌더링)합니다.
      */

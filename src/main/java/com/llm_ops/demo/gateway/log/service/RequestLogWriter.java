@@ -23,7 +23,7 @@ public class RequestLogWriter {
     @Transactional
     public UUID start(StartRequest request) {
         UUID requestId = request.requestId() != null ? request.requestId() : UUID.randomUUID();
-        RequestLog requestLog = RequestLog.start(
+        RequestLog requestLog = RequestLog.loggingStart(
                 requestId,
                 request.traceId(),
                 request.organizationId(),

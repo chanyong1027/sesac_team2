@@ -37,7 +37,7 @@ public class RequestLog {
     @Column(name = "latency_ms")
     private Integer latencyMs;
 
-    @Column(name = "organization_id")
+    @Column(name = "organization_id", nullable = false)
     private Long organizationId;
 
     @Column(name = "workspace_id", nullable = false)
@@ -134,7 +134,7 @@ public class RequestLog {
     @Column(name = "rag_context_hash", length = 64)
     private String ragContextHash;
 
-    public static RequestLog start(
+    public static RequestLog loggingStart(
             UUID requestId,
             String traceId,
             Long organizationId,
@@ -163,6 +163,9 @@ public class RequestLog {
     }
 
     public void markSuccess(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs) {
+        if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
+            return;
+        }
         this.status = RequestLogStatus.SUCCESS;
         this.finishedAt = finishedAt;
         this.httpStatus = httpStatus;
@@ -170,6 +173,9 @@ public class RequestLog {
     }
 
     public void markFail(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode, String errorMessage, String failReason) {
+        if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
+            return;
+        }
         this.status = RequestLogStatus.FAIL;
         this.finishedAt = finishedAt;
         this.httpStatus = httpStatus;
@@ -201,37 +207,5 @@ public class RequestLog {
         this.ragContextChars = ragContextChars;
         this.ragContextTruncated = ragContextTruncated;
         this.ragContextHash = ragContextHash;
-    }
-
-    public RequestLogStatus getStatus() {
-        return status;
-    }
-
-    public Integer getHttpStatus() {
-        return httpStatus;
-    }
-
-    public Integer getLatencyMs() {
-        return latencyMs;
-    }
-
-    public String getProvider() {
-        return provider;
-    }
-
-    public Integer getTotalTokens() {
-        return totalTokens;
-    }
-
-    public LocalDateTime getFinishedAt() {
-        return finishedAt;
-    }
-
-    public String getErrorCode() {
-        return errorCode;
-    }
-
-    public String getFailReason() {
-        return failReason;
     }
 }
