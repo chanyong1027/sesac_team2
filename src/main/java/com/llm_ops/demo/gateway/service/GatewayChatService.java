@@ -395,8 +395,12 @@ public class GatewayChatService {
 
         String rendered = promptKey;
         for (Map.Entry<String, String> entry : variables.entrySet()) {
-            String placeholder = "{{" + entry.getKey() + "}}";
-            rendered = rendered.replace(placeholder, entry.getValue());
+            String key = entry.getKey();
+            String value = entry.getValue();
+            String doubleBrace = "{{" + key + "}}";
+            String singleBrace = "{" + key + "}";
+            rendered = rendered.replace(doubleBrace, value);
+            rendered = rendered.replace(singleBrace, value);
         }
         return rendered;
     }
