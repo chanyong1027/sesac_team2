@@ -1,39 +1,38 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
+import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import type { ProviderCredentialSummaryResponse } from '@/types/api.types';
+import { Shield, Check, Terminal, ExternalLink, Plus } from 'lucide-react';
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PROVIDER KEYS SETTINGS PAGE - Light Theme
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// TODO: 실제 orgId는 context나 URL에서 가져와야 함
-const MOCK_ORG_ID = 1;
-
-const providerInfo: Record<string, { name: string; color: string; bgColor: string; icon: string }> = {
+const providerInfo: Record<string, { name: string; color: string; bgColor: string; borderColor: string; icon: string }> = {
   OPENAI: {
     name: 'OpenAI',
     color: '#000000',
-    bgColor: '#F5F5F5',
-    icon: '◆',
+    bgColor: '#FFFFFF',
+    borderColor: '#E5E5E5',
+    icon: 'text-gray-900',
   },
   ANTHROPIC: {
     name: 'Anthropic',
     color: '#D4A574',
-    bgColor: '#FEF7ED',
-    icon: '◇',
+    bgColor: '#FFFBF5',
+    borderColor: '#E8DCCB',
+    icon: 'text-amber-700',
   },
   GOOGLE: {
     name: 'Google AI',
     color: '#4285F4',
-    bgColor: '#EBF3FE',
-    icon: '◈',
+    bgColor: '#F8FAFF',
+    borderColor: '#D3E3FD',
+    icon: 'text-blue-600',
   },
   GEMINI: {
     name: 'Gemini',
     color: '#8B5CF6',
-    bgColor: '#F3E8FF',
-    icon: '✦',
+    bgColor: '#F5F3FF',
+    borderColor: '#DDD6FE',
+    icon: 'text-purple-600',
   },
 };
 
@@ -51,61 +50,52 @@ function ProviderCard({
   const info = providerInfo[provider] || {
     name: provider,
     color: '#525252',
-    bgColor: '#F5F5F5',
-    icon: '○',
+    bgColor: '#FFFFFF',
+    borderColor: '#E5E5E5',
+    icon: 'text-gray-500',
   };
 
   const isConnected = !!credential;
 
   return (
     <div
-      className="p-5 transition-all hover:shadow-sm"
+      className={`p-6 rounded-xl border transition-all ${isConnected ? 'shadow-sm' : 'hover:shadow-md hover:border-indigo-200'
+        }`}
       style={{
-        background: '#FFFFFF',
-        border: '1px solid #E5E5E5',
+        background: info.bgColor,
+        borderColor: isConnected ? '#10B981' : info.borderColor,
       }}
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 flex items-center justify-center text-lg"
-            style={{ background: info.bgColor, color: info.color }}
-          >
-            {info.icon}
+          <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-white shadow-sm border border-gray-100`}>
+            <span className={`text-xl font-bold ${info.icon}`}>{info.name.charAt(0)}</span>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-neutral-900">
+            <h3 className="text-base font-bold text-gray-900">
               {info.name}
             </h3>
-            <p className="text-[11px] text-neutral-400">
-              {isConnected ? '연결됨' : '연결되지 않음'}
+            <p className="text-xs text-gray-500 mt-0.5">
+              {isConnected ? '연결 완료' : '미연결'}
             </p>
           </div>
         </div>
 
-        {isConnected ? (
-          <span
-            className="px-2 py-0.5 text-[10px] uppercase tracking-wider font-medium"
-            style={{
-              background: '#D1FAE5',
-              color: '#065F46',
-            }}
-          >
-            활성
+        {isConnected && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+            <Check size={12} />
+            Active
           </span>
-        ) : null}
+        )}
       </div>
 
       {isConnected ? (
         <div className="space-y-3">
-          <div
-            className="p-3"
-            style={{ background: '#FAFAFA', border: '1px solid #F5F5F5' }}
-          >
-            <p className="text-[10px] uppercase tracking-wider text-neutral-400 mb-1">
+          <div className="p-3 bg-white/50 border border-black/5 rounded-lg">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
               등록일
             </p>
-            <p className="text-xs text-neutral-600">
+            <p className="text-sm font-medium text-gray-900">
               {new Date(credential.createdAt).toLocaleDateString('ko-KR', {
                 year: 'numeric',
                 month: 'long',
@@ -114,20 +104,24 @@ function ProviderCard({
             </p>
           </div>
           <button
-            className="w-full py-2 text-xs text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 transition-colors"
-            style={{ border: '1px solid #E5E5E5' }}
+            className="w-full py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
           >
             키 업데이트
           </button>
         </div>
       ) : (
-        <button
-          onClick={onAdd}
-          className="w-full py-2.5 text-xs font-medium text-white transition-colors hover:opacity-90"
-          style={{ background: '#0D9488' }}
-        >
-          + API 키 등록
-        </button>
+        <div className="space-y-3">
+          <p className="text-sm text-gray-500 leading-relaxed min-h-[40px]">
+            {info.name} 모델을 사용하려면 API 키를 등록하세요.
+          </p>
+          <button
+            onClick={onAdd}
+            className="w-full py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-2"
+          >
+            <Plus size={16} />
+            API 키 등록
+          </button>
+        </div>
       )}
     </div>
   );
@@ -144,13 +138,16 @@ function AddProviderModal({
 }) {
   const [apiKey, setApiKey] = useState('');
   const queryClient = useQueryClient();
+  const { currentOrgId } = useOrganizationStore();
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      organizationApi.createCredential(MOCK_ORG_ID, {
+    mutationFn: () => {
+      if (!currentOrgId) throw new Error("No organization selected");
+      return organizationApi.createCredential(currentOrgId, {
         provider: provider!,
         apiKey,
-      }),
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider-credentials'] });
       setApiKey('');
@@ -165,72 +162,55 @@ function AddProviderModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-
-      <div
-        className="relative w-full max-w-md mx-4 p-6"
-        style={{
-          background: '#FFFFFF',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15)',
-        }}
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <div
-            className="w-10 h-10 flex items-center justify-center text-lg"
-            style={{ background: info.bgColor, color: info.color }}
-          >
-            {info.icon}
+      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
+            <Shield size={24} />
           </div>
           <div>
-            <h3
-              className="text-lg font-medium text-neutral-900"
-              style={{ fontFamily: "'Newsreader', serif" }}
-            >
-              {info.name} 연결
+            <h3 className="text-lg font-bold text-gray-900">
+              {info?.name} 연결
             </h3>
-            <p className="text-xs text-neutral-500">
-              API 키를 입력하여 연결하세요
+            <p className="text-sm text-gray-500">
+              API 키를 안전하게 암호화하여 저장합니다.
             </p>
           </div>
         </div>
 
         <div className="mb-6">
-          <label className="block text-[10px] uppercase tracking-wider text-neutral-500 mb-2">
-            API 키
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            API Key
           </label>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={`${info.name} API 키를 입력하세요`}
-            className="w-full px-3 py-2.5 text-sm text-neutral-900 placeholder-neutral-300 focus:outline-none transition-colors"
-            style={{
-              background: '#FAFAFA',
-              border: '1px solid #E5E5E5',
-              fontFamily: "'IBM Plex Mono', monospace",
-            }}
+            placeholder={`sk-... (${info?.name} API Key)`}
+            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono"
+            autoFocus
           />
-          <p className="text-[11px] text-neutral-400 mt-2">
-            키는 암호화되어 안전하게 저장됩니다
+          <p className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+            <Shield size={12} />
+            키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
         </div>
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-xs font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             취소
           </button>
           <button
             onClick={() => createMutation.mutate()}
             disabled={!apiKey.trim() || createMutation.isPending}
-            className="flex-1 px-4 py-2.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
-            style={{ background: '#0D9488' }}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
           >
-            {createMutation.isPending ? '연결 중...' : '연결'}
+            {createMutation.isPending ? '연결 중...' : '연결하기'}
           </button>
         </div>
       </div>
@@ -240,63 +220,58 @@ function AddProviderModal({
 
 export function SettingsProviderKeysPage() {
   const [addingProvider, setAddingProvider] = useState<string | null>(null);
+  const { currentOrgId } = useOrganizationStore();
 
-  // Provider 자격증명 목록 조회
   const { data: credentials, isLoading } = useQuery({
-    queryKey: ['provider-credentials', MOCK_ORG_ID],
+    queryKey: ['provider-credentials', currentOrgId],
     queryFn: async () => {
-      const response = await organizationApi.getCredentials(MOCK_ORG_ID);
+      if (!currentOrgId) return [];
+      const response = await organizationApi.getCredentials(currentOrgId);
       return response.data;
     },
+    enabled: !!currentOrgId,
   });
 
-  // Provider별 credential 매핑
   const credentialMap = (credentials || []).reduce((acc, cred) => {
     acc[cred.provider] = cred;
     return acc;
   }, {} as Record<string, ProviderCredentialSummaryResponse>);
 
+  if (!currentOrgId) return <div>조직을 선택해주세요.</div>;
+
   return (
     <div>
-      {/* Page Header */}
       <div className="mb-8">
-        <h1
-          className="text-2xl font-medium text-neutral-900 tracking-tight"
-          style={{ fontFamily: "'Newsreader', serif" }}
-        >
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
           Provider 키
         </h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          LLM 제공업체의 API 키를 등록하여 서비스를 연동합니다
+        <p className="text-sm text-gray-500 mt-1">
+          LLM 제공업체(OpenAI, Anthropic 등)의 API 키를 등록하여 서비스를 연동합니다.
         </p>
       </div>
 
-      {/* BYOK Info */}
-      <div
-        className="p-4 mb-6 flex items-start gap-3"
-        style={{
-          background: '#F0FDFA',
-          border: '1px solid #99F6E4',
-        }}
-      >
-        <span className="text-teal-600 text-sm">◈</span>
+      <div className="p-5 mb-8 flex items-start gap-4 bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl">
+        <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
+          <Terminal size={20} />
+        </div>
         <div>
-          <p className="text-xs text-teal-800 font-medium mb-0.5">
+          <p className="text-sm font-bold text-indigo-900 mb-1">
             BYOK (Bring Your Own Key)
           </p>
-          <p className="text-[11px] text-teal-600">
-            자체 API 키를 사용하여 비용을 직접 관리하고, 사용량을 투명하게 확인할 수 있습니다.
+          <p className="text-xs text-indigo-700 leading-relaxed max-w-2xl">
+            LuminaOps는 사용자의 API 키를 중계하는 역할만 수행합니다.
+            모든 요청은 등록된 키를 사용하여 각 LLM 제공자에게 직접 전송되므로,
+            비용과 사용량을 각 제공자 대시보드에서 투명하게 관리할 수 있습니다.
           </p>
         </div>
       </div>
 
-      {/* Provider Grid */}
       {isLoading ? (
-        <div className="py-12 text-center">
-          <p className="text-sm text-neutral-400">Provider 목록을 불러오는 중...</p>
+        <div className="py-12 text-center text-sm text-gray-500">
+          Provider 목록을 불러오는 중...
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {providers.map((provider) => (
             <ProviderCard
               key={provider}
@@ -308,44 +283,16 @@ export function SettingsProviderKeysPage() {
         </div>
       )}
 
-      {/* Stats */}
-      <div
-        className="mt-8 p-5"
-        style={{
-          background: '#FFFFFF',
-          border: '1px solid #E5E5E5',
-        }}
-      >
-        <p className="text-[10px] uppercase tracking-wider text-neutral-400 mb-4">
-          연결 현황
-        </p>
-        <div className="flex items-center gap-8">
-          <div>
-            <p
-              className="text-3xl font-light"
-              style={{
-                fontFamily: "'Newsreader', serif",
-                color: '#0D9488',
-              }}
-            >
-              {Object.keys(credentialMap).length}
-            </p>
-            <p className="text-xs text-neutral-500 mt-0.5">연결된 Provider</p>
-          </div>
-          <div className="h-12 w-px bg-neutral-200" />
-          <div>
-            <p
-              className="text-3xl font-light text-neutral-900"
-              style={{ fontFamily: "'Newsreader', serif" }}
-            >
-              {providers.length - Object.keys(credentialMap).length}
-            </p>
-            <p className="text-xs text-neutral-500 mt-0.5">미연결</p>
-          </div>
+      <div className="mt-8 pt-8 border-t border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+          <span>{Object.keys(credentialMap).length}개 연결됨</span>
         </div>
+        <a href="#" className="hidden text-xs text-indigo-600 hover:underline flex items-center gap-1">
+          지원하는 모델 목록 보기 <ExternalLink size={10} />
+        </a>
       </div>
 
-      {/* Add Provider Modal */}
       <AddProviderModal
         isOpen={!!addingProvider}
         onClose={() => setAddingProvider(null)}
