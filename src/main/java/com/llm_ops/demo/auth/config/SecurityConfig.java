@@ -48,6 +48,8 @@ public class SecurityConfig {
                         // 인증 없이 접근 가능한 경로
                         .requestMatchers("/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/refresh")
                         .permitAll()
+                        // 게이트웨이 외부 호출(조직 API 키로 인증)
+                        .requestMatchers("/v1/chat/**").permitAll()
                         .requestMatchers("/health").permitAll() // 개발 중 서버 상태 체크 -> 클로드가 제시해줌
                         // 그 외 모든 요청(로그아웃 포함)은 인증 필요
                         .anyRequest().authenticated())
