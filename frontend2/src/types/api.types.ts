@@ -307,7 +307,17 @@ export interface PromptVersionCreateResponse {
 // ========================================
 // Document (RAG)
 // ========================================
-export type RagDocumentStatus = 'WAITING' | 'PROCESSED' | 'FAILED';
+export type RagDocumentStatus =
+  | 'UPLOADED'
+  | 'PARSING'
+  | 'CHUNKING'
+  | 'EMBEDDING'
+  | 'INDEXING'
+  | 'DONE'
+  | 'FAILED'
+  | 'ACTIVE'
+  | 'DELETING'
+  | 'DELETED';
 
 export interface DocumentResponse {
   id: number;
