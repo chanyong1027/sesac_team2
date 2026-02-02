@@ -125,4 +125,25 @@ public class OrganizationApiKey {
                 OrganizationApiKeyStatus.ACTIVE
         );
     }
+
+    /**
+     * API 키를 새로운 값으로 교체합니다 (Rotate).
+     * 기존 키는 더 이상 유효하지 않게 되고, 새로운 해시와 접두사가 저장됩니다.
+     *
+     * @param newKeyHash   새로운 키의 SHA-256 해시
+     * @param newKeyPrefix 새로운 키의 접두사
+     */
+    public void rotate(String newKeyHash, String newKeyPrefix) {
+        this.keyHash = newKeyHash;
+        this.keyPrefix = newKeyPrefix;
+    }
+
+    /**
+     * 이 API 키가 활성 상태인지 확인합니다.
+     *
+     * @return 활성 상태이면 true
+     */
+    public boolean isActive() {
+        return this.status == OrganizationApiKeyStatus.ACTIVE;
+    }
 }

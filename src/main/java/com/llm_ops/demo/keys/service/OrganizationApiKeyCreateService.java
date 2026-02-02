@@ -6,14 +6,10 @@ import com.llm_ops.demo.keys.domain.OrganizationApiKey;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
 import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
+import com.llm_ops.demo.keys.util.ApiKeyGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.util.Base64;
 
 /**
  * {@link OrganizationApiKey}를 생성하는 비즈니스 로직을 담당하는 서비스 클래스입니다.
@@ -23,12 +19,8 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class OrganizationApiKeyCreateService {
 
-    private static final String KEY_PREFIX = "lum_";
-    private static final int RANDOM_BYTES = 32;
-    private static final int KEY_PREFIX_LENGTH = 12;
-
     private final OrganizationApiKeyRepository organizationApiKeyRepository;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final ApiKeyGenerator apiKeyGenerator;
 
     /**
      * 새로운 조직 API 키를 생성하고 데이터베이스에 저장합니다.
@@ -42,15 +34,18 @@ public class OrganizationApiKeyCreateService {
     public OrganizationApiKeyCreateResponse create(Long organizationId, OrganizationApiKeyCreateRequest request) {
         validateNameUnique(organizationId, request.name());
 
-        String plaintextApiKey = generateApiKey();
-        String keyHash = sha256Hex(plaintextApiKey);
-        String keyPrefix = plaintextApiKey.substring(0, Math.min(KEY_PREFIX_LENGTH, plaintextApiKey.length()));
+        ApiKeyGenerator.GeneratedKey generatedKey = apiKeyGenerator.generateWithHash();
 
         organizationApiKeyRepository.save(
-                OrganizationApiKey.create(organizationId, request.name(), keyHash, keyPrefix)
+                OrganizationApiKey.create(
+                        organizationId,
+                        request.name(),
+                        generatedKey.hash(),
+                        generatedKey.prefix()
+                )
         );
 
-        return new OrganizationApiKeyCreateResponse(plaintextApiKey);
+        return new OrganizationApiKeyCreateResponse(generatedKey.plaintext());
     }
 
     /**
@@ -59,34 +54,6 @@ public class OrganizationApiKeyCreateService {
     private void validateNameUnique(Long organizationId, String name) {
         if (organizationApiKeyRepository.existsByOrganizationIdAndName(organizationId, name)) {
             throw new BusinessException(ErrorCode.CONFLICT, "이미 존재하는 API Key 이름입니다.");
-        }
-    }
-
-    /**
-     * 보안적으로 안전한 랜덤 API 키를 생성합니다.
-     * 형식: "lum_" + Base64(32-byte random)
-     */
-    private String generateApiKey() {
-        byte[] randomBytes = new byte[RANDOM_BYTES];
-        secureRandom.nextBytes(randomBytes);
-        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-        return KEY_PREFIX + encoded;
-    }
-
-    /**
-     * 주어진 문자열을 SHA-256 알고리즘으로 해싱하여 16진수 문자열로 반환합니다.
-     */
-    private String sha256Hex(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
-            StringBuilder builder = new StringBuilder(hash.length * 2);
-            for (byte b : hash) {
-                builder.append(String.format("%02x", b));
-            }
-            return builder.toString();
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to hash api key", e);
         }
     }
 }
