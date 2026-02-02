@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { LandingPage_v3 } from '@/pages/LandingPage_v3';
@@ -6,13 +6,21 @@ import { LandingPage_v2 } from '@/pages/LandingPage_v2';
 import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
-import { DashboardPage } from '@/pages/DashboardPage';
-import { WorkspaceDetailPage } from '@/pages/WorkspaceDetailPage';
+import { OrganizationDashboardPage } from '@/pages/dashboard/OrganizationDashboardPage';
+import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
+import { PromptListPage } from '@/pages/prompt/PromptListPage';
+import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
+import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
+import { DocumentListPage } from '@/pages/document/DocumentListPage';
+import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
+// import { DashboardPage } from '@/pages/DashboardPage'; // Deprecated
+// import { WorkspaceDetailPage } from '@/pages/WorkspaceDetailPage'; // Deprecated
 import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
-import { SettingsLayout } from '@/pages/settings/SettingsLayout';
+// import { SettingsLayout } from '@/pages/settings/SettingsLayout';
 import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
 import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
 import { SettingsProviderKeysPage } from '@/pages/settings/SettingsProviderKeysPage';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,9 +31,16 @@ const queryClient = new QueryClient({
   },
 });
 
+const DashboardLayoutWrapper = () => (
+  <DashboardLayout>
+    <Outlet />
+  </DashboardLayout>
+);
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthInitializer />
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
@@ -38,15 +53,18 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
+            <Route element={<DashboardLayoutWrapper />}>
+              <Route path="/dashboard" element={<OrganizationDashboardPage />} />
+              <Route path="/workspaces/:id" element={<WorkspaceDashboardPage />} />
+              <Route path="/workspaces/:id/prompts" element={<PromptListPage />} />
+              <Route path="/workspaces/:id/prompts/new" element={<PromptCreatePage />} />
+              <Route path="/workspaces/:id/prompts/:promptId" element={<PromptDetailPage />} />
+              <Route path="/workspaces/:id/documents" element={<DocumentListPage />} />
 
-            {/* Settings Routes */}
-            <Route path="/settings" element={<SettingsLayout />}>
-              <Route index element={<Navigate to="/settings/members" replace />} />
-              <Route path="members" element={<SettingsMembersPage />} />
-              <Route path="api-keys" element={<SettingsApiKeysPage />} />
-              <Route path="provider-keys" element={<SettingsProviderKeysPage />} />
+              {/* Settings Routes (Integrated) */}
+              <Route path="/settings/members" element={<SettingsMembersPage />} />
+              <Route path="/settings/api-keys" element={<SettingsApiKeysPage />} />
+              <Route path="/settings/provider-keys" element={<SettingsProviderKeysPage />} />
             </Route>
           </Route>
         </Routes>
