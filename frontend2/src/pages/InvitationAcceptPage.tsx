@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { workspaceApi } from '@/api/workspace.api';
@@ -8,6 +8,7 @@ export function InvitationAcceptPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
   const token = searchParams.get('token');
 
   const acceptMutation = useMutation({
@@ -15,10 +16,16 @@ export function InvitationAcceptPage() {
     onSuccess: (response) => {
       const payload = (response.data as any).data ?? response.data;
       const { workspaceId, organizationId } = payload;
+      const resolvedWorkspaceId = Number(workspaceId);
+      if (!Number.isFinite(resolvedWorkspaceId)) {
+        console.warn('Invitation accept: missing workspaceId', payload);
+        setNavigationError('워크스페이스 정보를 찾을 수 없습니다.');
+        return;
+      }
       if (organizationId) {
-        navigate(`/orgs/${organizationId}/workspaces/${workspaceId}`);
+        navigate(`/orgs/${organizationId}/workspaces/${resolvedWorkspaceId}`);
       } else {
-        navigate(`/workspaces/${workspaceId}`);
+        navigate(`/workspaces/${resolvedWorkspaceId}`);
       }
     },
   });
@@ -47,6 +54,23 @@ export function InvitationAcceptPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-white text-lg">초대를 수락하는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (navigationError) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-400 text-lg mb-4">{navigationError}</p>
+          <p className="text-gray-400">다시 시도하거나 대시보드로 이동해주세요.</p>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="mt-6 px-6 py-3 bg-blue-500 text-white rounded-lg"
+          >
+            대시보드로 이동
+          </button>
         </div>
       </div>
     );
