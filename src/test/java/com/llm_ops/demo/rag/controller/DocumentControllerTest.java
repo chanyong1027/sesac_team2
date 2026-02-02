@@ -104,7 +104,7 @@ class DocumentControllerTest {
                 .with(authentication(createAuth(userId))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.documentId").value(10L))
-            .andExpect(jsonPath("$.status").value("ACTIVE"));
+            .andExpect(jsonPath("$.status").value("UPLOADED"));
 
         verify(ragDocumentIngestService).ingest(eq(workspaceId), eq(10L), any(org.springframework.core.io.Resource.class));
     }
@@ -130,10 +130,10 @@ class DocumentControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].id").value(1L))
             .andExpect(jsonPath("$[0].fileName").value("a.txt"))
-            .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+            .andExpect(jsonPath("$[0].status").value("UPLOADED"))
             .andExpect(jsonPath("$[1].id").value(2L))
             .andExpect(jsonPath("$[1].fileName").value("b.txt"))
-            .andExpect(jsonPath("$[1].status").value("ACTIVE"));
+            .andExpect(jsonPath("$[1].status").value("UPLOADED"));
     }
 
     @Test

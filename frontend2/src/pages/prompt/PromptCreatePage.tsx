@@ -5,8 +5,9 @@ import { ArrowLeft, MessageSquare } from 'lucide-react';
 import { promptApi } from '@/api/prompt.api';
 
 export function PromptCreatePage() {
-    const { id } = useParams<{ id: string }>();
-    const workspaceId = Number(id);
+    const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
+    const workspaceId = Number(workspaceIdParam);
+    const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
@@ -22,7 +23,7 @@ export function PromptCreatePage() {
         onSuccess: () => {
             // 목록 캐시 무효화
             queryClient.invalidateQueries({ queryKey: ['prompts', workspaceId] });
-            navigate(`/workspaces/${workspaceId}/prompts`);
+            navigate(`${basePath}/prompts`);
         },
         onError: (error) => {
             console.error('Failed to create prompt:', error);
@@ -38,7 +39,7 @@ export function PromptCreatePage() {
     return (
         <div className="max-w-2xl mx-auto py-8">
             <Link
-                to={`/workspaces/${workspaceId}/prompts`}
+                to={`${basePath}/prompts`}
                 className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors"
             >
                 <ArrowLeft size={16} className="mr-1" />

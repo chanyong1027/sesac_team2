@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -52,6 +53,9 @@ class PromptVersionServiceTest {
     @Mock
     private WorkspaceMemberRepository workspaceMemberRepository;
 
+    @Mock
+    private PromptModelAllowlistService promptModelAllowlistService;
+
     @Test
     @DisplayName("프롬프트 버전을 생성한다")
     void create_Success() throws Exception {
@@ -85,6 +89,37 @@ class PromptVersionServiceTest {
         assertThat(response.versionNo()).isEqualTo(1);
 
         verify(promptVersionRepository).save(any(PromptVersion.class));
+        verify(promptModelAllowlistService).validateModel(request.provider(), request.model());
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 모델이면 예외가 발생한다")
+    void create_InvalidModel_ThrowsException() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        PromptVersionCreateRequest request = createRequest();
+
+        User user = createMockUser(userId);
+        Workspace workspace = createMockWorkspace(1L, user);
+        Prompt prompt = createMockPrompt(promptId, workspace);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
+                .willReturn(Optional.of(prompt));
+        given(workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user))
+                .willReturn(true);
+
+        doThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 모델입니다."))
+                .when(promptModelAllowlistService)
+                .validateModel(request.provider(), request.model());
+
+        // when & then
+        assertThatThrownBy(() -> promptVersionService.create(promptId, userId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(promptVersionRepository, never()).save(any());
     }
 
     @Test

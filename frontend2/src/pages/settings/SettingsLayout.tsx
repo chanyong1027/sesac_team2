@@ -1,23 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SETTINGS LAYOUT - Light Theme with Swiss Precision
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const navigationItems = [
-  { path: '/settings/members', label: '멤버', icon: '◎' },
-  { path: '/settings/api-keys', label: 'API 키', icon: '⬡' },
-  { path: '/settings/provider-keys', label: 'Provider 키', icon: '◈' },
-];
-
 export function SettingsLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { orgId } = useParams<{ orgId: string }>();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const basePath = orgId ? `/orgs/${orgId}` : '';
+  const navigationItems = [
+    { path: `${basePath}/settings/members`, label: '멤버', icon: '◎' },
+    { path: `${basePath}/settings/api-keys`, label: 'API 키', icon: '⬡' },
+    { path: `${basePath}/settings/provider-keys`, label: 'Provider 키', icon: '◈' },
+  ];
 
   // 인증되지 않은 사용자는 로그인 페이지로
   useEffect(() => {
@@ -55,7 +56,7 @@ export function SettingsLayout() {
           {/* Logo & Back */}
           <div className="flex items-center gap-6">
             <Link
-              to="/dashboard"
+              to={basePath ? `${basePath}/dashboard` : '/dashboard'}
               className="flex items-center gap-2 text-neutral-400 hover:text-neutral-600 transition-colors"
             >
               <span className="text-sm">←</span>

@@ -8,7 +8,7 @@ interface Props {
 export function WorkspaceCard({ workspace }: Props) {
   return (
     <Link
-      to={`/workspaces/${workspace.id}`}
+      to={`/orgs/${workspace.organizationId}/workspaces/${workspace.id}`}
       className="block p-6 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all duration-200 group"
     >
       <div className="flex items-center justify-between mb-4">

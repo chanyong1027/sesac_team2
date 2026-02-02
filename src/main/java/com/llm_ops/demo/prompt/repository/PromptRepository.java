@@ -13,5 +13,7 @@ public interface PromptRepository extends JpaRepository<Prompt, Long> {
 
     List<Prompt> findByWorkspaceAndStatusOrderByCreatedAtDesc(Workspace workspace, PromptStatus status);
 
+    Optional<Prompt> findByWorkspaceAndPromptKeyAndStatus(Workspace workspace, String promptKey, PromptStatus status);
+
     boolean existsByWorkspaceAndPromptKey(Workspace workspace, String promptKey);
 }

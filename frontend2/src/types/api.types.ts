@@ -76,6 +76,13 @@ export interface OrganizationCreateResponse {
   status: string;
 }
 
+export interface OrganizationDetailResponse {
+  id: number;
+  name: string;
+  status: string;
+  createdAt: string;
+}
+
 export interface OrganizationMemberResponse {
   memberId: number;
   userId: number;
@@ -239,9 +246,26 @@ export interface PromptUpdateRequest {
 }
 
 // ========================================
+// Prompt Release
+// ========================================
+export interface PromptReleaseResponse {
+  promptId: number;
+  activeVersionId: number;
+  activeVersionNo: number;
+  releasedAt: string;
+}
+
+export interface PromptReleaseRequest {
+  versionId: number;
+  reason?: string;
+}
+
+// ========================================
 // Prompt Version
 // ========================================
-export type ProviderType = 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | 'CLOVA'; // Add more as needed
+export type ProviderType = 'OPENAI' | 'ANTHROPIC' | 'GEMINI';
+
+export type ModelAllowlistResponse = Record<ProviderType, string[]>;
 
 export interface PromptVersionSummaryResponse {
   id: number;
@@ -285,7 +309,17 @@ export interface PromptVersionCreateResponse {
 // ========================================
 // Document (RAG)
 // ========================================
-export type RagDocumentStatus = 'WAITING' | 'PROCESSED' | 'FAILED';
+export type RagDocumentStatus =
+  | 'UPLOADED'
+  | 'PARSING'
+  | 'CHUNKING'
+  | 'EMBEDDING'
+  | 'INDEXING'
+  | 'DONE'
+  | 'FAILED'
+  | 'ACTIVE'
+  | 'DELETING'
+  | 'DELETED';
 
 export interface DocumentResponse {
   id: number;

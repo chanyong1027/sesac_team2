@@ -12,8 +12,9 @@ import {
 import type { PromptSummaryResponse } from '@/types/api.types';
 
 export function PromptListPage() {
-    const { id } = useParams<{ id: string }>();
-    const workspaceId = Number(id);
+    const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
+    const workspaceId = Number(workspaceIdParam);
+    const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'DRAFT' | 'ARCHIVED'>('ALL');
 
@@ -49,7 +50,7 @@ export function PromptListPage() {
                     </p>
                 </div>
                 <Link
-                    to={`/workspaces/${workspaceId}/prompts/new`}
+                    to={`${basePath}/prompts/new`}
                     className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm"
                 >
                     <Plus size={16} />
@@ -108,7 +109,7 @@ export function PromptListPage() {
                                             </div>
                                             <div>
                                                 <Link
-                                                    to={`/workspaces/${workspaceId}/prompts/${prompt.id}`}
+                                                    to={`${basePath}/prompts/${prompt.id}`}
                                                     className="text-sm font-semibold text-gray-900 hover:text-indigo-600 mb-0.5 block"
                                                 >
                                                     {prompt.promptKey}

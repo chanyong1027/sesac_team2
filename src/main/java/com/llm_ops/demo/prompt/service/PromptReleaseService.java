@@ -84,6 +84,9 @@ public class PromptReleaseService {
 
         PromptRelease release = promptReleaseRepository.findByPromptId(promptId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다."));
+        if (release.getActiveVersion() == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다.");
+        }
 
         return PromptReleaseResponse.from(release);
     }
@@ -136,8 +139,11 @@ public class PromptReleaseService {
     }
 
     private User findUser(Long userId) {
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHENTICATED, "로그인이 필요합니다.");
+        }
         return userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "사용자를 찾을 수 없습니다."));
     }
 
     private Prompt findActivePrompt(Long promptId) {

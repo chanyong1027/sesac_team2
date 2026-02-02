@@ -15,8 +15,8 @@ import {
 import type { DocumentResponse, RagDocumentStatus } from '@/types/api.types';
 
 export function DocumentListPage() {
-    const { id } = useParams<{ id: string }>();
-    const workspaceId = Number(id);
+    const { workspaceId: workspaceIdParam } = useParams<{ workspaceId: string }>();
+    const workspaceId = Number(workspaceIdParam);
     const [searchQuery, setSearchQuery] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const queryClient = useQueryClient();
@@ -189,19 +189,27 @@ export function DocumentListPage() {
 }
 
 function StatusBadge({ status }: { status: RagDocumentStatus }) {
-    if (status === 'WAITING') {
+    if (status === 'UPLOADED') {
         return (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                <Loader2 size={12} className="animate-spin" />
-                대기 중
+                <CheckCircle2 size={12} />
+                업로드 완료
             </span>
         );
     }
-    if (status === 'PROCESSED') {
+    if (status === 'PARSING' || status === 'CHUNKING' || status === 'EMBEDDING' || status === 'INDEXING') {
+        return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <Loader2 size={12} className="animate-spin" />
+                처리 중
+            </span>
+        );
+    }
+    if (status === 'DONE' || status === 'ACTIVE') {
         return (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
                 <CheckCircle2 size={12} />
-                처리됨
+                완료
             </span>
         );
     }
@@ -213,5 +221,24 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
             </span>
         );
     }
-    return null;
+    if (status === 'DELETING') {
+        return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                <Loader2 size={12} className="animate-spin" />
+                삭제 중
+            </span>
+        );
+    }
+    if (status === 'DELETED') {
+        return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                삭제됨
+            </span>
+        );
+    }
+    return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+            {status}
+        </span>
+    );
 }

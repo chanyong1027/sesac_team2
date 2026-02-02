@@ -5,7 +5,7 @@
 -- ============================================================
 
 -- request_logs: 게이트웨이 요청 로그 (1요청 = 1row)
-CREATE TABLE request_logs (
+CREATE TABLE IF NOT EXISTS request_logs (
     -- 식별자
     request_id UUID PRIMARY KEY,
     trace_id VARCHAR(64) NOT NULL,
@@ -75,21 +75,21 @@ COMMENT ON COLUMN request_logs.rag_context_hash IS 'RAG 컨텍스트 SHA-256 해
 -- ============================================================
 
 -- 워크스페이스별 로그 리스트 (기본 조회)
-CREATE INDEX idx_request_logs_ws_time 
+CREATE INDEX IF NOT EXISTS idx_request_logs_ws_time 
     ON request_logs (workspace_id, created_at DESC);
 
 -- traceId로 단건 조회
-CREATE INDEX idx_request_logs_trace 
+CREATE INDEX IF NOT EXISTS idx_request_logs_trace 
     ON request_logs (trace_id);
 
 -- 워크스페이스별 상태 필터링
-CREATE INDEX idx_request_logs_ws_status_time 
+CREATE INDEX IF NOT EXISTS idx_request_logs_ws_status_time 
     ON request_logs (workspace_id, status, created_at DESC);
 
 -- 워크스페이스별 failover 필터링
-CREATE INDEX idx_request_logs_ws_failover_time 
+CREATE INDEX IF NOT EXISTS idx_request_logs_ws_failover_time 
     ON request_logs (workspace_id, is_failover, created_at DESC);
 
 -- 조직별 사용량 집계
-CREATE INDEX idx_request_logs_org_time 
+CREATE INDEX IF NOT EXISTS idx_request_logs_org_time 
     ON request_logs (organization_id, created_at DESC);

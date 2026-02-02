@@ -1,0 +1,62 @@
+import { useEffect, useMemo } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { promptApi } from '@/api/prompt.api';
+import { ArrowRight } from 'lucide-react';
+
+export function PromptEntryPage() {
+  const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
+  const parsedWorkspaceId = Number(workspaceIdParam);
+  const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
+  const navigate = useNavigate();
+
+  if (!isValidWorkspaceId) {
+    return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
+  }
+
+  const workspaceId = parsedWorkspaceId;
+  const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
+
+  const { data: prompts, isLoading } = useQuery({
+        queryKey: ['prompts', workspaceId],
+        queryFn: async () => {
+            const response = await promptApi.getPrompts(workspaceId);
+            return response.data;
+        },
+        enabled: isValidWorkspaceId,
+    });
+
+    const orderedPrompts = useMemo(() => {
+        if (!prompts) return [];
+        return [...prompts].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    }, [prompts]);
+
+  useEffect(() => {
+    if (!orderedPrompts.length) return;
+    navigate(`${basePath}/prompts/${orderedPrompts[0].id}`, { replace: true });
+  }, [orderedPrompts, basePath, navigate]);
+
+  if (isLoading) {
+    return <div className="p-8 text-gray-500">메인 프롬프트를 찾는 중...</div>;
+  }
+
+  if (!prompts || prompts.length === 0) {
+    return (
+      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm text-center space-y-4">
+        <h1 className="text-xl font-semibold text-gray-900">프롬프트가 없습니다</h1>
+        <p className="text-sm text-gray-500">
+          워크스페이스에 메인 프롬프트를 만들고 릴리즈 버전을 설정하세요.
+        </p>
+                <Link
+                    to={`${basePath}/prompts/new`}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                >
+                    새 프롬프트 만들기
+                    <ArrowRight size={16} />
+                </Link>
+      </div>
+    );
+  }
+
+  return null;
+}

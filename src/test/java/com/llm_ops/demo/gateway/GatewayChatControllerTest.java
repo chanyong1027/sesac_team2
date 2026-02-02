@@ -8,6 +8,20 @@ import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.keys.domain.ProviderType;
+import com.llm_ops.demo.organization.domain.Organization;
+import com.llm_ops.demo.organization.repository.OrganizationRepository;
+import com.llm_ops.demo.prompt.domain.Prompt;
+import com.llm_ops.demo.prompt.domain.PromptRelease;
+import com.llm_ops.demo.prompt.domain.PromptVersion;
+import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
+import com.llm_ops.demo.prompt.repository.PromptRepository;
+import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
+import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +33,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -30,6 +45,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @ActiveProfiles({"test", "mock-auth"})
 @TestPropertySource(properties = "PROVIDER_KEY_ENC_KEY=test-secret")
 @Import(TestSecurityConfig.class)
+@Transactional
 class GatewayChatControllerTest {
 
         @Autowired
@@ -47,7 +63,33 @@ class GatewayChatControllerTest {
         @Autowired
         private ProviderCredentialRepository providerCredentialRepository;
 
+        @Autowired
+        private UserRepository userRepository;
+
+        @Autowired
+        private OrganizationRepository organizationRepository;
+
+        @Autowired
+        private WorkspaceRepository workspaceRepository;
+
+        @Autowired
+        private PromptRepository promptRepository;
+
+        @Autowired
+        private PromptVersionRepository promptVersionRepository;
+
+        @Autowired
+        private PromptReleaseRepository promptReleaseRepository;
+
+        @Autowired
+        private EntityManager entityManager;
+
         private MockMvc mockMvc;
+        private Long organizationId;
+        private Long workspaceId;
+        private String promptKey;
+        private User creatorUser;
+        private Workspace workspace;
 
         @BeforeEach
         void setUp() {
@@ -56,6 +98,20 @@ class GatewayChatControllerTest {
                                 .build();
                 organizationApiKeyRepository.deleteAll();
                 providerCredentialRepository.deleteAll();
+                promptReleaseRepository.deleteAll();
+                promptVersionRepository.deleteAll();
+                promptRepository.deleteAll();
+                workspaceRepository.deleteAll();
+                organizationRepository.deleteAll();
+                userRepository.deleteAll();
+
+                creatorUser = userRepository.save(User.create("test@example.com", "password", "tester"));
+                Organization organization = organizationRepository.save(Organization.create("테스트 조직", creatorUser));
+                workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
+                organizationId = organization.getId();
+                workspaceId = workspace.getId();
+
+                promptKey = createReleasedPrompt("cs-bot", "hello {{name}}");
         }
 
         @Test
@@ -63,26 +119,26 @@ class GatewayChatControllerTest {
         void 게이트웨이_호출에_성공한다() throws Exception {
                 // given
                 OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                                1L,
+                                organizationId,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
                 providerCredentialService.register(
-                                1L,
+                                organizationId,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
 
                 // when & then
                 mockMvc.perform(post("/v1/chat/completions")
                                 .header("X-API-Key", apiKeyResponse.apiKey())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
+                                .content(String.format("""
                                                 {
-                                                  "workspaceId": 1,
-                                                  "promptKey": "hello {{name}}",
+                                                  "workspaceId": %d,
+                                                  "promptKey": "%s",
                                                   "variables": {
                                                     "name": "lumina"
                                                   }
                                                 }
-                                                """))
+                                                """, workspaceId, promptKey)))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.answer").value("hello lumina"))
                                 .andExpect(jsonPath("$.traceId").isString())
@@ -110,22 +166,22 @@ class GatewayChatControllerTest {
         void 필수_요청_값이_없으면_예외가_발생한다() throws Exception {
                 // given
                 OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                                1L,
+                                organizationId,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
                 providerCredentialService.register(
-                                1L,
+                                organizationId,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
 
                 // when & then
                 mockMvc.perform(post("/v1/chat/completions")
                                 .header("X-API-Key", apiKeyResponse.apiKey())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
+                                .content(String.format("""
                                                 {
-                                                  "promptKey": "hello"
+                                                  "promptKey": "%s"
                                                 }
-                                                """))
+                                                """, promptKey)))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("C400"));
         }
@@ -135,23 +191,44 @@ class GatewayChatControllerTest {
         void 변수_값이_null이면_예외가_발생한다() throws Exception {
                 // given
                 OrganizationApiKeyCreateResponse apiKeyResponse = organizationApiKeyCreateService.create(
-                                1L,
+                                organizationId,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
                 // when & then
                 mockMvc.perform(post("/v1/chat/completions")
                                 .header("X-API-Key", apiKeyResponse.apiKey())
                                 .contentType(MediaType.APPLICATION_JSON)
-                                .content("""
+                                .content(String.format("""
                                                 {
-                                                  "workspaceId": 1,
-                                                  "promptKey": "hello {{name}}",
+                                                  "workspaceId": %d,
+                                                  "promptKey": "%s",
                                                   "variables": {
                                                     "name": null
                                                   }
                                                 }
-                                                """))
+                                                """, workspaceId, promptKey)))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("C400"));
+        }
+
+        private String createReleasedPrompt(String key, String userTemplate) {
+                Prompt prompt = promptRepository.save(Prompt.create(workspace, key, "test prompt"));
+                PromptVersion version = promptVersionRepository.save(
+                        PromptVersion.create(
+                                prompt,
+                                1,
+                                "v1",
+                                ProviderType.OPENAI,
+                                "gpt-4o-mini",
+                                null,
+                                userTemplate,
+                                null,
+                                creatorUser
+                        )
+                );
+                PromptRelease release = PromptRelease.create(prompt, version);
+                entityManager.persist(release);
+                entityManager.flush();
+                return prompt.getPromptKey();
         }
 }
