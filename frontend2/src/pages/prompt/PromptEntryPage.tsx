@@ -6,8 +6,15 @@ import { ArrowRight } from 'lucide-react';
 
 export function PromptEntryPage() {
   const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
-  const workspaceId = Number(workspaceIdParam);
+  const parsedWorkspaceId = Number(workspaceIdParam);
+  const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
   const navigate = useNavigate();
+
+  if (!isValidWorkspaceId) {
+    return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
+  }
+
+  const workspaceId = parsedWorkspaceId;
   const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
   const { data: prompts, isLoading } = useQuery({
@@ -16,7 +23,7 @@ export function PromptEntryPage() {
             const response = await promptApi.getPrompts(workspaceId);
             return response.data;
         },
-        enabled: !!workspaceId,
+        enabled: isValidWorkspaceId,
     });
 
     const orderedPrompts = useMemo(() => {

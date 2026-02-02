@@ -17,11 +17,22 @@ import {
 
 export function WorkspaceDashboardPage() {
     const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
-    const workspaceId = Number(workspaceIdParam);
+    const parsedWorkspaceId = Number(workspaceIdParam);
+    const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
+    const parsedOrgId = orgId ? Number(orgId) : undefined;
+    const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
+        ? parsedOrgId
+        : undefined;
+
+    if (!isValidWorkspaceId) {
+        return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
+    }
+
+    const workspaceId = parsedWorkspaceId;
     const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
     // 워크스페이스 정보 조회 (캐시 활용)
-    const { data: workspaces, isLoading: isWorkspaceLoading } = useOrganizationWorkspaces(orgId ? Number(orgId) : undefined);
+    const { data: workspaces, isLoading: isWorkspaceLoading } = useOrganizationWorkspaces(resolvedOrgId);
     const workspace = workspaces?.find(w => w.id === workspaceId);
 
     // 프롬프트 목록 조회 (통계용)
@@ -106,10 +117,10 @@ export function WorkspaceDashboardPage() {
                                 color="blue"
                             />
                             <QuickActionButton
-                                to={`${basePath}/playground`}
+                                to={`${basePath}/prompts`}
                                 icon={<Play size={20} />}
-                                label="Playground"
-                                description="프롬프트 테스트"
+                                label="프롬프트 테스트"
+                                description="프롬프트 선택 후 테스트"
                                 color="emerald"
                             />
                         </div>
