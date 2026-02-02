@@ -12,8 +12,16 @@ import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.organization.domain.Organization;
 import com.llm_ops.demo.organization.repository.OrganizationRepository;
+import com.llm_ops.demo.prompt.domain.Prompt;
+import com.llm_ops.demo.prompt.domain.PromptRelease;
+import com.llm_ops.demo.prompt.domain.PromptVersion;
+import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
+import com.llm_ops.demo.prompt.repository.PromptRepository;
+import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.keys.domain.ProviderType;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +33,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
@@ -47,6 +56,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
         "rag.vectorstore.pgvector.enabled=true"
 })
 @DisplayName("Gateway-RAG 통합 테스트")
+@Transactional
 class GatewayRagIntegrationTest {
 
     @Autowired
@@ -74,25 +84,42 @@ class GatewayRagIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
+    private PromptRepository promptRepository;
+
+    @Autowired
+    private PromptVersionRepository promptVersionRepository;
+
+    @Autowired
+    private PromptReleaseRepository promptReleaseRepository;
+
+    @Autowired
     private TestVectorStoreState testVectorStoreState;
+
+    @Autowired
+    private EntityManager entityManager;
 
     private MockMvc mockMvc;
     private Long organizationId;
     private Long workspaceId;
+    private User creatorUser;
+    private Workspace workspace;
 
     @BeforeEach
     void setUp() {
         mockMvc = webAppContextSetup(context).build();
         organizationApiKeyRepository.deleteAll();
         providerCredentialRepository.deleteAll();
+        promptReleaseRepository.deleteAll();
+        promptVersionRepository.deleteAll();
+        promptRepository.deleteAll();
         workspaceRepository.deleteAll();
         organizationRepository.deleteAll();
         userRepository.deleteAll();
         testVectorStoreState.clear();
 
-        User creator = userRepository.save(User.create("test@example.com", "password", "tester"));
-        Organization organization = organizationRepository.save(Organization.create("테스트 조직", creator));
-        Workspace workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
+        creatorUser = userRepository.save(User.create("test@example.com", "password", "tester"));
+        Organization organization = organizationRepository.save(Organization.create("테스트 조직", creatorUser));
+        workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
         organizationId = organization.getId();
         workspaceId = workspace.getId();
     }
@@ -117,6 +144,8 @@ class GatewayRagIntegrationTest {
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
+        String promptKey = createReleasedPrompt("refund-policy", "환불 정책을 알려줘");
+
         // when
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
@@ -124,11 +153,11 @@ class GatewayRagIntegrationTest {
                         .content(String.format("""
                                 {
                                   "workspaceId": %d,
-                                  "promptKey": "환불 정책을 알려줘",
+                                  "promptKey": "%s",
                                   "variables": {},
                                   "ragEnabled": false
                                 }
-                                """, workspaceId)))
+                                """, workspaceId, promptKey)))
                 // then
                 .andExpect(status().isOk());
         assertThat(testVectorStoreState.getLastQuery()).isNull();
@@ -154,6 +183,8 @@ class GatewayRagIntegrationTest {
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
+        String promptKey = createReleasedPrompt("refund-policy", "환불 정책을 알려줘");
+
         // when
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
@@ -161,11 +192,11 @@ class GatewayRagIntegrationTest {
                         .content(String.format("""
                                 {
                                   "workspaceId": %d,
-                                  "promptKey": "환불 정책을 알려줘",
+                                  "promptKey": "%s",
                                   "variables": {},
                                   "ragEnabled": true
                                 }
-                                """, workspaceId)))
+                                """, workspaceId, promptKey)))
                 // then
                 .andExpect(status().isOk());
         assertThat(testVectorStoreState.getLastQuery()).isNotNull()
@@ -186,6 +217,8 @@ class GatewayRagIntegrationTest {
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
+        String promptKey = createReleasedPrompt("question-template", "질문: {{question}}");
+
         // when: {{question}} 변수가 있는 프롬프트 요청
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
@@ -193,12 +226,12 @@ class GatewayRagIntegrationTest {
                         .content(String.format("""
                                 {
                                   "workspaceId": %d,
-                                  "promptKey": "질문: {{question}}",
+                                  "promptKey": "%s",
                                   "variables": {
                                     "question": "안녕하세요"
                                   }
                                 }
-                                """, workspaceId)))
+                                """, workspaceId, promptKey)))
                 // then: 프롬프트 렌더링은 정상 작동
                 .andExpect(status().isOk());
     }
@@ -222,6 +255,8 @@ class GatewayRagIntegrationTest {
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
 
+        String promptKey = createReleasedPrompt("product-price", "상품 A의 가격은 얼마인가요?");
+
         // when: ragEnabled 필드 없이 요청
         mockMvc.perform(post("/v1/chat/completions")
                         .header("X-API-Key", apiKeyResponse.apiKey())
@@ -229,12 +264,33 @@ class GatewayRagIntegrationTest {
                         .content(String.format("""
                                 {
                                   "workspaceId": %d,
-                                  "promptKey": "상품 A의 가격은 얼마인가요?",
+                                  "promptKey": "%s",
                                   "variables": {}
                                 }
-                                """, workspaceId)))
+                                """, workspaceId, promptKey)))
                 // then
                 .andExpect(status().isOk());
         assertThat(testVectorStoreState.getLastQuery()).isNull();
+    }
+
+    private String createReleasedPrompt(String promptKey, String userTemplate) {
+        Prompt prompt = promptRepository.save(Prompt.create(workspace, promptKey, "test prompt"));
+        PromptVersion version = promptVersionRepository.save(
+                PromptVersion.create(
+                        prompt,
+                        1,
+                        "v1",
+                        ProviderType.OPENAI,
+                        "gpt-4o-mini",
+                        null,
+                        userTemplate,
+                        null,
+                        creatorUser
+                )
+        );
+        PromptRelease release = PromptRelease.create(prompt, version);
+        entityManager.persist(release);
+        entityManager.flush();
+        return prompt.getPromptKey();
     }
 }

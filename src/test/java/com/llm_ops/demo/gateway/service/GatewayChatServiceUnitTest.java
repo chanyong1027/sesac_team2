@@ -6,8 +6,14 @@ import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.prompt.domain.PromptRelease;
+import com.llm_ops.demo.prompt.domain.PromptStatus;
+import com.llm_ops.demo.prompt.domain.PromptVersion;
+import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
+import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +38,7 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,6 +85,12 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private RequestLogWriter requestLogWriter;
+
+    @Mock
+    private PromptRepository promptRepository;
+
+    @Mock
+    private PromptReleaseRepository promptReleaseRepository;
 
     @InjectMocks
     private GatewayChatService gatewayChatService;
@@ -260,11 +273,27 @@ class GatewayChatServiceUnitTest {
                     new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
             when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
             when(requestLogWriter.start(any())).thenReturn(requestId);
-            when(workspaceRepository.existsByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE)).thenReturn(true);
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
             when(ragSearchService.search(eq(workspaceId), anyString())).thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
-            when(gatewayChatProviderResolveService.resolve(eq(organizationId), any())).thenReturn(ProviderType.OPENAI);
             when(providerCredentialService.getDecryptedApiKey(eq(organizationId), eq(ProviderType.OPENAI))).thenReturn("provider-key");
-            when(gatewayModelProperties.getModels()).thenReturn(models);
             when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
             when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
@@ -335,8 +364,9 @@ class GatewayChatServiceUnitTest {
         assertThat(gatewayChatService).isNotNull();
         assertThat(gatewayChatService).hasFieldOrPropertyWithValue("ragSearchService", ragSearchService);
         assertThat(gatewayChatService).hasFieldOrPropertyWithValue("organizationApiKeyAuthService", organizationApiKeyAuthService);
-        assertThat(gatewayChatService).hasFieldOrPropertyWithValue("gatewayChatProviderResolveService", gatewayChatProviderResolveService);
         assertThat(gatewayChatService).hasFieldOrPropertyWithValue("providerCredentialService", providerCredentialService);
+        assertThat(gatewayChatService).hasFieldOrPropertyWithValue("promptRepository", promptRepository);
+        assertThat(gatewayChatService).hasFieldOrPropertyWithValue("promptReleaseRepository", promptReleaseRepository);
     }
 
     @Test

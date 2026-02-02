@@ -21,7 +21,8 @@ import java.util.Map;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
@@ -41,10 +42,11 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
-@Slf4j
 @ConditionalOnProperty(prefix = "storage.s3", name = "enabled", havingValue = "true")
 @Validated
 public class DocumentController {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentController.class);
 
     private final S3ApiClient s3ApiClient;
     private final RagDocumentCreateService ragDocumentCreateService;

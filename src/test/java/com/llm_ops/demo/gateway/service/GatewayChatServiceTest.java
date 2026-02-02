@@ -6,6 +6,8 @@ import com.llm_ops.demo.config.TestChatModelState;
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
@@ -14,6 +16,17 @@ import com.llm_ops.demo.keys.domain.OrganizationApiKey;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.keys.domain.ProviderType;
+import com.llm_ops.demo.organization.domain.Organization;
+import com.llm_ops.demo.organization.repository.OrganizationRepository;
+import com.llm_ops.demo.prompt.domain.Prompt;
+import com.llm_ops.demo.prompt.domain.PromptRelease;
+import com.llm_ops.demo.prompt.domain.PromptVersion;
+import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
+import com.llm_ops.demo.prompt.repository.PromptRepository;
+import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
+import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,11 +42,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.persistence.EntityManager;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @TestPropertySource(properties = "PROVIDER_KEY_ENC_KEY=test-secret")
 @Import(TestSecurityConfig.class)
+@Transactional
 class GatewayChatServiceTest {
 
         @Autowired
@@ -57,11 +73,51 @@ class GatewayChatServiceTest {
         @Autowired
         private TestChatModelState testChatModelState;
 
+        @Autowired
+        private UserRepository userRepository;
+
+        @Autowired
+        private OrganizationRepository organizationRepository;
+
+        @Autowired
+        private WorkspaceRepository workspaceRepository;
+
+        @Autowired
+        private PromptRepository promptRepository;
+
+        @Autowired
+        private PromptVersionRepository promptVersionRepository;
+
+        @Autowired
+        private PromptReleaseRepository promptReleaseRepository;
+
+        @Autowired
+        private EntityManager entityManager;
+
+        private Long organizationId;
+        private Long workspaceId;
+        private String promptKey;
+        private User creatorUser;
+        private Workspace workspace;
+
         @BeforeEach
         void setUp() {
                 organizationApiKeyRepository.deleteAll();
                 providerCredentialRepository.deleteAll();
                 requestLogRepository.deleteAll();
+                promptReleaseRepository.deleteAll();
+                promptVersionRepository.deleteAll();
+                promptRepository.deleteAll();
+                workspaceRepository.deleteAll();
+                organizationRepository.deleteAll();
+                userRepository.deleteAll();
+
+                creatorUser = userRepository.save(User.create("test@example.com", "password", "tester"));
+                Organization organization = organizationRepository.save(Organization.create("테스트 조직", creatorUser));
+                workspace = workspaceRepository.save(Workspace.create(organization, "default", "기본"));
+                organizationId = organization.getId();
+                workspaceId = workspace.getId();
+                promptKey = createReleasedPrompt("cs-bot", "hello {{name}}");
         }
 
         @Test
@@ -69,18 +125,18 @@ class GatewayChatServiceTest {
         void 변수_치환된_프롬프트로_응답을_받는다() {
                 // given
                 OrganizationApiKeyCreateResponse response = organizationApiKeyCreateService.create(
-                                1L,
+                                organizationId,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
                 OrganizationApiKey apiKeyEntity = organizationApiKeyRepository.findAll().get(0);
 
                 providerCredentialService.register(
-                                1L,
+                                organizationId,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
 
                 GatewayChatRequest request = new GatewayChatRequest(
-                                1L,
-                                "hello {{name}}",
+                                workspaceId,
+                                promptKey,
                                 Map.of("name", "lumina"),
                                 false);
 
@@ -115,13 +171,13 @@ class GatewayChatServiceTest {
         void RAG_권한_검증_실패시_FAIL_로그가_남는다() {
                 // given
                 OrganizationApiKeyCreateResponse response = organizationApiKeyCreateService.create(
-                                1L,
+                                organizationId,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
                 OrganizationApiKey apiKeyEntity = organizationApiKeyRepository.findAll().get(0);
                 GatewayChatRequest request = new GatewayChatRequest(
                                 9999L,
-                                "hello",
+                                promptKey,
                                 Map.of(),
                                 true
                 );
@@ -141,5 +197,26 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getFinishedAt()).isNotNull();
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
+        }
+
+        private String createReleasedPrompt(String key, String userTemplate) {
+                Prompt prompt = promptRepository.save(Prompt.create(workspace, key, "test prompt"));
+                PromptVersion version = promptVersionRepository.save(
+                        PromptVersion.create(
+                                prompt,
+                                1,
+                                "v1",
+                                ProviderType.OPENAI,
+                                "gpt-4o-mini",
+                                null,
+                                userTemplate,
+                                null,
+                                creatorUser
+                        )
+                );
+                PromptRelease release = PromptRelease.create(prompt, version);
+                entityManager.persist(release);
+                entityManager.flush();
+                return prompt.getPromptKey();
         }
 }

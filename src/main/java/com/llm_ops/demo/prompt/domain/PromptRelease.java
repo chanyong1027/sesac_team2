@@ -9,17 +9,21 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
+import jakarta.persistence.Transient;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Persistable;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Entity
 @Table(name = "prompt_releases")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PromptRelease {
+public class PromptRelease implements Persistable<Long> {
 
     @Id
     @Column(name = "prompt_id")
@@ -38,6 +42,9 @@ public class PromptRelease {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @Transient
+    private boolean isNew = true;
+
     public static PromptRelease create(Prompt prompt, PromptVersion activeVersion) {
         if (prompt == null || activeVersion == null) {
             throw new IllegalArgumentException("Prompt와 ActiveVersion은 필수입니다.");
@@ -47,6 +54,7 @@ public class PromptRelease {
         release.prompt = prompt;
         release.promptId = prompt.getId();
         release.activeVersion = activeVersion;
+        release.isNew = true;
         return release;
     }
 
@@ -56,5 +64,21 @@ public class PromptRelease {
         }
 
         this.activeVersion = newVersion;
+    }
+
+    @Override
+    public Long getId() {
+        return promptId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostLoad
+    @PostPersist
+    private void markNotNew() {
+        this.isNew = false;
     }
 }

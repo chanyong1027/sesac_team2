@@ -55,6 +55,10 @@ public class Prompt {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    public Long getId() {
+        return id;
+    }
+
     public static Prompt create(Workspace workspace, String promptKey, String description) {
         Prompt prompt = new Prompt();
         prompt.workspace = workspace;

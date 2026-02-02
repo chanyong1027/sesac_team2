@@ -20,13 +20,6 @@ const providerInfo: Record<string, { name: string; color: string; bgColor: strin
     borderColor: '#E8DCCB',
     icon: 'text-amber-700',
   },
-  GOOGLE: {
-    name: 'Google AI',
-    color: '#4285F4',
-    bgColor: '#F8FAFF',
-    borderColor: '#D3E3FD',
-    icon: 'text-blue-600',
-  },
   GEMINI: {
     name: 'Gemini',
     color: '#8B5CF6',
@@ -36,7 +29,14 @@ const providerInfo: Record<string, { name: string; color: string; bgColor: strin
   },
 };
 
-const providers = ['OPENAI', 'ANTHROPIC', 'GOOGLE', 'GEMINI'];
+const providers = ['OPENAI', 'ANTHROPIC', 'GEMINI'];
+
+const normalizeProviderKey = (raw: string) => {
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === 'google') return 'GEMINI';
+  if (normalized === 'claude') return 'ANTHROPIC';
+  return normalized.toUpperCase();
+};
 
 function ProviderCard({
   provider,
@@ -149,7 +149,7 @@ function AddProviderModal({
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['provider-credentials'] });
+      queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
       setApiKey('');
       onClose();
     },
@@ -233,7 +233,8 @@ export function SettingsProviderKeysPage() {
   });
 
   const credentialMap = (credentials || []).reduce((acc, cred) => {
-    acc[cred.provider] = cred;
+    const key = normalizeProviderKey(cred.provider);
+    acc[key] = cred;
     return acc;
   }, {} as Record<string, ProviderCredentialSummaryResponse>);
 

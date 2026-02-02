@@ -11,6 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.config.TestSecurityConfig;
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.prompt.dto.PromptVersionCreateRequest;
 import com.llm_ops.demo.prompt.dto.PromptVersionCreateResponse;
@@ -142,6 +144,33 @@ class PromptVersionControllerTest {
                 "{{question}}",
                 null
         );
+
+        // when & then
+        mockMvc.perform(post("/api/v1/prompts/{promptId}/versions", promptId)
+                        .header("X-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 모델이면 400 응답")
+    void createVersion_InvalidModel_ReturnsBadRequest() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        PromptVersionCreateRequest request = new PromptVersionCreateRequest(
+                "버전 1",
+                ProviderType.OPENAI,
+                "invalid-model",
+                "You are a helpful assistant.",
+                "{{question}}",
+                null
+        );
+
+        given(promptVersionService.create(eq(promptId), eq(userId), any(PromptVersionCreateRequest.class)))
+                .willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "지원하지 않는 모델입니다."));
 
         // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/versions", promptId)

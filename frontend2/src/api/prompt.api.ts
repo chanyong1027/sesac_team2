@@ -5,11 +5,13 @@ import type {
     PromptSummaryResponse,
     PromptDetailResponse,
     PromptUpdateRequest,
+    ModelAllowlistResponse,
     PromptVersionCreateRequest,
     PromptVersionCreateResponse,
     PromptVersionSummaryResponse,
     PromptVersionDetailResponse,
-    ApiResponse
+    PromptReleaseResponse,
+    PromptReleaseRequest
 } from '@/types/api.types';
 
 export const promptApi = {
@@ -37,6 +39,9 @@ export const promptApi = {
     // Prompt Version
     // =================================================================
 
+    // 모델 allowlist 조회
+    getModelAllowlist: () => api.get<ModelAllowlistResponse>(`/models/allowlist`),
+
     // 버전 목록 조회
     getVersions: (promptId: number) =>
         api.get<PromptVersionSummaryResponse[]>(`/prompts/${promptId}/versions`),
@@ -48,4 +53,13 @@ export const promptApi = {
     // 버전 생성
     createVersion: (promptId: number, data: PromptVersionCreateRequest) =>
         api.post<PromptVersionCreateResponse>(`/prompts/${promptId}/versions`, data),
+
+    // =================================================================
+    // Prompt Release
+    // =================================================================
+    getRelease: (promptId: number) =>
+        api.get<PromptReleaseResponse>(`/prompts/${promptId}/release`),
+
+    releasePrompt: (promptId: number, data: PromptReleaseRequest) =>
+        api.post<PromptReleaseResponse>(`/prompts/${promptId}/release`, data),
 };

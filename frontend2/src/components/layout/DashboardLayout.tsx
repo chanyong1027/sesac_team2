@@ -1,7 +1,10 @@
 import { type ReactNode, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store';
-import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
+import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
+import { useOrganizationStore } from '@/features/organization/store/organizationStore';
+import { useQuery } from '@tanstack/react-query';
+import { organizationApi } from '@/api/organization.api';
 import {
   LayoutDashboard,
   Plus,
@@ -22,6 +25,9 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
+  const { orgId } = useParams<{ orgId: string }>();
+  const { currentOrgId } = useOrganizationStore();
+  const resolvedOrgId = orgId ? Number(orgId) : currentOrgId ?? null;
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -36,6 +42,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
+        orgId={resolvedOrgId}
         onCreateOrg={() => setIsOrgModalOpen(true)}
       />
 
@@ -60,9 +67,21 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   );
 }
 
-function Sidebar({ isOpen, onCreateOrg }: { isOpen: boolean; onCreateOrg: () => void }) {
+function Sidebar({ isOpen, onCreateOrg, orgId }: { isOpen: boolean; onCreateOrg: () => void; orgId: number | null }) {
   const location = useLocation();
-  const { data: workspaces } = useWorkspaces();
+  const { data: workspaces } = useOrganizationWorkspaces(orgId ?? undefined);
+  const resolvedOrgId = orgId ?? workspaces?.[0]?.organizationId ?? null;
+  const basePath = resolvedOrgId ? `/orgs/${resolvedOrgId}` : '';
+  const dashboardPath = resolvedOrgId ? `${basePath}/dashboard` : '/dashboard';
+  const { data: orgDetail } = useQuery({
+    queryKey: ['organization', resolvedOrgId],
+    queryFn: async () => {
+      if (!resolvedOrgId) return null;
+      const response = await organizationApi.getOrganization(resolvedOrgId);
+      return response.data;
+    },
+    enabled: !!resolvedOrgId,
+  });
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
@@ -76,7 +95,7 @@ function Sidebar({ isOpen, onCreateOrg }: { isOpen: boolean; onCreateOrg: () => 
     >
       {/* Logo */}
       <div className="h-16 flex items-center px-6 border-b border-gray-100">
-        <Link to="/dashboard" className="flex items-center gap-2 overflow-hidden">
+        <Link to={dashboardPath} className="flex items-center gap-2 overflow-hidden">
           <div className="min-w-[32px] w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
             L
           </div>
@@ -86,13 +105,22 @@ function Sidebar({ isOpen, onCreateOrg }: { isOpen: boolean; onCreateOrg: () => 
         </Link>
       </div>
 
+      {isOpen && (
+        <div className="px-6 py-4 border-b border-gray-100">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400">Organization</p>
+          <p className="text-sm font-semibold text-gray-900 mt-1">
+            {orgDetail?.name ?? '조직 정보 불러오는 중...'}
+          </p>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
         <SidebarItem
           icon={<LayoutDashboard size={20} />}
           label="대시보드"
-          to="/dashboard"
-          active={location.pathname === '/dashboard'}
+          to={dashboardPath}
+          active={location.pathname === dashboardPath}
           isOpen={isOpen}
         />
 
@@ -114,10 +142,10 @@ function Sidebar({ isOpen, onCreateOrg }: { isOpen: boolean; onCreateOrg: () => 
           {workspaces?.slice(0, 5).map(ws => (
             <Link
               key={ws.id}
-              to={`/workspaces/${ws.id}`}
+              to={`/orgs/${ws.organizationId}/workspaces/${ws.id}`}
               className={`
                 flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors relative
-                ${isActive(`/workspaces/${ws.id}`)
+                ${isActive(`/orgs/${ws.organizationId}/workspaces/${ws.id}`)
                   ? 'bg-indigo-50 text-indigo-700 font-medium'
                   : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
               `}
@@ -154,22 +182,22 @@ function Sidebar({ isOpen, onCreateOrg }: { isOpen: boolean; onCreateOrg: () => 
           <SidebarItem
             icon={<User size={20} />}
             label="멤버 관리"
-            to="/settings/members"
-            active={isActive('/settings/members')}
+            to={`${basePath}/settings/members`}
+            active={isActive(`${basePath}/settings/members`)}
             isOpen={isOpen}
           />
           <SidebarItem
             icon={<Key size={20} />}
             label="API 키"
-            to="/settings/api-keys"
-            active={isActive('/settings/api-keys')}
+            to={`${basePath}/settings/api-keys`}
+            active={isActive(`${basePath}/settings/api-keys`)}
             isOpen={isOpen}
           />
           <SidebarItem
             icon={<Shield size={20} />}
             label="Provider 키"
-            to="/settings/provider-keys"
-            active={isActive('/settings/provider-keys')}
+            to={`${basePath}/settings/provider-keys`}
+            active={isActive(`${basePath}/settings/provider-keys`)}
             isOpen={isOpen}
           />
         </div>
