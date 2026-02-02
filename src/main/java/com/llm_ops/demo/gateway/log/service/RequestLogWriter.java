@@ -52,6 +52,13 @@ public class RequestLogWriter {
                 update.outputTokens(),
                 update.totalTokens()
         );
+        requestLog.fillRagMetrics(
+                update.ragLatencyMs(),
+                update.ragChunksCount(),
+                update.ragContextChars(),
+                update.ragContextTruncated(),
+                update.ragContextHash()
+        );
         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs());
     }
 
@@ -67,6 +74,13 @@ public class RequestLogWriter {
                 update.inputTokens(),
                 update.outputTokens(),
                 update.totalTokens()
+        );
+        requestLog.fillRagMetrics(
+                update.ragLatencyMs(),
+                update.ragChunksCount(),
+                update.ragContextChars(),
+                update.ragContextTruncated(),
+                update.ragContextHash()
         );
         requestLog.markFail(
                 LocalDateTime.now(clock),
@@ -101,7 +115,12 @@ public class RequestLogWriter {
             boolean isFailover,
             Integer inputTokens,
             Integer outputTokens,
-            Integer totalTokens
+            Integer totalTokens,
+            Integer ragLatencyMs,
+            Integer ragChunksCount,
+            Integer ragContextChars,
+            Boolean ragContextTruncated,
+            String ragContextHash
     ) {
     }
 
@@ -117,7 +136,12 @@ public class RequestLogWriter {
             Integer totalTokens,
             String errorCode,
             String errorMessage,
-            String failReason
+            String failReason,
+            Integer ragLatencyMs,
+            Integer ragChunksCount,
+            Integer ragContextChars,
+            Boolean ragContextTruncated,
+            String ragContextHash
     ) {
     }
 }
