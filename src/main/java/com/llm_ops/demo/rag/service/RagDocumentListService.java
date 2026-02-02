@@ -21,9 +21,9 @@ public class RagDocumentListService {
         if (workspaceId == null || workspaceId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
         }
-        return ragDocumentRepository.findAllByWorkspaceIdAndStatusOrderByCreatedAtDesc(
+        return ragDocumentRepository.findAllByWorkspaceIdAndStatusNotOrderByCreatedAtDesc(
                 workspaceId,
-                RagDocumentStatus.ACTIVE
+                RagDocumentStatus.DELETED
         );
     }
 }

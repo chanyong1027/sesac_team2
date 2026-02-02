@@ -1,5 +1,8 @@
 package com.llm_ops.demo.rag.service;
 
+import com.llm_ops.demo.rag.domain.RagDocument;
+import com.llm_ops.demo.rag.domain.RagDocumentStatus;
+import com.llm_ops.demo.rag.repository.RagDocumentRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,11 +25,13 @@ public class RagDocumentIngestService {
     private final RagDocumentExtractService ragDocumentExtractService;
     private final RagDocumentChunkService ragDocumentChunkService;
     private final RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
+    private final RagDocumentRepository ragDocumentRepository;
 
     public int ingest(Long workspaceId, Long documentId, Resource resource) {
         long startNs = System.nanoTime();
         String stage = "start";
         try {
+            updateStatus(documentId, RagDocumentStatus.PARSING);
             stage = "extract";
             long extractStartNs = System.nanoTime();
             List<Document> extracted = ragDocumentExtractService.extract(workspaceId, resource);
@@ -40,6 +45,7 @@ public class RagDocumentIngestService {
                     extractMs
             );
 
+            updateStatus(documentId, RagDocumentStatus.CHUNKING);
             stage = "chunk";
             long chunkStartNs = System.nanoTime();
             String documentName = resource != null ? resource.getFilename() : null;
@@ -54,10 +60,13 @@ public class RagDocumentIngestService {
                     chunkMs
             );
 
+            updateStatus(documentId, RagDocumentStatus.EMBEDDING);
             stage = "save";
             long saveStartNs = System.nanoTime();
             int savedCount = ragDocumentVectorStoreSaveService.save(workspaceId, documentId, chunks);
             long saveMs = (System.nanoTime() - saveStartNs) / 1_000_000;
+            updateStatus(documentId, RagDocumentStatus.INDEXING);
+            updateStatus(documentId, RagDocumentStatus.DONE);
             long totalMs = (System.nanoTime() - startNs) / 1_000_000;
             log.info(
                     "RAG ingest save done workspaceId={} documentId={} savedCount={} tookMs={} totalMs={} (extract+chunk+save)",
@@ -70,6 +79,7 @@ public class RagDocumentIngestService {
             return savedCount;
         } catch (RuntimeException ex) {
             long elapsedMs = (System.nanoTime() - startNs) / 1_000_000;
+            updateStatus(documentId, RagDocumentStatus.FAILED);
             log.warn(
                     "RAG ingest failed stage={} workspaceId={} documentId={} resource={} elapsedMs={}",
                     stage,
@@ -81,5 +91,25 @@ public class RagDocumentIngestService {
             );
             throw ex;
         }
+    }
+
+    private void updateStatus(Long documentId, RagDocumentStatus status) {
+        if (documentId == null) {
+            return;
+        }
+        ragDocumentRepository.findById(documentId).ifPresent(document -> {
+            switch (status) {
+                case PARSING -> document.markParsing();
+                case CHUNKING -> document.markChunking();
+                case EMBEDDING -> document.markEmbedding();
+                case INDEXING -> document.markIndexing();
+                case DONE -> document.markDone();
+                case FAILED -> document.markFailed();
+                default -> {
+                    return;
+                }
+            }
+            ragDocumentRepository.save(document);
+        });
     }
 }

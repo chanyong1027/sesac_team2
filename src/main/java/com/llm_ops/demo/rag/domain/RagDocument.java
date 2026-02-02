@@ -60,7 +60,31 @@ public class RagDocument {
     }
 
     public static RagDocument create(Long workspaceId, String fileName, String fileUrl) {
-        return new RagDocument(workspaceId, fileName, fileUrl, RagDocumentStatus.ACTIVE);
+        return new RagDocument(workspaceId, fileName, fileUrl, RagDocumentStatus.UPLOADED);
+    }
+
+    public void markParsing() {
+        updateStatus(RagDocumentStatus.PARSING);
+    }
+
+    public void markChunking() {
+        updateStatus(RagDocumentStatus.CHUNKING);
+    }
+
+    public void markEmbedding() {
+        updateStatus(RagDocumentStatus.EMBEDDING);
+    }
+
+    public void markIndexing() {
+        updateStatus(RagDocumentStatus.INDEXING);
+    }
+
+    public void markDone() {
+        updateStatus(RagDocumentStatus.DONE);
+    }
+
+    public void markFailed() {
+        updateStatus(RagDocumentStatus.FAILED);
     }
 
     public void markDeleted() {
@@ -75,5 +99,12 @@ public class RagDocument {
             return;
         }
         this.status = RagDocumentStatus.DELETING;
+    }
+
+    private void updateStatus(RagDocumentStatus nextStatus) {
+        if (this.status == RagDocumentStatus.DELETED) {
+            return;
+        }
+        this.status = nextStatus;
     }
 }

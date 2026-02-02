@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface RagDocumentRepository extends JpaRepository<RagDocument, Long> {
     List<RagDocument> findAllByWorkspaceIdAndStatusOrderByCreatedAtDesc(Long workspaceId, RagDocumentStatus status);
 
+    List<RagDocument> findAllByWorkspaceIdAndStatusNotOrderByCreatedAtDesc(Long workspaceId, RagDocumentStatus status);
+
     Optional<RagDocument> findByIdAndWorkspaceId(Long id, Long workspaceId);
 }
-

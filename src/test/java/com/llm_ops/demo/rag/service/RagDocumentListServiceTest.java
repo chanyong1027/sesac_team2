@@ -35,8 +35,8 @@ class RagDocumentListServiceTest {
     }
 
     @Test
-    @DisplayName("워크스페이스의 ACTIVE 문서만 조회한다")
-    void 워크스페이스의_ACTIVE_문서만_조회한다() {
+    @DisplayName("워크스페이스의 삭제되지 않은 문서를 조회한다")
+    void 워크스페이스의_삭제되지_않은_문서를_조회한다() {
         // given
         RagDocument active = ragDocumentRepository.save(
                 RagDocument.create(1L, "active.pdf", "workspaces/1/documents/active.pdf")
@@ -53,6 +53,6 @@ class RagDocumentListServiceTest {
         // then
         assertThat(documents).hasSize(1);
         assertThat(documents.get(0).getId()).isEqualTo(active.getId());
-        assertThat(documents.get(0).getStatus()).isEqualTo(RagDocumentStatus.ACTIVE);
+        assertThat(documents.get(0).getStatus()).isEqualTo(RagDocumentStatus.UPLOADED);
     }
 }
