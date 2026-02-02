@@ -266,9 +266,6 @@ class GatewayChatServiceUnitTest {
                     new ChunkDetailResponse("기온은 25도입니다.", 0.90, 10L, "weather.txt")
             );
 
-            GatewayModelProperties.Models models = new GatewayModelProperties.Models();
-            models.setOpenai("gpt-4o-mini");
-
             OrganizationApiKeyAuthService.AuthResult authResult =
                     new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
             when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
