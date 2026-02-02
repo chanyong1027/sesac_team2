@@ -81,20 +81,4 @@ public class PromptRelease implements Persistable<Long> {
     private void markNotNew() {
         this.isNew = false;
     }
-
-    @Override
-    public Long getId() {
-        return promptId;
-    }
-
-    @Override
-    public boolean isNew() {
-        return isNew;
-    }
-
-    @PostLoad
-    @PostPersist
-    private void markNotNew() {
-        this.isNew = false;
-    }
 }
