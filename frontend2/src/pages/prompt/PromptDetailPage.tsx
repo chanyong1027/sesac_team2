@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -242,6 +242,11 @@ function VersionsTab({ promptId }: { promptId: number }) {
     const queryClient = useQueryClient();
     const { currentOrgId } = useOrganizationStore();
     const { orgId } = useParams<{ orgId: string }>();
+    const parsedOrgId = orgId ? Number(orgId) : undefined;
+    const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
+        ? parsedOrgId
+        : currentOrgId;
+    const isResolvedOrgId = typeof resolvedOrgId === 'number' && !Number.isNaN(resolvedOrgId);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [detailVersionId, setDetailVersionId] = useState<number | null>(null);
     const [form, setForm] = useState({
@@ -301,13 +306,25 @@ function VersionsTab({ promptId }: { promptId: number }) {
     };
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
-        queryKey: ['provider-credentials', currentOrgId],
+        queryKey: ['provider-credentials', resolvedOrgId],
         queryFn: async () => {
-            if (!currentOrgId) return [];
-            const response = await organizationApi.getCredentials(currentOrgId);
+            if (!isResolvedOrgId) return [];
+            const response = await organizationApi.getCredentials(resolvedOrgId);
             return response.data;
         },
-        enabled: !!currentOrgId,
+        enabled: isResolvedOrgId,
+    });
+
+    const {
+        data: modelAllowlist,
+        isLoading: isAllowlistLoading,
+        isError: isAllowlistError,
+    } = useQuery({
+        queryKey: ['model-allowlist'],
+        queryFn: async () => {
+            const response = await promptApi.getModelAllowlist();
+            return response.data;
+        },
     });
 
     const availableProviders = Array.from(
@@ -316,12 +333,24 @@ function VersionsTab({ promptId }: { promptId: number }) {
 
     const filteredPresets = presets.filter((preset) => availableProviders.includes(preset.data.provider));
 
+    const providerModels = useMemo(() => {
+        if (!modelAllowlist) return [];
+        return modelAllowlist[form.provider] ?? [];
+    }, [modelAllowlist, form.provider]);
+
     useEffect(() => {
         if (!availableProviders.length) return;
         if (!availableProviders.includes(form.provider)) {
             setForm((prev) => ({ ...prev, provider: availableProviders[0] as ProviderType }));
         }
     }, [availableProviders, form.provider]);
+
+    useEffect(() => {
+        if (!providerModels.length) return;
+        if (!providerModels.includes(form.model)) {
+            setForm((prev) => ({ ...prev, model: providerModels[0] }));
+        }
+    }, [providerModels, form.model]);
 
     const { data: versions, isLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
@@ -491,8 +520,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
                                     <select
+                                        id="prompt-provider"
                                         value={form.provider}
                                         onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
                                         className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
@@ -509,14 +539,27 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
-                                    <input
-                                        type="text"
+                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                                    <select
+                                        id="prompt-model"
                                         value={form.model}
                                         onChange={(e) => setForm({ ...form, model: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                                        placeholder="예: gpt-4o-mini / claude-3-5-sonnet / gemini-2.0-flash"
-                                    />
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        disabled={isAllowlistLoading || isAllowlistError || providerModels.length === 0}
+                                    >
+                                        {isAllowlistLoading && <option value="">모델 목록 불러오는 중...</option>}
+                                        {!isAllowlistLoading && providerModels.length === 0 && (
+                                            <option value="">사용 가능한 모델 없음</option>
+                                        )}
+                                        {providerModels.map((model) => (
+                                            <option key={model} value={model}>
+                                                {model}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {isAllowlistError && (
+                                        <p className="mt-1 text-xs text-rose-600">모델 목록을 불러오지 못했습니다.</p>
+                                    )}
                                 </div>
                             </div>
                             <div>
@@ -563,7 +606,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </button>
                             <button
                                 onClick={() => createMutation.mutate()}
-                                disabled={!form.model.trim() || createMutation.isPending || availableProviders.length === 0}
+                                disabled={
+                                    !form.model.trim() ||
+                                    createMutation.isPending ||
+                                    availableProviders.length === 0 ||
+                                    isAllowlistLoading ||
+                                    isAllowlistError ||
+                                    providerModels.length === 0
+                                }
                                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                             >
                                 {createMutation.isPending ? '생성 중...' : '버전 생성'}
