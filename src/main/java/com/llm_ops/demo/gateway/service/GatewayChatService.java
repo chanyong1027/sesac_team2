@@ -99,7 +99,8 @@ public class GatewayChatService {
      * @return LLM의 답변 및 관련 메타데이터가 포함된 응답 DTO
      */
     public GatewayChatResponse chat(String apiKey, GatewayChatRequest request) {
-        Long organizationId = organizationApiKeyAuthService.resolveOrganizationId(apiKey);
+        OrganizationApiKeyAuthService.AuthResult authResult = organizationApiKeyAuthService.resolveAuthResult(apiKey);
+        Long organizationId = authResult.organizationId();
 
         String traceId = UUID.randomUUID().toString();
         requestLogWriter.start(new RequestLogWriter.StartRequest(
@@ -107,6 +108,8 @@ public class GatewayChatService {
                 traceId,
                 organizationId,
                 request.workspaceId(),
+                authResult.apiKeyId(),
+                authResult.apiKeyPrefix(),
                 GATEWAY_CHAT_COMPLETIONS_PATH,
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
