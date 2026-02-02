@@ -10,12 +10,17 @@ import type {
   OrganizationApiKeyCreateRequest,
   OrganizationApiKeyCreateResponse,
   OrganizationApiKeySummaryResponse,
+  OrganizationDetailResponse,
 } from '@/types/api.types';
 
 export const organizationApi = {
   // 조직 생성 - 현재 백엔드: POST /api/v1/organizations
   createOrganization: (data: OrganizationCreateRequest) =>
     api.post<OrganizationCreateResponse>('/organizations', data),
+
+  // 조직 상세 조회 - GET /api/v1/organizations/{orgId}
+  getOrganization: (orgId: number) =>
+    api.get<OrganizationDetailResponse>(`/organizations/${orgId}`),
 
   // 멤버 목록 조회 - 현재 백엔드: GET /api/v1/organizations/{orgId}/members
   getMembers: (orgId: number) =>

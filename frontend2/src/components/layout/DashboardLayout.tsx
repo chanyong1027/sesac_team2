@@ -3,6 +3,8 @@ import { Link, useLocation, useParams } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
+import { useQuery } from '@tanstack/react-query';
+import { organizationApi } from '@/api/organization.api';
 import {
   LayoutDashboard,
   Plus,
@@ -71,6 +73,15 @@ function Sidebar({ isOpen, onCreateOrg, orgId }: { isOpen: boolean; onCreateOrg:
   const resolvedOrgId = orgId ?? workspaces?.[0]?.organizationId ?? null;
   const basePath = resolvedOrgId ? `/orgs/${resolvedOrgId}` : '';
   const dashboardPath = resolvedOrgId ? `${basePath}/dashboard` : '/dashboard';
+  const { data: orgDetail } = useQuery({
+    queryKey: ['organization', resolvedOrgId],
+    queryFn: async () => {
+      if (!resolvedOrgId) return null;
+      const response = await organizationApi.getOrganization(resolvedOrgId);
+      return response.data;
+    },
+    enabled: !!resolvedOrgId,
+  });
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
@@ -93,6 +104,15 @@ function Sidebar({ isOpen, onCreateOrg, orgId }: { isOpen: boolean; onCreateOrg:
           </span>
         </Link>
       </div>
+
+      {isOpen && (
+        <div className="px-6 py-4 border-b border-gray-100">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400">Organization</p>
+          <p className="text-sm font-semibold text-gray-900 mt-1">
+            {orgDetail?.name ?? '조직 정보 불러오는 중...'}
+          </p>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">

@@ -76,6 +76,13 @@ export interface OrganizationCreateResponse {
   status: string;
 }
 
+export interface OrganizationDetailResponse {
+  id: number;
+  name: string;
+  status: string;
+  createdAt: string;
+}
+
 export interface OrganizationMemberResponse {
   memberId: number;
   userId: number;
