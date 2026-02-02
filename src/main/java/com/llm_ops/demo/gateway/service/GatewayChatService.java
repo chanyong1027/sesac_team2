@@ -117,44 +117,81 @@ public class GatewayChatService {
                 request.promptKey(),
                 request.isRagEnabled()
         ));
-        String prompt = renderPrompt(request.promptKey(), request.variables());
+        try {
+            String prompt = renderPrompt(request.promptKey(), request.variables());
 
-        if (request.isRagEnabled()) {
-            validateWorkspaceOwnership(organizationId, request.workspaceId());
-            prompt = enrichPromptWithRagContext(request.workspaceId(), prompt);
+            if (request.isRagEnabled()) {
+                validateWorkspaceOwnership(organizationId, request.workspaceId());
+                prompt = enrichPromptWithRagContext(request.workspaceId(), prompt);
+            }
+
+            ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
+            String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
+            ChatResponse response = switch (providerType) {
+                case OPENAI -> callOpenAi(prompt, providerApiKey);
+                case ANTHROPIC -> callAnthropic(prompt, providerApiKey);
+                case GEMINI -> callGemini(prompt, providerApiKey);
+            };
+
+            String answer = response.getResult().getOutput().getText();
+            String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
+
+            GatewayChatUsage usage = extractUsage(response);
+
+            requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
+                    200,
+                    toLatencyMs(startedAtNanos),
+                    providerType.name().toLowerCase(),
+                    resolveRequestedModel(providerType),
+                    usedModel,
+                    false,
+                    null,
+                    null,
+                    safeToInteger(usage != null ? usage.totalTokens() : null)
+            ));
+
+            return GatewayChatResponse.from(
+                    traceId,
+                    answer,
+                    false,
+                    usedModel,
+                    usage
+            );
+        } catch (BusinessException e) {
+            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                    e.getErrorCode().getStatus().value(),
+                    toLatencyMs(startedAtNanos),
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    e.getErrorCode().name(),
+                    e.getMessage(),
+                    "BUSINESS_EXCEPTION"
+            ));
+            throw e;
+        } catch (Exception e) {
+            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                    ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
+                    toLatencyMs(startedAtNanos),
+                    null,
+                    null,
+                    null,
+                    false,
+                    null,
+                    null,
+                    null,
+                    ErrorCode.INTERNAL_SERVER_ERROR.name(),
+                    "Unhandled exception",
+                    "UNHANDLED_EXCEPTION"
+            ));
+            throw e;
         }
-
-        ProviderType providerType = gatewayChatProviderResolveService.resolve(organizationId, request);
-        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-        ChatResponse response = switch (providerType) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey);
-            case GEMINI -> callGemini(prompt, providerApiKey);
-        };
-
-        String answer = response.getResult().getOutput().getText();
-        String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
-        GatewayChatUsage usage = extractUsage(response);
-
-        requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
-                200,
-                toLatencyMs(startedAtNanos),
-                providerType.name().toLowerCase(),
-                resolveRequestedModel(providerType),
-                usedModel,
-                false,
-                null,
-                null,
-                safeToInteger(usage != null ? usage.totalTokens() : null)
-        ));
-        return GatewayChatResponse.from(
-                traceId,
-                answer,
-                false,
-                usedModel,
-                usage
-        );
     }
+
     private static Integer toLatencyMs(long startedAtNanos) {
         long elapsedNanos = System.nanoTime() - startedAtNanos;
         if (elapsedNanos <= 0) {
@@ -188,6 +225,7 @@ public class GatewayChatService {
         }
         return (model == null || model.isBlank()) ? null : model;
     }
+
     private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
         if (workspaceId == null || workspaceId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
@@ -270,7 +308,6 @@ public class GatewayChatService {
 
         return builder.toString();
     }
-
     /**
      * 프롬프트 키(템플릿)와 변수 맵을 사용하여 최종 프롬프트 문자열을 생성(렌더링)합니다.
      */

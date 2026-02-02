@@ -23,8 +23,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @SpringBootTest
@@ -101,5 +103,35 @@ class GatewayChatServiceTest {
                 OpenAiChatOptions options = (OpenAiChatOptions) lastPrompt.getOptions();
                 assertThat(options.getHttpHeaders())
                                 .containsEntry("Authorization", "Bearer provider-key");
+        }
+
+        @Test
+        @DisplayName("RAG 권한 검증 실패 시에도 FAIL 로그가 1건 남는다")
+        void RAG_권한_검증_실패시_FAIL_로그가_남는다() {
+                // given
+                OrganizationApiKeyCreateResponse response = organizationApiKeyCreateService.create(
+                                1L,
+                                new OrganizationApiKeyCreateRequest("prod"));
+
+                GatewayChatRequest request = new GatewayChatRequest(
+                                9999L,
+                                "hello",
+                                Map.of(),
+                                true
+                );
+
+                // when
+                assertThatThrownBy(() -> gatewayChatService.chat(response.apiKey(), request))
+                                .isInstanceOf(com.llm_ops.demo.global.error.BusinessException.class);
+
+                // then
+                List<RequestLog> logs = requestLogRepository.findAll();
+                assertThat(logs).hasSize(1);
+                RequestLog requestLog = logs.get(0);
+                assertThat(requestLog.getStatus()).isEqualTo(RequestLogStatus.FAIL);
+                assertThat(requestLog.getHttpStatus()).isEqualTo(403);
+                assertThat(requestLog.getErrorCode()).isEqualTo("FORBIDDEN");
+                assertThat(requestLog.getFailReason()).isEqualTo("BUSINESS_EXCEPTION");
+                assertThat(requestLog.getFinishedAt()).isNotNull();
         }
 }
