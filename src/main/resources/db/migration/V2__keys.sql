@@ -9,7 +9,7 @@ CREATE TABLE provider_credential (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uq_provider_credential_workspace_provider UNIQUE (workspace_id, provider),
     CONSTRAINT fk_provider_credential_workspace
-        FOREIGN KEY (workspace_id) REFERENCES workspace (id)
+        FOREIGN KEY (workspace_id) REFERENCES workspaces (id)
 );
 
 CREATE TABLE gateway_api_key (

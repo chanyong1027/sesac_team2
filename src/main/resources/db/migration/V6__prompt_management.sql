@@ -1,7 +1,7 @@
 -- Prompt Management Tables
 
 -- 1. prompts 테이블
-CREATE TABLE prompts (
+CREATE TABLE IF NOT EXISTS prompts (
     id BIGSERIAL PRIMARY KEY,
     workspace_id BIGINT NOT NULL,
     prompt_key VARCHAR(100) NOT NULL,
@@ -13,11 +13,11 @@ CREATE TABLE prompts (
     CONSTRAINT uq_prompts_workspace_prompt_key UNIQUE (workspace_id, prompt_key)
 );
 
-CREATE INDEX idx_prompts_workspace_id ON prompts(workspace_id);
-CREATE INDEX idx_prompts_status ON prompts(status);
+CREATE INDEX IF NOT EXISTS idx_prompts_workspace_id ON prompts(workspace_id);
+CREATE INDEX IF NOT EXISTS idx_prompts_status ON prompts(status);
 
 -- 2. prompt_versions 테이블
-CREATE TABLE prompt_versions (
+CREATE TABLE IF NOT EXISTS prompt_versions (
     id BIGSERIAL PRIMARY KEY,
     prompt_id BIGINT NOT NULL,
     version_no INTEGER NOT NULL,
@@ -34,10 +34,10 @@ CREATE TABLE prompt_versions (
     CONSTRAINT uq_prompt_versions_prompt_version UNIQUE (prompt_id, version_no)
 );
 
-CREATE INDEX idx_prompt_versions_prompt_id ON prompt_versions(prompt_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_versions_prompt_id ON prompt_versions(prompt_id);
 
 -- 3. prompt_releases 테이블 (1:1 관계)
-CREATE TABLE prompt_releases (
+CREATE TABLE IF NOT EXISTS prompt_releases (
     prompt_id BIGINT PRIMARY KEY,
     active_version_id BIGINT NOT NULL,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -46,7 +46,7 @@ CREATE TABLE prompt_releases (
 );
 
 -- 4. prompt_release_histories 테이블
-CREATE TABLE prompt_release_histories (
+CREATE TABLE IF NOT EXISTS prompt_release_histories (
     id BIGSERIAL PRIMARY KEY,
     prompt_id BIGINT NOT NULL,
     from_version_id BIGINT,
@@ -61,5 +61,5 @@ CREATE TABLE prompt_release_histories (
     CONSTRAINT fk_prompt_release_histories_changed_by FOREIGN KEY (changed_by) REFERENCES users(id)
 );
 
-CREATE INDEX idx_prompt_release_histories_prompt_id ON prompt_release_histories(prompt_id);
-CREATE INDEX idx_prompt_release_histories_created_at ON prompt_release_histories(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_prompt_release_histories_prompt_id ON prompt_release_histories(prompt_id);
+CREATE INDEX IF NOT EXISTS idx_prompt_release_histories_created_at ON prompt_release_histories(created_at DESC);
