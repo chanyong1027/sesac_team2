@@ -235,54 +235,6 @@ public class GatewayChatService {
         }
     }
 
-    private static Integer toLatencyMs(long startedAtNanos) {
-        long elapsedNanos = System.nanoTime() - startedAtNanos;
-        if (elapsedNanos <= 0) {
-            return 0;
-        }
-        long elapsedMs = elapsedNanos / 1_000_000L;
-        return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
-    }
-
-    private static Integer safeToInteger(Long value) {
-        if (value == null) {
-            return null;
-        }
-        if (value > Integer.MAX_VALUE) {
-            return Integer.MAX_VALUE;
-        }
-        if (value < Integer.MIN_VALUE) {
-            return Integer.MIN_VALUE;
-        }
-        return value.intValue();
-    }
-
-    private String resolveRequestedModel(ProviderType providerType) {
-        String model = switch (providerType) {
-            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
-            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
-            case GEMINI -> gatewayModelProperties.getModels().getGemini();
-        };
-        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
-            return DEFAULT_GEMINI_MODEL;
-        }
-        return (model == null || model.isBlank()) ? null : model;
-    }
-
-    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
-        if (workspaceId == null || workspaceId <= 0) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
-        }
-        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
-                workspaceId,
-                organizationId,
-                WorkspaceStatus.ACTIVE
-        );
-        if (!exists) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
-        }
-    }
-
     private static class RagContextResult {
         private final String context;
         private final int chunksIncluded;
@@ -365,6 +317,54 @@ public class GatewayChatService {
             return builder.toString();
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private static Integer toLatencyMs(long startedAtNanos) {
+        long elapsedNanos = System.nanoTime() - startedAtNanos;
+        if (elapsedNanos <= 0) {
+            return 0;
+        }
+        long elapsedMs = elapsedNanos / 1_000_000L;
+        return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+    }
+
+    private static Integer safeToInteger(Long value) {
+        if (value == null) {
+            return null;
+        }
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (value < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return value.intValue();
+    }
+
+    private String resolveRequestedModel(ProviderType providerType) {
+        String model = switch (providerType) {
+            case OPENAI -> gatewayModelProperties.getModels().getOpenai();
+            case ANTHROPIC -> gatewayModelProperties.getModels().getAnthropic();
+            case GEMINI -> gatewayModelProperties.getModels().getGemini();
+        };
+        if (providerType == ProviderType.GEMINI && (model == null || model.isBlank())) {
+            return DEFAULT_GEMINI_MODEL;
+        }
+        return (model == null || model.isBlank()) ? null : model;
+    }
+
+    private void validateWorkspaceOwnership(Long organizationId, Long workspaceId) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        boolean exists = workspaceRepository.existsByIdAndOrganizationIdAndStatus(
+                workspaceId,
+                organizationId,
+                WorkspaceStatus.ACTIVE
+        );
+        if (!exists) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다.");
         }
     }
 

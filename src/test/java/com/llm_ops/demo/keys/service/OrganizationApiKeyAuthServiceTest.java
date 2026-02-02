@@ -50,6 +50,24 @@ class OrganizationApiKeyAuthServiceTest {
     }
 
     @Test
+    @DisplayName("유효한 API Key로 인증 결과(orgId/apiKeyId/prefix)를 조회한다")
+    void 유효한_api_key면_인증_결과를_반환한다() {
+        // given
+        Long organizationId = 1L;
+        OrganizationApiKeyCreateResponse response = organizationApiKeyCreateService.create(
+                organizationId,
+                new OrganizationApiKeyCreateRequest("prod"));
+
+        // when
+        OrganizationApiKeyAuthService.AuthResult authResult = organizationApiKeyAuthService.resolveAuthResult(response.apiKey());
+
+        // then
+        assertThat(authResult.organizationId()).isEqualTo(organizationId);
+        assertThat(authResult.apiKeyId()).isNotNull();
+        assertThat(authResult.apiKeyPrefix()).isNotBlank();
+    }
+
+    @Test
     @DisplayName("유효하지 않은 API Key면 인증 예외가 발생한다")
     void 유효하지_않은_api_key면_예외가_발생한다() {
         // given

@@ -10,6 +10,7 @@ import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
 import com.llm_ops.demo.keys.repository.OrganizationApiKeyRepository;
+import com.llm_ops.demo.keys.domain.OrganizationApiKey;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
@@ -71,6 +72,8 @@ class GatewayChatServiceTest {
                                 1L,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
+                OrganizationApiKey apiKeyEntity = organizationApiKeyRepository.findAll().get(0);
+
                 providerCredentialService.register(
                                 1L,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
@@ -97,6 +100,8 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getLatencyMs()).isNotNull();
                 assertThat(requestLog.getFinishedAt()).isNotNull();
 
+                assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
+                assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
                 var lastPrompt = testChatModelState.getLastPrompt();
                 assertThat(lastPrompt).isNotNull();
                 assertThat(lastPrompt.getOptions()).isInstanceOf(OpenAiChatOptions.class);
@@ -113,6 +118,7 @@ class GatewayChatServiceTest {
                                 1L,
                                 new OrganizationApiKeyCreateRequest("prod"));
 
+                OrganizationApiKey apiKeyEntity = organizationApiKeyRepository.findAll().get(0);
                 GatewayChatRequest request = new GatewayChatRequest(
                                 9999L,
                                 "hello",
@@ -133,5 +139,7 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getErrorCode()).isEqualTo("FORBIDDEN");
                 assertThat(requestLog.getFailReason()).isEqualTo("BUSINESS_EXCEPTION");
                 assertThat(requestLog.getFinishedAt()).isNotNull();
+                assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
+                assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
         }
 }

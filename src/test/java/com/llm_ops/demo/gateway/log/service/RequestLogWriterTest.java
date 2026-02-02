@@ -31,7 +31,7 @@ class RequestLogWriterTest {
                 10L,
                 20L,
                 30L,
-                "lum_abc123",
+                "prefix-123",
                 "/v1/chat/completions",
                 "POST",
                 "prompt-key",
@@ -62,7 +62,8 @@ class RequestLogWriterTest {
         assertThat(saved.getProvider()).isEqualTo("openai");
         assertThat(saved.getTotalTokens()).isEqualTo(12);
         assertThat(saved.getFinishedAt()).isNotNull();
-
+        assertThat(saved.getApiKeyId()).isEqualTo(30L);
+        assertThat(saved.getApiKeyPrefix()).isEqualTo("prefix-123");
         assertThat(saved.getRagLatencyMs()).isEqualTo(50);
         assertThat(saved.getRagChunksCount()).isEqualTo(2);
         assertThat(saved.getRagContextChars()).isEqualTo(1234);
@@ -78,7 +79,7 @@ class RequestLogWriterTest {
                 10L,
                 20L,
                 30L,
-                "lum_abc123",
+                "prefix-err",
                 "/v1/chat/completions",
                 "POST",
                 "prompt-key",
@@ -111,7 +112,8 @@ class RequestLogWriterTest {
         assertThat(saved.getErrorCode()).isEqualTo("UPSTREAM_5XX");
         assertThat(saved.getFailReason()).isEqualTo("UPSTREAM_5XX");
         assertThat(saved.getFinishedAt()).isNotNull();
-
+        assertThat(saved.getApiKeyId()).isEqualTo(30L);
+        assertThat(saved.getApiKeyPrefix()).isEqualTo("prefix-err");
         assertThat(saved.getRagLatencyMs()).isEqualTo(77);
         assertThat(saved.getRagChunksCount()).isEqualTo(0);
         assertThat(saved.getRagContextChars()).isEqualTo(0);
