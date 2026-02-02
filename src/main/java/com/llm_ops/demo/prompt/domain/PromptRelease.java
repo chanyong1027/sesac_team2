@@ -66,22 +66,6 @@ public class PromptRelease implements Persistable<Long> {
         this.activeVersion = newVersion;
     }
 
-    public Long getPromptId() {
-        return promptId;
-    }
-
-    public Prompt getPrompt() {
-        return prompt;
-    }
-
-    public PromptVersion getActiveVersion() {
-        return activeVersion;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
     @Override
     public Long getId() {
         return promptId;
