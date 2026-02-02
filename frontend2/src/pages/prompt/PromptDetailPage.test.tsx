@@ -1,0 +1,137 @@
+import { describe, it, beforeEach, expect, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { PromptDetailPage } from './PromptDetailPage';
+import { promptApi } from '@/api/prompt.api';
+import { organizationApi } from '@/api/organization.api';
+
+vi.mock('@/api/prompt.api', () => ({
+  promptApi: {
+    getPrompt: vi.fn(),
+    getVersions: vi.fn(),
+    getVersion: vi.fn(),
+    createVersion: vi.fn(),
+    getRelease: vi.fn(),
+    releasePrompt: vi.fn(),
+    getModelAllowlist: vi.fn(),
+  },
+}));
+
+vi.mock('@/api/organization.api', () => ({
+  organizationApi: {
+    getCredentials: vi.fn(),
+  },
+}));
+
+vi.mock('@/features/organization/store/organizationStore', () => ({
+  useOrganizationStore: () => ({ currentOrgId: 1 }),
+}));
+
+const mockedPromptApi = vi.mocked(promptApi);
+const mockedOrganizationApi = vi.mocked(organizationApi);
+
+const renderPage = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/orgs/1/workspaces/1/prompts/1']}>
+        <Routes>
+          <Route path="/orgs/:orgId/workspaces/:workspaceId/prompts/:promptId" element={<PromptDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+};
+
+beforeEach(() => {
+  mockedPromptApi.getPrompt.mockResolvedValue({
+    data: {
+      id: 1,
+      workspaceId: 1,
+      promptKey: 'cs-bot',
+      description: 'CS Bot',
+      status: 'ACTIVE',
+      createdAt: '2026-02-01T00:00:00Z',
+      updatedAt: '2026-02-01T00:00:00Z',
+    },
+  });
+  mockedPromptApi.getVersions.mockResolvedValue({ data: [] });
+  mockedPromptApi.getVersion.mockResolvedValue({ data: null });
+  mockedPromptApi.getRelease.mockResolvedValue({
+    data: {
+      promptId: 1,
+      activeVersionId: 1,
+      activeVersionNo: 1,
+      releasedAt: '2026-02-01T00:00:00Z',
+    },
+  });
+  mockedPromptApi.releasePrompt.mockResolvedValue({
+    data: {
+      promptId: 1,
+      activeVersionId: 1,
+      activeVersionNo: 1,
+      releasedAt: '2026-02-01T00:00:00Z',
+    },
+  });
+  mockedPromptApi.createVersion.mockResolvedValue({
+    data: {
+      id: 1,
+      versionNumber: 1,
+      createdAt: '2026-02-01T00:00:00Z',
+    },
+  });
+
+  mockedPromptApi.getModelAllowlist.mockResolvedValue({
+    data: {
+      OPENAI: ['gpt-4o-mini', 'gpt-4o'],
+      ANTHROPIC: ['claude-3-5-sonnet'],
+      GEMINI: ['gemini-2.0-flash'],
+    },
+  });
+
+  mockedOrganizationApi.getCredentials.mockResolvedValue({
+    data: [
+      { id: 1, provider: 'openai', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
+      { id: 2, provider: 'anthropic', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
+    ],
+  });
+});
+
+describe('PromptDetailPage VersionsTab', () => {
+  it('updates model options when provider changes', async () => {
+    renderPage();
+
+    const openButton = await screen.findByText('+ 새 버전 생성');
+    fireEvent.click(openButton);
+
+    const providerSelect = await screen.findByLabelText('Provider');
+    const modelSelect = await screen.findByLabelText('Model');
+
+    await waitFor(() => expect(modelSelect).toBeEnabled());
+    expect(modelSelect).toHaveTextContent('gpt-4o-mini');
+
+    fireEvent.change(providerSelect, { target: { value: 'ANTHROPIC' } });
+
+    await waitFor(() => expect(modelSelect).toHaveTextContent('claude-3-5-sonnet'));
+  });
+
+  it('disables model selection when allowlist fails', async () => {
+    mockedPromptApi.getModelAllowlist.mockRejectedValueOnce(new Error('network error'));
+
+    renderPage();
+
+    const openButton = await screen.findByText('+ 새 버전 생성');
+    fireEvent.click(openButton);
+
+    const modelSelect = await screen.findByLabelText('Model');
+
+    await waitFor(() => expect(modelSelect).toBeDisabled());
+    expect(screen.getByText('모델 목록을 불러오지 못했습니다.')).toBeInTheDocument();
+  });
+});

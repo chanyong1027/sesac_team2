@@ -263,7 +263,9 @@ export interface PromptReleaseRequest {
 // ========================================
 // Prompt Version
 // ========================================
-export type ProviderType = 'OPENAI' | 'ANTHROPIC' | 'GEMINI' | 'CLOVA'; // Add more as needed
+export type ProviderType = 'OPENAI' | 'ANTHROPIC' | 'GEMINI';
+
+export type ModelAllowlistResponse = Record<ProviderType, string[]>;
 
 export interface PromptVersionSummaryResponse {
   id: number;
