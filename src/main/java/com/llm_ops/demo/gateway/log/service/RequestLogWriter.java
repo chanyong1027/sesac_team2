@@ -70,6 +70,7 @@ public class RequestLogWriter {
                                         update.ragContextChars(),
                                         update.ragContextTruncated(),
                                         update.ragContextHash());
+
                         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs());
                 } catch (Exception e) {
                         log.error("로그 성공 기록 실패: requestId={}", requestId, e);
@@ -103,6 +104,7 @@ public class RequestLogWriter {
                                         update.ragContextChars(),
                                         update.ragContextTruncated(),
                                         update.ragContextHash());
+
                         requestLog.markFail(
                                         LocalDateTime.now(clock),
                                         update.httpStatus(),
