@@ -13,9 +13,12 @@ import java.util.List;
 import org.springframework.ai.document.Document;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
 
 @Service
+@ConditionalOnBean(S3Client.class)
 public class RagDocumentPreviewService {
 
     private static final int DEFAULT_PREVIEW_CHARS = 1200;
