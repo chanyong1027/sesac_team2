@@ -11,6 +11,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -72,6 +75,40 @@ public class S3ApiClient {
         } catch (Exception ex) {
             log.error("S3 delete failed. key={}", key, ex);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 삭제에 실패했습니다.");
+        }
+    }
+
+    public InputStream downloadDocument(String key) {
+        if (key == null || key.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "문서 키가 필요합니다.");
+        }
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(key)
+                .build();
+        try {
+            return s3Client.getObject(request);
+        } catch (Exception ex) {
+            log.error("S3 download failed. key={}", key, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 다운로드에 실패했습니다.");
+        }
+    }
+
+    public byte[] downloadDocumentBytes(String key) {
+        if (key == null || key.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "문서 키가 필요합니다.");
+        }
+        GetObjectRequest request = GetObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(key)
+                .build();
+        try {
+            try (ResponseInputStream<GetObjectResponse> stream = s3Client.getObject(request)) {
+                return stream.readAllBytes();
+            }
+        } catch (Exception ex) {
+            log.error("S3 download failed. key={}", key, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 다운로드에 실패했습니다.");
         }
     }
 }
