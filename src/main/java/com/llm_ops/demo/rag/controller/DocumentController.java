@@ -4,12 +4,14 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
 import com.llm_ops.demo.rag.dto.DocumentDeleteResponse;
+import com.llm_ops.demo.rag.dto.DocumentPreviewResponse;
 import com.llm_ops.demo.rag.dto.DocumentResponse;
 import com.llm_ops.demo.rag.dto.DocumentUploadResponse;
 import com.llm_ops.demo.rag.service.RagDocumentCreateService;
 import com.llm_ops.demo.rag.service.RagDocumentDeleteService;
 import com.llm_ops.demo.rag.service.RagDocumentIngestService;
 import com.llm_ops.demo.rag.service.RagDocumentListService;
+import com.llm_ops.demo.rag.service.RagDocumentPreviewService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreDeleteService;
 import com.llm_ops.demo.rag.storage.S3ApiClient;
 import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -54,6 +57,7 @@ public class DocumentController {
     private final RagDocumentDeleteService ragDocumentDeleteService;
     private final ObjectProvider<RagDocumentIngestService> ragDocumentIngestServiceProvider;
     private final ObjectProvider<RagDocumentVectorStoreDeleteService> ragDocumentVectorStoreDeleteServiceProvider;
+    private final RagDocumentPreviewService ragDocumentPreviewService;
     private final WorkspaceAccessService workspaceAccessService;
 
     @PostMapping(value = "/workspaces/{workspaceId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -112,6 +116,24 @@ public class DocumentController {
         List<DocumentResponse> response = ragDocumentListService.findActiveDocuments(workspaceId).stream()
                 .map(DocumentResponse::from)
                 .toList();
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/workspaces/{workspaceId}/documents/{documentId}/preview")
+    public ResponseEntity<DocumentPreviewResponse> previewDocument(
+        @PathVariable @NotNull @Positive Long workspaceId,
+        @PathVariable @NotNull @Positive Long documentId,
+        @RequestParam(required = false) Integer sampleCount,
+        @RequestParam(required = false) Integer previewChars,
+        @AuthenticationPrincipal Long userId
+    ) {
+        workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
+        DocumentPreviewResponse response = ragDocumentPreviewService.preview(
+                workspaceId,
+                documentId,
+                sampleCount,
+                previewChars
+        );
         return ResponseEntity.ok(response);
     }
 
