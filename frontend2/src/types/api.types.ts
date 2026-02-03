@@ -166,16 +166,23 @@ export interface ProviderCredentialCreateRequest {
   apiKey: string;
 }
 
+export interface ProviderCredentialUpdateRequest {
+  apiKey: string;
+}
+
 export interface ProviderCredentialCreateResponse {
-  id: number;
+  credentialId: number;
   provider: string;
   status: string;
+  createdAt: string;
+  lastVerifiedAt?: string | null;
 }
 
 export interface ProviderCredentialSummaryResponse {
-  id: number;
+  credentialId: number;
   provider: string;
   status: string;
+  lastVerifiedAt?: string | null;
   createdAt: string;
 }
 

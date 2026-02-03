@@ -123,8 +123,8 @@ beforeEach(() => {
 
   mockedOrganizationApi.getCredentials.mockResolvedValue(
     mockAxiosResponse([
-      { id: 1, provider: 'openai', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
-      { id: 2, provider: 'anthropic', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
+      { credentialId: 1, provider: 'openai', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
+      { credentialId: 2, provider: 'anthropic', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
     ])
   );
 });

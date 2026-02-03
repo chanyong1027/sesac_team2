@@ -7,6 +7,7 @@ import type {
   ProviderCredentialCreateRequest,
   ProviderCredentialCreateResponse,
   ProviderCredentialSummaryResponse,
+  ProviderCredentialUpdateRequest,
   OrganizationApiKeyCreateRequest,
   OrganizationApiKeyCreateResponse,
   OrganizationApiKeySummaryResponse,
@@ -45,6 +46,17 @@ export const organizationApi = {
   getCredentials: (orgId: number) =>
     api.get<ProviderCredentialSummaryResponse[]>(
       `/organizations/${orgId}/credentials`
+    ),
+
+  // Provider 자격증명 업데이트 - PUT /api/v1/organizations/{orgId}/credentials/{credentialId}
+  updateCredential: (
+    orgId: number,
+    credentialId: number,
+    data: ProviderCredentialUpdateRequest
+  ) =>
+    api.put<ProviderCredentialCreateResponse>(
+      `/organizations/${orgId}/credentials/${credentialId}`,
+      data
     ),
 
   // API 키 생성 - 현재 백엔드: POST /api/v1/organizations/{orgId}/api-keys
