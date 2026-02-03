@@ -58,8 +58,12 @@ class PromptVersionControllerTest {
                 "버전 1",
                 ProviderType.OPENAI,
                 "gpt-4",
+                null,
+                null,
                 "You are a helpful assistant.",
                 "{{question}}",
+                false,
+                "https://notion.so/changes",
                 Map.of("temperature", 0.7)
         );
 
@@ -91,8 +95,12 @@ class PromptVersionControllerTest {
                 "버전 1",
                 null,
                 "gpt-4",
+                null,
+                null,
                 "You are a helpful assistant.",
                 "{{question}}",
+                false,
+                null,
                 null
         );
 
@@ -115,8 +123,12 @@ class PromptVersionControllerTest {
                 "버전 1",
                 ProviderType.OPENAI,
                 "",
+                null,
+                null,
                 "You are a helpful assistant.",
                 "{{question}}",
+                false,
+                null,
                 null
         );
 
@@ -140,8 +152,12 @@ class PromptVersionControllerTest {
                 longTitle,
                 ProviderType.OPENAI,
                 "gpt-4",
+                null,
+                null,
                 "You are a helpful assistant.",
                 "{{question}}",
+                false,
+                null,
                 null
         );
 
@@ -164,8 +180,12 @@ class PromptVersionControllerTest {
                 "버전 1",
                 ProviderType.OPENAI,
                 "invalid-model",
+                null,
+                null,
                 "You are a helpful assistant.",
                 "{{question}}",
+                false,
+                null,
                 null
         );
 
@@ -192,6 +212,10 @@ class PromptVersionControllerTest {
         PromptVersionDetailResponse response = new PromptVersionDetailResponse(
                 versionId, promptId, 1, "버전 1",
                 ProviderType.OPENAI, "gpt-4",
+                null,
+                null,
+                false,
+                "https://notion.so/changes",
                 "You are a helpful assistant.",
                 "{{question}}",
                 Map.of("temperature", 0.7),
@@ -220,8 +244,8 @@ class PromptVersionControllerTest {
         Long userId = 1L;
 
         List<PromptVersionSummaryResponse> response = List.of(
-                new PromptVersionSummaryResponse(2L, 2, "버전 2", ProviderType.OPENAI, "gpt-4", userId, LocalDateTime.now()),
-                new PromptVersionSummaryResponse(1L, 1, "버전 1", ProviderType.OPENAI, "gpt-3.5-turbo", userId, LocalDateTime.now())
+                new PromptVersionSummaryResponse(2L, 2, "버전 2", ProviderType.OPENAI, "gpt-4", null, null, false, userId, LocalDateTime.now()),
+                new PromptVersionSummaryResponse(1L, 1, "버전 1", ProviderType.OPENAI, "gpt-3.5-turbo", null, null, false, userId, LocalDateTime.now())
         );
 
         given(promptVersionService.getList(promptId, userId)).willReturn(response);
