@@ -32,7 +32,7 @@ class RequestLogQueryServiceTest {
     @Autowired
     private RequestLogRepository requestLogRepository;
 
-    private Long workspaceId = 100L;
+    private static final Long WORKSPACE_ID = 100L;
 
     @AfterEach
     void cleanup() {
@@ -48,11 +48,11 @@ class RequestLogQueryServiceTest {
         void traceId로_로그를_조회한다() {
             // given
             String traceId = "trace-single-test";
-            RequestLog log = createLog(traceId, workspaceId, RequestLogStatus.SUCCESS);
+            RequestLog log = createLog(traceId, WORKSPACE_ID, RequestLogStatus.SUCCESS);
             requestLogRepository.save(log);
 
             // when
-            RequestLogResponse response = requestLogQueryService.findByTraceId(workspaceId, traceId);
+            RequestLogResponse response = requestLogQueryService.findByTraceId(WORKSPACE_ID, traceId);
 
             // then
             assertThat(response.traceId()).isEqualTo(traceId);
@@ -66,7 +66,7 @@ class RequestLogQueryServiceTest {
             String nonExistentTraceId = "non-existent";
 
             // when & then
-            assertThatThrownBy(() -> requestLogQueryService.findByTraceId(workspaceId, nonExistentTraceId))
+            assertThatThrownBy(() -> requestLogQueryService.findByTraceId(WORKSPACE_ID, nonExistentTraceId))
                     .isInstanceOf(BusinessException.class);
         }
 
@@ -79,7 +79,7 @@ class RequestLogQueryServiceTest {
             requestLogRepository.save(log);
 
             // when & then
-            assertThatThrownBy(() -> requestLogQueryService.findByTraceId(workspaceId, traceId))
+            assertThatThrownBy(() -> requestLogQueryService.findByTraceId(WORKSPACE_ID, traceId))
                     .isInstanceOf(BusinessException.class);
         }
     }
@@ -90,14 +90,16 @@ class RequestLogQueryServiceTest {
 
         @BeforeEach
         void setUp() {
-            // SUCCESS 로그 3개
+            // SUCCESS 로그 3개 (OpenAI)
             for (int i = 0; i < 3; i++) {
-                RequestLog log = createLog("trace-success-" + i, workspaceId, RequestLogStatus.SUCCESS);
+                RequestLog log = createLog("trace-success-" + i, WORKSPACE_ID, RequestLogStatus.SUCCESS);
+                log = fillProviderInfo(log, "openai", "gpt-4"); // provider 설정
                 requestLogRepository.save(log);
             }
-            // FAIL 로그 2개
+            // FAIL 로그 2개 (Anthropic)
             for (int i = 0; i < 2; i++) {
-                RequestLog log = createLog("trace-fail-" + i, workspaceId, RequestLogStatus.FAIL);
+                RequestLog log = createLog("trace-fail-" + i, WORKSPACE_ID, RequestLogStatus.FAIL);
+                log = fillProviderInfo(log, "anthropic", "claude-3"); // provider 설정
                 requestLogRepository.save(log);
             }
         }
@@ -110,7 +112,7 @@ class RequestLogQueryServiceTest {
             PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
 
             // when
-            RequestLogListResponse response = requestLogQueryService.search(workspaceId, condition, pageable);
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
 
             // then
             assertThat(response.totalElements()).isEqualTo(5);
@@ -126,7 +128,7 @@ class RequestLogQueryServiceTest {
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when
-            RequestLogListResponse response = requestLogQueryService.search(workspaceId, condition, pageable);
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
 
             // then
             assertThat(response.totalElements()).isEqualTo(3);
@@ -141,13 +143,49 @@ class RequestLogQueryServiceTest {
             PageRequest pageable = PageRequest.of(0, 2);
 
             // when
-            RequestLogListResponse response = requestLogQueryService.search(workspaceId, condition, pageable);
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
 
             // then
             assertThat(response.size()).isEqualTo(2);
             assertThat(response.content()).hasSize(2);
             assertThat(response.totalPages()).isEqualTo(3);
         }
+
+        @Test
+        @DisplayName("복합_필터로_검색한다")
+        void 복합_필터로_검색한다() {
+            // given: SUCCESS + openai 조합 검색
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null);
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(3);
+            assertThat(response.content())
+                    .allMatch(log -> log.status() == RequestLogStatus.SUCCESS && "openai".equals(log.provider()));
+        }
+
+        @Test
+        @DisplayName("null_condition이면_전체_조회된다")
+        void null_condition이면_전체_조회된다() {
+            // given
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, null, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(5);
+        }
+    }
+
+    // 헬퍼 메서드 추가: provider 등 설정
+    private RequestLog fillProviderInfo(RequestLog log, String provider, String model) {
+        log.fillModelUsage(provider, model, model, false, 10, 20, 30);
+        return log;
     }
 
     private RequestLog createLog(String traceId, Long workspaceId, RequestLogStatus status) {
