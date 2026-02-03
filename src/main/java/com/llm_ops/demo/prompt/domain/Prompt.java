@@ -59,6 +59,14 @@ public class Prompt {
         return id;
     }
 
+    public Workspace getWorkspace() {
+        return workspace;
+    }
+
+    public String getPromptKey() {
+        return promptKey;
+    }
+
     public static Prompt create(Workspace workspace, String promptKey, String description) {
         Prompt prompt = new Prompt();
         prompt.workspace = workspace;
