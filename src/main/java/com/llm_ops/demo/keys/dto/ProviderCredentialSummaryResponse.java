@@ -5,6 +5,7 @@ import com.llm_ops.demo.keys.domain.ProviderCredential;
 import java.time.LocalDateTime;
 
 public record ProviderCredentialSummaryResponse(
+        Long credentialId,
         String provider,
         String status,
         LocalDateTime lastVerifiedAt,
@@ -12,6 +13,7 @@ public record ProviderCredentialSummaryResponse(
 ) {
     public static ProviderCredentialSummaryResponse from(ProviderCredential credential) {
         return new ProviderCredentialSummaryResponse(
+                credential.getId(),
                 credential.getProvider().getValue(),
                 credential.getStatus().name(),
                 credential.getLastVerifiedAt(),

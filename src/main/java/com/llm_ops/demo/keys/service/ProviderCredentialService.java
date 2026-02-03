@@ -8,6 +8,7 @@ import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateResponse;
 import com.llm_ops.demo.keys.dto.ProviderCredentialSummaryResponse;
+import com.llm_ops.demo.keys.dto.ProviderCredentialUpdateRequest;
 import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,29 @@ public class ProviderCredentialService {
                 .findByOrganizationIdAndProvider(organizationId, providerType)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
         return providerKeyEncryptor.decrypt(credential.getKeyCiphertext());
+    }
+
+    @Transactional
+    public ProviderCredentialCreateResponse update(
+            Long organizationId,
+            Long credentialId,
+            ProviderCredentialUpdateRequest request
+    ) {
+        if (credentialId == null || credentialId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "credentialId가 올바르지 않습니다.");
+        }
+
+        ProviderCredential credential = providerCredentialRepository.findById(credentialId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+
+        if (!credential.getOrganizationId().equals(organizationId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "조직에 대한 권한이 없습니다.");
+        }
+
+        String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
+        credential.updateKey(ciphertext);
+        ProviderCredential saved = providerCredentialRepository.save(credential);
+        return ProviderCredentialCreateResponse.from(saved);
     }
     private void validateDuplicate(Long organizationId, ProviderType providerType) {
         if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {

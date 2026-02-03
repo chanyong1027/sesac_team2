@@ -82,4 +82,10 @@ public class ProviderCredential {
                 ProviderCredentialStatus.ACTIVE
         );
     }
+
+    public void updateKey(String keyCiphertext) {
+        this.keyCiphertext = keyCiphertext;
+        this.status = ProviderCredentialStatus.ACTIVE;
+        this.lastVerifiedAt = null;
+    }
 }
