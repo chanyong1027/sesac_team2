@@ -22,6 +22,7 @@ import com.llm_ops.demo.rag.service.RagSearchService;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -53,8 +54,6 @@ public class GatewayChatService {
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-    private static final int MAX_RAG_CHUNKS = 10;
-    private static final int MAX_RAG_CHARS = 4000;
     private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
     private static final String RAG_CONTEXT_TEMPLATE = """
             다음은 질문과 관련된 참고 문서입니다:
@@ -71,6 +70,7 @@ public class GatewayChatService {
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
     private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceRagSettingsService workspaceRagSettingsService;
     private final RequestLogWriter requestLogWriter;
     private final PromptRepository promptRepository;
     private final PromptReleaseRepository promptReleaseRepository;
@@ -82,6 +82,7 @@ public class GatewayChatService {
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
             WorkspaceRepository workspaceRepository,
+            WorkspaceRagSettingsService workspaceRagSettingsService,
             RequestLogWriter requestLogWriter,
         PromptRepository promptRepository,
             PromptReleaseRepository promptReleaseRepository) {
@@ -91,6 +92,7 @@ public class GatewayChatService {
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
         this.workspaceRepository = workspaceRepository;
+        this.workspaceRagSettingsService = workspaceRagSettingsService;
         this.requestLogWriter = requestLogWriter;
         this.promptRepository = promptRepository;
         this.promptReleaseRepository = promptReleaseRepository;
@@ -147,12 +149,23 @@ public class GatewayChatService {
                 ragLatencyMs = 0;
 
                 if (ragSearchService != null) {
+                    WorkspaceRagSettingsService.RagRuntimeSettings ragSettings =
+                            workspaceRagSettingsService.resolveRuntimeSettings(workspace.getId());
                     long ragStartedAtNanos = System.nanoTime();
-                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), renderedUserPrompt);
+                    RagSearchResponse ragResponse = ragSearchService.search(
+                            request.workspaceId(),
+                            renderedUserPrompt,
+                            ragSettings.topK(),
+                            ragSettings.similarityThreshold()
+                    );
                     ragLatencyMs = toLatencyMs(ragStartedAtNanos);
 
                     if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
-                        RagContextResult result = buildRagContextWithMetrics(ragResponse.chunks());
+                        RagContextResult result = buildRagContextWithMetrics(
+                                ragResponse.chunks(),
+                                ragSettings.maxChunks(),
+                                ragSettings.maxContextChars()
+                        );
                         ragChunksCount = result.chunksIncluded;
                         ragContextChars = result.contextChars;
                         ragContextTruncated = result.truncated;
@@ -255,7 +268,7 @@ public class GatewayChatService {
         }
     }
 
-    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks) {
+    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks, int maxChunks, int maxChars) {
         if (chunks == null || chunks.isEmpty()) {
             return new RagContextResult("", 0, 0, false);
         }
@@ -266,7 +279,7 @@ public class GatewayChatService {
         boolean truncated = false;
 
         for (ChunkDetailResponse chunk : chunks) {
-            if (count >= MAX_RAG_CHUNKS) {
+            if (count >= maxChunks) {
                 truncated = true;
                 break;
             }
@@ -275,7 +288,7 @@ public class GatewayChatService {
             }
 
             String content = chunk.content();
-            int remaining = MAX_RAG_CHARS - totalChars;
+            int remaining = maxChars - totalChars;
             if (remaining <= 0) {
                 truncated = true;
                 break;
@@ -293,7 +306,7 @@ public class GatewayChatService {
             totalChars += content.length();
             count++;
 
-            if (totalChars >= MAX_RAG_CHARS) {
+            if (totalChars >= maxChars) {
                 truncated = true;
                 break;
             }
