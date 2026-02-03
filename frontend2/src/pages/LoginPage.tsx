@@ -154,11 +154,12 @@ export function LoginPage() {
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: async (response) => {
-      const { accessToken } = response.data.data;
+      const { accessToken, refreshToken } = response.data.data;
       localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
 
       const userResponse = await authApi.getMe();
-      setAuth(userResponse.data.data, accessToken);
+      setAuth(userResponse.data.data, accessToken, refreshToken);
 
       const pendingToken = sessionStorage.getItem('pendingInvitation');
       if (pendingToken) {
