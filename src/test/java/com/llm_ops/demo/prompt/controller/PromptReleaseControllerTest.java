@@ -117,11 +117,11 @@ class PromptReleaseControllerTest {
         List<PromptReleaseHistoryResponse> response = List.of(
                 new PromptReleaseHistoryResponse(
                         2L, promptId, 1L, 1, 2L, 2,
-                        ChangeType.RELEASE, "버전 업데이트", userId, LocalDateTime.now()
+                        ChangeType.RELEASE, "버전 업데이트", userId, "테스트유저", LocalDateTime.now()
                 ),
                 new PromptReleaseHistoryResponse(
                         1L, promptId, null, null, 1L, 1,
-                        ChangeType.RELEASE, "첫 릴리스", userId, LocalDateTime.now()
+                        ChangeType.RELEASE, "첫 릴리스", userId, "테스트유저", LocalDateTime.now()
                 )
         );
 
