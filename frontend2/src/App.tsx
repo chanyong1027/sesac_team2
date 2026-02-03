@@ -14,16 +14,15 @@ import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
 import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
 import { DocumentListPage } from '@/pages/document/DocumentListPage';
 import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
-// import { DashboardPage } from '@/pages/DashboardPage'; // Deprecated
-// import { WorkspaceDetailPage } from '@/pages/WorkspaceDetailPage'; // Deprecated
 import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
-// import { SettingsLayout } from '@/pages/settings/SettingsLayout';
 import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
 import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
 import { SettingsProviderKeysPage } from '@/pages/settings/SettingsProviderKeysPage';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
+import { OnboardingPage } from '@/pages/OnboardingPage';
+import DashboardPage from '@/pages/dashboard/DashboardPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,8 +57,12 @@ function NavigateToOrgDashboard() {
   const { data: workspaces, isLoading } = useWorkspaces();
   const orgId = currentOrgId ?? workspaces?.[0]?.organizationId;
 
-  if (isLoading || !orgId) {
+  if (isLoading) {
     return <div className="p-6 text-gray-500">조직 정보를 불러오는 중...</div>;
+  }
+
+  if (!orgId) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <Navigate to={`/orgs/${orgId}/dashboard`} replace />;
@@ -101,6 +104,7 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/dashboard" element={<NavigateToOrgDashboard />} />
             <Route path="/workspaces/:workspaceId/*" element={<LegacyWorkspaceRedirect />} />
             <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
@@ -115,6 +119,9 @@ function App() {
               <Route path="settings/members" element={<SettingsMembersPage />} />
               <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
               <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
+
+              {/* Statistics Dashboard */}
+              <Route path="stats" element={<DashboardPage />} />
             </Route>
           </Route>
         </Routes>

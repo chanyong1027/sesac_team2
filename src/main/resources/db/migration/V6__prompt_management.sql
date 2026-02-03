@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
     created_by BIGINT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_prompt_versions_prompt FOREIGN KEY (prompt_id) REFERENCES prompts(id),
-    CONSTRAINT fk_prompt_versions_created_by FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT fk_prompt_versions_created_by FOREIGN KEY (created_by) REFERENCES console_user(id),
     CONSTRAINT uq_prompt_versions_prompt_version UNIQUE (prompt_id, version_no)
 );
 
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS prompt_release_histories (
     CONSTRAINT fk_prompt_release_histories_prompt FOREIGN KEY (prompt_id) REFERENCES prompts(id),
     CONSTRAINT fk_prompt_release_histories_from_version FOREIGN KEY (from_version_id) REFERENCES prompt_versions(id),
     CONSTRAINT fk_prompt_release_histories_to_version FOREIGN KEY (to_version_id) REFERENCES prompt_versions(id),
-    CONSTRAINT fk_prompt_release_histories_changed_by FOREIGN KEY (changed_by) REFERENCES users(id)
+    CONSTRAINT fk_prompt_release_histories_changed_by FOREIGN KEY (changed_by) REFERENCES console_user(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_prompt_release_histories_prompt_id ON prompt_release_histories(prompt_id);

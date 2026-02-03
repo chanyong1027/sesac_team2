@@ -23,6 +23,9 @@ export function AuthInitializer() {
                     if (!currentOrgId || !workspaces.some(ws => ws.organizationId === currentOrgId)) {
                         setCurrentOrgId(workspaces[0].organizationId);
                     }
+                } else {
+                    // 워크스페이스가 아예 없다면(신규 유저 등), 선택된 조직 정보도 날려야 함 (잘못된 캐싱 방지)
+                    setCurrentOrgId(null);
                 }
             } catch (error) {
                 console.error('Failed to initialize organization context:', error);
