@@ -48,8 +48,9 @@ export default function DashboardPage() {
 
     // axios wraps in .data, and we filter by current org
     const allWorkspaces = workspacesResponse?.data || [];
+    console.log('allWorkspaces:', allWorkspaces, 'organizationId:', organizationId);
     const workspaces = Array.isArray(allWorkspaces)
-        ? allWorkspaces.filter((ws) => ws.organizationId === organizationId)
+        ? allWorkspaces.filter((ws) => Number(ws.organizationId) === organizationId)
         : [];
 
     // Fetch Overview
@@ -418,7 +419,7 @@ export default function DashboardPage() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {prompts.map((prompt) => (
-                                        <tr key={prompt.promptId} className="hover:bg-gray-50 transition-colors">
+                                        <tr key={prompt.promptId || prompt.promptKey} className="hover:bg-gray-50 transition-colors">
                                             <td className="py-3">
                                                 <div>
                                                     <div className="font-medium text-gray-900">{prompt.promptKey}</div>

@@ -8,7 +8,7 @@ export function useOrganizationWorkspaces(orgId?: number) {
   const query = useWorkspaces();
 
   const data = useMemo(() => {
-    if (!query.data) return [];
+    if (!query.data || !Array.isArray(query.data)) return [];
     if (!targetOrgId) return [];
     return query.data.filter((ws) => ws.organizationId === targetOrgId);
   }, [query.data, targetOrgId]);
