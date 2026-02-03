@@ -1,6 +1,8 @@
 package com.llm_ops.demo.config;
 
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -23,8 +25,13 @@ public class TestChatModelConfig {
     ChatModel openAiChatModel(TestChatModelState testChatModelState) {
         return prompt -> {
             testChatModelState.record(prompt);
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                .withModel("gpt-4o-mini")
+                .withUsage(new DefaultUsage(1000L, 1000L, 2000L))
+                .build();
             return new ChatResponse(
-                List.of(new Generation(new AssistantMessage(prompt.getContents())))
+                List.of(new Generation(new AssistantMessage(prompt.getContents()))),
+                metadata
             );
         };
     }
