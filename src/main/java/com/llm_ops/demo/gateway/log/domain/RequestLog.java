@@ -8,7 +8,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -145,14 +144,8 @@ public class RequestLog {
             String requestPath,
             String httpMethod,
             String promptKey,
-            boolean ragEnabled) {
-        Objects.requireNonNull(traceId, "traceId는 필수입니다");
-        Objects.requireNonNull(organizationId, "organizationId는 필수입니다");
-        Objects.requireNonNull(workspaceId, "workspaceId는 필수입니다");
-        Objects.requireNonNull(requestPath, "requestPath는 필수입니다");
-        Objects.requireNonNull(httpMethod, "httpMethod는 필수입니다");
-        Objects.requireNonNull(promptKey, "promptKey는 필수입니다");
-
+            boolean ragEnabled
+    ) {
         RequestLog requestLog = new RequestLog();
         requestLog.requestId = requestId;
         requestLog.traceId = traceId;
@@ -179,8 +172,7 @@ public class RequestLog {
         this.latencyMs = latencyMs;
     }
 
-    public void markFail(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode,
-            String errorMessage, String failReason) {
+    public void markFail(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode, String errorMessage, String failReason) {
         if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
             return;
         }
@@ -193,8 +185,7 @@ public class RequestLog {
         this.failReason = failReason;
     }
 
-    public void fillModelUsage(String provider, String requestedModel, String usedModel, boolean isFailover,
-            Integer inputTokens, Integer outputTokens, Integer totalTokens) {
+    public void fillModelUsage(String provider, String requestedModel, String usedModel, boolean isFailover, Integer inputTokens, Integer outputTokens, Integer totalTokens) {
         this.provider = provider;
         this.requestedModel = requestedModel;
         this.usedModel = usedModel;
@@ -209,7 +200,8 @@ public class RequestLog {
             Integer ragChunksCount,
             Integer ragContextChars,
             Boolean ragContextTruncated,
-            String ragContextHash) {
+            String ragContextHash
+    ) {
         this.ragLatencyMs = ragLatencyMs;
         this.ragChunksCount = ragChunksCount;
         this.ragContextChars = ragContextChars;
