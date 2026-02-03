@@ -24,4 +24,12 @@ public class RagSearchProperties {
      * 유사도 점수 하한선입니다.
      */
     private double similarityThreshold = SearchRequest.SIMILARITY_THRESHOLD_ACCEPT_ALL;
+
+    public int getTopK() {
+        return topK;
+    }
+
+    public double getSimilarityThreshold() {
+        return similarityThreshold;
+    }
 }
