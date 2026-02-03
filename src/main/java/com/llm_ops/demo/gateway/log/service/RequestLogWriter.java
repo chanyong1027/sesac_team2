@@ -52,7 +52,14 @@ public class RequestLogWriter {
                 update.outputTokens(),
                 update.totalTokens()
         );
+        requestLog.fillCost(
+                update.estimatedCost(),
+                update.currency(),
+                update.pricingVersion()
+        );
         requestLog.fillRagMetrics(
+                update.ragTopK(),
+                update.ragSimilarityThreshold(),
                 update.ragLatencyMs(),
                 update.ragChunksCount(),
                 update.ragContextChars(),
@@ -75,7 +82,14 @@ public class RequestLogWriter {
                 update.outputTokens(),
                 update.totalTokens()
         );
+        requestLog.fillCost(
+                update.estimatedCost(),
+                update.currency(),
+                update.pricingVersion()
+        );
         requestLog.fillRagMetrics(
+                update.ragTopK(),
+                update.ragSimilarityThreshold(),
                 update.ragLatencyMs(),
                 update.ragChunksCount(),
                 update.ragContextChars(),
@@ -116,6 +130,11 @@ public class RequestLogWriter {
             Integer inputTokens,
             Integer outputTokens,
             Integer totalTokens,
+            java.math.BigDecimal estimatedCost,
+            String currency,
+            String pricingVersion,
+            Integer ragTopK,
+            Double ragSimilarityThreshold,
             Integer ragLatencyMs,
             Integer ragChunksCount,
             Integer ragContextChars,
@@ -137,6 +156,11 @@ public class RequestLogWriter {
             String errorCode,
             String errorMessage,
             String failReason,
+            java.math.BigDecimal estimatedCost,
+            String currency,
+            String pricingVersion,
+            Integer ragTopK,
+            Double ragSimilarityThreshold,
             Integer ragLatencyMs,
             Integer ragChunksCount,
             Integer ragContextChars,

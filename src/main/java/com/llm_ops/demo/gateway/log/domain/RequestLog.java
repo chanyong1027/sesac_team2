@@ -119,6 +119,70 @@ public class RequestLog {
     @Column(name = "rag_similarity_threshold")
     private Double ragSimilarityThreshold;
 
+    public RequestLogStatus getStatus() {
+        return status;
+    }
+
+    public Integer getHttpStatus() {
+        return httpStatus;
+    }
+
+    public Integer getLatencyMs() {
+        return latencyMs;
+    }
+
+    public LocalDateTime getFinishedAt() {
+        return finishedAt;
+    }
+
+    public Long getApiKeyId() {
+        return apiKeyId;
+    }
+
+    public String getApiKeyPrefix() {
+        return apiKeyPrefix;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public String getFailReason() {
+        return failReason;
+    }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public Integer getTotalTokens() {
+        return totalTokens;
+    }
+
+    public Integer getRagLatencyMs() {
+        return ragLatencyMs;
+    }
+
+    public Integer getRagChunksCount() {
+        return ragChunksCount;
+    }
+
+    public Integer getRagContextChars() {
+        return ragContextChars;
+    }
+
+    public Boolean getRagContextTruncated() {
+        return ragContextTruncated;
+    }
+
+    public String getRagContextHash() {
+        return ragContextHash;
+    }
+
+    public BigDecimal getEstimatedCost() {
+        return estimatedCost;
+    }
+
     @Column(name = "rag_latency_ms")
     private Integer ragLatencyMs;
 
@@ -196,16 +260,28 @@ public class RequestLog {
     }
 
     public void fillRagMetrics(
+            Integer ragTopK,
+            Double ragSimilarityThreshold,
             Integer ragLatencyMs,
             Integer ragChunksCount,
             Integer ragContextChars,
             Boolean ragContextTruncated,
             String ragContextHash
     ) {
+        this.ragTopK = ragTopK;
+        this.ragSimilarityThreshold = ragSimilarityThreshold;
         this.ragLatencyMs = ragLatencyMs;
         this.ragChunksCount = ragChunksCount;
         this.ragContextChars = ragContextChars;
         this.ragContextTruncated = ragContextTruncated;
         this.ragContextHash = ragContextHash;
+    }
+
+    public void fillCost(BigDecimal estimatedCost, String currency, String pricingVersion) {
+        this.estimatedCost = estimatedCost;
+        if (currency != null && !currency.isBlank()) {
+            this.currency = currency;
+        }
+        this.pricingVersion = pricingVersion;
     }
 }
