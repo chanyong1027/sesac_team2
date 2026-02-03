@@ -48,6 +48,10 @@ public class Workspace {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    public Long getId() {
+        return id;
+    }
+
     public static Workspace create(Organization organization, String name, String displayName) {
         Workspace workspace = new Workspace();
         workspace.organization = organization;
