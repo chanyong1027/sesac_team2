@@ -37,8 +37,9 @@ public class RequestLogQueryService {
      * 목록 조회 - 검색 조건 + 페이징
      */
     public RequestLogListResponse search(Long workspaceId, RequestLogSearchCondition condition, Pageable pageable) {
+        RequestLogSearchCondition safeCondition = condition != null ? condition : RequestLogSearchCondition.empty();
         Page<RequestLog> page = requestLogRepository.findAll(
-                RequestLogSpecification.searchByCondition(workspaceId, condition),
+                RequestLogSpecification.searchByCondition(workspaceId, safeCondition),
                 pageable);
         Page<RequestLogResponse> responsePage = page.map(RequestLogResponse::from);
         return RequestLogListResponse.from(responsePage);
