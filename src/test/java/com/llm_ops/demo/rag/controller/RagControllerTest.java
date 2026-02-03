@@ -48,7 +48,7 @@ class RagControllerTest {
             new ChunkDetailResponse("환불은 7일 이내 가능합니다.", 0.87, 10L, "policy.md")
         ));
 
-        given(ragSearchFacade.search(workspaceId, userId, query)).willReturn(response);
+        given(ragSearchFacade.search(workspaceId, userId, query, null, null)).willReturn(response);
 
         // when & then
         TestSecurityContextHolder.setAuthentication(
