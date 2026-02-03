@@ -2,146 +2,166 @@ package com.llm_ops.demo.gateway.log.service;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
-import com.llm_ops.demo.global.error.BusinessException;
-import com.llm_ops.demo.global.error.ErrorCode;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 public class RequestLogWriter {
 
-    private final RequestLogRepository requestLogRepository;
-    private final Clock clock = Clock.systemUTC();
+        private final RequestLogRepository requestLogRepository;
+        private final Clock clock = Clock.systemUTC();
 
-    public RequestLogWriter(RequestLogRepository requestLogRepository) {
-        this.requestLogRepository = requestLogRepository;
-    }
+        public RequestLogWriter(RequestLogRepository requestLogRepository) {
+                this.requestLogRepository = requestLogRepository;
+        }
 
-    @Transactional
-    public UUID start(StartRequest request) {
-        UUID requestId = request.requestId() != null ? request.requestId() : UUID.randomUUID();
-        RequestLog requestLog = RequestLog.loggingStart(
-                requestId,
-                request.traceId(),
-                request.organizationId(),
-                request.workspaceId(),
-                request.apiKeyId(),
-                request.apiKeyPrefix(),
-                request.requestPath(),
-                request.httpMethod(),
-                request.promptKey(),
-                request.ragEnabled()
-        );
-        requestLogRepository.save(requestLog);
-        return requestId;
-    }
+        /**
+         * 로그 시작을 동기로 저장합니다.
+         * requestId를 반환해야 하므로 동기로 유지합니다.
+         */
+        @Transactional
+        public UUID start(StartRequest request) {
+                UUID requestId = request.requestId() != null ? request.requestId() : UUID.randomUUID();
+                RequestLog requestLog = RequestLog.loggingStart(
+                                requestId,
+                                request.traceId(),
+                                request.organizationId(),
+                                request.workspaceId(),
+                                request.apiKeyId(),
+                                request.apiKeyPrefix(),
+                                request.requestPath(),
+                                request.httpMethod(),
+                                request.promptKey(),
+                                request.ragEnabled());
+                requestLogRepository.save(requestLog);
+                return requestId;
+        }
 
-    @Transactional
-    public void markSuccess(UUID requestId, SuccessUpdate update) {
-        RequestLog requestLog = requestLogRepository.findById(requestId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "request log not found: " + requestId));
-        requestLog.fillModelUsage(
-                update.provider(),
-                update.requestedModel(),
-                update.usedModel(),
-                update.isFailover(),
-                update.inputTokens(),
-                update.outputTokens(),
-                update.totalTokens()
-        );
-        requestLog.fillRagMetrics(
-                update.ragLatencyMs(),
-                update.ragChunksCount(),
-                update.ragContextChars(),
-                update.ragContextTruncated(),
-                update.ragContextHash()
-        );
-        requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs());
-    }
+        /**
+         * 성공 로그를 비동기로 업데이트합니다.
+         * API 응답 시간에 영향을 주지 않도록 별도 스레드에서 처리합니다.
+         */
+        @Async("logExecutor")
+        @Transactional
+        public void markSuccess(UUID requestId, SuccessUpdate update) {
+                try {
+                        RequestLog requestLog = requestLogRepository.findById(requestId).orElse(null);
+                        if (requestLog == null) {
+                                log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
+                                return;
+                        }
+                        requestLog.fillModelUsage(
+                                        update.provider(),
+                                        update.requestedModel(),
+                                        update.usedModel(),
+                                        update.isFailover(),
+                                        update.inputTokens(),
+                                        update.outputTokens(),
+                                        update.totalTokens());
+                        requestLog.fillRagMetrics(
+                                        update.ragLatencyMs(),
+                                        update.ragChunksCount(),
+                                        update.ragContextChars(),
+                                        update.ragContextTruncated(),
+                                        update.ragContextHash());
+                        requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs());
+                } catch (Exception e) {
+                        log.error("로그 성공 기록 실패: requestId={}", requestId, e);
+                }
+        }
 
-    @Transactional
-    public void markFail(UUID requestId, FailUpdate update) {
-        RequestLog requestLog = requestLogRepository.findById(requestId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "request log not found: " + requestId));
-        requestLog.fillModelUsage(
-                update.provider(),
-                update.requestedModel(),
-                update.usedModel(),
-                update.isFailover(),
-                update.inputTokens(),
-                update.outputTokens(),
-                update.totalTokens()
-        );
-        requestLog.fillRagMetrics(
-                update.ragLatencyMs(),
-                update.ragChunksCount(),
-                update.ragContextChars(),
-                update.ragContextTruncated(),
-                update.ragContextHash()
-        );
-        requestLog.markFail(
-                LocalDateTime.now(clock),
-                update.httpStatus(),
-                update.latencyMs(),
-                update.errorCode(),
-                update.errorMessage(),
-                update.failReason()
-        );
-    }
+        /**
+         * 실패 로그를 비동기로 업데이트합니다.
+         * API 응답 시간에 영향을 주지 않도록 별도 스레드에서 처리합니다.
+         */
+        @Async("logExecutor")
+        @Transactional
+        public void markFail(UUID requestId, FailUpdate update) {
+                try {
+                        RequestLog requestLog = requestLogRepository.findById(requestId).orElse(null);
+                        if (requestLog == null) {
+                                log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
+                                return;
+                        }
+                        requestLog.fillModelUsage(
+                                        update.provider(),
+                                        update.requestedModel(),
+                                        update.usedModel(),
+                                        update.isFailover(),
+                                        update.inputTokens(),
+                                        update.outputTokens(),
+                                        update.totalTokens());
+                        requestLog.fillRagMetrics(
+                                        update.ragLatencyMs(),
+                                        update.ragChunksCount(),
+                                        update.ragContextChars(),
+                                        update.ragContextTruncated(),
+                                        update.ragContextHash());
+                        requestLog.markFail(
+                                        LocalDateTime.now(clock),
+                                        update.httpStatus(),
+                                        update.latencyMs(),
+                                        update.errorCode(),
+                                        update.errorMessage(),
+                                        update.failReason());
+                } catch (Exception e) {
+                        log.error("로그 실패 기록 실패: requestId={}", requestId, e);
+                }
+        }
 
-    public record StartRequest(
-            UUID requestId,
-            String traceId,
-            Long organizationId,
-            Long workspaceId,
-            Long apiKeyId,
-            String apiKeyPrefix,
-            String requestPath,
-            String httpMethod,
-            String promptKey,
-            boolean ragEnabled
-    ) {
-    }
+        public record StartRequest(
+                        UUID requestId,
+                        String traceId,
+                        Long organizationId,
+                        Long workspaceId,
+                        Long apiKeyId,
+                        String apiKeyPrefix,
+                        String requestPath,
+                        String httpMethod,
+                        String promptKey,
+                        boolean ragEnabled) {
+        }
 
-    public record SuccessUpdate(
-            Integer httpStatus,
-            Integer latencyMs,
-            String provider,
-            String requestedModel,
-            String usedModel,
-            boolean isFailover,
-            Integer inputTokens,
-            Integer outputTokens,
-            Integer totalTokens,
-            Integer ragLatencyMs,
-            Integer ragChunksCount,
-            Integer ragContextChars,
-            Boolean ragContextTruncated,
-            String ragContextHash
-    ) {
-    }
+        public record SuccessUpdate(
+                        Integer httpStatus,
+                        Integer latencyMs,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        boolean isFailover,
+                        Integer inputTokens,
+                        Integer outputTokens,
+                        Integer totalTokens,
+                        Integer ragLatencyMs,
+                        Integer ragChunksCount,
+                        Integer ragContextChars,
+                        Boolean ragContextTruncated,
+                        String ragContextHash) {
+        }
 
-    public record FailUpdate(
-            Integer httpStatus,
-            Integer latencyMs,
-            String provider,
-            String requestedModel,
-            String usedModel,
-            boolean isFailover,
-            Integer inputTokens,
-            Integer outputTokens,
-            Integer totalTokens,
-            String errorCode,
-            String errorMessage,
-            String failReason,
-            Integer ragLatencyMs,
-            Integer ragChunksCount,
-            Integer ragContextChars,
-            Boolean ragContextTruncated,
-            String ragContextHash
-    ) {
-    }
+        public record FailUpdate(
+                        Integer httpStatus,
+                        Integer latencyMs,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        boolean isFailover,
+                        Integer inputTokens,
+                        Integer outputTokens,
+                        Integer totalTokens,
+                        String errorCode,
+                        String errorMessage,
+                        String failReason,
+                        Integer ragLatencyMs,
+                        Integer ragChunksCount,
+                        Integer ragContextChars,
+                        Boolean ragContextTruncated,
+                        String ragContextHash) {
+        }
 }
