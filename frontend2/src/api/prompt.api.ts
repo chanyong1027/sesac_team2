@@ -11,7 +11,9 @@ import type {
     PromptVersionSummaryResponse,
     PromptVersionDetailResponse,
     PromptReleaseResponse,
-    PromptReleaseRequest
+    PromptReleaseRequest,
+    PromptReleaseHistoryResponse,
+    PromptRollbackRequest
 } from '@/types/api.types';
 
 export const promptApi = {
@@ -62,4 +64,10 @@ export const promptApi = {
 
     releasePrompt: (promptId: number, data: PromptReleaseRequest) =>
         api.post<PromptReleaseResponse>(`/prompts/${promptId}/release`, data),
+
+    getReleaseHistory: (promptId: number) =>
+        api.get<PromptReleaseHistoryResponse[]>(`/prompts/${promptId}/history`),
+
+    rollbackPrompt: (promptId: number, data: PromptRollbackRequest) =>
+        api.post<PromptReleaseResponse>(`/prompts/${promptId}/rollback`, data),
 };

@@ -58,11 +58,11 @@ public class GatewayChatService {
     private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
     private static final String RAG_CONTEXT_TEMPLATE = """
             다음은 질문과 관련된 참고 문서입니다:
-            
+
             %s
-            
+
             위 문서를 참고하여 다음 질문에 답변해주세요:
-            
+
             """;
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
@@ -84,8 +84,7 @@ public class GatewayChatService {
             WorkspaceRepository workspaceRepository,
             RequestLogWriter requestLogWriter,
             PromptRepository promptRepository,
-            PromptReleaseRepository promptReleaseRepository
-    ) {
+            PromptReleaseRepository promptReleaseRepository) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.providerCredentialService = providerCredentialService;
@@ -121,8 +120,7 @@ public class GatewayChatService {
                 GATEWAY_CHAT_COMPLETIONS_PATH,
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
-                request.isRagEnabled()
-        ));
+                request.isRagEnabled()));
 
         Integer ragLatencyMs = null;
         Integer ragChunksCount = null;
@@ -134,7 +132,8 @@ public class GatewayChatService {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
             PromptVersion activeVersion = resolveActiveVersion(workspace, request.promptKey());
 
-            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()), request.variables());
+            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
+                    request.variables());
             String renderedSystemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
 
             String prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
@@ -191,16 +190,14 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash
-            ));
+                    ragContextHash));
 
             return GatewayChatResponse.from(
                     traceId,
                     answer,
                     false,
                     usedModel,
-                    usage
-            );
+                    usage);
         } catch (BusinessException e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     e.getErrorCode().getStatus().value(),
@@ -219,8 +216,7 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash
-            ));
+                    ragContextHash));
             throw e;
         } catch (Exception e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
@@ -240,8 +236,7 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash
-            ));
+                    ragContextHash));
             throw e;
         }
     }
@@ -357,13 +352,14 @@ public class GatewayChatService {
         if (workspaceId == null || workspaceId <= 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
         }
-        return workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE)
+        return workspaceRepository
+                .findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다."));
     }
 
     private PromptVersion resolveActiveVersion(Workspace workspace, String promptKey) {
-        com.llm_ops.demo.prompt.domain.Prompt promptEntity =
-                promptRepository.findByWorkspaceAndPromptKeyAndStatus(workspace, promptKey, PromptStatus.ACTIVE)
+        com.llm_ops.demo.prompt.domain.Prompt promptEntity = promptRepository
+                .findByWorkspaceAndPromptKeyAndStatus(workspace, promptKey, PromptStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "프롬프트를 찾을 수 없습니다."));
         PromptRelease release = promptReleaseRepository.findWithActiveVersionByPromptId(promptEntity.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다."));
@@ -372,10 +368,11 @@ public class GatewayChatService {
 
     private String resolveUserTemplate(PromptVersion version, String fallbackPromptKey) {
         if (version == null) {
-            return fallbackPromptKey;
+            return "{{question}}";
         }
         String template = version.getUserTemplate();
-        return (template == null || template.isBlank()) ? fallbackPromptKey : template;
+        // 템플릿이 없으면 단순히 프롬프트 키를 사용하는 대신, 기본적으로 {{question}} 변수를 사용하도록 처리
+        return (template == null || template.isBlank()) ? "{{question}}" : template;
     }
 
     private String renderOptionalTemplate(String template, Map<String, String> variables) {
@@ -447,16 +444,14 @@ public class GatewayChatService {
         GenerateContentResponse response = client.models.generateContent(
                 model,
                 prompt,
-                null
-        );
+                null);
         if (response == null) {
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                     .withModel(model)
                     .build();
             return new ChatResponse(
                     List.of(new Generation(new AssistantMessage(""))),
-                    metadata
-            );
+                    metadata);
         }
 
         String answer = response.text();
@@ -477,7 +472,6 @@ public class GatewayChatService {
         ChatResponseMetadata metadata = metadataBuilder.build();
         return new ChatResponse(
                 List.of(new Generation(new AssistantMessage(answer))),
-                metadata
-        );
+                metadata);
     }
 }

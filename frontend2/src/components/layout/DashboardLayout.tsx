@@ -14,7 +14,8 @@ import {
   Search,
   Menu,
   Key,
-  Shield
+  Shield,
+  BarChart3
 } from 'lucide-react';
 import { CreateOrganizationModal } from '@/features/organization/components/CreateOrganizationModal';
 
@@ -121,6 +122,13 @@ function Sidebar({ isOpen, onCreateOrg, orgId }: { isOpen: boolean; onCreateOrg:
           label="대시보드"
           to={dashboardPath}
           active={location.pathname === dashboardPath}
+          isOpen={isOpen}
+        />
+        <SidebarItem
+          icon={<BarChart3 size={20} />}
+          label="통계"
+          to={`${basePath}/stats`}
+          active={isActive(`${basePath}/stats`)}
           isOpen={isOpen}
         />
 

@@ -42,8 +42,22 @@ export interface UserLoginRequest {
 
 export interface UserLoginResponse {
   accessToken: string;
+  refreshToken: string;
   tokenType: string;
-  expiresIn: number;
+  expiresInSec: number;
+  refreshExpiresInSec: number;
+}
+
+export interface TokenRefreshRequest {
+  refreshToken: string;
+}
+
+export interface TokenRefreshResponse {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: string;
+  expiresInSec: number;
+  refreshExpiresInSec: number;
 }
 
 export interface UserMeResponse {
@@ -257,6 +271,25 @@ export interface PromptReleaseResponse {
 
 export interface PromptReleaseRequest {
   versionId: number;
+  reason?: string;
+}
+
+export interface PromptReleaseHistoryResponse {
+  id: number;
+  promptId: number;
+  fromVersionId: number | null;
+  fromVersionNo: number | null;
+  toVersionId: number;
+  toVersionNo: number;
+  changeType: 'RELEASE' | 'ROLLBACK';
+  reason?: string;
+  changedBy: number;
+  changedByName: string;
+  createdAt: string;
+}
+
+export interface PromptRollbackRequest {
+  targetVersionId: number;
   reason?: string;
 }
 
