@@ -2,9 +2,12 @@ package com.llm_ops.demo.keys.controller;
 
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateRequest;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeyCreateResponse;
+import com.llm_ops.demo.keys.dto.OrganizationApiKeyRotateRequest;
+import com.llm_ops.demo.keys.dto.OrganizationApiKeyRotateResponse;
 import com.llm_ops.demo.keys.dto.OrganizationApiKeySummaryResponse;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyCreateService;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyQueryService;
+import com.llm_ops.demo.keys.service.OrganizationApiKeyRotateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -29,6 +32,7 @@ public class OrganizationApiKeyController {
 
     private final OrganizationApiKeyCreateService organizationApiKeyCreateService;
     private final OrganizationApiKeyQueryService organizationApiKeyQueryService;
+    private final OrganizationApiKeyRotateService organizationApiKeyRotateService;
 
     /**
      * 지정된 조직에 대한 신규 API 키를 발급합니다.
@@ -59,5 +63,25 @@ public class OrganizationApiKeyController {
             @PathVariable("orgId") Long organizationId
     ) {
         return ResponseEntity.ok(organizationApiKeyQueryService.getOrganizationApiKeys(organizationId));
+    }
+
+    /**
+     * 지정된 API 키를 새로운 값으로 교체(Rotate)합니다.
+     * 기존 키는 더 이상 유효하지 않게 되며, 새로운 키의 실제 값은 이 응답에서만 한 번 노출됩니다.
+     *
+     * @param organizationId API 키가 속한 조직의 ID
+     * @param keyId          교체할 API 키의 ID
+     * @param request        교체 요청 DTO (사유 포함)
+     * @return 새로운 API 키 정보
+     */
+    @PostMapping("/{keyId}/rotate")
+    public ResponseEntity<OrganizationApiKeyRotateResponse> rotate(
+            @PathVariable("orgId") Long organizationId,
+            @PathVariable("keyId") Long keyId,
+            @Valid @RequestBody OrganizationApiKeyRotateRequest request
+    ) {
+        OrganizationApiKeyRotateResponse response =
+                organizationApiKeyRotateService.rotate(organizationId, keyId, request);
+        return ResponseEntity.ok(response);
     }
 }
