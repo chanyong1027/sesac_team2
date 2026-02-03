@@ -335,8 +335,12 @@ class PromptVersionServiceTest {
                 "버전 제목",
                 ProviderType.OPENAI,
                 "gpt-4",
+                null,
+                null,
                 "You are a helpful assistant.",
                 "{{question}}",
+                false,
+                "https://notion.so/changes",
                 Map.of("temperature", 0.7)
         );
     }
@@ -369,7 +373,11 @@ class PromptVersionServiceTest {
         PromptVersion version = PromptVersion.create(
                 prompt, versionNo, "버전 " + versionNo,
                 ProviderType.OPENAI, "gpt-4",
+                null,
+                null,
                 "system prompt", "user template",
+                false,
+                null,
                 Map.of("temperature", 0.7), user
         );
         setId(version, id);

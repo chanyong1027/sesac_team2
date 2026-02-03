@@ -11,16 +11,15 @@ import com.llm_ops.demo.prompt.dto.PromptVersionCreateRequest;
 import com.llm_ops.demo.prompt.dto.PromptVersionCreateResponse;
 import com.llm_ops.demo.prompt.dto.PromptVersionDetailResponse;
 import com.llm_ops.demo.prompt.dto.PromptVersionSummaryResponse;
+import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class PromptVersionService {
 
     private final PromptVersionRepository promptVersionRepository;
@@ -29,6 +28,20 @@ public class PromptVersionService {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final PromptModelAllowlistService promptModelAllowlistService;
 
+    public PromptVersionService(
+            PromptVersionRepository promptVersionRepository,
+            PromptRepository promptRepository,
+            UserRepository userRepository,
+            WorkspaceMemberRepository workspaceMemberRepository,
+            PromptModelAllowlistService promptModelAllowlistService
+    ) {
+        this.promptVersionRepository = promptVersionRepository;
+        this.promptRepository = promptRepository;
+        this.userRepository = userRepository;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.promptModelAllowlistService = promptModelAllowlistService;
+    }
+
     @Transactional
     public PromptVersionCreateResponse create(Long promptId, Long userId, PromptVersionCreateRequest request) {
         User user = findUser(userId);
@@ -36,6 +49,8 @@ public class PromptVersionService {
 
         validateWorkspaceMembership(prompt, user);
         promptModelAllowlistService.validateModel(request.provider(), request.model());
+        validateUserTemplate(request.userTemplate());
+        validateSecondaryModel(request);
 
         int nextVersionNo = calculateNextVersionNo(prompt);
         PromptVersion version = buildVersion(prompt, nextVersionNo, request, user);
@@ -96,16 +111,49 @@ public class PromptVersionService {
     }
 
     private PromptVersion buildVersion(Prompt prompt, int versionNo, PromptVersionCreateRequest request, User user) {
+        boolean ragEnabled = Boolean.TRUE.equals(request.ragEnabled());
         return PromptVersion.create(
                 prompt,
                 versionNo,
                 request.title(),
                 request.provider(),
                 request.model(),
+                request.secondaryProvider(),
+                request.secondaryModel(),
                 request.systemPrompt(),
                 request.userTemplate(),
+                ragEnabled,
+                request.contextUrl(),
                 request.modelConfig(),
                 user
         );
+    }
+
+    private void validateUserTemplate(String userTemplate) {
+        if (userTemplate == null || userTemplate.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate는 필수입니다.");
+        }
+        if (!containsQuestionPlaceholder(userTemplate)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate에 {{question}} 변수가 필요합니다.");
+        }
+    }
+
+    private boolean containsQuestionPlaceholder(String template) {
+        return template.contains("{{question}}") || template.contains("{question}");
+    }
+
+    private void validateSecondaryModel(PromptVersionCreateRequest request) {
+        ProviderType secondaryProvider = request.secondaryProvider();
+        String secondaryModel = request.secondaryModel();
+
+        if (secondaryProvider == null && (secondaryModel == null || secondaryModel.isBlank())) {
+            return;
+        }
+
+        if (secondaryProvider == null || secondaryModel == null || secondaryModel.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "예비 모델 설정이 올바르지 않습니다.");
+        }
+
+        promptModelAllowlistService.validateModel(secondaryProvider, secondaryModel);
     }
 }
