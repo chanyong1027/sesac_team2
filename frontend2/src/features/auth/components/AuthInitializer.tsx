@@ -1,9 +1,12 @@
 import { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/features/auth/store';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { workspaceApi } from '@/api/workspace.api';
 
 export function AuthInitializer() {
+    const navigate = useNavigate();
+    const location = useLocation();
     const { isAuthenticated } = useAuthStore();
     const { currentOrgId, setCurrentOrgId } = useOrganizationStore();
 
@@ -24,16 +27,23 @@ export function AuthInitializer() {
                         setCurrentOrgId(workspaces[0].organizationId);
                     }
                 } else {
-                    // 워크스페이스가 아예 없다면(신규 유저 등), 선택된 조직 정보도 날려야 함 (잘못된 캐싱 방지)
+                    // 워크스페이스가 아예 없다면 (퇴출된 회원 또는 신규 유저)
                     setCurrentOrgId(null);
+
+                    // 온보딩 페이지가 아닌 경우에만 리다이렉트
+                    if (location.pathname !== '/onboarding') {
+                        console.warn('사용자에게 워크스페이스가 없습니다. 온보딩 페이지로 이동합니다.');
+                        navigate('/onboarding', { replace: true });
+                    }
                 }
             } catch (error) {
                 console.error('Failed to initialize organization context:', error);
+                // 네트워크 에러가 아닌 경우 (예: 401, 403) 로그아웃 처리를 고려할 수 있음
             }
         };
 
         initOrganization();
-    }, [isAuthenticated, setCurrentOrgId, currentOrgId]);
+    }, [isAuthenticated, setCurrentOrgId, currentOrgId, navigate, location.pathname]);
 
     return null;
 }

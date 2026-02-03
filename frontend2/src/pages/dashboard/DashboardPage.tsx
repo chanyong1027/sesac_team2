@@ -102,7 +102,10 @@ export default function DashboardPage() {
     };
 
     const formatCurrency = (num: number) => {
-        return '$' + num.toFixed(2);
+        if (num === 0) return '$0.00';
+        if (num < 0.01) return '$' + num.toFixed(6);  // 작은 금액은 소수점 6자리
+        if (num < 1) return '$' + num.toFixed(4);     // $1 미만은 소수점 4자리
+        return '$' + num.toFixed(2);                  // 그 외는 소수점 2자리
     };
 
     const formatDate = (dateStr: string) => {

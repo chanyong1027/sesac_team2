@@ -5,6 +5,7 @@ import { workspaceApi } from '@/api/workspace.api';
 import type { OrganizationMemberResponse } from '@/types/api.types';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
+import { useAuthStore } from '@/features/auth/store';
 import { User, Shield, Info, Link as LinkIcon, Check, Copy, AlertCircle } from 'lucide-react';
 
 const roleColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -61,8 +62,13 @@ function InviteMemberModal({
   const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const { currentOrgId } = useOrganizationStore();
+
   // 워크스페이스 목록 조회
   const { data: workspaces, isLoading: isWorkspacesLoading } = useWorkspaces();
+
+  // 현재 조직의 워크스페이스만 필터링
+  const availableWorkspaces = workspaces?.filter(ws => ws.organizationId === currentOrgId);
 
   const inviteMutation = useMutation({
     mutationFn: (workspaceId: number) =>
@@ -116,14 +122,14 @@ function InviteMemberModal({
               </label>
               {isWorkspacesLoading ? (
                 <div className="h-10 bg-gray-100 rounded animate-pulse" />
-              ) : workspaces && workspaces.length > 0 ? (
+              ) : availableWorkspaces && availableWorkspaces.length > 0 ? (
                 <select
                   value={selectedWorkspaceId || ''}
                   onChange={(e) => setSelectedWorkspaceId(Number(e.target.value))}
                   className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 >
                   <option value="" disabled>워크스페이스를 선택하세요</option>
-                  {workspaces.map((ws) => (
+                  {availableWorkspaces.map((ws) => (
                     <option key={ws.id} value={ws.id}>
                       {ws.displayName}
                     </option>
@@ -249,6 +255,7 @@ export function SettingsMembersPage() {
   const [memberToRemove, setMemberToRemove] = useState<OrganizationMemberResponse | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const { currentOrgId } = useOrganizationStore();
+  const { user } = useAuthStore();
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['organization-members', currentOrgId],
@@ -259,6 +266,10 @@ export function SettingsMembersPage() {
     },
     enabled: !!currentOrgId,
   });
+
+  // 현재 로그인한 사용자의 역할 확인
+  const currentMember = members?.find(m => m.userId === user?.id);
+  const canManageMembers = currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
 
   const removeMutation = useMutation({
     mutationFn: (memberId: number) => {
@@ -284,13 +295,15 @@ export function SettingsMembersPage() {
             조직 멤버를 관리하고 역할을 설정합니다.
           </p>
         </div>
-        <button
-          onClick={() => setIsInviteModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-        >
-          <LinkIcon size={16} />
-          멤버 초대
-        </button>
+        {canManageMembers && (
+          <button
+            onClick={() => setIsInviteModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          >
+            <LinkIcon size={16} />
+            멤버 초대
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -369,7 +382,7 @@ export function SettingsMembersPage() {
                 </div>
 
                 <div className="col-span-1 flex justify-end">
-                  {member.role !== 'OWNER' && (
+                  {canManageMembers && member.role !== 'OWNER' && (
                     <button
                       onClick={() => setMemberToRemove(member)}
                       className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
