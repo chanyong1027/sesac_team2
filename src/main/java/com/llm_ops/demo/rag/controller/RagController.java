@@ -5,7 +5,6 @@ import com.llm_ops.demo.rag.facade.RagSearchFacade;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/workspaces/{workspaceId}/rag")
-@RequiredArgsConstructor
 @Validated
 @ConditionalOnBean(RagSearchFacade.class)
 @ConditionalOnProperty(prefix = "rag.vectorstore.pgvector", name = "enabled", havingValue = "true")
@@ -27,13 +25,19 @@ public class RagController {
 
     private final RagSearchFacade ragSearchFacade;
 
+    public RagController(RagSearchFacade ragSearchFacade) {
+        this.ragSearchFacade = ragSearchFacade;
+    }
+
     @GetMapping("/search")
     public ResponseEntity<RagSearchResponse> search(
         @PathVariable @NotNull @Positive Long workspaceId,
         @RequestParam @NotBlank String query,
+        @RequestParam(required = false) Integer topK,
+        @RequestParam(required = false) Double similarityThreshold,
         @AuthenticationPrincipal @NotNull @Positive Long userId
     ) {
-        RagSearchResponse response = ragSearchFacade.search(workspaceId, userId, query);
+        RagSearchResponse response = ragSearchFacade.search(workspaceId, userId, query, topK, similarityThreshold);
         return ResponseEntity.ok(response);
     }
 }

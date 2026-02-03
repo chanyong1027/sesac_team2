@@ -10,13 +10,11 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 @ConditionalOnBean(RagSearchService.class)
 @Transactional(readOnly = true)
 public class RagSearchFacade {
@@ -26,10 +24,22 @@ public class RagSearchFacade {
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
 
-    public RagSearchResponse search(Long workspaceId, Long userId, String query) {
+    public RagSearchFacade(
+        RagSearchService ragSearchService,
+        WorkspaceRepository workspaceRepository,
+        WorkspaceMemberRepository workspaceMemberRepository,
+        UserRepository userRepository
+    ) {
+        this.ragSearchService = ragSearchService;
+        this.workspaceRepository = workspaceRepository;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+        this.userRepository = userRepository;
+    }
+
+    public RagSearchResponse search(Long workspaceId, Long userId, String query, Integer topK, Double similarityThreshold) {
         validateIds(workspaceId, userId);
         validateWorkspaceAccess(workspaceId, userId);
-        return ragSearchService.search(workspaceId, query);
+        return ragSearchService.search(workspaceId, query, topK, similarityThreshold);
     }
 
     private void validateIds(Long workspaceId, Long userId) {
