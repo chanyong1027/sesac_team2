@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
+import { organizationApi } from '@/api/organization.api';
 import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
 import {
@@ -8,9 +9,7 @@ import {
     FileText,
     Play,
     Activity,
-    Clock,
     Plus,
-    ArrowRight,
     CheckCircle2,
     Circle
 } from 'lucide-react';
@@ -45,6 +44,16 @@ export function WorkspaceDashboardPage() {
         enabled: !!workspaceId,
     });
 
+    const { data: credentials } = useQuery({
+        queryKey: ['provider-credentials', resolvedOrgId],
+        queryFn: async () => {
+            if (!resolvedOrgId) return [];
+            const response = await organizationApi.getCredentials(resolvedOrgId);
+            return response.data;
+        },
+        enabled: !!resolvedOrgId,
+    });
+
     // 문서 목록 조회 (통계용)
     const { data: documents } = useQuery({
         queryKey: ['documents', workspaceId],
@@ -58,9 +67,7 @@ export function WorkspaceDashboardPage() {
     if (isWorkspaceLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
     if (!workspace) return <div className="p-8 text-gray-500">워크스페이스를 찾을 수 없습니다.</div>;
 
-    // 최근 활동 (Mock - 실제 API 구현 시 대체)
-    // 간단히 최신 프롬프트나 문서를 보여줄 수도 있음
-    const recentPrompts = prompts ? [...prompts].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 3) : [];
+    const hasProviderKeys = (credentials?.length ?? 0) > 0;
 
     return (
         <div className="space-y-8">
@@ -74,9 +81,9 @@ export function WorkspaceDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard
                     icon={<MessageSquare className="text-indigo-600" />}
-                    label="총 프롬프트"
+                    label="프롬프트 설정"
                     value={prompts?.length.toString() || "0"}
-                    trend={prompts ? `최근 ${recentPrompts.length}건 활동` : "-"}
+                    trend={prompts ? '버전 중심 관리' : "-"}
                     to={`${basePath}/prompts`}
                 />
                 <StatCard
@@ -103,11 +110,18 @@ export function WorkspaceDashboardPage() {
                         <h2 className="text-lg font-medium text-gray-900 mb-4">빠른 작업</h2>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <QuickActionButton
-                                to={`${basePath}/prompts/new`}
+                                to={`${basePath}/prompts`}
                                 icon={<Plus size={20} />}
-                                label="프롬프트 생성"
-                                description="새 템플릿 만들기"
+                                label="프롬프트 설정"
+                                description="기본 프롬프트 확인"
                                 color="indigo"
+                            />
+                            <QuickActionButton
+                                to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'}
+                                icon={<Activity size={20} />}
+                                label="API 키 등록"
+                                description="모델 키 먼저 준비"
+                                color="emerald"
                             />
                             <QuickActionButton
                                 to={`${basePath}/documents`}
@@ -119,40 +133,10 @@ export function WorkspaceDashboardPage() {
                             <QuickActionButton
                                 to={`${basePath}/prompts`}
                                 icon={<Play size={20} />}
-                                label="프롬프트 테스트"
-                                description="프롬프트 선택 후 테스트"
-                                color="emerald"
+                                label="버전 관리"
+                                description="버전 생성/배포"
+                                color="indigo"
                             />
-                        </div>
-                    </section>
-
-                    {/* Recent Activity */}
-                    <section>
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-medium text-gray-900">최근 프롬프트</h2>
-                            <Link to={`${basePath}/prompts`} className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
-                                모두 보기 <ArrowRight size={14} />
-                            </Link>
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            {recentPrompts.length > 0 ? (
-                                <div className="divide-y divide-gray-100">
-                                    {recentPrompts.map((prompt) => (
-                                        <ActivityItem
-                                            key={prompt.id}
-                                            type="prompt"
-                                            title={prompt.promptKey}
-                                            action={`Status: ${prompt.status}`}
-                                            time={new Date(prompt.updatedAt).toLocaleDateString()}
-                                            user="User" // 사용자 정보는 현재 API에 없음
-                                        />
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="p-8 text-center text-gray-500 text-sm">
-                                    최근 활동이 없습니다.
-                                </div>
-                            )}
                         </div>
                     </section>
                 </div>
@@ -163,24 +147,46 @@ export function WorkspaceDashboardPage() {
                         <h2 className="text-lg font-medium text-gray-900 mb-4">시작하기 가이드</h2>
                         <div className="space-y-4">
                             <CheckListItem
-                                checked={true}
-                                label="워크스페이스 생성"
+                                checked={hasProviderKeys}
+                                label="Provider 키 등록"
+                                subtext="OpenAI/Claude/Gemini 키를 먼저 등록합니다."
+                                action={!hasProviderKeys && (
+                                    <Link to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'} className="text-xs text-indigo-600 font-medium hover:underline">등록</Link>
+                                )}
                             />
                             <CheckListItem
                                 checked={!!prompts && prompts.length > 0}
-                                label="첫 번째 프롬프트 만들기"
-                                action={(!prompts || prompts.length === 0) && <Link to={`${basePath}/prompts/new`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
+                                label="프롬프트 설정 확인"
+                                subtext="메인 프롬프트는 1개만 관리합니다."
+                                action={(!prompts || prompts.length === 0) && <Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">설정</Link>}
+                            />
+                            <CheckListItem
+                                checked={false}
+                                label="첫 버전 생성"
+                                subtext="이전 버전 내용을 복사해 빠르게 시작합니다."
+                                action={<Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
+                            />
+                            <CheckListItem
+                                checked={false}
+                                label="배포하기"
+                                subtext="릴리즈 탭에서 운영 버전을 선택합니다."
+                                action={<Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">배포</Link>}
                             />
                             <CheckListItem
                                 checked={!!documents && documents.length > 0}
                                 label="지식 데이터 업로드"
+                                subtext="RAG 기반 답변이 필요할 때만 추가하세요."
                                 action={(!documents || documents.length === 0) && <Link to={`${basePath}/documents`} className="text-xs text-indigo-600 font-medium hover:underline">업로드</Link>}
                             />
-                            <CheckListItem
-                                checked={false}
-                                label="API 키 발급"
-                            />
                         </div>
+                    </section>
+                    <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <h2 className="text-lg font-medium text-gray-900 mb-3">LLM 초심자 가이드</h2>
+                        <ol className="space-y-2 text-sm text-gray-600">
+                            <li>1. Provider 키 등록 → 사용할 모델 선택</li>
+                            <li>2. 버전 생성 → {'{{question}}'} 템플릿 입력</li>
+                            <li>3. 릴리즈 → 운영 버전 지정 후 테스트</li>
+                        </ol>
                     </section>
                 </div>
             </div>
@@ -225,22 +231,6 @@ function QuickActionButton({ to, icon, label, description, color }: { to: string
     );
 }
 
-function ActivityItem({ type, title, action, time, user }: { type: 'prompt' | 'document', title: string, action: string, time: string, user: string }) {
-    return (
-        <div className="p-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${type === 'prompt' ? 'bg-indigo-100 text-indigo-600' : 'bg-blue-100 text-blue-600'}`}>
-                {type === 'prompt' ? <MessageSquare size={14} /> : <FileText size={14} />}
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{title}</p>
-                <p className="text-xs text-gray-500">{action} • by {user}</p>
-            </div>
-            <div className="text-xs text-gray-400 flexItems-center gap-1 whitespace-nowrap">
-                <Clock size={12} /> {time}
-            </div>
-        </div>
-    );
-}
 
 function CheckListItem({ checked, label, subtext, action }: { checked: boolean, label: string, subtext?: string, action?: React.ReactNode }) {
     return (
