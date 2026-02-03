@@ -51,8 +51,11 @@ rag:
     index-type: HNSW
     max-document-batch-size: 10000
   search:
-    top-k: 5
-    similarity-threshold: 0.0
+    top-k: 3
+    similarity-threshold: 0.3
+  context:
+    max-chunks: 6
+    max-context-chars: 3500
 
 prompt:
   model-allowlist:
@@ -74,6 +77,29 @@ prompt:
     gemini:
       - gemini-2.0-flash
       - gemini-2.5-flash-lite
+
+  pricing:
+    version: "2025-02-03-openai-anthropic-gemini"
+    currency: "USD"
+    providers:
+      openai:
+        gpt-4o: { input: 0.00125, output: 0.00500 }
+        gpt-4o-mini: { input: 0.000075, output: 0.00030 }
+        gpt-4.1: { input: 0.00100, output: 0.00400 }
+        gpt-4.1-mini: { input: 0.00020, output: 0.00080 }
+        gpt-4.1-nano: { input: 0.00005, output: 0.00020 }
+        gpt-4: { input: 0.01000, output: 0.03000 }
+        gpt-3.5-turbo: { input: 0.00050, output: 0.00150 }
+      anthropic:
+        claude-3-5-sonnet: { input: 0.00300, output: 0.01500 }
+        claude-3-5-haiku: { input: 0.00080, output: 0.00400 }
+        claude-3-opus: { input: 0.01500, output: 0.07500 }
+        claude-3-sonnet: { input: 0.00300, output: 0.01500 }
+        claude-3-haiku: { input: 0.00025, output: 0.00125 }
+        claude-3-haiku-20240307: { input: 0.00025, output: 0.00125 }
+      gemini:
+        gemini-2.0-flash: { input: 0.00015, output: 0.00060 }
+        gemini-2.5-flash-lite: { input: 0.00010, output: 0.00040 }
 
 storage:
   s3:
