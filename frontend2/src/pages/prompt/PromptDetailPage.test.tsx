@@ -1,5 +1,6 @@
 import { describe, it, beforeEach, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { PromptDetailPage } from './PromptDetailPage';
@@ -15,6 +16,7 @@ vi.mock('@/api/prompt.api', () => ({
     getRelease: vi.fn(),
     releasePrompt: vi.fn(),
     getModelAllowlist: vi.fn(),
+    getReleaseHistory: vi.fn(),
   },
 }));
 
@@ -30,6 +32,14 @@ vi.mock('@/features/organization/store/organizationStore', () => ({
 
 const mockedPromptApi = vi.mocked(promptApi);
 const mockedOrganizationApi = vi.mocked(organizationApi);
+
+const mockAxiosResponse = <T,>(data: T): AxiosResponse<T> => ({
+  data,
+  status: 200,
+  statusText: 'OK',
+  headers: {},
+  config: { headers: {} } as InternalAxiosRequestConfig,
+});
 
 const renderPage = () => {
   const queryClient = new QueryClient({
@@ -50,8 +60,8 @@ const renderPage = () => {
 };
 
 beforeEach(() => {
-  mockedPromptApi.getPrompt.mockResolvedValue({
-    data: {
+  mockedPromptApi.getPrompt.mockResolvedValue(
+    mockAxiosResponse({
       id: 1,
       workspaceId: 1,
       promptKey: 'cs-bot',
@@ -59,53 +69,72 @@ beforeEach(() => {
       status: 'ACTIVE',
       createdAt: '2026-02-01T00:00:00Z',
       updatedAt: '2026-02-01T00:00:00Z',
-    },
-  });
-  mockedPromptApi.getVersions.mockResolvedValue({ data: [] });
-  mockedPromptApi.getVersion.mockResolvedValue({ data: null });
-  mockedPromptApi.getRelease.mockResolvedValue({
-    data: {
+    })
+  );
+  mockedPromptApi.getVersions.mockResolvedValue(mockAxiosResponse([]));
+  mockedPromptApi.getVersion.mockResolvedValue(
+    mockAxiosResponse({
+      id: 1,
+      promptId: 1,
+      versionNumber: 1,
+      title: 'v1',
+      provider: 'OPENAI',
+      model: 'gpt-4o-mini',
+      systemPrompt: 'system',
+      userTemplate: '질문: {{question}}',
+      modelConfig: {},
+      createdBy: 1,
+      createdAt: '2026-02-01T00:00:00Z',
+    })
+  );
+  mockedPromptApi.getRelease.mockResolvedValue(
+    mockAxiosResponse({
       promptId: 1,
       activeVersionId: 1,
       activeVersionNo: 1,
       releasedAt: '2026-02-01T00:00:00Z',
-    },
-  });
-  mockedPromptApi.releasePrompt.mockResolvedValue({
-    data: {
+    })
+  );
+  mockedPromptApi.releasePrompt.mockResolvedValue(
+    mockAxiosResponse({
       promptId: 1,
       activeVersionId: 1,
       activeVersionNo: 1,
       releasedAt: '2026-02-01T00:00:00Z',
-    },
-  });
-  mockedPromptApi.createVersion.mockResolvedValue({
-    data: {
+    })
+  );
+  mockedPromptApi.createVersion.mockResolvedValue(
+    mockAxiosResponse({
       id: 1,
       versionNumber: 1,
       createdAt: '2026-02-01T00:00:00Z',
-    },
-  });
+    })
+  );
 
-  mockedPromptApi.getModelAllowlist.mockResolvedValue({
-    data: {
+  mockedPromptApi.getModelAllowlist.mockResolvedValue(
+    mockAxiosResponse({
       OPENAI: ['gpt-4o-mini', 'gpt-4o'],
       ANTHROPIC: ['claude-3-5-sonnet'],
       GEMINI: ['gemini-2.0-flash'],
-    },
-  });
+    })
+  );
 
-  mockedOrganizationApi.getCredentials.mockResolvedValue({
-    data: [
+  mockedPromptApi.getReleaseHistory.mockResolvedValue(mockAxiosResponse([]));
+
+  mockedOrganizationApi.getCredentials.mockResolvedValue(
+    mockAxiosResponse([
       { id: 1, provider: 'openai', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
       { id: 2, provider: 'anthropic', status: 'ACTIVE', createdAt: '2026-02-01T00:00:00Z' },
-    ],
-  });
+    ])
+  );
 });
 
 describe('PromptDetailPage VersionsTab', () => {
   it('updates model options when provider changes', async () => {
     renderPage();
+
+    const versionsTab = await screen.findByRole('button', { name: '버전 (Versions)' });
+    fireEvent.click(versionsTab);
 
     const openButton = await screen.findByText('+ 새 버전 생성');
     fireEvent.click(openButton);
@@ -125,6 +154,9 @@ describe('PromptDetailPage VersionsTab', () => {
     mockedPromptApi.getModelAllowlist.mockRejectedValueOnce(new Error('network error'));
 
     renderPage();
+
+    const versionsTab = await screen.findByRole('button', { name: '버전 (Versions)' });
+    fireEvent.click(versionsTab);
 
     const openButton = await screen.findByText('+ 새 버전 생성');
     fireEvent.click(openButton);

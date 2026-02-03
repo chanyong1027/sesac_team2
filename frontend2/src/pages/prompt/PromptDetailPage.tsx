@@ -15,10 +15,15 @@ import {
     CheckCircle2,
     AlertCircle,
     Copy,
-    Save,
-    RotateCcw
+    Save
 } from 'lucide-react';
-import type { PromptDetailResponse, PromptReleaseResponse, PromptVersionSummaryResponse, ProviderType } from '@/types/api.types';
+import type {
+    PromptDetailResponse,
+    PromptReleaseHistoryResponse,
+    PromptReleaseResponse,
+    PromptVersionDetailResponse,
+    ProviderType
+} from '@/types/api.types';
 
 // 탭 정의
 type TabType = 'overview' | 'versions' | 'release' | 'playground';
@@ -70,7 +75,7 @@ export function PromptDetailPage() {
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <Link
-                    to={`${basePath}/prompts`}
+                    to={basePath}
                     className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors w-fit"
                 >
                     <ArrowLeft size={16} className="mr-1" />
@@ -249,15 +254,19 @@ function VersionsTab({ promptId }: { promptId: number }) {
     const isResolvedOrgId = typeof resolvedOrgId === 'number' && !Number.isNaN(resolvedOrgId);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [detailVersionId, setDetailVersionId] = useState<number | null>(null);
+    const [baseVersionId, setBaseVersionId] = useState<number | null>(null);
     const [form, setForm] = useState({
         title: '',
         provider: 'OPENAI' as ProviderType,
         model: '',
         systemPrompt: '',
         userTemplate: '',
+        contextUrl: '',
         modelConfig: '',
     });
     const [configError, setConfigError] = useState<string | null>(null);
+    const [templateError, setTemplateError] = useState<string | null>(null);
+    const [createError, setCreateError] = useState<string | null>(null);
     const presets = [
         {
             label: 'CS-Bot 기본',
@@ -304,6 +313,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
         if (normalized === 'claude') return 'ANTHROPIC';
         return normalized.toUpperCase();
     };
+    const hasQuestionPlaceholder = (template: string) =>
+        template.includes('{{question}}') || template.includes('{question}');
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
         queryKey: ['provider-credentials', resolvedOrgId],
@@ -338,6 +349,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
         return modelAllowlist[form.provider] ?? [];
     }, [modelAllowlist, form.provider]);
 
+    const isTemplateValid = form.userTemplate.trim().length > 0 && hasQuestionPlaceholder(form.userTemplate);
+
     useEffect(() => {
         if (!availableProviders.length) return;
         if (!availableProviders.includes(form.provider)) {
@@ -359,6 +372,18 @@ function VersionsTab({ promptId }: { promptId: number }) {
             return response.data;
         },
     });
+    const {
+        data: baseVersionDetail,
+        isLoading: isBaseVersionLoading,
+    } = useQuery({
+        queryKey: ['promptVersionDetail', promptId, baseVersionId],
+        queryFn: async () => {
+            if (!baseVersionId) return null;
+            const response = await promptApi.getVersion(promptId, baseVersionId);
+            return response.data;
+        },
+        enabled: !!baseVersionId,
+    });
     const { data: versionDetail, isLoading: isDetailLoading } = useQuery({
         queryKey: ['promptVersionDetail', promptId, detailVersionId],
         queryFn: async () => {
@@ -369,8 +394,49 @@ function VersionsTab({ promptId }: { promptId: number }) {
         enabled: !!detailVersionId,
     });
 
+    useEffect(() => {
+        if (isCreateOpen) {
+            if (!baseVersionId && versions && versions.length > 0) {
+                setBaseVersionId(versions[0].id);
+            }
+            return;
+        }
+        setBaseVersionId(null);
+        setConfigError(null);
+        setTemplateError(null);
+        setCreateError(null);
+    }, [isCreateOpen, versions, baseVersionId]);
+
+    const applyBaseVersion = (detail: PromptVersionDetailResponse | null) => {
+        if (!detail) return;
+        setForm({
+            title: detail.title ? `${detail.title} (복사)` : '',
+            provider: detail.provider,
+            model: detail.model,
+            systemPrompt: detail.systemPrompt || '',
+            userTemplate: detail.userTemplate || '',
+            contextUrl: detail.contextUrl || '',
+            modelConfig: detail.modelConfig ? JSON.stringify(detail.modelConfig, null, 2) : '',
+        });
+        setConfigError(null);
+        setTemplateError(null);
+        setCreateError(null);
+    };
+
     const createMutation = useMutation({
         mutationFn: async () => {
+            setTemplateError(null);
+            setCreateError(null);
+            const trimmedTemplate = form.userTemplate.trim();
+            if (!trimmedTemplate) {
+                setTemplateError('userTemplate는 필수입니다.');
+                throw new Error('userTemplate required');
+            }
+            if (!hasQuestionPlaceholder(trimmedTemplate)) {
+                setTemplateError('userTemplate에 {{question}} 변수가 필요합니다.');
+                throw new Error('userTemplate missing placeholder');
+            }
+
             let parsedConfig: Record<string, any> | undefined = undefined;
             if (form.modelConfig.trim()) {
                 try {
@@ -387,7 +453,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 provider: form.provider,
                 model: form.model.trim(),
                 systemPrompt: form.systemPrompt.trim() || undefined,
-                userTemplate: form.userTemplate.trim() || undefined,
+                userTemplate: trimmedTemplate,
+                contextUrl: form.contextUrl.trim() || undefined,
                 modelConfig: parsedConfig,
             });
         },
@@ -400,9 +467,18 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 model: '',
                 systemPrompt: '',
                 userTemplate: '',
+                contextUrl: '',
                 modelConfig: '',
             });
             setConfigError(null);
+            setTemplateError(null);
+            setCreateError(null);
+        },
+        onError: (error) => {
+            if (error instanceof Error && error.message.startsWith('userTemplate')) {
+                return;
+            }
+            setCreateError('버전 생성에 실패했습니다. 입력 값을 확인해주세요.');
         },
     });
 
@@ -464,7 +540,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setIsCreateOpen(false)}
                     />
-                    <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900">
+                    <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900 max-h-[90vh] overflow-y-auto">
                         <div className="p-6 border-b border-gray-100">
                             <h4 className="text-lg font-semibold text-gray-900">새 버전 생성</h4>
                             <p className="text-sm text-gray-500 mt-1">
@@ -507,6 +583,39 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         등록된 Provider 기준으로 사용할 수 있는 예시가 없습니다.
                                     </span>
                                 )}
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                <div className="flex flex-col sm:flex-row items-end gap-3">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">기존 버전 불러오기</label>
+                                        <select
+                                            value={baseVersionId ?? ''}
+                                            onChange={(e) => setBaseVersionId(Number(e.target.value) || null)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            disabled={!versions?.length}
+                                        >
+                                            <option value="">
+                                                {versions?.length ? '복사할 버전을 선택하세요' : '복사할 버전이 없습니다'}
+                                            </option>
+                                            {versions?.map((ver) => (
+                                                <option key={ver.id} value={ver.id}>
+                                                    v{ver.versionNumber} · {ver.title || ver.model} ({ver.provider}/{ver.model})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => applyBaseVersion(baseVersionDetail ?? null)}
+                                        disabled={!baseVersionDetail || isBaseVersionLoading}
+                                        className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                                    >
+                                        {isBaseVersionLoading ? '불러오는 중...' : '내용 불러오기'}
+                                    </button>
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    이전 버전의 설정을 가져와 빠르게 수정할 수 있습니다.
+                                </p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
@@ -573,14 +682,31 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">User Template</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">User Template (필수)</label>
                                 <textarea
                                     value={form.userTemplate}
-                                    onChange={(e) => setForm({ ...form, userTemplate: e.target.value })}
+                                    onChange={(e) => {
+                                        setForm({ ...form, userTemplate: e.target.value });
+                                        setTemplateError(null);
+                                    }}
                                     rows={4}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
-                                    placeholder="사용자 입력 템플릿을 입력하세요."
+                                    placeholder="예: 사용자 질문: {{question}}"
                                 />
+                                <p className="mt-1 text-xs text-gray-400">{'{{question}}'} 변수가 반드시 포함되어야 합니다.</p>
+                                {templateError && (
+                                    <p className="mt-1 text-xs text-rose-600">{templateError}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">관련 링크 (선택)</label>
+                                <input
+                                    value={form.contextUrl}
+                                    onChange={(e) => setForm({ ...form, contextUrl: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                                    placeholder="Jira/Notion 링크를 입력하세요"
+                                />
+                                <p className="mt-1 text-xs text-gray-400">변경 근거를 남겨두면 추적이 쉬워집니다.</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Model Config (JSON)</label>
@@ -595,6 +721,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 {configError && (
                                     <p className="mt-1 text-xs text-rose-600">{configError}</p>
                                 )}
+                                {createError && (
+                                    <p className="mt-2 text-xs text-rose-600">{createError}</p>
+                                )}
                             </div>
                         </div>
                         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
@@ -608,6 +737,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 onClick={() => createMutation.mutate()}
                                 disabled={
                                     !form.model.trim() ||
+                                    !isTemplateValid ||
                                     createMutation.isPending ||
                                     availableProviders.length === 0 ||
                                     isAllowlistLoading ||
@@ -685,6 +815,21 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             {versionDetail.modelConfig ? JSON.stringify(versionDetail.modelConfig, null, 2) : '-'}
                                         </pre>
                                     </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500 mb-2">관련 링크</div>
+                                        {versionDetail.contextUrl ? (
+                                            <a
+                                                href={versionDetail.contextUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 break-all"
+                                            >
+                                                {versionDetail.contextUrl}
+                                            </a>
+                                        ) : (
+                                            <div className="text-sm text-gray-400">-</div>
+                                        )}
+                                    </div>
                                 </>
                             )}
                         </div>
@@ -718,6 +863,14 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
     });
 
+    const { data: releaseHistory, isLoading: isHistoryLoading } = useQuery({
+        queryKey: ['promptReleaseHistory', promptId],
+        queryFn: async () => {
+            const response = await promptApi.getReleaseHistory(promptId);
+            return response.data;
+        },
+    });
+
     const releaseMutation = useMutation({
         mutationFn: async () => {
             if (!selectedVersionId) {
@@ -730,6 +883,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
+            queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] });
             setReleaseReason('');
             setReleaseMessage('배포가 완료되었습니다.');
             setReleaseError(null);
@@ -807,6 +961,33 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                 )}
                 {releaseError && (
                     <p className="mt-3 text-sm text-rose-600">{releaseError}</p>
+                )}
+            </div>
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">배포 이력</h3>
+                <p className="text-sm text-gray-500 mb-4">왜 버전이 바뀌었는지 확인할 수 있습니다.</p>
+                {isHistoryLoading ? (
+                    <div className="text-sm text-gray-500">이력을 불러오는 중...</div>
+                ) : releaseHistory && releaseHistory.length > 0 ? (
+                    <div className="divide-y divide-gray-100">
+                        {releaseHistory.map((history: PromptReleaseHistoryResponse) => (
+                            <div key={history.id} className="py-4 flex flex-col gap-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="font-semibold text-gray-900">
+                                        {history.changeType === 'ROLLBACK'
+                                            ? `롤백 · v${history.toVersionNo}`
+                                            : `배포 · v${history.toVersionNo}`}
+                                    </span>
+                                    <span className="text-xs text-gray-400">{new Date(history.createdAt).toLocaleString()}</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    {history.reason || '배포 사유 없음'}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-sm text-gray-500">배포 이력이 없습니다.</div>
                 )}
             </div>
         </div>

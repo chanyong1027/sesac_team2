@@ -318,6 +318,7 @@ export interface PromptVersionDetailResponse {
   model: string;
   systemPrompt: string;
   userTemplate: string;
+  contextUrl?: string;
   modelConfig: Record<string, any>;
   createdBy: number;
   createdAt: string;
@@ -329,6 +330,7 @@ export interface PromptVersionCreateRequest {
   model: string;
   systemPrompt?: string;
   userTemplate?: string;
+  contextUrl?: string;
   modelConfig?: Record<string, any>;
 }
 
@@ -360,7 +362,46 @@ export interface DocumentResponse {
   createdAt: string;
 }
 
+export interface ChunkPreviewResponse {
+  chunkIndex: number | null;
+  chunkTotal: number | null;
+  content: string;
+}
+
+export interface DocumentPreviewResponse {
+  document: DocumentResponse;
+  extractedPreview: string;
+  chunkSamples: ChunkPreviewResponse[];
+  totalChunks: number;
+}
+
 export interface DocumentUploadResponse {
   documentId: number;
   status: RagDocumentStatus;
+}
+
+export interface ChunkDetailResponse {
+  content: string;
+  score: number | null;
+  documentId: number | null;
+  documentName: string | null;
+}
+
+export interface RagSearchResponse {
+  chunks: ChunkDetailResponse[];
+}
+
+export interface WorkspaceRagSettingsResponse {
+  workspaceId: number;
+  topK: number;
+  similarityThreshold: number;
+  maxChunks: number;
+  maxContextChars: number;
+}
+
+export interface WorkspaceRagSettingsUpdateRequest {
+  topK: number;
+  similarityThreshold: number;
+  maxChunks: number;
+  maxContextChars: number;
 }
