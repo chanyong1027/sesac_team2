@@ -44,6 +44,10 @@ public class Organization {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    public Long getId() {
+        return id;
+    }
+
     public static Organization create(String name, User creator) {
         Organization organization = new Organization();
         organization.name = name;
