@@ -19,6 +19,7 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,6 +73,8 @@ public class GatewayChatService {
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
     private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceRagSettingsService workspaceRagSettingsService;
+    private final PromptModelPricingService promptModelPricingService;
     private final RequestLogWriter requestLogWriter;
     private final PromptRepository promptRepository;
     private final PromptReleaseRepository promptReleaseRepository;
@@ -82,6 +86,8 @@ public class GatewayChatService {
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
             WorkspaceRepository workspaceRepository,
+            WorkspaceRagSettingsService workspaceRagSettingsService,
+            PromptModelPricingService promptModelPricingService,
             RequestLogWriter requestLogWriter,
             PromptRepository promptRepository,
             PromptReleaseRepository promptReleaseRepository) {
@@ -91,6 +97,8 @@ public class GatewayChatService {
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
         this.workspaceRepository = workspaceRepository;
+        this.workspaceRagSettingsService = workspaceRagSettingsService;
+        this.promptModelPricingService = promptModelPricingService;
         this.requestLogWriter = requestLogWriter;
         this.promptRepository = promptRepository;
         this.promptReleaseRepository = promptReleaseRepository;
@@ -127,20 +135,30 @@ public class GatewayChatService {
         Integer ragContextChars = null;
         Boolean ragContextTruncated = null;
         String ragContextHash = null;
+        Integer ragTopK = null;
+        Double ragSimilarityThreshold = null;
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
             PromptVersion activeVersion = resolveActiveVersion(workspace, request.promptKey());
+            boolean ragEnabled = resolveRagEnabled(request, activeVersion);
 
-            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
-                    request.variables());
-            String renderedSystemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
+            String rawUserTemplate = resolveUserTemplate(activeVersion, request.promptKey());
+            String rawSystemPrompt = activeVersion.getSystemPrompt();
+            Map<String, String> baseVariables = request.variables();
+
+            String renderedUserPrompt = renderPrompt(rawUserTemplate, baseVariables);
+            String renderedSystemPrompt = renderOptionalTemplate(rawSystemPrompt, baseVariables);
 
             String prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
                     ? renderedUserPrompt
                     : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
 
-            if (request.isRagEnabled()) {
+            if (ragEnabled) {
+                WorkspaceRagSettingsService.RagRuntimeSettings ragSettings =
+                        workspaceRagSettingsService.resolveRuntimeSettings(request.workspaceId());
+                ragTopK = ragSettings.topK();
+                ragSimilarityThreshold = ragSettings.similarityThreshold();
                 ragChunksCount = 0;
                 ragContextChars = 0;
                 ragContextTruncated = false;
@@ -148,44 +166,111 @@ public class GatewayChatService {
 
                 if (ragSearchService != null) {
                     long ragStartedAtNanos = System.nanoTime();
-                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), renderedUserPrompt);
+                    String ragQuery = resolveRagQuery(baseVariables, renderedUserPrompt);
+                    RagSearchResponse ragResponse = ragSearchService.search(
+                            request.workspaceId(),
+                            ragQuery,
+                            ragSettings.topK(),
+                            ragSettings.similarityThreshold()
+                    );
                     ragLatencyMs = toLatencyMs(ragStartedAtNanos);
 
                     if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
-                        RagContextResult result = buildRagContextWithMetrics(ragResponse.chunks());
+                        RagContextResult result = buildRagContextWithMetrics(
+                                ragResponse.chunks(),
+                                ragSettings.maxChunks(),
+                                ragSettings.maxContextChars()
+                        );
                         ragChunksCount = result.chunksIncluded;
                         ragContextChars = result.contextChars;
                         ragContextTruncated = result.truncated;
                         ragContextHash = sha256HexOrNull(result.context);
-                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context) + prompt;
+
+                        Map<String, String> variablesWithContext = mergeContext(baseVariables, result.context);
+                        boolean hasContextPlaceholder = hasContextPlaceholder(rawSystemPrompt)
+                                || hasContextPlaceholder(rawUserTemplate);
+
+                        renderedUserPrompt = renderPrompt(rawUserTemplate, variablesWithContext);
+                        renderedSystemPrompt = renderOptionalTemplate(rawSystemPrompt, variablesWithContext);
+                        prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
+                                ? renderedUserPrompt
+                                : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
+
+                        if (!hasContextPlaceholder) {
+                            prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context) + prompt;
+                        }
                     }
                 }
             }
 
             ProviderType providerType = activeVersion.getProvider();
             String requestedModel = activeVersion.getModel();
-            String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-            ChatResponse response = switch (providerType) {
-                case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
-                case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
-                case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
-            };
+            ChatResponse response;
+            boolean isFailover = false;
+            ProviderType usedProvider = providerType;
+
+            try {
+                String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
+                response = callProvider(providerType, prompt, providerApiKey, requestedModel);
+            } catch (Exception primaryException) {
+                if (shouldFailover(activeVersion)) {
+                    ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
+                    String secondaryModel = activeVersion.getSecondaryModel();
+                    try {
+                        String secondaryApiKey = providerCredentialService.getDecryptedApiKey(organizationId, secondaryProvider);
+                        response = callProvider(secondaryProvider, prompt, secondaryApiKey, secondaryModel);
+                        isFailover = true;
+                        usedProvider = secondaryProvider;
+                    } catch (Exception secondaryException) {
+                        secondaryException.addSuppressed(primaryException);
+                        throw secondaryException;
+                    }
+                } else {
+                    throw primaryException;
+                }
+            }
 
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
-            GatewayChatUsage usage = extractUsage(response);
+            UsageTokens tokens = extractUsageTokens(response);
+            Long promptTokens = tokens != null ? tokens.promptTokens() : null;
+            Long completionTokens = tokens != null ? tokens.completionTokens() : null;
+            Long totalTokens = tokens != null ? tokens.totalTokens() : null;
+
+            PromptModelPricingService.PricingResult pricingResult = tokens != null
+                    ? promptModelPricingService.calculate(
+                        usedProvider,
+                        usedModel != null ? usedModel : requestedModel,
+                        promptTokens,
+                        completionTokens,
+                        totalTokens
+                    )
+                    : null;
+            java.math.BigDecimal estimatedCostValue = pricingResult != null ? pricingResult.estimatedCost() : null;
+            String pricingCurrency = pricingResult != null ? pricingResult.currency() : null;
+            String pricingVersion = pricingResult != null ? pricingResult.pricingVersion() : null;
+            Double estimatedCost = estimatedCostValue != null ? estimatedCostValue.doubleValue() : null;
+
+            GatewayChatUsage usage = tokens == null
+                    ? null
+                    : new GatewayChatUsage(promptTokens, completionTokens, totalTokens, estimatedCost);
 
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
                     toLatencyMs(startedAtNanos),
-                    providerType.name().toLowerCase(),
+                    usedProvider.name().toLowerCase(),
                     requestedModel,
                     usedModel,
-                    false,
-                    null,
-                    null,
-                    safeToInteger(usage != null ? usage.totalTokens() : null),
+                    isFailover,
+                    safeToInteger(promptTokens),
+                    safeToInteger(completionTokens),
+                    safeToInteger(totalTokens),
+                    estimatedCostValue,
+                    pricingCurrency,
+                    pricingVersion,
+                    ragTopK,
+                    ragSimilarityThreshold,
                     ragLatencyMs,
                     ragChunksCount,
                     ragContextChars,
@@ -195,7 +280,7 @@ public class GatewayChatService {
             return GatewayChatResponse.from(
                     traceId,
                     answer,
-                    false,
+                    isFailover,
                     usedModel,
                     usage);
         } catch (BusinessException e) {
@@ -212,6 +297,11 @@ public class GatewayChatService {
                     e.getErrorCode().name(),
                     e.getMessage(),
                     "BUSINESS_EXCEPTION",
+                    null,
+                    null,
+                    null,
+                    ragTopK,
+                    ragSimilarityThreshold,
                     ragLatencyMs,
                     ragChunksCount,
                     ragContextChars,
@@ -232,6 +322,11 @@ public class GatewayChatService {
                     ErrorCode.INTERNAL_SERVER_ERROR.name(),
                     "Unhandled exception",
                     "UNHANDLED_EXCEPTION",
+                    null,
+                    null,
+                    null,
+                    ragTopK,
+                    ragSimilarityThreshold,
                     ragLatencyMs,
                     ragChunksCount,
                     ragContextChars,
@@ -255,7 +350,11 @@ public class GatewayChatService {
         }
     }
 
-    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks) {
+    private RagContextResult buildRagContextWithMetrics(
+            List<ChunkDetailResponse> chunks,
+            int maxChunks,
+            int maxContextChars
+    ) {
         if (chunks == null || chunks.isEmpty()) {
             return new RagContextResult("", 0, 0, false);
         }
@@ -266,7 +365,7 @@ public class GatewayChatService {
         boolean truncated = false;
 
         for (ChunkDetailResponse chunk : chunks) {
-            if (count >= MAX_RAG_CHUNKS) {
+            if (count >= maxChunks) {
                 truncated = true;
                 break;
             }
@@ -275,7 +374,7 @@ public class GatewayChatService {
             }
 
             String content = chunk.content();
-            int remaining = MAX_RAG_CHARS - totalChars;
+            int remaining = maxContextChars - totalChars;
             if (remaining <= 0) {
                 truncated = true;
                 break;
@@ -293,7 +392,7 @@ public class GatewayChatService {
             totalChars += content.length();
             count++;
 
-            if (totalChars >= MAX_RAG_CHARS) {
+            if (totalChars >= maxContextChars) {
                 truncated = true;
                 break;
             }
@@ -394,6 +493,9 @@ public class GatewayChatService {
         for (Map.Entry<String, String> entry : variables.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
+            if (key == null || value == null) {
+                continue;
+            }
             String doubleBrace = "{{" + key + "}}";
             String singleBrace = "{" + key + "}";
             rendered = rendered.replace(doubleBrace, value);
@@ -402,16 +504,81 @@ public class GatewayChatService {
         return rendered;
     }
 
+    private String resolveRagQuery(Map<String, String> variables, String fallbackPrompt) {
+        if (variables != null) {
+            String question = variables.get("question");
+            if (question != null && !question.isBlank()) {
+                return question;
+            }
+            String query = variables.get("query");
+            if (query != null && !query.isBlank()) {
+                return query;
+            }
+        }
+        return fallbackPrompt;
+    }
+
+    private boolean resolveRagEnabled(GatewayChatRequest request, PromptVersion activeVersion) {
+        if (request.ragEnabled() != null) {
+            return request.isRagEnabled();
+        }
+        if (activeVersion == null) {
+            return false;
+        }
+        return activeVersion.isRagEnabled();
+    }
+
+    private Map<String, String> mergeContext(Map<String, String> variables, String context) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        if (variables != null) {
+            merged.putAll(variables);
+        }
+        if (context != null && !context.isBlank()) {
+            merged.put("context", context);
+        }
+        return merged;
+    }
+
+    private boolean hasContextPlaceholder(String template) {
+        if (template == null || template.isBlank()) {
+            return false;
+        }
+        return template.contains("{{context}}") || template.contains("{context}");
+    }
+
+    private boolean shouldFailover(PromptVersion version) {
+        if (version == null) {
+            return false;
+        }
+        if (version.getSecondaryProvider() == null) {
+            return false;
+        }
+        String secondaryModel = version.getSecondaryModel();
+        return secondaryModel != null && !secondaryModel.isBlank();
+    }
+
+    private ChatResponse callProvider(ProviderType providerType, String prompt, String apiKey, String model) {
+        return switch (providerType) {
+            case OPENAI -> callOpenAi(prompt, apiKey, model);
+            case ANTHROPIC -> callAnthropic(prompt, apiKey, model);
+            case GEMINI -> callGemini(prompt, apiKey, model);
+        };
+    }
+
     /**
      * Spring AI의 ChatResponse 메타데이터에서 토큰 사용량 정보를 추출합니다.
      */
-    private GatewayChatUsage extractUsage(ChatResponse response) {
+    private UsageTokens extractUsageTokens(ChatResponse response) {
         if (response.getMetadata() == null || response.getMetadata().getUsage() == null) {
             return null;
         }
+        Long promptTokens = response.getMetadata().getUsage().getPromptTokens();
+        Long completionTokens = response.getMetadata().getUsage().getGenerationTokens();
         Long totalTokens = response.getMetadata().getUsage().getTotalTokens();
-        // TODO: Cost calculation logic needs to be implemented.
-        return new GatewayChatUsage(totalTokens, null);
+        return new UsageTokens(promptTokens, completionTokens, totalTokens);
+    }
+
+    private record UsageTokens(Long promptTokens, Long completionTokens, Long totalTokens) {
     }
 
     private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride) {

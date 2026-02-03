@@ -16,6 +16,7 @@ import com.llm_ops.demo.rag.service.RagSearchService;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,12 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private PromptReleaseRepository promptReleaseRepository;
+
+    @Mock
+    private WorkspaceRagSettingsService workspaceRagSettingsService;
+
+    @Mock
+    private PromptModelPricingService promptModelPricingService;
 
     @InjectMocks
     private GatewayChatService gatewayChatService;
@@ -216,7 +223,7 @@ class GatewayChatServiceUnitTest {
             );
 
             // when
-            Object result = invokeBuildRagContextWithMetrics(chunks);
+            Object result = invokeBuildRagContextWithMetrics(chunks, 6, 3500);
 
             // then
             String context = (String) getField(result, "context");
@@ -235,7 +242,7 @@ class GatewayChatServiceUnitTest {
         @DisplayName("빈 chunks면 컨텍스트는 비고 메트릭은 0/false")
         void RAG_빈_chunks_테스트() throws Exception {
             // given
-            Object result = invokeBuildRagContextWithMetrics(List.of());
+            Object result = invokeBuildRagContextWithMetrics(List.of(), 6, 3500);
             assertThat(getField(result, "context")).isEqualTo("");
             assertThat(getField(result, "chunksIncluded")).isEqualTo(0);
             assertThat(getField(result, "contextChars")).isEqualTo(0);
@@ -289,7 +296,10 @@ class GatewayChatServiceUnitTest {
             when(release.getActiveVersion()).thenReturn(activeVersion);
             when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
 
-            when(ragSearchService.search(eq(workspaceId), anyString())).thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
+            when(ragSearchService.search(eq(workspaceId), anyString(), any(), any()))
+                    .thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
+            when(workspaceRagSettingsService.resolveRuntimeSettings(workspaceId))
+                    .thenReturn(new WorkspaceRagSettingsService.RagRuntimeSettings(3, 0.3, 6, 3500));
             when(providerCredentialService.getDecryptedApiKey(eq(organizationId), eq(ProviderType.OPENAI))).thenReturn("provider-key");
             when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
             when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
@@ -308,7 +318,7 @@ class GatewayChatServiceUnitTest {
                     true
             );
 
-            Object ctx = invokeBuildRagContextWithMetrics(chunks);
+            Object ctx = invokeBuildRagContextWithMetrics(chunks, 6, 3500);
             String context = (String) getField(ctx, "context");
             int contextChars = (int) getField(ctx, "contextChars");
             boolean truncated = (boolean) getField(ctx, "truncated");
@@ -329,13 +339,15 @@ class GatewayChatServiceUnitTest {
             assertThat(update.ragContextHash()).isEqualTo(expectedHash);
         }
 
-        private Object invokeBuildRagContextWithMetrics(List<ChunkDetailResponse> chunks) throws Exception {
+        private Object invokeBuildRagContextWithMetrics(List<ChunkDetailResponse> chunks, int maxChunks, int maxContextChars) throws Exception {
             Method method = GatewayChatService.class.getDeclaredMethod(
                     "buildRagContextWithMetrics",
-                    List.class
+                    List.class,
+                    int.class,
+                    int.class
             );
             method.setAccessible(true);
-            return method.invoke(gatewayChatService, chunks);
+            return method.invoke(gatewayChatService, chunks, maxChunks, maxContextChars);
         }
 
         private String invokeSha256HexOrNull(String value) throws Exception {

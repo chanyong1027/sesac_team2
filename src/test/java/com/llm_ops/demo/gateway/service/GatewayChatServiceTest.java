@@ -147,7 +147,9 @@ class GatewayChatServiceTest {
                 assertThat(chatResponse.answer()).isEqualTo("hello lumina");
                 assertThat(chatResponse.isFailover()).isFalse();
                 assertThat(chatResponse.usage()).isNotNull();
-                assertThat(chatResponse.usage().totalTokens()).isEqualTo(0L);
+                assertThat(chatResponse.usage().totalTokens()).isEqualTo(2000L);
+                assertThat(chatResponse.usage().estimatedCost()).isNotNull();
+                assertThat(chatResponse.usage().estimatedCost()).isGreaterThan(0.0);
                 assertThat(chatResponse.traceId()).isNotBlank();
 
                 RequestLog requestLog = requestLogRepository.findByTraceId(chatResponse.traceId()).orElseThrow();
@@ -155,6 +157,8 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getHttpStatus()).isEqualTo(200);
                 assertThat(requestLog.getLatencyMs()).isNotNull();
                 assertThat(requestLog.getFinishedAt()).isNotNull();
+                assertThat(requestLog.getEstimatedCost()).isNotNull();
+                assertThat(requestLog.getEstimatedCost()).isPositive();
 
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
@@ -209,7 +213,11 @@ class GatewayChatServiceTest {
                                 ProviderType.OPENAI,
                                 "gpt-4o-mini",
                                 null,
+                                null,
+                                null,
                                 userTemplate,
+                                false,
+                                null,
                                 null,
                                 creatorUser
                         )
