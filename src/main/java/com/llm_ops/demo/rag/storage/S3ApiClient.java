@@ -15,6 +15,7 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 /**
@@ -109,6 +110,22 @@ public class S3ApiClient {
         } catch (Exception ex) {
             log.error("S3 download failed. key={}", key, ex);
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 다운로드에 실패했습니다.");
+        }
+    }
+
+    public long getContentLength(String key) {
+        if (key == null || key.isBlank()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "문서 키가 필요합니다.");
+        }
+        HeadObjectRequest request = HeadObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(key)
+                .build();
+        try {
+            return s3Client.headObject(request).contentLength();
+        } catch (Exception ex) {
+            log.error("S3 metadata 조회 실패. key={}", key, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "S3 메타데이터 조회에 실패했습니다.");
         }
     }
 }

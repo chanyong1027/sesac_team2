@@ -10,6 +10,9 @@ public record WorkspaceRagSettingsResponse(
     Integer maxContextChars
 ) {
     public static WorkspaceRagSettingsResponse from(WorkspaceRagSettings settings) {
+        if (settings == null || settings.getWorkspace() == null) {
+            throw new IllegalStateException("워크스페이스 설정에 workspace가 없습니다.");
+        }
         return new WorkspaceRagSettingsResponse(
             settings.getWorkspace().getId(),
             settings.getTopK(),

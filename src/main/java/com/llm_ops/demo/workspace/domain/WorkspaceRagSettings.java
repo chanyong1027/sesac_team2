@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -32,6 +33,7 @@ public class WorkspaceRagSettings {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "workspace_id", nullable = false)
+    @NotNull
     private Workspace workspace;
 
     @Column(name = "top_k", nullable = false)
@@ -54,6 +56,7 @@ public class WorkspaceRagSettings {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    @NotNull
     public Workspace getWorkspace() {
         return workspace;
     }
