@@ -164,7 +164,7 @@ export function LoginPage() {
       const pendingToken = sessionStorage.getItem('pendingInvitation');
       if (pendingToken) {
         sessionStorage.removeItem('pendingInvitation');
-          try {
+        try {
           const acceptResponse = await workspaceApi.acceptInvitation({
             token: pendingToken,
           });

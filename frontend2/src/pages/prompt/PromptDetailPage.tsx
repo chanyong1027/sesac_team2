@@ -315,8 +315,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         if (normalized === 'claude') return 'ANTHROPIC';
         return normalized.toUpperCase();
     };
-    const hasQuestionPlaceholder = (template: string) =>
-        template.includes('{{question}}') || template.includes('{question}');
+    const hasQuestionPlaceholder = (template: string) => template.includes('{{question}}');
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
         queryKey: ['provider-credentials', resolvedOrgId],
@@ -1109,12 +1108,20 @@ function PlaygroundTab() {
                     <h3 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
                         <span>System Prompt</span>
                         <div className="flex gap-2">
-                            <select className="text-xs border border-gray-300 rounded px-2 py-1">
+                            <select
+                                className="text-xs border border-gray-300 rounded px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled
+                                title="준비 중"
+                            >
                                 <option>GPT-4</option>
                                 <option>GPT-3.5-Turbo</option>
                                 <option>Claude-3-Opus</option>
                             </select>
-                            <button className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1">
+                            <button
+                                className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled
+                                title="준비 중"
+                            >
                                 <Save size={12} /> 저장
                             </button>
                         </div>
@@ -1122,6 +1129,8 @@ function PlaygroundTab() {
                     <textarea
                         className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                         defaultValue="You are a helpful customer support assistant. Always be polite and concise."
+                        readOnly
+                        title="준비 중"
                     />
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm h-1/3 flex flex-col">
@@ -1130,6 +1139,8 @@ function PlaygroundTab() {
                         className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                         placeholder="테스트할 사용자 입력을 입력하세요..."
                         defaultValue="환불 규정이 어떻게 되나요?"
+                        readOnly
+                        title="준비 중"
                     />
                 </div>
             </div>
@@ -1138,20 +1149,18 @@ function PlaygroundTab() {
             <div className="w-1/2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
                 <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center rounded-t-xl">
                     <h3 className="font-medium text-gray-900">Output</h3>
-                    <button className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                    <button
+                        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                        title="준비 중"
+                    >
                         <Play size={14} /> Run
                     </button>
                 </div>
                 <div className="flex-1 p-4 overflow-auto">
-                    <div className="prose prose-sm max-w-none">
-                        <p>저희 서비스의 환불 규정은 다음과 같습니다:</p>
-                        <ul>
-                            <li>구매 후 7일 이내: 전액 환불 가능 (단, 미사용 시)</li>
-                            <li>구매 후 7일 ~ 30일: 결제 금액의 50% 환불</li>
-                            <li>30일 이후: 환불 불가</li>
-                        </ul>
-                        <p>추가적인 문의사항은 고객센터(1588-0000)로 연락 주시면 상세히 안내해 드리겠습니다.</p>
-                    </div>
+                    <p className="text-sm text-gray-500">
+                        플레이그라운드 준비 중 - 기능이 활성화되면 여기에 결과가 표시됩니다.
+                    </p>
                 </div>
                 <div className="p-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between bg-gray-50 rounded-b-xl">
                     <span>Latency: 1.2s</span>

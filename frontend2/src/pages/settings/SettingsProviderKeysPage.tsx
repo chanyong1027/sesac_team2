@@ -140,8 +140,15 @@ function AddProviderModal({
   provider: string | null;
 }) {
   const [apiKey, setApiKey] = useState('');
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentOrgId } = useOrganizationStore();
+
+  const handleClose = () => {
+    setUpdateError(null);
+    setApiKey('');
+    onClose();
+  };
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -241,8 +248,13 @@ function UpdateProviderModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
+      setUpdateError(null);
       setApiKey('');
       onClose();
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'API 키 업데이트에 실패했습니다.';
+      setUpdateError(message);
     },
   });
 
@@ -254,7 +266,7 @@ function UpdateProviderModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
         <div className="flex items-center gap-4 mb-6">
@@ -278,7 +290,10 @@ function UpdateProviderModal({
           <input
             type="password"
             value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              if (updateError) setUpdateError(null);
+            }}
             placeholder={`sk-... (${info?.name} API Key)`}
             className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono"
             autoFocus
@@ -287,11 +302,14 @@ function UpdateProviderModal({
             <Shield size={12} />
             키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
+          {updateError && (
+            <p className="mt-2 text-xs text-rose-600">{updateError}</p>
+          )}
         </div>
 
         <div className="flex gap-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             취소
