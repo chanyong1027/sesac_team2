@@ -327,31 +327,31 @@ export function SettingsApiKeysPage() {
           </div>
         ) : apiKeys && apiKeys.length > 0 ? (
           <div className="divide-y divide-gray-100">
-            {apiKeys.map((key) => (
+            {apiKeys.map((apiKey) => (
               <div
-                key={key.id}
+                key={apiKey.id}
                 className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors"
               >
                 <div className="col-span-3">
                   <p className="text-sm font-medium text-gray-900">
-                    {key.name}
+                    {apiKey.name}
                   </p>
                 </div>
 
                 <div className="col-span-3">
                   <code className="px-2 py-1 text-xs font-mono bg-gray-100 text-gray-600 rounded">
-                    {key.keyPrefix}...
+                    {apiKey.keyPrefix}...
                   </code>
                 </div>
 
                 <div className="col-span-2">
-                  <StatusBadge status={key.status} />
+                  <StatusBadge status={apiKey.status} />
                 </div>
 
                 <div className="col-span-2">
                   <span className="text-sm text-gray-500">
-                    {key.lastUsedAt
-                      ? new Date(key.lastUsedAt).toLocaleDateString('ko-KR', {
+                    {apiKey.lastUsedAt
+                      ? new Date(apiKey.lastUsedAt).toLocaleDateString('ko-KR', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
@@ -362,7 +362,7 @@ export function SettingsApiKeysPage() {
 
                 <div className="col-span-2 text-right">
                   <button
-                    onClick={() => setRotateTarget({ id: key.id, name: key.name })}
+                    onClick={() => setRotateTarget({ id: apiKey.id, name: apiKey.name })}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
                   >
                     <RefreshCw size={12} />
@@ -408,6 +408,7 @@ export function SettingsApiKeysPage() {
       />
 
       <RotateConfirmModal
+        key={rotateTarget?.id}
         isOpen={!!rotateTarget}
         onClose={() => setRotateTarget(null)}
         onConfirm={handleRotateConfirm}
@@ -419,7 +420,6 @@ export function SettingsApiKeysPage() {
         isOpen={!!rotatedKey}
         onClose={() => setRotatedKey(null)}
         apiKey={rotatedKey || ''}
-        title="API 키가 재발급되었습니다"
       />
     </div>
   );
