@@ -182,9 +182,8 @@ class RequestLogQueryServiceTest {
         }
     }
 
-    // 헬퍼 메서드 추가: provider 등 설정
     private RequestLog fillProviderInfo(RequestLog log, String provider, String model) {
-        log.fillModelUsage(provider, model, model, false, 10, 20, 30);
+        log.fillModelUsage(provider, model, model, false, 10, 20, 30, null, null);
         return log;
     }
 

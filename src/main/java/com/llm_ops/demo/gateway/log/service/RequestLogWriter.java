@@ -63,7 +63,9 @@ public class RequestLogWriter {
                                         update.isFailover(),
                                         update.inputTokens(),
                                         update.outputTokens(),
-                                        update.totalTokens());
+                                        update.totalTokens(),
+                                        update.estimatedCost(),
+                                        update.pricingVersion());
                         requestLog.fillRagMetrics(
                                         update.ragLatencyMs(),
                                         update.ragChunksCount(),
@@ -97,7 +99,9 @@ public class RequestLogWriter {
                                         update.isFailover(),
                                         update.inputTokens(),
                                         update.outputTokens(),
-                                        update.totalTokens());
+                                        update.totalTokens(),
+                                        update.estimatedCost(),
+                                        update.pricingVersion());
                         requestLog.fillRagMetrics(
                                         update.ragLatencyMs(),
                                         update.ragChunksCount(),
@@ -140,6 +144,8 @@ public class RequestLogWriter {
                         Integer inputTokens,
                         Integer outputTokens,
                         Integer totalTokens,
+                        java.math.BigDecimal estimatedCost,
+                        String pricingVersion,
                         Integer ragLatencyMs,
                         Integer ragChunksCount,
                         Integer ragContextChars,
@@ -157,6 +163,8 @@ public class RequestLogWriter {
                         Integer inputTokens,
                         Integer outputTokens,
                         Integer totalTokens,
+                        java.math.BigDecimal estimatedCost,
+                        String pricingVersion,
                         String errorCode,
                         String errorMessage,
                         String failReason,
