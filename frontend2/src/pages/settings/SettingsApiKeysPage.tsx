@@ -442,6 +442,7 @@ export function SettingsApiKeysPage() {
         isOpen={!!rotatedKey}
         onClose={() => setRotatedKey(null)}
         apiKey={rotatedKey || ''}
+        title="API 키가 재발급되었습니다"
       />
     </div>
   );
