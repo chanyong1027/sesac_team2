@@ -166,16 +166,23 @@ export interface ProviderCredentialCreateRequest {
   apiKey: string;
 }
 
+export interface ProviderCredentialUpdateRequest {
+  apiKey: string;
+}
+
 export interface ProviderCredentialCreateResponse {
-  id: number;
+  credentialId: number;
   provider: string;
   status: string;
+  createdAt: string;
+  lastVerifiedAt?: string | null;
 }
 
 export interface ProviderCredentialSummaryResponse {
-  id: number;
+  credentialId: number;
   provider: string;
   status: string;
+  lastVerifiedAt?: string | null;
   createdAt: string;
 }
 
@@ -292,7 +299,6 @@ export interface PromptRollbackRequest {
   targetVersionId: number;
   reason?: string;
 }
-
 // ========================================
 // Prompt Version
 // ========================================
@@ -306,6 +312,8 @@ export interface PromptVersionSummaryResponse {
   title: string;
   provider: ProviderType;
   model: string;
+  secondaryProvider: ProviderType | null;
+  secondaryModel: string | null;
   createdBy: number;
   createdAt: string;
 }
@@ -317,8 +325,11 @@ export interface PromptVersionDetailResponse {
   title: string;
   provider: ProviderType;
   model: string;
+  secondaryProvider: ProviderType | null;
+  secondaryModel: string | null;
   systemPrompt: string;
   userTemplate: string;
+  contextUrl?: string;
   modelConfig: Record<string, any>;
   createdBy: number;
   createdAt: string;
@@ -328,8 +339,11 @@ export interface PromptVersionCreateRequest {
   title: string;
   provider: ProviderType;
   model: string;
+  secondaryProvider?: ProviderType;
+  secondaryModel?: string;
   systemPrompt?: string;
   userTemplate?: string;
+  contextUrl?: string;
   modelConfig?: Record<string, any>;
 }
 
@@ -361,7 +375,46 @@ export interface DocumentResponse {
   createdAt: string;
 }
 
+export interface ChunkPreviewResponse {
+  chunkIndex: number | null;
+  chunkTotal: number | null;
+  content: string;
+}
+
+export interface DocumentPreviewResponse {
+  document: DocumentResponse;
+  extractedPreview: string;
+  chunkSamples: ChunkPreviewResponse[];
+  totalChunks: number;
+}
+
 export interface DocumentUploadResponse {
   documentId: number;
   status: RagDocumentStatus;
+}
+
+export interface ChunkDetailResponse {
+  content: string;
+  score: number | null;
+  documentId: number | null;
+  documentName: string | null;
+}
+
+export interface RagSearchResponse {
+  chunks: ChunkDetailResponse[];
+}
+
+export interface WorkspaceRagSettingsResponse {
+  workspaceId: number;
+  topK: number;
+  similarityThreshold: number;
+  maxChunks: number;
+  maxContextChars: number;
+}
+
+export interface WorkspaceRagSettingsUpdateRequest {
+  topK: number;
+  similarityThreshold: number;
+  maxChunks: number;
+  maxContextChars: number;
 }

@@ -42,10 +42,12 @@ function ProviderCard({
   provider,
   credential,
   onAdd,
+  onUpdate,
 }: {
   provider: string;
   credential?: ProviderCredentialSummaryResponse;
   onAdd: () => void;
+  onUpdate: () => void;
 }) {
   const info = providerInfo[provider] || {
     name: provider,
@@ -104,6 +106,7 @@ function ProviderCard({
             </p>
           </div>
           <button
+            onClick={onUpdate}
             className="w-full py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
           >
             키 업데이트
@@ -137,8 +140,15 @@ function AddProviderModal({
   provider: string | null;
 }) {
   const [apiKey, setApiKey] = useState('');
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentOrgId } = useOrganizationStore();
+
+  const handleClose = () => {
+    setUpdateError(null);
+    setApiKey('');
+    onClose();
+  };
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -218,8 +228,108 @@ function AddProviderModal({
   );
 }
 
+function UpdateProviderModal({
+  isOpen,
+  onClose,
+  credential,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  credential: ProviderCredentialSummaryResponse | null;
+}) {
+  const [apiKey, setApiKey] = useState('');
+  const queryClient = useQueryClient();
+  const { currentOrgId } = useOrganizationStore();
+
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      if (!currentOrgId || !credential) throw new Error('No organization selected');
+      return organizationApi.updateCredential(currentOrgId, credential.credentialId, { apiKey });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
+      setUpdateError(null);
+      setApiKey('');
+      onClose();
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'API 키 업데이트에 실패했습니다.';
+      setUpdateError(message);
+    },
+  });
+
+  if (!isOpen || !credential) return null;
+
+  const info = providerInfo[normalizeProviderKey(credential.provider)];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={handleClose}
+      />
+      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-12 h-12 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
+            <Shield size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">
+              {info?.name} 키 업데이트
+            </h3>
+            <p className="text-sm text-gray-500">
+              기존 키를 새 키로 교체합니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            새 API Key
+          </label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              if (updateError) setUpdateError(null);
+            }}
+            placeholder={`sk-... (${info?.name} API Key)`}
+            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono"
+            autoFocus
+          />
+          <p className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+            <Shield size={12} />
+            키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
+          </p>
+          {updateError && (
+            <p className="mt-2 text-xs text-rose-600">{updateError}</p>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleClose}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => updateMutation.mutate()}
+            disabled={!apiKey.trim() || updateMutation.isPending}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
+          >
+            {updateMutation.isPending ? '업데이트 중...' : '업데이트'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsProviderKeysPage() {
   const [addingProvider, setAddingProvider] = useState<string | null>(null);
+  const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
   const { currentOrgId } = useOrganizationStore();
 
   const { data: credentials, isLoading } = useQuery({
@@ -279,6 +389,7 @@ export function SettingsProviderKeysPage() {
               provider={provider}
               credential={credentialMap[provider]}
               onAdd={() => setAddingProvider(provider)}
+              onUpdate={() => setUpdatingCredential(credentialMap[provider] ?? null)}
             />
           ))}
         </div>
@@ -298,6 +409,11 @@ export function SettingsProviderKeysPage() {
         isOpen={!!addingProvider}
         onClose={() => setAddingProvider(null)}
         provider={addingProvider}
+      />
+      <UpdateProviderModal
+        isOpen={!!updatingCredential}
+        onClose={() => setUpdatingCredential(null)}
+        credential={updatingCredential}
       />
     </div>
   );

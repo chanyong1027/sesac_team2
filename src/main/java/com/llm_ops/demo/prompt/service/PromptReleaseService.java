@@ -20,12 +20,10 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class PromptReleaseService {
 
     private final PromptReleaseRepository promptReleaseRepository;
@@ -34,6 +32,22 @@ public class PromptReleaseService {
     private final PromptVersionRepository promptVersionRepository;
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
+
+    public PromptReleaseService(
+            PromptReleaseRepository promptReleaseRepository,
+            PromptReleaseHistoryRepository promptReleaseHistoryRepository,
+            PromptRepository promptRepository,
+            PromptVersionRepository promptVersionRepository,
+            UserRepository userRepository,
+            WorkspaceMemberRepository workspaceMemberRepository
+    ) {
+        this.promptReleaseRepository = promptReleaseRepository;
+        this.promptReleaseHistoryRepository = promptReleaseHistoryRepository;
+        this.promptRepository = promptRepository;
+        this.promptVersionRepository = promptVersionRepository;
+        this.userRepository = userRepository;
+        this.workspaceMemberRepository = workspaceMemberRepository;
+    }
 
     @Transactional
     public PromptReleaseResponse release(Long promptId, Long userId, PromptReleaseRequest request) {

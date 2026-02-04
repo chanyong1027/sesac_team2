@@ -39,6 +39,10 @@ public class User {
     @CreationTimestamp
     private LocalDateTime createdAt;
 
+    public Long getId() {
+        return id;
+    }
+
     private User(String email, String passwordHash, String name) {
         validateEmail(email);
         validateName(name);

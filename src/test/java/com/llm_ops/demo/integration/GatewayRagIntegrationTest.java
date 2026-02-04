@@ -284,7 +284,11 @@ GatewayRagIntegrationTest {
                         ProviderType.OPENAI,
                         "gpt-4o-mini",
                         null,
+                        null,
+                        null,
                         userTemplate,
+                        false,
+                        null,
                         null,
                         creatorUser
                 )
