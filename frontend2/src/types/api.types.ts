@@ -145,7 +145,6 @@ export interface WorkspaceUpdateResponse {
   name: string;
   displayName: string;
   status: string;
-  updatedAt: string;
 }
 
 // ========================================
