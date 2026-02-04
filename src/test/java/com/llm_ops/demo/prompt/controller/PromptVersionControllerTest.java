@@ -195,7 +195,7 @@ class PromptVersionControllerTest {
                 "You are a helpful assistant.",
                 "{{question}}",
                 Map.of("temperature", 0.7),
-                userId, LocalDateTime.now()
+                userId, "테스트 유저", LocalDateTime.now()
         );
 
         given(promptVersionService.getDetail(promptId, versionId, userId)).willReturn(response);
@@ -220,8 +220,8 @@ class PromptVersionControllerTest {
         Long userId = 1L;
 
         List<PromptVersionSummaryResponse> response = List.of(
-                new PromptVersionSummaryResponse(2L, 2, "버전 2", ProviderType.OPENAI, "gpt-4", userId, LocalDateTime.now()),
-                new PromptVersionSummaryResponse(1L, 1, "버전 1", ProviderType.OPENAI, "gpt-3.5-turbo", userId, LocalDateTime.now())
+                new PromptVersionSummaryResponse(2L, 2, "버전 2", ProviderType.OPENAI, "gpt-4", userId, "테스트 유저", LocalDateTime.now()),
+                new PromptVersionSummaryResponse(1L, 1, "버전 1", ProviderType.OPENAI, "gpt-3.5-turbo", userId, "테스트 유저", LocalDateTime.now())
         );
 
         given(promptVersionService.getList(promptId, userId)).willReturn(response);

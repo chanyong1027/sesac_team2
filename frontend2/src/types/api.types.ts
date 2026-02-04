@@ -307,6 +307,7 @@ export interface PromptVersionSummaryResponse {
   provider: ProviderType;
   model: string;
   createdBy: number;
+  createdByName: string;
   createdAt: string;
 }
 
@@ -321,6 +322,7 @@ export interface PromptVersionDetailResponse {
   userTemplate: string;
   modelConfig: Record<string, any>;
   createdBy: number;
+  createdByName: string;
   createdAt: string;
 }
 

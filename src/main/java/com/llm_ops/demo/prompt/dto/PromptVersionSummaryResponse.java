@@ -12,6 +12,7 @@ public record PromptVersionSummaryResponse(
     ProviderType provider,
     String model,
     Long createdBy,
+    String createdByName,
     LocalDateTime createdAt
 ) {
     public static PromptVersionSummaryResponse from(PromptVersion version) {
@@ -22,6 +23,7 @@ public record PromptVersionSummaryResponse(
             version.getProvider(),
             version.getModel(),
             version.getCreatedBy().getId(),
+            version.getCreatedBy().getName(),
             version.getCreatedAt()
         );
     }

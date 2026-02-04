@@ -437,8 +437,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 </div>
                                 <div className="flex items-center gap-4 text-xs text-gray-400">
                                     <span className="flex items-center gap-1"><Clock size={12} /> {new Date(ver.createdAt).toLocaleDateString()}</span>
-                                    {/* CreatedBy는 ID만 있으므로 이름은 표시 불가 (추후 개선) */}
-                                    <span>by User {ver.createdBy}</span>
+                                    <span>by {ver.createdByName}</span>
                                 </div>
                             </div>
                             <div>
@@ -665,6 +664,10 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         <div>
                                             <div className="text-xs text-gray-500">Created At</div>
                                             <div className="text-sm text-gray-900">{new Date(versionDetail.createdAt).toLocaleString()}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">Created By</div>
+                                            <div className="text-sm text-gray-900">{versionDetail.createdByName}</div>
                                         </div>
                                     </div>
                                     <div>

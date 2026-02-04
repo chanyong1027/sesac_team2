@@ -17,6 +17,7 @@ public record PromptVersionDetailResponse(
     String userTemplate,
     Map<String, Object> modelConfig,
     Long createdBy,
+    String createdByName,
     LocalDateTime createdAt
 ) {
     public static PromptVersionDetailResponse from(PromptVersion version) {
@@ -31,6 +32,7 @@ public record PromptVersionDetailResponse(
             version.getUserTemplate(),
             version.getModelConfig(),
             version.getCreatedBy().getId(),
+            version.getCreatedBy().getName(),
             version.getCreatedAt()
         );
     }
