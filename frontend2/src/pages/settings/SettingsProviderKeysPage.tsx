@@ -238,8 +238,15 @@ function UpdateProviderModal({
   credential: ProviderCredentialSummaryResponse | null;
 }) {
   const [apiKey, setApiKey] = useState('');
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentOrgId } = useOrganizationStore();
+
+  const handleClose = () => {
+    setUpdateError(null);
+    setApiKey('');
+    onClose();
+  };
 
   const updateMutation = useMutation({
     mutationFn: () => {
