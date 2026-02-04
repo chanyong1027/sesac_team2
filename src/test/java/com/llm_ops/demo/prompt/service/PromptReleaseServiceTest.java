@@ -371,7 +371,11 @@ class PromptReleaseServiceTest {
         PromptVersion version = PromptVersion.create(
                 prompt, versionNo, "버전 " + versionNo,
                 ProviderType.OPENAI, "gpt-4",
+                null,
+                null,
                 "system prompt", "user template",
+                false,
+                null,
                 Map.of("temperature", 0.7), user
         );
         setId(version, id);
@@ -380,7 +384,9 @@ class PromptReleaseServiceTest {
 
     private PromptReleaseHistory createMockHistory(Long id, Prompt prompt, PromptVersion from,
                                                     PromptVersion to, ChangeType type, User user) throws Exception {
-        PromptReleaseHistory history = PromptReleaseHistory.create(prompt, from, to, type, "테스트 사유", user);
+        PromptReleaseHistory history = PromptReleaseHistory.create(
+                prompt, from, to, type, "테스트 사유", user
+        );
         setId(history, id);
         return history;
     }

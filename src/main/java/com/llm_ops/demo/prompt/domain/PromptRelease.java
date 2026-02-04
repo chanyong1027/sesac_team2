@@ -45,6 +45,14 @@ public class PromptRelease implements Persistable<Long> {
     @Transient
     private boolean isNew = true;
 
+    public PromptVersion getActiveVersion() {
+        return activeVersion;
+    }
+
+    public Prompt getPrompt() {
+        return prompt;
+    }
+
     public static PromptRelease create(Prompt prompt, PromptVersion activeVersion) {
         if (prompt == null || activeVersion == null) {
             throw new IllegalArgumentException("Prompt와 ActiveVersion은 필수입니다.");

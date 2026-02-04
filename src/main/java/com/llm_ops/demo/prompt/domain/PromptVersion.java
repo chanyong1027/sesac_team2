@@ -53,11 +53,24 @@ public class PromptVersion {
     @Column(nullable = false, length = 100)
     private String model;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "secondary_provider", length = 50)
+    private ProviderType secondaryProvider;
+
+    @Column(name = "secondary_model", length = 100)
+    private String secondaryModel;
+
     @Column(name = "system_prompt", columnDefinition = "TEXT")
     private String systemPrompt;
 
     @Column(name = "user_template", columnDefinition = "TEXT")
     private String userTemplate;
+
+    @Column(name = "rag_enabled", nullable = false)
+    private boolean ragEnabled;
+
+    @Column(name = "context_url", length = 1000)
+    private String contextUrl;
 
     @Column(name = "model_config")
     @JdbcTypeCode(SqlTypes.JSON)
@@ -71,14 +84,78 @@ public class PromptVersion {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    public ProviderType getProvider() {
+        return provider;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Integer getVersionNo() {
+        return versionNo;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public ProviderType getSecondaryProvider() {
+        return secondaryProvider;
+    }
+
+    public String getSecondaryModel() {
+        return secondaryModel;
+    }
+
+    public String getSystemPrompt() {
+        return systemPrompt;
+    }
+
+    public String getUserTemplate() {
+        return userTemplate;
+    }
+
+    public String getContextUrl() {
+        return contextUrl;
+    }
+
+    public Prompt getPrompt() {
+        return prompt;
+    }
+
+    public Map<String, Object> getModelConfig() {
+        return modelConfig;
+    }
+
+    public User getCreatedBy() {
+        return createdBy;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public boolean isRagEnabled() {
+        return ragEnabled;
+    }
+
     public static PromptVersion create(
             Prompt prompt,
             Integer versionNo,
             String title,
             ProviderType provider,
             String model,
+            ProviderType secondaryProvider,
+            String secondaryModel,
             String systemPrompt,
             String userTemplate,
+            boolean ragEnabled,
+            String contextUrl,
             Map<String, Object> modelConfig,
             User createdBy
     ) {
@@ -88,8 +165,12 @@ public class PromptVersion {
         version.title = title;
         version.provider = provider;
         version.model = model;
+        version.secondaryProvider = secondaryProvider;
+        version.secondaryModel = secondaryModel;
         version.systemPrompt = systemPrompt;
         version.userTemplate = userTemplate;
+        version.ragEnabled = ragEnabled;
+        version.contextUrl = contextUrl;
         version.modelConfig = modelConfig;
         version.createdBy = createdBy;
         return version;

@@ -23,4 +23,8 @@ public enum ErrorCode {
         this.code = code;
         this.defaultMessage = defaultMessage;
     }
+
+    public HttpStatus getStatus() {
+        return status;
+    }
 }

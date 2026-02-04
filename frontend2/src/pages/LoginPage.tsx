@@ -168,7 +168,7 @@ export function LoginPage() {
           const acceptResponse = await workspaceApi.acceptInvitation({
             token: pendingToken,
           });
-          const { workspaceId, organizationId } = acceptResponse.data.data;
+          const { workspaceId, organizationId } = acceptResponse.data;
           if (organizationId) {
             navigate(`/orgs/${organizationId}/workspaces/${workspaceId}`);
           } else {

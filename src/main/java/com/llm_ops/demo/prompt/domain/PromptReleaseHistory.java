@@ -72,4 +72,36 @@ public class PromptReleaseHistory {
         history.changedBy = changedBy;
         return history;
     }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Prompt getPrompt() {
+        return prompt;
+    }
+
+    public PromptVersion getFromVersion() {
+        return fromVersion;
+    }
+
+    public PromptVersion getToVersion() {
+        return toVersion;
+    }
+
+    public ChangeType getChangeType() {
+        return changeType;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public User getChangedBy() {
+        return changedBy;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

@@ -248,7 +248,11 @@ class ChatCompletionE2ETest {
                         ProviderType.OPENAI,
                         "gpt-4o-mini",
                         null,
+                        null,
+                        null,
                         userTemplate,
+                        false,
+                        null,
                         null,
                         creatorUser
                 )

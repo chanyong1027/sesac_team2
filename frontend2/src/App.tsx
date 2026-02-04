@@ -64,7 +64,6 @@ function NavigateToOrgDashboard() {
   if (!orgId) {
     return <Navigate to="/onboarding" replace />;
   }
-
   return <Navigate to={`/orgs/${orgId}/dashboard`} replace />;
 }
 
@@ -119,7 +118,6 @@ function App() {
               <Route path="settings/members" element={<SettingsMembersPage />} />
               <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
               <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
-
               {/* Statistics Dashboard */}
               <Route path="stats" element={<DashboardPage />} />
             </Route>

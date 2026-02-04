@@ -24,6 +24,7 @@ import com.llm_ops.demo.rag.service.RagSearchService;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -38,12 +39,18 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -55,8 +62,6 @@ public class GatewayChatService {
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-    private static final int MAX_RAG_CHUNKS = 10;
-    private static final int MAX_RAG_CHARS = 4000;
     private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
     private static final String RAG_CONTEXT_TEMPLATE = """
             다음은 질문과 관련된 참고 문서입니다:
@@ -73,6 +78,7 @@ public class GatewayChatService {
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
     private final WorkspaceRepository workspaceRepository;
+    private final WorkspaceRagSettingsService workspaceRagSettingsService;
     private final RequestLogWriter requestLogWriter;
     private final PromptRepository promptRepository;
     private final PromptReleaseRepository promptReleaseRepository;
@@ -84,8 +90,9 @@ public class GatewayChatService {
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
             WorkspaceRepository workspaceRepository,
+            WorkspaceRagSettingsService workspaceRagSettingsService,
             RequestLogWriter requestLogWriter,
-            PromptRepository promptRepository,
+        PromptRepository promptRepository,
             PromptReleaseRepository promptReleaseRepository) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
@@ -93,6 +100,7 @@ public class GatewayChatService {
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
         this.workspaceRepository = workspaceRepository;
+        this.workspaceRagSettingsService = workspaceRagSettingsService;
         this.requestLogWriter = requestLogWriter;
         this.promptRepository = promptRepository;
         this.promptReleaseRepository = promptReleaseRepository;
@@ -129,6 +137,9 @@ public class GatewayChatService {
         Integer ragContextChars = null;
         Boolean ragContextTruncated = null;
         String ragContextHash = null;
+        ProviderType usedProvider = null;
+        String usedRequestedModel = null;
+        boolean isFailover = false;
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -149,12 +160,23 @@ public class GatewayChatService {
                 ragLatencyMs = 0;
 
                 if (ragSearchService != null) {
+                    WorkspaceRagSettingsService.RagRuntimeSettings ragSettings =
+                            workspaceRagSettingsService.resolveRuntimeSettings(workspace.getId());
                     long ragStartedAtNanos = System.nanoTime();
-                    RagSearchResponse ragResponse = ragSearchService.search(request.workspaceId(), renderedUserPrompt);
+                    RagSearchResponse ragResponse = ragSearchService.search(
+                            request.workspaceId(),
+                            renderedUserPrompt,
+                            ragSettings.topK(),
+                            ragSettings.similarityThreshold()
+                    );
                     ragLatencyMs = toLatencyMs(ragStartedAtNanos);
 
                     if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
-                        RagContextResult result = buildRagContextWithMetrics(ragResponse.chunks());
+                        RagContextResult result = buildRagContextWithMetrics(
+                                ragResponse.chunks(),
+                                ragSettings.maxChunks(),
+                                ragSettings.maxContextChars()
+                        );
                         ragChunksCount = result.chunksIncluded;
                         ragContextChars = result.contextChars;
                         ragContextTruncated = result.truncated;
@@ -166,12 +188,26 @@ public class GatewayChatService {
 
             ProviderType providerType = activeVersion.getProvider();
             String requestedModel = activeVersion.getModel();
-            String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-            ChatResponse response = switch (providerType) {
-                case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
-                case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
-                case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
-            };
+            ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
+            String secondaryModel = activeVersion.getSecondaryModel();
+            usedProvider = providerType;
+            usedRequestedModel = requestedModel;
+
+            ChatResponse response;
+            try {
+                response = callProvider(organizationId, providerType, requestedModel, prompt);
+            } catch (Exception primaryException) {
+                if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
+                    throw primaryException;
+                }
+                if (!isRetryableException(primaryException)) {
+                    throw primaryException;
+                }
+                isFailover = true;
+                usedProvider = secondaryProvider;
+                usedRequestedModel = secondaryModel;
+                response = callProvider(organizationId, secondaryProvider, secondaryModel, prompt);
+            }
 
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
@@ -200,10 +236,10 @@ public class GatewayChatService {
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
                     toLatencyMs(startedAtNanos),
-                    providerType.name().toLowerCase(),
-                    requestedModel,
+                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                    usedRequestedModel,
                     usedModel,
-                    false,
+                    isFailover,
                     inputTokens,
                     outputTokens,
                     totalTokens,
@@ -218,17 +254,17 @@ public class GatewayChatService {
             return GatewayChatResponse.from(
                     traceId,
                     answer,
-                    false,
+                    isFailover,
                     usedModel,
                     usage);
         } catch (BusinessException e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     e.getErrorCode().getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                    usedRequestedModel,
                     null,
-                    null,
-                    null,
-                    false,
+                    isFailover,
                     null,
                     null,
                     null,
@@ -247,10 +283,10 @@ public class GatewayChatService {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                    usedRequestedModel,
                     null,
-                    null,
-                    null,
-                    false,
+                    isFailover,
                     null,
                     null,
                     null,
@@ -282,7 +318,7 @@ public class GatewayChatService {
         }
     }
 
-    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks) {
+    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks, int maxChunks, int maxChars) {
         if (chunks == null || chunks.isEmpty()) {
             return new RagContextResult("", 0, 0, false);
         }
@@ -293,7 +329,7 @@ public class GatewayChatService {
         boolean truncated = false;
 
         for (ChunkDetailResponse chunk : chunks) {
-            if (count >= MAX_RAG_CHUNKS) {
+            if (count >= maxChunks) {
                 truncated = true;
                 break;
             }
@@ -302,7 +338,7 @@ public class GatewayChatService {
             }
 
             String content = chunk.content();
-            int remaining = MAX_RAG_CHARS - totalChars;
+            int remaining = maxChars - totalChars;
             if (remaining <= 0) {
                 truncated = true;
                 break;
@@ -320,7 +356,7 @@ public class GatewayChatService {
             totalChars += content.length();
             count++;
 
-            if (totalChars >= MAX_RAG_CHARS) {
+            if (totalChars >= maxChars) {
                 truncated = true;
                 break;
             }
@@ -419,8 +455,12 @@ public class GatewayChatService {
 
         String rendered = promptKey;
         for (Map.Entry<String, String> entry : variables.entrySet()) {
-            String placeholder = "{{" + entry.getKey() + "}}";
-            rendered = rendered.replace(placeholder, entry.getValue());
+            String key = entry.getKey();
+            String value = entry.getValue();
+            String doubleBrace = "{{" + key + "}}";
+            String singleBrace = "{" + key + "}";
+            rendered = rendered.replace(doubleBrace, value);
+            rendered = rendered.replace(singleBrace, value);
         }
         return rendered;
     }
@@ -435,6 +475,47 @@ public class GatewayChatService {
             chatOptions.setModel(modelOverride);
         }
         return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
+    }
+
+    private ChatResponse callProvider(
+            Long organizationId,
+            ProviderType providerType,
+            String requestedModel,
+            String prompt
+    ) {
+        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
+        return switch (providerType) {
+            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
+            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
+            case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
+        };
+    }
+
+    private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
+        return secondaryProvider != null && secondaryModel != null && !secondaryModel.isBlank();
+    }
+
+    private boolean isRetryableException(Exception exception) {
+        if (exception instanceof BusinessException) {
+            return false;
+        }
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof SocketTimeoutException
+                    || current instanceof ConnectException
+                    || current instanceof UnknownHostException
+                    || current instanceof TimeoutException
+                    || current instanceof ResourceAccessException) {
+                return true;
+            }
+            if (current instanceof HttpStatusCodeException statusException) {
+                if (statusException.getStatusCode().is5xxServerError()) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride) {
