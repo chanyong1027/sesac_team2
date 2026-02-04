@@ -259,6 +259,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
         title: '',
         provider: 'OPENAI' as ProviderType,
         model: '',
+        secondaryProvider: '' as ProviderType | '',
+        secondaryModel: '',
         systemPrompt: '',
         userTemplate: '',
         contextUrl: '',
@@ -349,6 +351,11 @@ function VersionsTab({ promptId }: { promptId: number }) {
         return modelAllowlist[form.provider] ?? [];
     }, [modelAllowlist, form.provider]);
 
+    const secondaryProviderModels = useMemo(() => {
+        if (!modelAllowlist || !form.secondaryProvider) return [];
+        return modelAllowlist[form.secondaryProvider as ProviderType] ?? [];
+    }, [modelAllowlist, form.secondaryProvider]);
+
     const isTemplateValid = form.userTemplate.trim().length > 0 && hasQuestionPlaceholder(form.userTemplate);
 
     useEffect(() => {
@@ -359,11 +366,36 @@ function VersionsTab({ promptId }: { promptId: number }) {
     }, [availableProviders, form.provider]);
 
     useEffect(() => {
+        if (!form.secondaryProvider) return;
+        if (!availableProviders.includes(form.secondaryProvider)) {
+            setForm((prev) => ({ ...prev, secondaryProvider: '', secondaryModel: '' }));
+        }
+    }, [availableProviders, form.secondaryProvider]);
+
+    useEffect(() => {
         if (!providerModels.length) return;
         if (!providerModels.includes(form.model)) {
             setForm((prev) => ({ ...prev, model: providerModels[0] }));
         }
     }, [providerModels, form.model]);
+
+    useEffect(() => {
+        if (!form.secondaryProvider) {
+            if (form.secondaryModel) {
+                setForm((prev) => ({ ...prev, secondaryModel: '' }));
+            }
+            return;
+        }
+        if (!secondaryProviderModels.length) {
+            if (form.secondaryModel) {
+                setForm((prev) => ({ ...prev, secondaryModel: '' }));
+            }
+            return;
+        }
+        if (!secondaryProviderModels.includes(form.secondaryModel)) {
+            setForm((prev) => ({ ...prev, secondaryModel: secondaryProviderModels[0] }));
+        }
+    }, [form.secondaryProvider, form.secondaryModel, secondaryProviderModels]);
 
     const { data: versions, isLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
@@ -413,6 +445,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
             title: detail.title ? `${detail.title} (복사)` : '',
             provider: detail.provider,
             model: detail.model,
+            secondaryProvider: detail.secondaryProvider ?? '',
+            secondaryModel: detail.secondaryModel ?? '',
             systemPrompt: detail.systemPrompt || '',
             userTemplate: detail.userTemplate || '',
             contextUrl: detail.contextUrl || '',
@@ -448,10 +482,23 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 }
             }
 
+            const trimmedSecondaryModel = form.secondaryModel.trim();
+            const trimmedSecondaryProvider = form.secondaryProvider || undefined;
+            if (!trimmedSecondaryProvider && trimmedSecondaryModel) {
+                setCreateError('예비 Provider를 선택해주세요.');
+                throw new Error('secondary provider required');
+            }
+            if (trimmedSecondaryProvider && !trimmedSecondaryModel) {
+                setCreateError('예비 모델을 선택해주세요.');
+                throw new Error('secondary model required');
+            }
+
             return promptApi.createVersion(promptId, {
                 title: form.title.trim(),
                 provider: form.provider,
                 model: form.model.trim(),
+                secondaryProvider: trimmedSecondaryProvider,
+                secondaryModel: trimmedSecondaryProvider ? trimmedSecondaryModel : undefined,
                 systemPrompt: form.systemPrompt.trim() || undefined,
                 userTemplate: trimmedTemplate,
                 contextUrl: form.contextUrl.trim() || undefined,
@@ -465,6 +512,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 title: '',
                 provider: 'OPENAI',
                 model: '',
+                secondaryProvider: '',
+                secondaryModel: '',
                 systemPrompt: '',
                 userTemplate: '',
                 contextUrl: '',
@@ -671,6 +720,53 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     )}
                                 </div>
                             </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="secondary-provider" className="block text-sm font-medium text-gray-700 mb-1">예비 Provider (선택)</label>
+                                    <select
+                                        id="secondary-provider"
+                                        value={form.secondaryProvider}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                secondaryProvider: e.target.value as ProviderType | '',
+                                                secondaryModel: '',
+                                            })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        disabled={availableProviders.length === 0}
+                                    >
+                                        <option value="">예비 모델 없음</option>
+                                        {availableProviders.map((provider) => (
+                                            <option key={provider} value={provider}>
+                                                {providerLabel[provider] || provider}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="secondary-model" className="block text-sm font-medium text-gray-700 mb-1">예비 Model (선택)</label>
+                                    <select
+                                        id="secondary-model"
+                                        value={form.secondaryModel}
+                                        onChange={(e) => setForm({ ...form, secondaryModel: e.target.value })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        disabled={!form.secondaryProvider || isAllowlistLoading || isAllowlistError || secondaryProviderModels.length === 0}
+                                    >
+                                        {!form.secondaryProvider && <option value="">예비 Provider를 먼저 선택하세요</option>}
+                                        {form.secondaryProvider && isAllowlistLoading && (
+                                            <option value="">모델 목록 불러오는 중...</option>
+                                        )}
+                                        {form.secondaryProvider && !isAllowlistLoading && secondaryProviderModels.length === 0 && (
+                                            <option value="">사용 가능한 모델 없음</option>
+                                        )}
+                                        {secondaryProviderModels.map((model) => (
+                                            <option key={model} value={model}>
+                                                {model}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
                                 <textarea
@@ -742,7 +838,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     availableProviders.length === 0 ||
                                     isAllowlistLoading ||
                                     isAllowlistError ||
-                                    providerModels.length === 0
+                                    providerModels.length === 0 ||
+                                    (form.secondaryProvider && !form.secondaryModel.trim()) ||
+                                    (form.secondaryProvider && secondaryProviderModels.length === 0)
                                 }
                                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                             >
@@ -786,6 +884,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             <div className="text-xs text-gray-500">Provider / Model</div>
                                             <div className="text-sm font-semibold text-gray-900">
                                                 {versionDetail.provider} / {versionDetail.model}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-gray-500">Secondary Provider / Model</div>
+                                            <div className="text-sm font-semibold text-gray-900">
+                                                {versionDetail.secondaryProvider && versionDetail.secondaryModel
+                                                    ? `${versionDetail.secondaryProvider} / ${versionDetail.secondaryModel}`
+                                                    : '-'}
                                             </div>
                                         </div>
                                         <div>

@@ -312,6 +312,8 @@ export interface PromptVersionSummaryResponse {
   title: string;
   provider: ProviderType;
   model: string;
+  secondaryProvider: ProviderType | null;
+  secondaryModel: string | null;
   createdBy: number;
   createdAt: string;
 }
@@ -323,6 +325,8 @@ export interface PromptVersionDetailResponse {
   title: string;
   provider: ProviderType;
   model: string;
+  secondaryProvider: ProviderType | null;
+  secondaryModel: string | null;
   systemPrompt: string;
   userTemplate: string;
   contextUrl?: string;
@@ -335,6 +339,8 @@ export interface PromptVersionCreateRequest {
   title: string;
   provider: ProviderType;
   model: string;
+  secondaryProvider?: ProviderType;
+  secondaryModel?: string;
   systemPrompt?: string;
   userTemplate?: string;
   contextUrl?: string;

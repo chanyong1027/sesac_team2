@@ -129,6 +129,9 @@ public class GatewayChatService {
         Integer ragContextChars = null;
         Boolean ragContextTruncated = null;
         String ragContextHash = null;
+        ProviderType usedProvider = null;
+        String usedRequestedModel = null;
+        boolean isFailover = false;
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -177,12 +180,23 @@ public class GatewayChatService {
 
             ProviderType providerType = activeVersion.getProvider();
             String requestedModel = activeVersion.getModel();
-            String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-            ChatResponse response = switch (providerType) {
-                case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
-                case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
-                case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
-            };
+            ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
+            String secondaryModel = activeVersion.getSecondaryModel();
+            usedProvider = providerType;
+            usedRequestedModel = requestedModel;
+
+            ChatResponse response;
+            try {
+                response = callProvider(organizationId, providerType, requestedModel, prompt);
+            } catch (Exception primaryException) {
+                if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
+                    throw primaryException;
+                }
+                isFailover = true;
+                usedProvider = secondaryProvider;
+                usedRequestedModel = secondaryModel;
+                response = callProvider(organizationId, secondaryProvider, secondaryModel, prompt);
+            }
 
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
@@ -192,10 +206,10 @@ public class GatewayChatService {
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
                     toLatencyMs(startedAtNanos),
-                    providerType.name().toLowerCase(),
-                    requestedModel,
+                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                    usedRequestedModel,
                     usedModel,
-                    false,
+                    isFailover,
                     null,
                     null,
                     safeToInteger(usage != null ? usage.totalTokens() : null),
@@ -208,17 +222,17 @@ public class GatewayChatService {
             return GatewayChatResponse.from(
                     traceId,
                     answer,
-                    false,
+                    isFailover,
                     usedModel,
                     usage);
         } catch (BusinessException e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     e.getErrorCode().getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                    usedRequestedModel,
                     null,
-                    null,
-                    null,
-                    false,
+                    isFailover,
                     null,
                     null,
                     null,
@@ -235,10 +249,10 @@ public class GatewayChatService {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                    usedRequestedModel,
                     null,
-                    null,
-                    null,
-                    false,
+                    isFailover,
                     null,
                     null,
                     null,
@@ -437,6 +451,24 @@ public class GatewayChatService {
             chatOptions.setModel(modelOverride);
         }
         return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
+    }
+
+    private ChatResponse callProvider(
+            Long organizationId,
+            ProviderType providerType,
+            String requestedModel,
+            String prompt
+    ) {
+        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
+        return switch (providerType) {
+            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
+            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
+            case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
+        };
+    }
+
+    private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
+        return secondaryProvider != null && secondaryModel != null && !secondaryModel.isBlank();
     }
 
     private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride) {
