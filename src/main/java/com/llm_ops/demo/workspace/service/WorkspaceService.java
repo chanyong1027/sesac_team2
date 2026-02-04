@@ -15,6 +15,7 @@ import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateResponse;
+import com.llm_ops.demo.workspace.dto.WorkspaceDeleteResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateResponse;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
@@ -65,13 +66,30 @@ public class WorkspaceService {
         Workspace workspace = workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, orgId, WorkspaceStatus.ACTIVE)
             .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
 
-        validateUpdatePermission(workspace, organization, user);
+        validateManagePermission(workspace, organization, user);
 
         workspace.updateDisplayName(request.displayName());
         return WorkspaceUpdateResponse.from(workspace);
     }
 
-    private void validateUpdatePermission(Workspace workspace, Organization organization, User user) {
+    @Transactional
+    public WorkspaceDeleteResponse delete(Long orgId, Long workspaceId, Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        Organization organization = organizationRepository.findByIdAndStatus(orgId, OrganizationStatus.ACTIVE)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        Workspace workspace = workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, orgId, WorkspaceStatus.ACTIVE)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        validateManagePermission(workspace, organization, user);
+
+        workspace.deactivate();
+        return WorkspaceDeleteResponse.of(workspaceId);
+    }
+
+    private void validateManagePermission(Workspace workspace, Organization organization, User user) {
         Optional<WorkspaceMember> workspaceMember = workspaceMemberRepository.findByWorkspaceAndUser(workspace, user);
         if (workspaceMember.isPresent() && workspaceMember.get().isOwner()) {
             return;
