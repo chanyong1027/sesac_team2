@@ -186,7 +186,10 @@ public class GatewayChatService {
                 inputTokens = safeToInteger(response.getMetadata().getUsage().getPromptTokens());
                 outputTokens = safeToInteger(response.getMetadata().getUsage().getGenerationTokens());
                 totalTokens = safeToInteger(response.getMetadata().getUsage().getTotalTokens());
-                estimatedCost = ModelPricing.calculateCost(usedModel, inputTokens, outputTokens);
+                // 입력/출력 토큰 모두 있을 때만 비용 계산 (일부 프로바이더는 totalTokens만 반환)
+                if (inputTokens != null && outputTokens != null) {
+                    estimatedCost = ModelPricing.calculateCost(usedModel, inputTokens, outputTokens);
+                }
             }
 
             // API 응답용 DTO (클라이언트에게는 총 토큰과 비용만 전달)
