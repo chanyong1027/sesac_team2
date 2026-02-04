@@ -10,7 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface PromptVersionRepository extends JpaRepository<PromptVersion, Long> {
 
-    List<PromptVersion> findByPromptOrderByVersionNoDesc(Prompt prompt);
+    @Query("SELECT pv FROM PromptVersion pv " +
+            "JOIN FETCH pv.createdBy " +
+            "WHERE pv.prompt = :prompt " +
+            "ORDER BY pv.versionNo DESC")
+    List<PromptVersion> findByPromptOrderByVersionNoDesc(@Param("prompt") Prompt prompt);
 
     Optional<PromptVersion> findByPromptAndVersionNo(Prompt prompt, Integer versionNo);
 
