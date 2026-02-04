@@ -79,13 +79,28 @@ public class ProviderCredential {
                 organizationId,
                 provider,
                 keyCiphertext,
-                ProviderCredentialStatus.ACTIVE
+                ProviderCredentialStatus.VERIFYING
         );
     }
 
     public void updateKey(String keyCiphertext) {
         this.keyCiphertext = keyCiphertext;
-        this.status = ProviderCredentialStatus.ACTIVE;
+        this.status = ProviderCredentialStatus.VERIFYING;
         this.lastVerifiedAt = null;
+    }
+
+    public void markVerifying() {
+        this.status = ProviderCredentialStatus.VERIFYING;
+        this.lastVerifiedAt = null;
+    }
+
+    public void markActive() {
+        this.status = ProviderCredentialStatus.ACTIVE;
+        this.lastVerifiedAt = LocalDateTime.now();
+    }
+
+    public void markInvalid() {
+        this.status = ProviderCredentialStatus.INVALID;
+        this.lastVerifiedAt = LocalDateTime.now();
     }
 }
