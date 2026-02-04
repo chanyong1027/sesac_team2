@@ -59,7 +59,8 @@ class ProviderCredentialControllerTest {
         // then
         .andExpect(jsonPath("$.credentialId").isNumber())
         .andExpect(jsonPath("$.provider").value("openai"))
-        .andExpect(jsonPath("$.status").value("ACTIVE"))
+        .andExpect(jsonPath("$.status").value("VERIFYING"))
+        .andExpect(jsonPath("$.lastVerifiedAt").isEmpty())
         .andExpect(jsonPath("$.apiKey").doesNotExist());
 
     // then
@@ -151,7 +152,7 @@ class ProviderCredentialControllerTest {
         // then
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].provider").value("openai"))
-        .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+        .andExpect(jsonPath("$[0].status").value("VERIFYING"))
         .andExpect(jsonPath("$[0].apiKey").doesNotExist());
   }
 
@@ -174,7 +175,7 @@ class ProviderCredentialControllerTest {
         // then
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].provider").value("openai"))
-        .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+        .andExpect(jsonPath("$[0].status").value("VERIFYING"))
         .andExpect(jsonPath("$[0].createdAt").isNotEmpty())
         .andExpect(jsonPath("$[0].lastVerifiedAt").isEmpty());
   }
