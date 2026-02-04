@@ -193,39 +193,18 @@ public class StatisticsService {
         }
 
         /**
-         * 이전 기간 계산
+         * 이전 기간 계산 - 현재 기간과 동일한 길이의 이전 기간 반환
+         * prevTo = currentFrom, prevFrom = currentFrom - duration
          */
         private PeriodRange calculatePreviousPeriod(String period, LocalDateTime currentFrom, LocalDateTime currentTo) {
-                if (period == null) {
-                        period = "daily";
-                }
+                // 현재 기간의 길이 계산
+                java.time.Duration duration = java.time.Duration.between(currentFrom, currentTo);
 
-                return switch (period.toLowerCase()) {
-                        case "daily" -> {
-                                // 어제와 비교
-                                LocalDateTime prevFrom = currentFrom.minusDays(1);
-                                LocalDateTime prevTo = currentTo.minusDays(1);
-                                yield new PeriodRange(prevFrom, prevTo);
-                        }
-                        case "weekly" -> {
-                                // 지난 주와 비교
-                                LocalDateTime prevFrom = currentFrom.minusWeeks(1);
-                                LocalDateTime prevTo = currentTo.minusWeeks(1);
-                                yield new PeriodRange(prevFrom, prevTo);
-                        }
-                        case "monthly" -> {
-                                // 지난 달과 비교
-                                LocalDateTime prevFrom = currentFrom.minusMonths(1);
-                                LocalDateTime prevTo = currentTo.minusMonths(1);
-                                yield new PeriodRange(prevFrom, prevTo);
-                        }
-                        default -> {
-                                // 기본값: daily
-                                LocalDateTime prevFrom = currentFrom.minusDays(1);
-                                LocalDateTime prevTo = currentTo.minusDays(1);
-                                yield new PeriodRange(prevFrom, prevTo);
-                        }
-                };
+                // 이전 기간: 현재 시작점 직전까지, 동일한 길이
+                LocalDateTime prevTo = currentFrom;
+                LocalDateTime prevFrom = currentFrom.minus(duration);
+
+                return new PeriodRange(prevFrom, prevTo);
         }
 
         /**
