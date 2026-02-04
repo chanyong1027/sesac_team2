@@ -315,6 +315,7 @@ export interface PromptVersionSummaryResponse {
   secondaryProvider: ProviderType | null;
   secondaryModel: string | null;
   createdBy: number;
+  createdByName: string;
   createdAt: string;
 }
 
