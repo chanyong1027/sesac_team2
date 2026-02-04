@@ -88,6 +88,14 @@ public class OrganizationApiKey {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    public Long getId() {
+        return id;
+    }
+
+    public String getKeyPrefix() {
+        return keyPrefix;
+    }
+
     private OrganizationApiKey(
             Long organizationId,
             String name,

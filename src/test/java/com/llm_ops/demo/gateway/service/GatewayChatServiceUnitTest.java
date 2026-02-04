@@ -16,6 +16,7 @@ import com.llm_ops.demo.rag.service.RagSearchService;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,9 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private WorkspaceRepository workspaceRepository;
+
+    @Mock
+    private WorkspaceRagSettingsService workspaceRagSettingsService;
 
     @Mock
     private RequestLogWriter requestLogWriter;
@@ -205,6 +209,10 @@ class GatewayChatServiceUnitTest {
     @Nested
     @DisplayName("RAG 컨텍스트 주입 테스트")
     class RagContextEnrichmentTest {
+        private static final int RAG_TOP_K = 3;
+        private static final double RAG_SIMILARITY_THRESHOLD = 0.0;
+        private static final int RAG_MAX_CHUNKS = 3;
+        private static final int RAG_MAX_CONTEXT_CHARS = 4000;
 
         @Test
         @DisplayName("RAG 컨텍스트 빌드 시 chunks/char/truncated 메트릭이 계산된다")
@@ -216,7 +224,7 @@ class GatewayChatServiceUnitTest {
             );
 
             // when
-            Object result = invokeBuildRagContextWithMetrics(chunks);
+            Object result = invokeBuildRagContextWithMetrics(chunks, RAG_MAX_CHUNKS, RAG_MAX_CONTEXT_CHARS);
 
             // then
             String context = (String) getField(result, "context");
@@ -235,7 +243,7 @@ class GatewayChatServiceUnitTest {
         @DisplayName("빈 chunks면 컨텍스트는 비고 메트릭은 0/false")
         void RAG_빈_chunks_테스트() throws Exception {
             // given
-            Object result = invokeBuildRagContextWithMetrics(List.of());
+            Object result = invokeBuildRagContextWithMetrics(List.of(), RAG_MAX_CHUNKS, RAG_MAX_CONTEXT_CHARS);
             assertThat(getField(result, "context")).isEqualTo("");
             assertThat(getField(result, "chunksIncluded")).isEqualTo(0);
             assertThat(getField(result, "contextChars")).isEqualTo(0);
@@ -266,14 +274,12 @@ class GatewayChatServiceUnitTest {
                     new ChunkDetailResponse("기온은 25도입니다.", 0.90, 10L, "weather.txt")
             );
 
-            GatewayModelProperties.Models models = new GatewayModelProperties.Models();
-            models.setOpenai("gpt-4o-mini");
-
             OrganizationApiKeyAuthService.AuthResult authResult =
                     new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
             when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
             when(requestLogWriter.start(any())).thenReturn(requestId);
             Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
             when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
                     .thenReturn(Optional.of(workspace));
 
@@ -292,7 +298,15 @@ class GatewayChatServiceUnitTest {
             when(release.getActiveVersion()).thenReturn(activeVersion);
             when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
 
-            when(ragSearchService.search(eq(workspaceId), anyString())).thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
+            when(workspaceRagSettingsService.resolveRuntimeSettings(workspaceId))
+                    .thenReturn(new WorkspaceRagSettingsService.RagRuntimeSettings(
+                            RAG_TOP_K,
+                            RAG_SIMILARITY_THRESHOLD,
+                            RAG_MAX_CHUNKS,
+                            RAG_MAX_CONTEXT_CHARS
+                    ));
+            when(ragSearchService.search(eq(workspaceId), anyString(), eq(RAG_TOP_K), eq(RAG_SIMILARITY_THRESHOLD)))
+                    .thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
             when(providerCredentialService.getDecryptedApiKey(eq(organizationId), eq(ProviderType.OPENAI))).thenReturn("provider-key");
             when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
             when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
@@ -311,7 +325,7 @@ class GatewayChatServiceUnitTest {
                     true
             );
 
-            Object ctx = invokeBuildRagContextWithMetrics(chunks);
+            Object ctx = invokeBuildRagContextWithMetrics(chunks, RAG_MAX_CHUNKS, RAG_MAX_CONTEXT_CHARS);
             String context = (String) getField(ctx, "context");
             int contextChars = (int) getField(ctx, "contextChars");
             boolean truncated = (boolean) getField(ctx, "truncated");
@@ -332,13 +346,16 @@ class GatewayChatServiceUnitTest {
             assertThat(update.ragContextHash()).isEqualTo(expectedHash);
         }
 
-        private Object invokeBuildRagContextWithMetrics(List<ChunkDetailResponse> chunks) throws Exception {
+        private Object invokeBuildRagContextWithMetrics(List<ChunkDetailResponse> chunks, int maxChunks, int maxChars)
+                throws Exception {
             Method method = GatewayChatService.class.getDeclaredMethod(
                     "buildRagContextWithMetrics",
-                    List.class
+                    List.class,
+                    int.class,
+                    int.class
             );
             method.setAccessible(true);
-            return method.invoke(gatewayChatService, chunks);
+            return method.invoke(gatewayChatService, chunks, maxChunks, maxChars);
         }
 
         private String invokeSha256HexOrNull(String value) throws Exception {

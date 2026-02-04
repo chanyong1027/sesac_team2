@@ -2,8 +2,10 @@ package com.llm_ops.demo.auth.store;
 
 import com.llm_ops.demo.auth.domain.RefreshToken;
 import com.llm_ops.demo.auth.repository.RefreshTokenRepository;
+import com.llm_ops.demo.auth.util.TokenHashingUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,22 +23,19 @@ import java.util.Optional;
 public class JpaRefreshTokenStore implements RefreshTokenStore {
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public RefreshToken save(String token, Long userId, Instant expiryDate) {
-        RefreshToken refreshToken = RefreshToken.create(token, userId, expiryDate);
+        String tokenHash = passwordEncoder.encode(TokenHashingUtils.sha256Hex(token));
+        RefreshToken refreshToken = RefreshToken.create(tokenHash, token, userId, expiryDate);
         return refreshTokenRepository.save(refreshToken);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<RefreshToken> findByToken(String token) {
-        return refreshTokenRepository.findByToken(token);
-    }
-
-    @Override
-    public void deleteByToken(String token) {
-        refreshTokenRepository.deleteByToken(token);
+    public Optional<RefreshToken> findByUserId(Long userId) {
+        return refreshTokenRepository.findByUserId(userId);
     }
 
     @Override

@@ -15,10 +15,15 @@ import {
     CheckCircle2,
     AlertCircle,
     Copy,
-    Save,
-    RotateCcw
+    Save
 } from 'lucide-react';
-import type { PromptDetailResponse, PromptReleaseResponse, PromptVersionSummaryResponse, ProviderType } from '@/types/api.types';
+import type {
+    PromptDetailResponse,
+    PromptReleaseHistoryResponse,
+    PromptReleaseResponse,
+    PromptVersionDetailResponse,
+    ProviderType
+} from '@/types/api.types';
 
 // 탭 정의
 type TabType = 'overview' | 'versions' | 'release' | 'playground';
@@ -70,7 +75,7 @@ export function PromptDetailPage() {
             {/* Header */}
             <div className="flex flex-col gap-4">
                 <Link
-                    to={`${basePath}`}
+                    to={basePath}
                     className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors w-fit"
                 >
                     <ArrowLeft size={16} className="mr-1" />
@@ -249,15 +254,21 @@ function VersionsTab({ promptId }: { promptId: number }) {
     const isResolvedOrgId = typeof resolvedOrgId === 'number' && !Number.isNaN(resolvedOrgId);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [detailVersionId, setDetailVersionId] = useState<number | null>(null);
+    const [baseVersionId, setBaseVersionId] = useState<number | null>(null);
     const [form, setForm] = useState({
         title: '',
         provider: 'OPENAI' as ProviderType,
         model: '',
+        secondaryProvider: '' as ProviderType | '',
+        secondaryModel: '',
         systemPrompt: '',
         userTemplate: '',
+        contextUrl: '',
         modelConfig: '',
     });
     const [configError, setConfigError] = useState<string | null>(null);
+    const [templateError, setTemplateError] = useState<string | null>(null);
+    const [createError, setCreateError] = useState<string | null>(null);
     const presets = [
         {
             label: 'CS-Bot 기본',
@@ -304,6 +315,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         if (normalized === 'claude') return 'ANTHROPIC';
         return normalized.toUpperCase();
     };
+    const hasQuestionPlaceholder = (template: string) => template.includes('{{question}}');
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
         queryKey: ['provider-credentials', resolvedOrgId],
@@ -338,6 +350,13 @@ function VersionsTab({ promptId }: { promptId: number }) {
         return modelAllowlist[form.provider] ?? [];
     }, [modelAllowlist, form.provider]);
 
+    const secondaryProviderModels = useMemo(() => {
+        if (!modelAllowlist || !form.secondaryProvider) return [];
+        return modelAllowlist[form.secondaryProvider as ProviderType] ?? [];
+    }, [modelAllowlist, form.secondaryProvider]);
+
+    const isTemplateValid = form.userTemplate.trim().length > 0 && hasQuestionPlaceholder(form.userTemplate);
+
     useEffect(() => {
         if (!availableProviders.length) return;
         if (!availableProviders.includes(form.provider)) {
@@ -346,11 +365,36 @@ function VersionsTab({ promptId }: { promptId: number }) {
     }, [availableProviders, form.provider]);
 
     useEffect(() => {
+        if (!form.secondaryProvider) return;
+        if (!availableProviders.includes(form.secondaryProvider)) {
+            setForm((prev) => ({ ...prev, secondaryProvider: '', secondaryModel: '' }));
+        }
+    }, [availableProviders, form.secondaryProvider]);
+
+    useEffect(() => {
         if (!providerModels.length) return;
         if (!providerModels.includes(form.model)) {
             setForm((prev) => ({ ...prev, model: providerModels[0] }));
         }
     }, [providerModels, form.model]);
+
+    useEffect(() => {
+        if (!form.secondaryProvider) {
+            if (form.secondaryModel) {
+                setForm((prev) => ({ ...prev, secondaryModel: '' }));
+            }
+            return;
+        }
+        if (!secondaryProviderModels.length) {
+            if (form.secondaryModel) {
+                setForm((prev) => ({ ...prev, secondaryModel: '' }));
+            }
+            return;
+        }
+        if (!secondaryProviderModels.includes(form.secondaryModel)) {
+            setForm((prev) => ({ ...prev, secondaryModel: secondaryProviderModels[0] }));
+        }
+    }, [form.secondaryProvider, form.secondaryModel, secondaryProviderModels]);
 
     const { data: versions, isLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
@@ -358,6 +402,18 @@ function VersionsTab({ promptId }: { promptId: number }) {
             const response = await promptApi.getVersions(promptId);
             return response.data;
         },
+    });
+    const {
+        data: baseVersionDetail,
+        isLoading: isBaseVersionLoading,
+    } = useQuery({
+        queryKey: ['promptVersionDetail', promptId, baseVersionId],
+        queryFn: async () => {
+            if (!baseVersionId) return null;
+            const response = await promptApi.getVersion(promptId, baseVersionId);
+            return response.data;
+        },
+        enabled: !!baseVersionId,
     });
     const { data: versionDetail, isLoading: isDetailLoading } = useQuery({
         queryKey: ['promptVersionDetail', promptId, detailVersionId],
@@ -369,8 +425,51 @@ function VersionsTab({ promptId }: { promptId: number }) {
         enabled: !!detailVersionId,
     });
 
+    useEffect(() => {
+        if (isCreateOpen) {
+            if (!baseVersionId && versions && versions.length > 0) {
+                setBaseVersionId(versions[0].id);
+            }
+            return;
+        }
+        setBaseVersionId(null);
+        setConfigError(null);
+        setTemplateError(null);
+        setCreateError(null);
+    }, [isCreateOpen, versions, baseVersionId]);
+
+    const applyBaseVersion = (detail: PromptVersionDetailResponse | null) => {
+        if (!detail) return;
+        setForm({
+            title: detail.title ? `${detail.title} (복사)` : '',
+            provider: detail.provider,
+            model: detail.model,
+            secondaryProvider: detail.secondaryProvider ?? '',
+            secondaryModel: detail.secondaryModel ?? '',
+            systemPrompt: detail.systemPrompt || '',
+            userTemplate: detail.userTemplate || '',
+            contextUrl: detail.contextUrl || '',
+            modelConfig: detail.modelConfig ? JSON.stringify(detail.modelConfig, null, 2) : '',
+        });
+        setConfigError(null);
+        setTemplateError(null);
+        setCreateError(null);
+    };
+
     const createMutation = useMutation({
         mutationFn: async () => {
+            setTemplateError(null);
+            setCreateError(null);
+            const trimmedTemplate = form.userTemplate.trim();
+            if (!trimmedTemplate) {
+                setTemplateError('userTemplate는 필수입니다.');
+                throw new Error('userTemplate required');
+            }
+            if (!hasQuestionPlaceholder(trimmedTemplate)) {
+                setTemplateError('userTemplate에 {{question}} 변수가 필요합니다.');
+                throw new Error('userTemplate missing placeholder');
+            }
+
             let parsedConfig: Record<string, any> | undefined = undefined;
             if (form.modelConfig.trim()) {
                 try {
@@ -382,12 +481,26 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 }
             }
 
+            const trimmedSecondaryModel = form.secondaryModel.trim();
+            const trimmedSecondaryProvider = form.secondaryProvider || undefined;
+            if (!trimmedSecondaryProvider && trimmedSecondaryModel) {
+                setCreateError('예비 Provider를 선택해주세요.');
+                throw new Error('secondary provider required');
+            }
+            if (trimmedSecondaryProvider && !trimmedSecondaryModel) {
+                setCreateError('예비 모델을 선택해주세요.');
+                throw new Error('secondary model required');
+            }
+
             return promptApi.createVersion(promptId, {
                 title: form.title.trim(),
                 provider: form.provider,
                 model: form.model.trim(),
+                secondaryProvider: trimmedSecondaryProvider,
+                secondaryModel: trimmedSecondaryProvider ? trimmedSecondaryModel : undefined,
                 systemPrompt: form.systemPrompt.trim() || undefined,
-                userTemplate: form.userTemplate.trim() || undefined,
+                userTemplate: trimmedTemplate,
+                contextUrl: form.contextUrl.trim() || undefined,
                 modelConfig: parsedConfig,
             });
         },
@@ -398,11 +511,22 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 title: '',
                 provider: 'OPENAI',
                 model: '',
+                secondaryProvider: '',
+                secondaryModel: '',
                 systemPrompt: '',
                 userTemplate: '',
+                contextUrl: '',
                 modelConfig: '',
             });
             setConfigError(null);
+            setTemplateError(null);
+            setCreateError(null);
+        },
+        onError: (error) => {
+            if (error instanceof Error && error.message.startsWith('userTemplate')) {
+                return;
+            }
+            setCreateError('버전 생성에 실패했습니다. 입력 값을 확인해주세요.');
         },
     });
 
@@ -464,7 +588,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setIsCreateOpen(false)}
                     />
-                    <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900">
+                    <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900 max-h-[90vh] overflow-y-auto">
                         <div className="p-6 border-b border-gray-100">
                             <h4 className="text-lg font-semibold text-gray-900">새 버전 생성</h4>
                             <p className="text-sm text-gray-500 mt-1">
@@ -507,6 +631,39 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         등록된 Provider 기준으로 사용할 수 있는 예시가 없습니다.
                                     </span>
                                 )}
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                <div className="flex flex-col sm:flex-row items-end gap-3">
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">기존 버전 불러오기</label>
+                                        <select
+                                            value={baseVersionId ?? ''}
+                                            onChange={(e) => setBaseVersionId(Number(e.target.value) || null)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            disabled={!versions?.length}
+                                        >
+                                            <option value="">
+                                                {versions?.length ? '복사할 버전을 선택하세요' : '복사할 버전이 없습니다'}
+                                            </option>
+                                            {versions?.map((ver) => (
+                                                <option key={ver.id} value={ver.id}>
+                                                    v{ver.versionNumber} · {ver.title || ver.model} ({ver.provider}/{ver.model})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => applyBaseVersion(baseVersionDetail ?? null)}
+                                        disabled={!baseVersionDetail || isBaseVersionLoading}
+                                        className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                                    >
+                                        {isBaseVersionLoading ? '불러오는 중...' : '내용 불러오기'}
+                                    </button>
+                                </div>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    이전 버전의 설정을 가져와 빠르게 수정할 수 있습니다.
+                                </p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
@@ -562,6 +719,53 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     )}
                                 </div>
                             </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="secondary-provider" className="block text-sm font-medium text-gray-700 mb-1">예비 Provider (선택)</label>
+                                    <select
+                                        id="secondary-provider"
+                                        value={form.secondaryProvider}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                secondaryProvider: e.target.value as ProviderType | '',
+                                                secondaryModel: '',
+                                            })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        disabled={availableProviders.length === 0}
+                                    >
+                                        <option value="">예비 모델 없음</option>
+                                        {availableProviders.map((provider) => (
+                                            <option key={provider} value={provider}>
+                                                {providerLabel[provider] || provider}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="secondary-model" className="block text-sm font-medium text-gray-700 mb-1">예비 Model (선택)</label>
+                                    <select
+                                        id="secondary-model"
+                                        value={form.secondaryModel}
+                                        onChange={(e) => setForm({ ...form, secondaryModel: e.target.value })}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        disabled={!form.secondaryProvider || isAllowlistLoading || isAllowlistError || secondaryProviderModels.length === 0}
+                                    >
+                                        {!form.secondaryProvider && <option value="">예비 Provider를 먼저 선택하세요</option>}
+                                        {form.secondaryProvider && isAllowlistLoading && (
+                                            <option value="">모델 목록 불러오는 중...</option>
+                                        )}
+                                        {form.secondaryProvider && !isAllowlistLoading && secondaryProviderModels.length === 0 && (
+                                            <option value="">사용 가능한 모델 없음</option>
+                                        )}
+                                        {secondaryProviderModels.map((model) => (
+                                            <option key={model} value={model}>
+                                                {model}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
                                 <textarea
@@ -573,14 +777,31 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">User Template</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">User Template (필수)</label>
                                 <textarea
                                     value={form.userTemplate}
-                                    onChange={(e) => setForm({ ...form, userTemplate: e.target.value })}
+                                    onChange={(e) => {
+                                        setForm({ ...form, userTemplate: e.target.value });
+                                        setTemplateError(null);
+                                    }}
                                     rows={4}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
-                                    placeholder="사용자 입력 템플릿을 입력하세요."
+                                    placeholder="예: 사용자 질문: {{question}}"
                                 />
+                                <p className="mt-1 text-xs text-gray-400">{'{{question}}'} 변수가 반드시 포함되어야 합니다.</p>
+                                {templateError && (
+                                    <p className="mt-1 text-xs text-rose-600">{templateError}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">관련 링크 (선택)</label>
+                                <input
+                                    value={form.contextUrl}
+                                    onChange={(e) => setForm({ ...form, contextUrl: e.target.value })}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                                    placeholder="Jira/Notion 링크를 입력하세요"
+                                />
+                                <p className="mt-1 text-xs text-gray-400">변경 근거를 남겨두면 추적이 쉬워집니다.</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Model Config (JSON)</label>
@@ -595,6 +816,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 {configError && (
                                     <p className="mt-1 text-xs text-rose-600">{configError}</p>
                                 )}
+                                {createError && (
+                                    <p className="mt-2 text-xs text-rose-600">{createError}</p>
+                                )}
                             </div>
                         </div>
                         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
@@ -608,11 +832,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 onClick={() => createMutation.mutate()}
                                 disabled={
                                     !form.model.trim() ||
+                                    !isTemplateValid ||
                                     createMutation.isPending ||
                                     availableProviders.length === 0 ||
                                     isAllowlistLoading ||
                                     isAllowlistError ||
-                                    providerModels.length === 0
+                                    providerModels.length === 0 ||
+                                    (form.secondaryProvider && !form.secondaryModel.trim()) ||
+                                    (form.secondaryProvider && secondaryProviderModels.length === 0)
                                 }
                                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                             >
@@ -659,6 +886,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             </div>
                                         </div>
                                         <div>
+                                            <div className="text-xs text-gray-500">Secondary Provider / Model</div>
+                                            <div className="text-sm font-semibold text-gray-900">
+                                                {versionDetail.secondaryProvider && versionDetail.secondaryModel
+                                                    ? `${versionDetail.secondaryProvider} / ${versionDetail.secondaryModel}`
+                                                    : '-'}
+                                            </div>
+                                        </div>
+                                        <div>
                                             <div className="text-xs text-gray-500">Title</div>
                                             <div className="text-sm text-gray-900">{versionDetail.title || '-'}</div>
                                         </div>
@@ -684,6 +919,21 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         <pre className="whitespace-pre-wrap text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg p-3">
                                             {versionDetail.modelConfig ? JSON.stringify(versionDetail.modelConfig, null, 2) : '-'}
                                         </pre>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-500 mb-2">관련 링크</div>
+                                        {versionDetail.contextUrl ? (
+                                            <a
+                                                href={versionDetail.contextUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-sm text-indigo-600 hover:text-indigo-700 break-all"
+                                            >
+                                                {versionDetail.contextUrl}
+                                            </a>
+                                        ) : (
+                                            <div className="text-sm text-gray-400">-</div>
+                                        )}
                                     </div>
                                 </>
                             )}
@@ -718,6 +968,14 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
     });
 
+    const { data: releaseHistory, isLoading: isHistoryLoading } = useQuery({
+        queryKey: ['promptReleaseHistory', promptId],
+        queryFn: async () => {
+            const response = await promptApi.getReleaseHistory(promptId);
+            return response.data;
+        },
+    });
+
     const releaseMutation = useMutation({
         mutationFn: async () => {
             if (!selectedVersionId) {
@@ -730,7 +988,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
-            queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] }); // Add this line
+            queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] });
             setReleaseReason('');
             setReleaseMessage('배포가 완료되었습니다.');
             setReleaseError(null);
@@ -810,417 +1068,103 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                     <p className="mt-3 text-sm text-rose-600">{releaseError}</p>
                 )}
             </div>
-
-            {/* Release History */}
-            <ReleaseHistoryList promptId={promptId} activeVersionId={versions?.find(v => v.id === selectedVersionId)?.id} />
-        </div>
-    );
-}
-
-function ReleaseHistoryList({ promptId, activeVersionId }: { promptId: number; activeVersionId?: number }) {
-    const queryClient = useQueryClient();
-    const [rollbackTargetId, setRollbackTargetId] = useState<number | null>(null);
-    const [rollbackReason, setRollbackReason] = useState('');
-    const [rollbackError, setRollbackError] = useState<string | null>(null);
-
-    const { data: history, isLoading } = useQuery({
-        queryKey: ['promptReleaseHistory', promptId],
-        queryFn: async () => {
-            const response = await promptApi.getReleaseHistory(promptId);
-            return response.data;
-        },
-    });
-
-    const rollbackMutation = useMutation({
-        mutationFn: async () => {
-            if (!rollbackTargetId) return;
-            return promptApi.rollbackPrompt(promptId, {
-                targetVersionId: rollbackTargetId,
-                reason: rollbackReason.trim() || undefined,
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] });
-            queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
-            setRollbackTargetId(null);
-            setRollbackReason('');
-            setRollbackError(null);
-        },
-        onError: (error) => {
-            console.error('Rollback failed:', error);
-            setRollbackError('롤백에 실패했습니다. 잠시 후 다시 시도해주세요.');
-        },
-    });
-
-    if (isLoading) return <div className="text-gray-500">배포 이력을 불러오는 중...</div>;
-
-    return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="font-medium text-gray-900">배포 이력</h3>
-            </div>
-            <div className="overflow-x-auto">
-                <table className="min-w-full text-left text-sm whitespace-nowrap">
-                    <thead className="uppercase tracking-wider border-b border-gray-200 bg-gray-50">
-                        <tr>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">Version</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">Released At</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">Reason</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium">By</th>
-                            <th scope="col" className="px-6 py-3 text-gray-500 font-medium text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {history && history.length > 0 ? (
-                            history.map((item, index) => {
-                                const isLatest = index === 0;
-                                return (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 font-medium text-gray-900">
-                                            v{item.toVersionNo ?? '?'}
-                                            {isLatest && (
-                                                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                    Active
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-500">
-                                            {new Date(item.createdAt).toLocaleString()}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-500">
-                                            {item.reason || '-'}
-                                        </td>
-                                        <td className="px-6 py-4 text-gray-500">
-                                            {item.changedByName}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            {!isLatest && (
-                                                <button
-                                                    onClick={() => setRollbackTargetId(item.toVersionId)}
-                                                    className="text-indigo-600 hover:text-indigo-900 font-medium text-xs flex items-center justify-end gap-1 ml-auto"
-                                                >
-                                                    <RotateCcw size={14} />
-                                                    Rollback
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        ) : (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                                    배포 이력이 없습니다.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Rollback Modal */}
-            {rollbackTargetId && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div
-                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                        onClick={() => setRollbackTargetId(null)}
-                    />
-                    <div className="relative w-full max-w-md mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900 p-6">
-                        <h4 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
-                            <RotateCcw size={20} className="text-amber-500" />
-                            버전 롤백 확인
-                        </h4>
-                        <p className="text-sm text-gray-600 mb-4">
-                            이전 버전으로 롤백하시겠습니까? 롤백은 새로운 배포 이력으로 기록되며, 즉시 반영됩니다.
-                        </p>
-
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">롤백 사유</label>
-                            <input
-                                value={rollbackReason}
-                                onChange={(e) => setRollbackReason(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="예: 이전 버전이 더 안정적임"
-                            />
-                        </div>
-
-                        {rollbackError && (
-                            <p className="mb-4 text-sm text-rose-600 bg-rose-50 p-2 rounded">
-                                {rollbackError}
-                            </p>
-                        )}
-
-                        <div className="flex justify-end gap-3">
-                            <button
-                                onClick={() => setRollbackTargetId(null)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                            >
-                                취소
-                            </button>
-                            <button
-                                onClick={() => rollbackMutation.mutate()}
-                                disabled={rollbackMutation.isPending}
-                                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50"
-                            >
-                                {rollbackMutation.isPending ? '처리 중...' : '롤백 실행'}
-                            </button>
-                        </div>
+            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">배포 이력</h3>
+                <p className="text-sm text-gray-500 mb-4">왜 버전이 바뀌었는지 확인할 수 있습니다.</p>
+                {isHistoryLoading ? (
+                    <div className="text-sm text-gray-500">이력을 불러오는 중...</div>
+                ) : releaseHistory && releaseHistory.length > 0 ? (
+                    <div className="divide-y divide-gray-100">
+                        {releaseHistory.map((history: PromptReleaseHistoryResponse) => (
+                            <div key={history.id} className="py-4 flex flex-col gap-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="font-semibold text-gray-900">
+                                        {history.changeType === 'ROLLBACK'
+                                            ? `롤백 · v${history.toVersionNo}`
+                                            : `배포 · v${history.toVersionNo}`}
+                                    </span>
+                                    <span className="text-xs text-gray-400">{new Date(history.createdAt).toLocaleString()}</span>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                    {history.reason || '배포 사유 없음'}
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                </div>
-            )}
+                ) : (
+                    <div className="text-sm text-gray-500">배포 이력이 없습니다.</div>
+                )}
+            </div>
         </div>
     );
 }
 
 function PlaygroundTab() {
-    const { orgId, workspaceId: workspaceIdStr, promptId: promptIdStr } = useParams<{ orgId: string; workspaceId: string; promptId: string }>();
-    const promptId = Number(promptIdStr);
-    const workspaceId = Number(workspaceIdStr);
-    const { currentOrgId } = useOrganizationStore();
-    const parsedOrgId = orgId ? Number(orgId) : undefined;
-    const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
-        ? parsedOrgId
-        : currentOrgId;
-
-    const [selectedApiKey, setSelectedApiKey] = useState<string>('');
-    const [apiKeyInputType, setApiKeyInputType] = useState<'select' | 'manual'>('select');
-    const [manualApiKey, setManualApiKey] = useState('');
-
-    // Gateway Request State
-    const [inputVariables, setInputVariables] = useState<Record<string, string>>({});
-    const [ragEnabled, setRagEnabled] = useState(false);
-    const [gatewayResponse, setGatewayResponse] = useState<any>(null);
-    const [chatHistory, setChatHistory] = useState<{ role: string; content: string }[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    // Fetch Prompt Key
-    const { data: prompt } = useQuery({
-        queryKey: ['prompt', workspaceId, promptId],
-        queryFn: async () => {
-            const response = await promptApi.getPrompt(workspaceId, promptId);
-            return response.data;
-        },
-        enabled: !!workspaceId && !!promptId,
-    });
-
-    // Fetch API Keys
-    const { data: apiKeys } = useQuery({
-        queryKey: ['organizationApiKeys', resolvedOrgId],
-        queryFn: async () => {
-            if (!resolvedOrgId) return [];
-            const response = await organizationApi.getApiKeys(resolvedOrgId);
-            return response.data;
-        },
-        enabled: !!resolvedOrgId,
-    });
-
-    useEffect(() => {
-        if (apiKeys && apiKeys.length > 0 && apiKeyInputType === 'select' && !selectedApiKey) {
-            // Select the first active key by default
-            const firstActive = apiKeys.find(k => k.status === 'ACTIVE');
-            if (firstActive) setSelectedApiKey(firstActive.keyPrefix + '...'); // We can't get full key, but we need a valid key for request.
-            // Actually, we can't use the prefix for the request. The user must copy/paste a full key OR we need to trust the backend to allow test calls.
-            // Wait, for SECURITY, the backend typically doesn't return the full key again.
-            // Challenge: How to test without the full key if the user forgot it?
-            // Solution: For now, we MUST ask the user to input the key MANUALLY or we provide a way to "Test with Internal Auth" if supported.
-            // STRICT REQUIREMENT: "User issued API key".
-            // So we can only list the keys for reference, but the user MUST input the FULL key manually if we don't store it.
-            // However, usually "Playground" implies easy testing. 
-            // Let's assume for this "Gateway Simulation", the user MUST provide the FULL key.
-            // I will make the default 'manual' entry, but show a dropdown of "Active Keys" just to show we know them, 
-            // but we can't fill the value because we don't have it.
-            // Oh, wait. If I am the developer, I might have the key.
-            // Let's adjust: Default to Manual Input.
-            setApiKeyInputType('manual');
-        }
-    }, [apiKeys]);
-
-    const handleRun = async () => {
-        if (!manualApiKey.trim()) {
-            setError('API Key를 입력해주세요.');
-            return;
-        }
-        if (!prompt?.promptKey) {
-            setError('프롬프트 정보를 불러올 수 없습니다.');
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        setGatewayResponse(null);
-
-        // Prepare variables (assuming single 'question' variable for now, or parsing from UI if we add variable builder)
-        // For simplicity, we'll treat the main textarea as the 'question' variable, or a JSON input?
-        // Let's use a simple JSON input for variables to be flexible, or just a "question" field.
-        // Given previous conversation context ("test case"), let's provide a "User Input" text area and map it to 'question' variable (common pattern).
-        const variables = {
-            ...inputVariables
-        };
-
-        try {
-            // Gateway API Call
-            const response = await axios.post('http://localhost:8080/v1/chat/completions', {
-                workspaceId: workspaceId,
-                promptKey: prompt.promptKey,
-                variables: variables,
-                ragEnabled: ragEnabled
-            }, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-API-Key': manualApiKey.trim()
-                }
-            });
-
-            setGatewayResponse(response.data);
-            if (response.data.answer) {
-                setChatHistory(prev => [...prev,
-                { role: 'user', content: variables.question || JSON.stringify(variables) },
-                { role: 'assistant', content: response.data.answer }
-                ]);
-            }
-        } catch (err: any) {
-            console.error(err);
-            setError(err.response?.data?.message || 'Gateway 요청에 실패했습니다.');
-            setGatewayResponse(err.response?.data || { error: 'Unknown error' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     return (
-        <div className="h-[600px] flex gap-6">
-            {/* Left Panel: Configuration & Input */}
-            <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2">
-
-                {/* 1. API Key Config */}
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                        Authentication
+        <div className="h-[600px] flex gap-4">
+            {/* Left: Settings & Prompt */}
+            <div className="w-1/2 flex flex-col gap-4">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col">
+                    <h3 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+                        <span>System Prompt</span>
+                        <div className="flex gap-2">
+                            <select
+                                className="text-xs border border-gray-300 rounded px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled
+                                title="준비 중"
+                            >
+                                <option>GPT-4</option>
+                                <option>GPT-3.5-Turbo</option>
+                                <option>Claude-3-Opus</option>
+                            </select>
+                            <button
+                                className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled
+                                title="준비 중"
+                            >
+                                <Save size={12} /> 저장
+                            </button>
+                        </div>
                     </h3>
-                    <div className="space-y-3">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Organization API Key</label>
-                            <input
-                                type="password"
-                                value={manualApiKey}
-                                onChange={(e) => setManualApiKey(e.target.value)}
-                                placeholder="sk-org-..."
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                            <p className="mt-1 text-xs text-gray-400">
-                                Settings &gt; API Keys에서 발급받은 키를 입력하세요.
-                            </p>
-                        </div>
-                    </div>
+                    <textarea
+                        className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        defaultValue="You are a helpful customer support assistant. Always be polite and concise."
+                        readOnly
+                        title="준비 중"
+                    />
                 </div>
-
-                {/* 2. Request Config */}
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-1">
-                    <h3 className="font-medium text-gray-900 mb-3">Request Parameters</h3>
-
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <label className="text-sm text-gray-700 font-medium">RAG (Retrieval)</label>
-                            <button
-                                onClick={() => setRagEnabled(!ragEnabled)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${ragEnabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ragEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                            </button>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Variable: question</label>
-                            <textarea
-                                value={inputVariables.question || ''}
-                                onChange={(e) => setInputVariables({ ...inputVariables, question: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none h-24"
-                                placeholder="질문을 입력하세요..."
-                            />
-                        </div>
-
-                        {/* Additional variables can be added here if needed */}
-
-                        <div className="pt-2">
-                            <button
-                                onClick={handleRun}
-                                disabled={isLoading || !manualApiKey}
-                                className="w-full py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                                {isLoading ? <Clock size={16} className="animate-spin" /> : <Play size={16} />}
-                                Run Request
-                            </button>
-                        </div>
-
-                        {error && (
-                            <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg break-all">
-                                {error}
-                            </div>
-                        )}
-                    </div>
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm h-1/3 flex flex-col">
+                    <h3 className="font-medium text-gray-900 mb-3">User Input (Test Case)</h3>
+                    <textarea
+                        className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        placeholder="테스트할 사용자 입력을 입력하세요..."
+                        defaultValue="환불 규정이 어떻게 되나요?"
+                        readOnly
+                        title="준비 중"
+                    />
                 </div>
             </div>
 
-            {/* Right Panel: Response & Logs */}
-            <div className="w-2/3 flex flex-col gap-4">
-                {/* Response Visualizer */}
-                <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                        <h3 className="font-medium text-gray-900">Chat Preview</h3>
-                        {gatewayResponse && (
-                            <span className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-50 rounded border border-green-100">
-                                200 OK
-                            </span>
-                        )}
-                    </div>
-                    <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50">
-                        {chatHistory.length === 0 ? (
-                            <div className="h-full flex items-center justify-center text-gray-400 text-sm">
-                                <p>요청을 보내면 여기에 대화 내용이 표시됩니다.</p>
-                            </div>
-                        ) : (
-                            chatHistory.map((msg, idx) => (
-                                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${msg.role === 'user'
-                                        ? 'bg-indigo-600 text-white rounded-br-none'
-                                        : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
-                                        }`}>
-                                        <div className="whitespace-pre-wrap">{msg.content}</div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                        {isLoading && (
-                            <div className="flex justify-start">
-                                <div className="bg-white border border-gray-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
-                                    <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+            {/* Right: Output */}
+            <div className="w-1/2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
+                <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center rounded-t-xl">
+                    <h3 className="font-medium text-gray-900">Output</h3>
+                    <button
+                        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                        title="준비 중"
+                    >
+                        <Play size={14} /> Run
+                    </button>
                 </div>
-
-                {/* Raw JSON Response */}
-                <div className="h-1/3 bg-gray-900 rounded-xl border border-gray-800 shadow-sm overflow-hidden flex flex-col">
-                    <div className="p-2 border-b border-gray-800 bg-gray-950 flex justify-between items-center px-4">
-                        <h3 className="text-xs font-mono text-gray-400">Raw JSON Response</h3>
-                        {gatewayResponse && (
-                            <div className="flex gap-3 text-xs text-gray-500 font-mono">
-                                {gatewayResponse.traceId && <span>Trace: {gatewayResponse.traceId.substring(0, 8)}...</span>}
-                                <span>Tokens: {gatewayResponse.usage?.totalTokens || '-'}</span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex-1 p-4 overflow-auto">
-                        <pre className="text-xs font-mono text-green-400 whitespace-pre-wrap">
-                            {gatewayResponse ? JSON.stringify(gatewayResponse, null, 2) : <span className="text-gray-600">// Waiting for response...</span>}
-                        </pre>
-                    </div>
+                <div className="flex-1 p-4 overflow-auto">
+                    <p className="text-sm text-gray-500">
+                        플레이그라운드 준비 중 - 기능이 활성화되면 여기에 결과가 표시됩니다.
+                    </p>
+                </div>
+                <div className="p-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between bg-gray-50 rounded-b-xl">
+                    <span>Latency: 1.2s</span>
+                    <span>Tokens: 154 / 4096</span>
                 </div>
             </div>
         </div>

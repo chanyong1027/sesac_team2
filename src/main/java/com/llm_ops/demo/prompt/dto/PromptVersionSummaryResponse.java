@@ -11,6 +11,9 @@ public record PromptVersionSummaryResponse(
     String title,
     ProviderType provider,
     String model,
+    ProviderType secondaryProvider,
+    String secondaryModel,
+    boolean ragEnabled,
     Long createdBy,
     LocalDateTime createdAt
 ) {
@@ -21,6 +24,9 @@ public record PromptVersionSummaryResponse(
             version.getTitle(),
             version.getProvider(),
             version.getModel(),
+            version.getSecondaryProvider(),
+            version.getSecondaryModel(),
+            version.isRagEnabled(),
             version.getCreatedBy().getId(),
             version.getCreatedAt()
         );

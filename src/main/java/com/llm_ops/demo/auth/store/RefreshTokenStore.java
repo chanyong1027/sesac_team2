@@ -17,14 +17,9 @@ public interface RefreshTokenStore {
     RefreshToken save(String token, Long userId, Instant expiryDate);
 
     /**
-     * 토큰으로 조회
+     * 사용자 ID로 조회
      */
-    Optional<RefreshToken> findByToken(String token);
-
-    /**
-     * 토큰으로 삭제
-     */
-    void deleteByToken(String token);
+    Optional<RefreshToken> findByUserId(Long userId);
 
     /**
      * 사용자 ID로 모든 토큰 삭제

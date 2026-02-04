@@ -17,9 +17,20 @@ public record PromptVersionCreateRequest(
     @Size(max = 100, message = "모델명은 100자를 초과할 수 없습니다.")
     String model,
 
+    ProviderType secondaryProvider,
+
+    @Size(max = 100, message = "예비 모델명은 100자를 초과할 수 없습니다.")
+    String secondaryModel,
+
     String systemPrompt,
 
+    @NotBlank(message = "userTemplate는 필수입니다.")
     String userTemplate,
+
+    Boolean ragEnabled,
+
+    @Size(max = 1000, message = "변경 링크는 1000자를 초과할 수 없습니다.")
+    String contextUrl,
 
     Map<String, Object> modelConfig
 ) {}

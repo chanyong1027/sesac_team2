@@ -135,7 +135,7 @@ class AuthServiceTest {
 
             // RefreshToken mocking
             com.llm_ops.demo.auth.domain.RefreshToken mockRefreshToken = com.llm_ops.demo.auth.domain.RefreshToken
-                    .create("mockRefreshToken", 1L, java.time.Instant.now());
+                    .create("mockRefreshTokenHash", "mockRefreshToken", 1L, java.time.Instant.now());
             given(refreshTokenService.createAndSave(1L)).willReturn(mockRefreshToken);
             given(jwtTokenProvider.getRefreshExpirationSec()).willReturn(1209600L);
 

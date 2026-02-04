@@ -3,9 +3,11 @@ package com.llm_ops.demo.auth.service;
 import com.llm_ops.demo.auth.domain.RefreshToken;
 import com.llm_ops.demo.auth.jwt.JwtTokenProvider;
 import com.llm_ops.demo.auth.store.RefreshTokenStore;
+import com.llm_ops.demo.auth.util.TokenHashingUtils;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ public class RefreshTokenService {
 
     private final RefreshTokenStore refreshTokenStore;
     private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * 로그인 시: Refresh Token 생성 및 저장
@@ -38,20 +41,32 @@ public class RefreshTokenService {
      * 토큰 갱신 시: 검증 후 새 토큰 발급 (RT Rotate)
      */
     public RefreshToken rotateRefreshToken(String oldToken) {
+        Long userId;
+        try {
+            userId = jwtTokenProvider.getUserIdFromToken(oldToken);
+        } catch (Exception ex) {
+            throw new BusinessException(ErrorCode.UNAUTHENTICATED,
+                    "유효하지 않은 Refresh Token입니다.");
+        }
+
         // 1. 토큰 존재 여부 확인 (화이트리스트)
-        RefreshToken existingToken = refreshTokenStore.findByToken(oldToken)
+        RefreshToken existingToken = refreshTokenStore.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHENTICATED,
                         "유효하지 않은 Refresh Token입니다."));
 
+        if (!passwordEncoder.matches(TokenHashingUtils.sha256Hex(oldToken), existingToken.getTokenHash())) {
+            throw new BusinessException(ErrorCode.UNAUTHENTICATED,
+                    "유효하지 않은 Refresh Token입니다.");
+        }
+
         // 2. 만료 여부 확인
         if (existingToken.isExpired()) {
-            refreshTokenStore.deleteByToken(oldToken);
+            refreshTokenStore.deleteByUserId(userId);
             throw new BusinessException(ErrorCode.UNAUTHENTICATED,
                     "만료된 Refresh Token입니다.");
         }
 
         // 3. RT Rotate (기존 토큰 삭제 후 새 토큰 발급)
-        Long userId = existingToken.getUserId();
         return createAndSave(userId);
     }
 
