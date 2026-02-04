@@ -31,6 +31,12 @@ const providerInfo: Record<string, { name: string; color: string; bgColor: strin
 };
 
 const providers = ['OPENAI', 'ANTHROPIC', 'GEMINI'];
+const statusMeta: Record<string, { label: string; badge: string; text: string }> = {
+  ACTIVE: { label: '연결 완료', badge: 'bg-green-100 text-green-700', text: 'text-gray-500' },
+  VERIFYING: { label: '검증 중', badge: 'bg-amber-100 text-amber-700', text: 'text-amber-600' },
+  INVALID: { label: '검증 실패', badge: 'bg-rose-100 text-rose-700', text: 'text-rose-600' },
+  REVOKED: { label: '비활성', badge: 'bg-gray-100 text-gray-600', text: 'text-gray-500' },
+};
 
 const normalizeProviderKey = (raw: string) => {
   const normalized = raw.trim().toLowerCase();
@@ -52,11 +58,15 @@ function ProviderCard({
   credential,
   onAdd,
   onUpdate,
+  onReverify,
+  isReverifyPending,
 }: {
   provider: string;
   credential?: ProviderCredentialSummaryResponse;
   onAdd: () => void;
   onUpdate: () => void;
+  onReverify: () => void;
+  isReverifyPending: boolean;
 }) {
   const info = providerInfo[provider] || {
     name: provider,
@@ -66,7 +76,11 @@ function ProviderCard({
     icon: 'text-gray-500',
   };
 
-  const isConnected = !!credential;
+  const status = credential?.status || 'UNKNOWN';
+  const meta = statusMeta[status] || { label: '미확인', badge: 'bg-gray-100 text-gray-600', text: 'text-gray-500' };
+  const isConnected = status === 'ACTIVE';
+  const isVerifying = status === 'VERIFYING';
+  const isInvalid = status === 'INVALID';
 
   return (
     <div
@@ -86,16 +100,16 @@ function ProviderCard({
             <h3 className="text-base font-bold text-gray-900">
               {info.name}
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {isConnected ? '연결 완료' : '미연결'}
+            <p className={`text-xs mt-0.5 ${isConnected ? 'text-gray-500' : meta.text}`}>
+              {isConnected ? '연결 완료' : meta.label}
             </p>
           </div>
         </div>
 
-        {isConnected && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
-            <Check size={12} />
-            Active
+        {credential && (
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${meta.badge}`}>
+            {isConnected ? <Check size={12} /> : null}
+            {isConnected ? 'Active' : meta.label}
           </span>
         )}
       </div>
@@ -114,12 +128,23 @@ function ProviderCard({
               })}
             </p>
           </div>
-          <button
-            onClick={onUpdate}
-            className="w-full py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
-          >
-            키 업데이트
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={onUpdate}
+              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
+            >
+              키 업데이트
+            </button>
+            {(isInvalid || isVerifying) && (
+              <button
+                onClick={onReverify}
+                disabled={isVerifying || isReverifyPending}
+                className="flex-1 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+              >
+                {isVerifying || isReverifyPending ? '검증 중...' : '재검증'}
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -173,9 +198,8 @@ function AddProviderModal({
       queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
       setUpdateError(null);
       setApiKey('');
-      onSuccessMessage('검증 완료 - API 키가 저장되었습니다.');
+      onSuccessMessage('검증이 시작되었습니다. 잠시 후 상태가 갱신됩니다.');
       handleClose();
-    },
     },
     onError: (error) => {
       setUpdateError(resolveCredentialError(error, 'API 키 검증에 실패했습니다.'));
@@ -282,7 +306,7 @@ function UpdateProviderModal({
       queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
       setUpdateError(null);
       setApiKey('');
-      onSuccessMessage('검증 완료 - API 키가 업데이트되었습니다.');
+      onSuccessMessage('검증이 시작되었습니다. 잠시 후 상태가 갱신됩니다.');
       onClose();
     },
     onError: (error) => {
@@ -390,9 +414,31 @@ export function SettingsProviderKeysPage() {
     queryFn: async () => {
       if (!currentOrgId) return [];
       const response = await organizationApi.getCredentials(currentOrgId);
-      return response.data;
+      const payload = response.data as
+        | ProviderCredentialSummaryResponse[]
+        | { data?: ProviderCredentialSummaryResponse[] };
+      if (Array.isArray(payload)) {
+        return payload;
+      }
+      return payload?.data ?? [];
     },
     enabled: !!currentOrgId,
+    refetchInterval: (data) =>
+      Array.isArray(data) && data.some((cred) => cred.status === 'VERIFYING') ? 5000 : false,
+  });
+
+  const reverifyMutation = useMutation({
+    mutationFn: async (credentialId: number) => {
+      if (!currentOrgId) throw new Error('No organization selected');
+      return organizationApi.verifyCredential(currentOrgId, credentialId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
+      showToast('재검증이 시작되었습니다.');
+    },
+    onError: (error) => {
+      showToast(resolveCredentialError(error, '재검증 요청에 실패했습니다.'));
+    },
   });
 
   const credentialMap = (credentials || []).reduce((acc, cred) => {
@@ -448,6 +494,13 @@ export function SettingsProviderKeysPage() {
               credential={credentialMap[provider]}
               onAdd={() => setAddingProvider(provider)}
               onUpdate={() => setUpdatingCredential(credentialMap[provider] ?? null)}
+              onReverify={() => {
+                const credentialId = credentialMap[provider]?.credentialId;
+                if (credentialId) {
+                  reverifyMutation.mutate(credentialId);
+                }
+              }}
+              isReverifyPending={reverifyMutation.isPending}
             />
           ))}
         </div>
