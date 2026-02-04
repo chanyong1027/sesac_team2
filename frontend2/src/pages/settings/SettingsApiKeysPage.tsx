@@ -166,12 +166,14 @@ function RotateConfirmModal({
   onConfirm,
   isPending,
   keyName,
+  errorMessage,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (reason: string) => void;
   isPending: boolean;
   keyName: string;
+  errorMessage?: string;
 }) {
   const [reason, setReason] = useState('');
 
@@ -217,6 +219,14 @@ function RotateConfirmModal({
           />
         </div>
 
+        {errorMessage && (
+          <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">
+              ❌ {errorMessage}
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -242,6 +252,7 @@ export function SettingsApiKeysPage() {
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
   const [rotateTarget, setRotateTarget] = useState<{ id: number; name: string } | null>(null);
   const [rotatedKey, setRotatedKey] = useState<string | null>(null);
+  const [rotateError, setRotateError] = useState<string | null>(null);
   const { currentOrgId } = useOrganizationStore();
   const queryClient = useQueryClient();
 
@@ -263,7 +274,11 @@ export function SettingsApiKeysPage() {
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['organization-api-keys'] });
       setRotateTarget(null);
+      setRotateError(null);
       setRotatedKey(response.data.apiKey);
+    },
+    onError: () => {
+      setRotateError('재발급에 실패했습니다. 다시 시도해주세요.');
     },
   });
 
@@ -274,8 +289,14 @@ export function SettingsApiKeysPage() {
 
   const handleRotateConfirm = (reason: string) => {
     if (rotateTarget) {
+      setRotateError(null);  // 재시도 시 에러 초기화
       rotateMutation.mutate({ keyId: rotateTarget.id, reason });
     }
+  };
+
+  const handleRotateModalClose = () => {
+    setRotateTarget(null);
+    setRotateError(null);  // 모달 닫을 때 에러 초기화
   };
 
   if (!currentOrgId) return <div>조직을 선택해주세요.</div>;
@@ -410,10 +431,11 @@ export function SettingsApiKeysPage() {
       <RotateConfirmModal
         key={rotateTarget?.id}
         isOpen={!!rotateTarget}
-        onClose={() => setRotateTarget(null)}
+        onClose={handleRotateModalClose}
         onConfirm={handleRotateConfirm}
         isPending={rotateMutation.isPending}
         keyName={rotateTarget?.name || ''}
+        errorMessage={rotateError || undefined}
       />
 
       <KeyRevealModal
