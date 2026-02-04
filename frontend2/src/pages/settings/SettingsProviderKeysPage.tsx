@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { AxiosError } from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
@@ -36,6 +37,14 @@ const normalizeProviderKey = (raw: string) => {
   if (normalized === 'google') return 'GEMINI';
   if (normalized === 'claude') return 'ANTHROPIC';
   return normalized.toUpperCase();
+};
+
+const resolveCredentialError = (error: unknown, fallback: string) => {
+  if (!error) {
+    return fallback;
+  }
+  const axiosError = error as AxiosError<{ message?: string }>;
+  return axiosError.response?.data?.message || fallback;
 };
 
 function ProviderCard({
@@ -134,10 +143,12 @@ function AddProviderModal({
   isOpen,
   onClose,
   provider,
+  onSuccessMessage,
 }: {
   isOpen: boolean;
   onClose: () => void;
   provider: string | null;
+  onSuccessMessage: (message: string) => void;
 }) {
   const [apiKey, setApiKey] = useState('');
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -160,8 +171,13 @@ function AddProviderModal({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
+      setUpdateError(null);
       setApiKey('');
+      onSuccessMessage('검증 완료 - API 키가 저장되었습니다.');
       onClose();
+    },
+    onError: (error) => {
+      setUpdateError(resolveCredentialError(error, 'API 키 검증에 실패했습니다.'));
     },
   });
 
@@ -173,7 +189,7 @@ function AddProviderModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       />
       <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
         <div className="flex items-center gap-4 mb-6">
@@ -197,7 +213,10 @@ function AddProviderModal({
           <input
             type="password"
             value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+            onChange={(e) => {
+              setApiKey(e.target.value);
+              if (updateError) setUpdateError(null);
+            }}
             placeholder={`sk-... (${info?.name} API Key)`}
             className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono"
             autoFocus
@@ -206,11 +225,14 @@ function AddProviderModal({
             <Shield size={12} />
             키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
+          {updateError && (
+            <p className="mt-2 text-xs text-rose-600">{updateError}</p>
+          )}
         </div>
 
         <div className="flex gap-3">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             취소
@@ -220,7 +242,7 @@ function AddProviderModal({
             disabled={!apiKey.trim() || createMutation.isPending}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
           >
-            {createMutation.isPending ? '연결 중...' : '연결하기'}
+            {createMutation.isPending ? '검증 중...' : '연결 및 검증'}
           </button>
         </div>
       </div>
@@ -232,14 +254,23 @@ function UpdateProviderModal({
   isOpen,
   onClose,
   credential,
+  onSuccessMessage,
 }: {
   isOpen: boolean;
   onClose: () => void;
   credential: ProviderCredentialSummaryResponse | null;
+  onSuccessMessage: (message: string) => void;
 }) {
   const [apiKey, setApiKey] = useState('');
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentOrgId } = useOrganizationStore();
+
+  const handleClose = () => {
+    setUpdateError(null);
+    setApiKey('');
+    onClose();
+  };
 
   const updateMutation = useMutation({
     mutationFn: () => {
@@ -250,11 +281,11 @@ function UpdateProviderModal({
       queryClient.invalidateQueries({ queryKey: ['provider-credentials', currentOrgId] });
       setUpdateError(null);
       setApiKey('');
+      onSuccessMessage('검증 완료 - API 키가 업데이트되었습니다.');
       onClose();
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : 'API 키 업데이트에 실패했습니다.';
-      setUpdateError(message);
+      setUpdateError(resolveCredentialError(error, 'API 키 검증에 실패했습니다.'));
     },
   });
 
@@ -319,7 +350,7 @@ function UpdateProviderModal({
             disabled={!apiKey.trim() || updateMutation.isPending}
             className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
           >
-            {updateMutation.isPending ? '업데이트 중...' : '업데이트'}
+            {updateMutation.isPending ? '검증 중...' : '업데이트 및 검증'}
           </button>
         </div>
       </div>
@@ -330,7 +361,28 @@ function UpdateProviderModal({
 export function SettingsProviderKeysPage() {
   const [addingProvider, setAddingProvider] = useState<string | null>(null);
   const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
   const { currentOrgId } = useOrganizationStore();
+
+  const showToast = (message: string) => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const { data: credentials, isLoading } = useQuery({
     queryKey: ['provider-credentials', currentOrgId],
@@ -352,6 +404,11 @@ export function SettingsProviderKeysPage() {
 
   return (
     <div>
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+          {toastMessage}
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
           Provider 키
@@ -409,11 +466,13 @@ export function SettingsProviderKeysPage() {
         isOpen={!!addingProvider}
         onClose={() => setAddingProvider(null)}
         provider={addingProvider}
+        onSuccessMessage={showToast}
       />
       <UpdateProviderModal
         isOpen={!!updatingCredential}
         onClose={() => setUpdatingCredential(null)}
         credential={updatingCredential}
+        onSuccessMessage={showToast}
       />
     </div>
   );
