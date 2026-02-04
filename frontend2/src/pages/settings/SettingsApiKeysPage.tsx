@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
-import { Key, Copy, Check, AlertTriangle, Plus } from 'lucide-react';
+import { Key, Copy, Check, AlertTriangle, Plus, RefreshCw } from 'lucide-react';
 
 function StatusBadge({ status }: { status: string }) {
   const isActive = status === 'ACTIVE';
@@ -99,10 +99,12 @@ function KeyRevealModal({
   isOpen,
   onClose,
   apiKey,
+  title = 'API 키가 생성되었습니다',
 }: {
   isOpen: boolean;
   onClose: () => void;
   apiKey: string;
+  title?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -124,7 +126,7 @@ function KeyRevealModal({
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900">
-              API 키가 생성되었습니다
+              {title}
             </h3>
             <p className="text-sm text-gray-500 mt-1">
               이 키는 지금 한 번만 표시됩니다. 안전한 곳에 복사하여 저장하세요.
@@ -158,10 +160,101 @@ function KeyRevealModal({
   );
 }
 
+function RotateConfirmModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  isPending,
+  keyName,
+  errorMessage,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (reason: string) => void;
+  isPending: boolean;
+  keyName: string;
+  errorMessage?: string;
+}) {
+  const [reason, setReason] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-12 h-12 flex items-center justify-center bg-amber-100 text-amber-600 rounded-full shrink-0">
+            <RefreshCw size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">
+              API 키 재발급
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
+              <strong>{keyName}</strong> 키를 재발급하시겠습니까?
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <p className="text-sm text-amber-800">
+            ⚠️ 기존 키는 즉시 무효화됩니다. 해당 키를 사용 중인 모든 서비스에서 새 키로 교체해야 합니다.
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+            재발급 사유 (선택)
+          </label>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="예: 키 노출로 인한 긴급 교체"
+            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+          />
+        </div>
+
+        {errorMessage && (
+          <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">
+              ❌ {errorMessage}
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => onConfirm(reason)}
+            disabled={isPending}
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50 shadow-sm"
+          >
+            {isPending ? '재발급 중...' : '재발급'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsApiKeysPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+  const [rotateTarget, setRotateTarget] = useState<{ id: number; name: string } | null>(null);
+  const [rotatedKey, setRotatedKey] = useState<string | null>(null);
+  const [rotateError, setRotateError] = useState<string | null>(null);
   const { currentOrgId } = useOrganizationStore();
+  const queryClient = useQueryClient();
 
   const { data: apiKeys, isLoading } = useQuery({
     queryKey: ['organization-api-keys', currentOrgId],
@@ -173,9 +266,37 @@ export function SettingsApiKeysPage() {
     enabled: !!currentOrgId,
   });
 
+  const rotateMutation = useMutation({
+    mutationFn: ({ keyId, reason }: { keyId: number; reason: string }) => {
+      if (!currentOrgId) throw new Error('No organization selected');
+      return organizationApi.rotateApiKey(currentOrgId, keyId, { reason: reason || undefined });
+    },
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ['organization-api-keys'] });
+      setRotateTarget(null);
+      setRotateError(null);
+      setRotatedKey(response.data.apiKey);
+    },
+    onError: () => {
+      setRotateError('재발급에 실패했습니다. 다시 시도해주세요.');
+    },
+  });
+
   const handleKeyCreated = (key: string) => {
     setIsCreateModalOpen(false);
     setNewlyCreatedKey(key);
+  };
+
+  const handleRotateConfirm = (reason: string) => {
+    if (rotateTarget) {
+      setRotateError(null);  // 재시도 시 에러 초기화
+      rotateMutation.mutate({ keyId: rotateTarget.id, reason });
+    }
+  };
+
+  const handleRotateModalClose = () => {
+    setRotateTarget(null);
+    setRotateError(null);  // 모달 닫을 때 에러 초기화
   };
 
   if (!currentOrgId) return <div>조직을 선택해주세요.</div>;
@@ -214,10 +335,11 @@ export function SettingsApiKeysPage() {
 
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
         <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <div className="col-span-4">이름</div>
+          <div className="col-span-3">이름</div>
           <div className="col-span-3">키 접두사</div>
           <div className="col-span-2">상태</div>
-          <div className="col-span-3">마지막 사용</div>
+          <div className="col-span-2">마지막 사용</div>
+          <div className="col-span-2"></div>
         </div>
 
         {isLoading ? (
@@ -226,37 +348,47 @@ export function SettingsApiKeysPage() {
           </div>
         ) : apiKeys && apiKeys.length > 0 ? (
           <div className="divide-y divide-gray-100">
-            {apiKeys.map((key) => (
+            {apiKeys.map((apiKey) => (
               <div
-                key={key.id}
+                key={apiKey.id}
                 className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors"
               >
-                <div className="col-span-4">
+                <div className="col-span-3">
                   <p className="text-sm font-medium text-gray-900">
-                    {key.name}
+                    {apiKey.name}
                   </p>
                 </div>
 
                 <div className="col-span-3">
                   <code className="px-2 py-1 text-xs font-mono bg-gray-100 text-gray-600 rounded">
-                    {key.keyPrefix}...
+                    {apiKey.keyPrefix}...
                   </code>
                 </div>
 
                 <div className="col-span-2">
-                  <StatusBadge status={key.status} />
+                  <StatusBadge status={apiKey.status} />
                 </div>
 
-                <div className="col-span-3">
+                <div className="col-span-2">
                   <span className="text-sm text-gray-500">
-                    {key.lastUsedAt
-                      ? new Date(key.lastUsedAt).toLocaleDateString('ko-KR', {
+                    {apiKey.lastUsedAt
+                      ? new Date(apiKey.lastUsedAt).toLocaleDateString('ko-KR', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric',
                       })
-                      : '사용 기록 없음'}
+                      : '-'}
                   </span>
+                </div>
+
+                <div className="col-span-2 text-right">
+                  <button
+                    onClick={() => setRotateTarget({ id: apiKey.id, name: apiKey.name })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    재발급
+                  </button>
                 </div>
               </div>
             ))}
@@ -294,6 +426,23 @@ export function SettingsApiKeysPage() {
         isOpen={!!newlyCreatedKey}
         onClose={() => setNewlyCreatedKey(null)}
         apiKey={newlyCreatedKey || ''}
+      />
+
+      <RotateConfirmModal
+        key={rotateTarget?.id}
+        isOpen={!!rotateTarget}
+        onClose={handleRotateModalClose}
+        onConfirm={handleRotateConfirm}
+        isPending={rotateMutation.isPending}
+        keyName={rotateTarget?.name || ''}
+        errorMessage={rotateError || undefined}
+      />
+
+      <KeyRevealModal
+        isOpen={!!rotatedKey}
+        onClose={() => setRotatedKey(null)}
+        apiKey={rotatedKey || ''}
+        title="API 키가 재발급되었습니다"
       />
     </div>
   );

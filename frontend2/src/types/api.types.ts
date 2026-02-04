@@ -205,6 +205,15 @@ export interface OrganizationApiKeySummaryResponse {
   lastUsedAt: string | null;
 }
 
+export interface OrganizationApiKeyRotateRequest {
+  reason?: string;
+}
+
+export interface OrganizationApiKeyRotateResponse {
+  apiKey: string;
+  rotatedAt: string;
+}
+
 // ========================================
 // Gateway Chat
 // ========================================
