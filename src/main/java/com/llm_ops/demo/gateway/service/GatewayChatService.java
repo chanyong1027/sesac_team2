@@ -6,7 +6,9 @@ import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
+import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.global.error.BusinessException;
+import java.math.BigDecimal;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
@@ -174,7 +176,26 @@ public class GatewayChatService {
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
-            GatewayChatUsage usage = extractUsage(response);
+            // 토큰 정보 추출 (로그 저장 및 비용 계산용)
+            Integer inputTokens = null;
+            Integer outputTokens = null;
+            Integer totalTokens = null;
+            BigDecimal estimatedCost = null;
+
+            if (response.getMetadata() != null && response.getMetadata().getUsage() != null) {
+                inputTokens = safeToInteger(response.getMetadata().getUsage().getPromptTokens());
+                outputTokens = safeToInteger(response.getMetadata().getUsage().getGenerationTokens());
+                totalTokens = safeToInteger(response.getMetadata().getUsage().getTotalTokens());
+                // 입력/출력 토큰 모두 있을 때만 비용 계산 (일부 프로바이더는 totalTokens만 반환)
+                if (inputTokens != null && outputTokens != null) {
+                    estimatedCost = ModelPricing.calculateCost(usedModel, inputTokens, outputTokens);
+                }
+            }
+
+            // API 응답용 DTO (클라이언트에게는 총 토큰과 비용만 전달)
+            GatewayChatUsage usage = new GatewayChatUsage(
+                    totalTokens != null ? totalTokens.longValue() : null,
+                    estimatedCost);
 
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
@@ -183,9 +204,11 @@ public class GatewayChatService {
                     requestedModel,
                     usedModel,
                     false,
-                    null,
-                    null,
-                    safeToInteger(usage != null ? usage.totalTokens() : null),
+                    inputTokens,
+                    outputTokens,
+                    totalTokens,
+                    estimatedCost,
+                    ModelPricing.getPricingVersion(),
                     ragLatencyMs,
                     ragChunksCount,
                     ragContextChars,
@@ -209,6 +232,8 @@ public class GatewayChatService {
                     null,
                     null,
                     null,
+                    null, // cost
+                    null, // version
                     e.getErrorCode().name(),
                     e.getMessage(),
                     "BUSINESS_EXCEPTION",
@@ -229,6 +254,8 @@ public class GatewayChatService {
                     null,
                     null,
                     null,
+                    null, // cost
+                    null, // version
                     ErrorCode.INTERNAL_SERVER_ERROR.name(),
                     "Unhandled exception",
                     "UNHANDLED_EXCEPTION",
@@ -396,18 +423,6 @@ public class GatewayChatService {
             rendered = rendered.replace(placeholder, entry.getValue());
         }
         return rendered;
-    }
-
-    /**
-     * Spring AI의 ChatResponse 메타데이터에서 토큰 사용량 정보를 추출합니다.
-     */
-    private GatewayChatUsage extractUsage(ChatResponse response) {
-        if (response.getMetadata() == null || response.getMetadata().getUsage() == null) {
-            return null;
-        }
-        Long totalTokens = response.getMetadata().getUsage().getTotalTokens();
-        // TODO: Cost calculation logic needs to be implemented.
-        return new GatewayChatUsage(totalTokens, null);
     }
 
     private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride) {

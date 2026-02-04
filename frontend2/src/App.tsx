@@ -91,8 +91,8 @@ function LegacyWorkspaceRedirect() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthInitializer />
       <BrowserRouter>
+        <AuthInitializer />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage_v3 />} />

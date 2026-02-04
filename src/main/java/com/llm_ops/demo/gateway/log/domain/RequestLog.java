@@ -1,6 +1,5 @@
 package com.llm_ops.demo.gateway.log.domain;
 
-import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -195,7 +194,8 @@ public class RequestLog {
     }
 
     public void fillModelUsage(String provider, String requestedModel, String usedModel, boolean isFailover,
-            Integer inputTokens, Integer outputTokens, Integer totalTokens) {
+            Integer inputTokens, Integer outputTokens, Integer totalTokens, BigDecimal estimatedCost,
+            String pricingVersion) {
         this.provider = provider;
         this.requestedModel = requestedModel;
         this.usedModel = usedModel;
@@ -203,22 +203,8 @@ public class RequestLog {
         this.inputTokens = inputTokens;
         this.outputTokens = outputTokens;
         this.totalTokens = totalTokens;
-
-        // 비용 자동 계산
-        calculateAndFillCost();
-    }
-
-    /**
-     * 모델 사용량 기반 비용 계산 및 설정
-     */
-    private void calculateAndFillCost() {
-        if (this.usedModel == null || this.inputTokens == null || this.outputTokens == null) {
-            return;
-        }
-
-        BigDecimal cost = ModelPricing.calculateCost(this.usedModel, this.inputTokens, this.outputTokens);
-        this.estimatedCost = cost;
-        this.pricingVersion = ModelPricing.getPricingVersion();
+        this.estimatedCost = estimatedCost;
+        this.pricingVersion = pricingVersion;
     }
 
     public void fillRagMetrics(

@@ -57,7 +57,8 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 })
 @DisplayName("Gateway-RAG 통합 테스트")
 @Transactional
-class GatewayRagIntegrationTest {
+class
+GatewayRagIntegrationTest {
 
     @Autowired
     private WebApplicationContext context;
