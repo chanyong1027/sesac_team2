@@ -3,6 +3,8 @@ import type {
   WorkspaceSummaryResponse,
   WorkspaceCreateRequest,
   WorkspaceCreateResponse,
+  WorkspaceUpdateRequest,
+  WorkspaceUpdateResponse,
   WorkspaceInviteCreateRequest,
   WorkspaceInviteCreateResponse,
   WorkspaceInviteAcceptRequest,
@@ -18,6 +20,13 @@ export const workspaceApi = {
   createWorkspace: (orgId: number, data: WorkspaceCreateRequest) =>
     api.post<WorkspaceCreateResponse>(
       `/organizations/${orgId}/workspaces`,
+      data
+    ),
+
+  // 워크스페이스 수정 - 현재 백엔드: PATCH /api/v1/organizations/{orgId}/workspaces/{workspaceId}
+  updateWorkspace: (orgId: number, workspaceId: number, data: WorkspaceUpdateRequest) =>
+    api.patch<WorkspaceUpdateResponse>(
+      `/organizations/${orgId}/workspaces/${workspaceId}`,
       data
     ),
 

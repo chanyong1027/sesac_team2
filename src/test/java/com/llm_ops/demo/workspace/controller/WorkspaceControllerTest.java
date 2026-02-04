@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +17,8 @@ import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceSummaryResponse;
+import com.llm_ops.demo.workspace.dto.WorkspaceUpdateRequest;
+import com.llm_ops.demo.workspace.dto.WorkspaceUpdateResponse;
 import com.llm_ops.demo.workspace.service.WorkspaceListService;
 import com.llm_ops.demo.workspace.service.WorkspaceService;
 import java.time.LocalDateTime;
@@ -171,5 +174,49 @@ class WorkspaceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("워크스페이스 수정 API 성공")
+    void updateWorkspace_Success() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 1L;
+        WorkspaceUpdateRequest request = new WorkspaceUpdateRequest("수정된 이름");
+        WorkspaceUpdateResponse response = new WorkspaceUpdateResponse(
+                workspaceId, "production", "수정된 이름", WorkspaceStatus.ACTIVE);
+
+        given(workspaceService.update(eq(orgId), eq(workspaceId), eq(userId), any(WorkspaceUpdateRequest.class)))
+                .willReturn(response);
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/organizations/{orgId}/workspaces/{workspaceId}", orgId, workspaceId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(workspaceId))
+                .andExpect(jsonPath("$.name").value("production"))
+                .andExpect(jsonPath("$.displayName").value("수정된 이름"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    @DisplayName("워크스페이스 수정 시 이름 누락이면 검증 실패")
+    void updateWorkspace_BlankDisplayName_ValidationFails() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 1L;
+        WorkspaceUpdateRequest request = new WorkspaceUpdateRequest("");
+
+        // when & then
+        mockMvc.perform(patch("/api/v1/organizations/{orgId}/workspaces/{workspaceId}", orgId, workspaceId)
+                .header("X-User-Id", userId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andDo(print())
+                .andExpect(status().isBadRequest());
     }
 }
