@@ -17,7 +17,10 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "token_hash", nullable = false, unique = true)
+    private String tokenHash;
+
+    @Transient
     private String token;
 
     @Column(nullable = false)
@@ -26,8 +29,9 @@ public class RefreshToken {
     @Column(nullable = false)
     private Instant expiryDate;
 
-    public static RefreshToken create(String token, Long userId, Instant expiryDate) {
+    public static RefreshToken create(String tokenHash, String token, Long userId, Instant expiryDate) {
         RefreshToken rt = new RefreshToken();
+        rt.tokenHash = tokenHash;
         rt.token = token;
         rt.userId = userId;
         rt.expiryDate = expiryDate;
