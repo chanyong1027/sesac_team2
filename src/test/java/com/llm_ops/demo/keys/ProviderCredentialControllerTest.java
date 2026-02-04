@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 @TestPropertySource(properties = "PROVIDER_KEY_ENC_KEY=test-secret")
 @Import(TestSecurityConfig.class)
 class ProviderCredentialControllerTest {
+    // no-op: trigger commit for TODO progression
 
   @Autowired
   private WebApplicationContext context;
