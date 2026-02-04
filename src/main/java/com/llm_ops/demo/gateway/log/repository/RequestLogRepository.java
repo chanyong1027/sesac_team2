@@ -25,8 +25,8 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
     @Query(value = """
             SELECT
                 COUNT(*) as totalRequests,
-                SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) as successCount,
-                SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) as errorCount,
+                COALESCE(SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END), 0) as successCount,
+                COALESCE(SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END), 0) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as totalTokens,
                 CAST(COALESCE(AVG(latency_ms), 0) AS int) as avgLatencyMs,
                 CAST(COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency_ms), 0) AS int) as p95LatencyMs,
