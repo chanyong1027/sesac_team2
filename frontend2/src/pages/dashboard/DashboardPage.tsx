@@ -103,9 +103,11 @@ export default function DashboardPage() {
 
     const formatCurrency = (num: number) => {
         if (num === 0) return '$0.00';
-        if (num < 0.01) return '$' + num.toFixed(6);  // 작은 금액은 소수점 6자리
-        if (num < 1) return '$' + num.toFixed(4);     // $1 미만은 소수점 4자리
-        return '$' + num.toFixed(2);                  // 그 외는 소수점 2자리
+        const sign = num < 0 ? '-' : '';
+        const abs = Math.abs(num);
+        if (abs < 0.01) return sign + '$' + abs.toFixed(6);  // 작은 금액은 소수점 6자리
+        if (abs < 1) return sign + '$' + abs.toFixed(4);     // $1 미만은 소수점 4자리
+        return sign + '$' + abs.toFixed(2);                  // 그 외는 소수점 2자리
     };
 
     const formatDate = (dateStr: string) => {
