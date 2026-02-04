@@ -2,7 +2,7 @@
 
 CREATE TABLE IF NOT EXISTS console_user (
     id BIGSERIAL PRIMARY KEY,
-    email VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(254) NOT NULL UNIQUE,
     name VARCHAR(50) NOT NULL,
     password VARCHAR(100) NOT NULL,
     status VARCHAR(20) NOT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS workspace_invitation_links (
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id BIGSERIAL PRIMARY KEY,
-    token VARCHAR(255) NOT NULL UNIQUE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
     user_id BIGINT NOT NULL,
     expiry_date TIMESTAMPTZ NOT NULL,
     CONSTRAINT fk_refresh_tokens_user
