@@ -71,4 +71,11 @@ export const organizationApi = {
     api.get<OrganizationApiKeySummaryResponse[]>(
       `/organizations/${orgId}/api-keys`
     ),
+
+  // API 키 재발급 - POST /api/v1/organizations/{orgId}/api-keys/{keyId}/rotate
+  rotateApiKey: (orgId: number, keyId: number, data: { reason?: string }) =>
+    api.post<{ apiKey: string; rotatedAt: string }>(
+      `/organizations/${orgId}/api-keys/${keyId}/rotate`,
+      data
+    ),
 };
