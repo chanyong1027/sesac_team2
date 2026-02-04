@@ -55,4 +55,14 @@ public class ProviderCredentialController {
                 providerCredentialService.update(organizationId, credentialId, request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{credentialId}/verify")
+    public ResponseEntity<ProviderCredentialCreateResponse> verify(
+            @PathVariable("orgId") Long organizationId,
+            @PathVariable Long credentialId
+    ) {
+        ProviderCredentialCreateResponse response =
+                providerCredentialService.requestVerification(organizationId, credentialId);
+        return ResponseEntity.ok(response);
+    }
 }

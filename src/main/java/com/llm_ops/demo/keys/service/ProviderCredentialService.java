@@ -13,6 +13,8 @@ import com.llm_ops.demo.keys.repository.ProviderCredentialRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 @Service
@@ -21,7 +23,7 @@ public class ProviderCredentialService {
 
     private final ProviderCredentialRepository providerCredentialRepository;
     private final ProviderKeyEncryptor providerKeyEncryptor;
-    private final ProviderCredentialVerifier providerCredentialVerifier;
+    private final ProviderCredentialVerificationService providerCredentialVerificationService;
 
     @Transactional
     public ProviderCredentialCreateResponse register(
@@ -35,8 +37,6 @@ public class ProviderCredentialService {
 
         validateDuplicate(organizationId, providerType);
 
-        providerCredentialVerifier.verify(providerType, request.apiKey());
-
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         ProviderCredential credential = ProviderCredential.create(
                 organizationId,
@@ -45,6 +45,7 @@ public class ProviderCredentialService {
         );
 
         ProviderCredential saved = providerCredentialRepository.save(credential);
+        runAfterCommit(() -> providerCredentialVerificationService.verifyAsync(saved.getId(), request.apiKey()));
         return ProviderCredentialCreateResponse.from(saved);
     }
 
@@ -82,12 +83,47 @@ public class ProviderCredentialService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "조직에 대한 권한이 없습니다.");
         }
 
-        providerCredentialVerifier.verify(credential.getProvider(), request.apiKey());
-
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         credential.updateKey(ciphertext);
         ProviderCredential saved = providerCredentialRepository.save(credential);
+        runAfterCommit(() -> providerCredentialVerificationService.verifyAsync(saved.getId(), request.apiKey()));
         return ProviderCredentialCreateResponse.from(saved);
+    }
+
+    @Transactional
+    public ProviderCredentialCreateResponse requestVerification(
+            Long organizationId,
+            Long credentialId
+    ) {
+        if (credentialId == null || credentialId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "credentialId가 올바르지 않습니다.");
+        }
+
+        ProviderCredential credential = providerCredentialRepository.findById(credentialId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+
+        if (!credential.getOrganizationId().equals(organizationId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "조직에 대한 권한이 없습니다.");
+        }
+
+        credential.markVerifying();
+        ProviderCredential saved = providerCredentialRepository.save(credential);
+        String apiKey = providerKeyEncryptor.decrypt(saved.getKeyCiphertext());
+        runAfterCommit(() -> providerCredentialVerificationService.verifyAsync(saved.getId(), apiKey));
+        return ProviderCredentialCreateResponse.from(saved);
+    }
+
+    private void runAfterCommit(Runnable task) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+        } else {
+            task.run();
+        }
     }
     private void validateDuplicate(Long organizationId, ProviderType providerType) {
         if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
