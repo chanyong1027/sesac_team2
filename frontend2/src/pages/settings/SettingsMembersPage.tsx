@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
 import { workspaceApi } from '@/api/workspace.api';
@@ -69,6 +69,13 @@ function InviteMemberModal({
 
   // 현재 조직의 워크스페이스만 필터링
   const availableWorkspaces = workspaces?.filter(ws => ws.organizationId === currentOrgId);
+
+  // 조직 전환 시 선택된 워크스페이스가 현재 조직에 없으면 초기화
+  useEffect(() => {
+    if (selectedWorkspaceId && !availableWorkspaces?.some(ws => ws.id === selectedWorkspaceId)) {
+      setSelectedWorkspaceId(null);
+    }
+  }, [selectedWorkspaceId, availableWorkspaces]);
 
   const inviteMutation = useMutation({
     mutationFn: (workspaceId: number) =>
