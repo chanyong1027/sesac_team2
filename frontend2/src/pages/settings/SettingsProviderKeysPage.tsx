@@ -176,6 +176,7 @@ function AddProviderModal({
       onSuccessMessage('검증 완료 - API 키가 저장되었습니다.');
       handleClose();
     },
+    },
     onError: (error) => {
       setUpdateError(resolveCredentialError(error, 'API 키 검증에 실패했습니다.'));
     },
