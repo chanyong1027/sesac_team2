@@ -25,239 +25,246 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class StatisticsService {
 
-    private final RequestLogRepository requestLogRepository;
+        private final RequestLogRepository requestLogRepository;
 
-    /**
-     * 개요 통계 조회 (요청수, 성공률, 토큰, latency, 비용 등)
-     */
-    @Transactional(readOnly = true)
-    public OverviewResponse getOverview(
-            Long organizationId,
-            Long workspaceId,
-            String period,
-            LocalDateTime from,
-            LocalDateTime to) {
+        /**
+         * 개요 통계 조회 (요청수, 성공률, 토큰, latency, 비용 등)
+         */
+        @Transactional(readOnly = true)
+        public OverviewResponse getOverview(
+                        Long organizationId,
+                        Long workspaceId,
+                        String period,
+                        LocalDateTime from,
+                        LocalDateTime to) {
 
-        // 기본값 설정 (from: 30일 전, to: 오늘)
-        LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
-        LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+                // 기본값 설정 (from: 30일 전, to: 오늘)
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
 
-        // 현재 기간 통계
-        OverviewStatsProjection current = requestLogRepository.getOverviewStats(
-                organizationId, workspaceId, currentFrom, currentTo);
+                // 현재 기간 통계
+                OverviewStatsProjection current = requestLogRepository.getOverviewStats(
+                                organizationId, workspaceId, currentFrom, currentTo);
 
-        // 이전 기간 계산 및 통계
-        PeriodRange previousPeriod = calculatePreviousPeriod(period, currentFrom, currentTo);
-        OverviewStatsProjection previous = requestLogRepository.getOverviewStats(
-                organizationId, workspaceId, previousPeriod.from(), previousPeriod.to());
+                // 이전 기간 계산 및 통계
+                PeriodRange previousPeriod = calculatePreviousPeriod(period, currentFrom, currentTo);
+                OverviewStatsProjection previous = requestLogRepository.getOverviewStats(
+                                organizationId, workspaceId, previousPeriod.from(), previousPeriod.to());
 
-        // 성공률 계산
-        double successRate = current.getTotalRequests() > 0
-                ? (current.getSuccessCount() * 100.0 / current.getTotalRequests())
-                : 0.0;
+                // 성공률 계산
+                double successRate = current.getTotalRequests() > 0
+                                ? (current.getSuccessCount() * 100.0 / current.getTotalRequests())
+                                : 0.0;
 
-        // 변화율 계산
-        Double requestsChange = calculateChangeRate(
-                current.getTotalRequests(),
-                previous.getTotalRequests());
+                // 변화율 계산
+                Double requestsChange = calculateChangeRate(
+                                current.getTotalRequests(),
+                                previous.getTotalRequests());
 
-        Double tokensChange = calculateChangeRate(
-                current.getTotalTokens(),
-                previous.getTotalTokens());
+                Double tokensChange = calculateChangeRate(
+                                current.getTotalTokens(),
+                                previous.getTotalTokens());
 
-        Double latencyChange = calculateChangeRate(
-                current.getAvgLatencyMs(),
-                previous.getAvgLatencyMs());
+                Double latencyChange = calculateChangeRate(
+                                current.getAvgLatencyMs(),
+                                previous.getAvgLatencyMs());
 
-        Double costChange = calculateChangeRate(
-                current.getTotalCost(),
-                previous.getTotalCost());
+                Double costChange = calculateChangeRate(
+                                current.getTotalCost(),
+                                previous.getTotalCost());
 
-        return new OverviewResponse(
-                current.getTotalRequests(),
-                requestsChange,
-                successRate,
-                current.getErrorCount(),
-                current.getTotalTokens(),
-                tokensChange,
-                current.getAvgLatencyMs(),
-                current.getP95LatencyMs(),
-                current.getP99LatencyMs(),
-                latencyChange,
-                current.getTotalCost(),
-                costChange
-        );
-    }
-
-    /**
-     * 시계열 데이터 조회 (날짜별 요청, 토큰, 비용)
-     */
-    @Transactional(readOnly = true)
-    public TimeseriesResponse getTimeseries(
-            Long organizationId,
-            Long workspaceId,
-            String period,
-            LocalDateTime from,
-            LocalDateTime to) {
-
-        LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
-        LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
-
-        List<TimeseriesDataProjection> projections = requestLogRepository.getTimeseriesData(
-                organizationId, workspaceId, currentFrom, currentTo);
-
-        List<TimeseriesDataPoint> dataPoints = projections.stream()
-                .map(p -> new TimeseriesDataPoint(
-                        p.getDate(),
-                        p.getRequests(),
-                        p.getTokens(),
-                        p.getCost()))
-                .toList();
-
-        return new TimeseriesResponse(dataPoints);
-    }
-
-    /**
-     * 모델별 사용량 조회
-     */
-    @Transactional(readOnly = true)
-    public ModelUsageResponse getByModel(
-            Long organizationId,
-            Long workspaceId,
-            LocalDateTime from,
-            LocalDateTime to) {
-
-        LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
-        LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
-
-        List<ModelUsageProjection> projections = requestLogRepository.getModelUsage(
-                organizationId, workspaceId, currentFrom, currentTo);
-
-        // 전체 요청 수 (비율 계산용)
-        long totalRequests = projections.stream()
-                .mapToLong(ModelUsageProjection::getRequests)
-                .sum();
-
-        List<ModelUsageItem> items = projections.stream()
-                .map(p -> {
-                    double percentage = totalRequests > 0
-                            ? (p.getRequests() * 100.0 / totalRequests)
-                            : 0.0;
-                    return new ModelUsageItem(
-                            p.getProvider(),
-                            p.getModelName(),
-                            p.getRequests(),
-                            p.getTokens(),
-                            p.getCost(),
-                            percentage);
-                })
-                .toList();
-
-        return new ModelUsageResponse(items);
-    }
-
-    /**
-     * 프롬프트별 사용량 조회
-     */
-    @Transactional(readOnly = true)
-    public PromptUsageResponse getByPrompt(
-            Long organizationId,
-            Long workspaceId,
-            LocalDateTime from,
-            LocalDateTime to) {
-
-        LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
-        LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
-
-        List<PromptUsageProjection> projections = requestLogRepository.getPromptUsage(
-                organizationId, workspaceId, currentFrom, currentTo);
-
-        List<PromptUsageItem> items = projections.stream()
-                .map(p -> new PromptUsageItem(
-                        p.getPromptId(),
-                        null, // name은 Prompt 테이블에서 조인 필요 (추후 개선)
-                        p.getPromptKey(),
-                        p.getRequests(),
-                        p.getTokens(),
-                        p.getCost()))
-                .toList();
-
-        return new PromptUsageResponse(items);
-    }
-
-    /**
-     * 이전 기간 계산
-     */
-    private PeriodRange calculatePreviousPeriod(String period, LocalDateTime currentFrom, LocalDateTime currentTo) {
-        if (period == null) {
-            period = "daily";
+                return new OverviewResponse(
+                                current.getTotalRequests(),
+                                requestsChange,
+                                successRate,
+                                current.getErrorCount(),
+                                current.getTotalTokens(),
+                                tokensChange,
+                                current.getAvgLatencyMs(),
+                                current.getP95LatencyMs(),
+                                current.getP99LatencyMs(),
+                                latencyChange,
+                                current.getTotalCost(),
+                                costChange);
         }
 
-        return switch (period.toLowerCase()) {
-            case "daily" -> {
-                // 어제와 비교
-                LocalDateTime prevFrom = currentFrom.minusDays(1);
-                LocalDateTime prevTo = currentTo.minusDays(1);
-                yield new PeriodRange(prevFrom, prevTo);
-            }
-            case "weekly" -> {
-                // 지난 주와 비교
-                LocalDateTime prevFrom = currentFrom.minusWeeks(1);
-                LocalDateTime prevTo = currentTo.minusWeeks(1);
-                yield new PeriodRange(prevFrom, prevTo);
-            }
-            case "monthly" -> {
-                // 지난 달과 비교
-                LocalDateTime prevFrom = currentFrom.minusMonths(1);
-                LocalDateTime prevTo = currentTo.minusMonths(1);
-                yield new PeriodRange(prevFrom, prevTo);
-            }
-            default -> {
-                // 기본값: daily
-                LocalDateTime prevFrom = currentFrom.minusDays(1);
-                LocalDateTime prevTo = currentTo.minusDays(1);
-                yield new PeriodRange(prevFrom, prevTo);
-            }
-        };
-    }
+        /**
+         * 시계열 데이터 조회 (날짜별 요청, 토큰, 비용)
+         */
+        @Transactional(readOnly = true)
+        public TimeseriesResponse getTimeseries(
+                        Long organizationId,
+                        Long workspaceId,
+                        String period,
+                        LocalDateTime from,
+                        LocalDateTime to) {
 
-    /**
-     * 변화율 계산
-     */
-    private Double calculateChangeRate(Number current, Number previous) {
-        if (current == null || previous == null) {
-            return 0.0;
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+
+                // period에 따라 다른 쿼리 호출
+                String normalizedPeriod = (period != null) ? period.toLowerCase() : "daily";
+                List<TimeseriesDataProjection> projections = switch (normalizedPeriod) {
+                        case "weekly" -> requestLogRepository.getTimeseriesDataWeekly(
+                                        organizationId, workspaceId, currentFrom, currentTo);
+                        case "monthly" -> requestLogRepository.getTimeseriesDataMonthly(
+                                        organizationId, workspaceId, currentFrom, currentTo);
+                        default -> requestLogRepository.getTimeseriesDataDaily(
+                                        organizationId, workspaceId, currentFrom, currentTo);
+                };
+
+                List<TimeseriesDataPoint> dataPoints = projections.stream()
+                                .map(p -> new TimeseriesDataPoint(
+                                                p.getDate(),
+                                                p.getRequests(),
+                                                p.getTokens(),
+                                                p.getCost()))
+                                .toList();
+
+                return new TimeseriesResponse(dataPoints);
         }
 
-        double currentValue = current.doubleValue();
-        double previousValue = previous.doubleValue();
+        /**
+         * 모델별 사용량 조회
+         */
+        @Transactional(readOnly = true)
+        public ModelUsageResponse getByModel(
+                        Long organizationId,
+                        Long workspaceId,
+                        LocalDateTime from,
+                        LocalDateTime to) {
 
-        if (previousValue == 0) {
-            return currentValue > 0 ? 100.0 : 0.0;
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+
+                List<ModelUsageProjection> projections = requestLogRepository.getModelUsage(
+                                organizationId, workspaceId, currentFrom, currentTo);
+
+                // 전체 요청 수 (비율 계산용)
+                long totalRequests = projections.stream()
+                                .mapToLong(ModelUsageProjection::getRequests)
+                                .sum();
+
+                List<ModelUsageItem> items = projections.stream()
+                                .map(p -> {
+                                        double percentage = totalRequests > 0
+                                                        ? (p.getRequests() * 100.0 / totalRequests)
+                                                        : 0.0;
+                                        return new ModelUsageItem(
+                                                        p.getProvider(),
+                                                        p.getModelName(),
+                                                        p.getRequests(),
+                                                        p.getTokens(),
+                                                        p.getCost(),
+                                                        percentage);
+                                })
+                                .toList();
+
+                return new ModelUsageResponse(items);
         }
 
-        return ((currentValue - previousValue) / previousValue) * 100;
-    }
+        /**
+         * 프롬프트별 사용량 조회
+         */
+        @Transactional(readOnly = true)
+        public PromptUsageResponse getByPrompt(
+                        Long organizationId,
+                        Long workspaceId,
+                        LocalDateTime from,
+                        LocalDateTime to) {
 
-    /**
-     * 변화율 계산 (BigDecimal)
-     */
-    private Double calculateChangeRate(BigDecimal current, BigDecimal previous) {
-        if (current == null || previous == null) {
-            return 0.0;
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+
+                List<PromptUsageProjection> projections = requestLogRepository.getPromptUsage(
+                                organizationId, workspaceId, currentFrom, currentTo);
+
+                List<PromptUsageItem> items = projections.stream()
+                                .map(p -> new PromptUsageItem(
+                                                p.getPromptId(),
+                                                null, // name은 Prompt 테이블에서 조인 필요 (추후 개선)
+                                                p.getPromptKey(),
+                                                p.getRequests(),
+                                                p.getTokens(),
+                                                p.getCost()))
+                                .toList();
+
+                return new PromptUsageResponse(items);
         }
 
-        if (previous.compareTo(BigDecimal.ZERO) == 0) {
-            return current.compareTo(BigDecimal.ZERO) > 0 ? 100.0 : 0.0;
+        /**
+         * 이전 기간 계산
+         */
+        private PeriodRange calculatePreviousPeriod(String period, LocalDateTime currentFrom, LocalDateTime currentTo) {
+                if (period == null) {
+                        period = "daily";
+                }
+
+                return switch (period.toLowerCase()) {
+                        case "daily" -> {
+                                // 어제와 비교
+                                LocalDateTime prevFrom = currentFrom.minusDays(1);
+                                LocalDateTime prevTo = currentTo.minusDays(1);
+                                yield new PeriodRange(prevFrom, prevTo);
+                        }
+                        case "weekly" -> {
+                                // 지난 주와 비교
+                                LocalDateTime prevFrom = currentFrom.minusWeeks(1);
+                                LocalDateTime prevTo = currentTo.minusWeeks(1);
+                                yield new PeriodRange(prevFrom, prevTo);
+                        }
+                        case "monthly" -> {
+                                // 지난 달과 비교
+                                LocalDateTime prevFrom = currentFrom.minusMonths(1);
+                                LocalDateTime prevTo = currentTo.minusMonths(1);
+                                yield new PeriodRange(prevFrom, prevTo);
+                        }
+                        default -> {
+                                // 기본값: daily
+                                LocalDateTime prevFrom = currentFrom.minusDays(1);
+                                LocalDateTime prevTo = currentTo.minusDays(1);
+                                yield new PeriodRange(prevFrom, prevTo);
+                        }
+                };
         }
 
-        BigDecimal change = current.subtract(previous)
-                .divide(previous, 4, RoundingMode.HALF_UP)
-                .multiply(BigDecimal.valueOf(100));
+        /**
+         * 변화율 계산
+         */
+        private Double calculateChangeRate(Number current, Number previous) {
+                if (current == null || previous == null) {
+                        return 0.0;
+                }
 
-        return change.doubleValue();
-    }
+                double currentValue = current.doubleValue();
+                double previousValue = previous.doubleValue();
 
-    private record PeriodRange(LocalDateTime from, LocalDateTime to) {
-    }
+                if (previousValue == 0) {
+                        return currentValue > 0 ? 100.0 : 0.0;
+                }
+
+                return ((currentValue - previousValue) / previousValue) * 100;
+        }
+
+        /**
+         * 변화율 계산 (BigDecimal)
+         */
+        private Double calculateChangeRate(BigDecimal current, BigDecimal previous) {
+                if (current == null || previous == null) {
+                        return 0.0;
+                }
+
+                if (previous.compareTo(BigDecimal.ZERO) == 0) {
+                        return current.compareTo(BigDecimal.ZERO) > 0 ? 100.0 : 0.0;
+                }
+
+                BigDecimal change = current.subtract(previous)
+                                .divide(previous, 4, RoundingMode.HALF_UP)
+                                .multiply(BigDecimal.valueOf(100));
+
+                return change.doubleValue();
+        }
+
+        private record PeriodRange(LocalDateTime from, LocalDateTime to) {
+        }
 }
