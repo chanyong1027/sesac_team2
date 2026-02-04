@@ -27,6 +27,7 @@ public class RagDocumentPreviewService {
     private static final int MAX_SAMPLE_CHUNKS = 10;
     private static final int MIN_PREVIEW_CHARS = 200;
     private static final int MAX_PREVIEW_CHARS = 5000;
+    private static final long MAX_PREVIEW_FILE_BYTES = 10L * 1024 * 1024;
 
     private final RagDocumentRepository ragDocumentRepository;
     private final RagDocumentExtractService ragDocumentExtractService;
@@ -66,6 +67,10 @@ public class RagDocumentPreviewService {
                 MIN_PREVIEW_CHARS, MAX_PREVIEW_CHARS);
 
         try {
+            long contentLength = s3ApiClient.getContentLength(document.getFileUrl());
+            if (contentLength > MAX_PREVIEW_FILE_BYTES) {
+                throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "미리보기용 파일이 너무 큽니다.");
+            }
             byte[] bytes = s3ApiClient.downloadDocumentBytes(document.getFileUrl());
             Resource resource = new ByteArrayResource(bytes) {
                 @Override

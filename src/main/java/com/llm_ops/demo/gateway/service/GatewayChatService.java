@@ -39,12 +39,18 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -192,6 +198,9 @@ public class GatewayChatService {
                 response = callProvider(organizationId, providerType, requestedModel, prompt);
             } catch (Exception primaryException) {
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
+                    throw primaryException;
+                }
+                if (!isRetryableException(primaryException)) {
                     throw primaryException;
                 }
                 isFailover = true;
@@ -484,6 +493,29 @@ public class GatewayChatService {
 
     private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
         return secondaryProvider != null && secondaryModel != null && !secondaryModel.isBlank();
+    }
+
+    private boolean isRetryableException(Exception exception) {
+        if (exception instanceof BusinessException) {
+            return false;
+        }
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof SocketTimeoutException
+                    || current instanceof ConnectException
+                    || current instanceof UnknownHostException
+                    || current instanceof TimeoutException
+                    || current instanceof ResourceAccessException) {
+                return true;
+            }
+            if (current instanceof HttpStatusCodeException statusException) {
+                if (statusException.getStatusCode().is5xxServerError()) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride) {
