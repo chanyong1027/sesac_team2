@@ -436,6 +436,11 @@ export interface WorkspaceRagSettingsResponse {
   similarityThreshold: number;
   maxChunks: number;
   maxContextChars: number;
+  hybridEnabled: boolean;
+  rerankEnabled: boolean;
+  rerankTopN: number;
+  chunkSize: number;
+  chunkOverlapTokens: number;
 }
 
 export interface WorkspaceRagSettingsUpdateRequest {
@@ -443,4 +448,9 @@ export interface WorkspaceRagSettingsUpdateRequest {
   similarityThreshold: number;
   maxChunks: number;
   maxContextChars: number;
+  hybridEnabled: boolean;
+  rerankEnabled: boolean;
+  rerankTopN: number;
+  chunkSize: number;
+  chunkOverlapTokens: number;
 }

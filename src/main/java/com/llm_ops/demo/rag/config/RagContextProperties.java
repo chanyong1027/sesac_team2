@@ -13,6 +13,10 @@ public class RagContextProperties {
 
     private int maxChunks = 10;
     private int maxContextChars = 4000;
+    private boolean includeSource = true;
+    private boolean includeScore = false;
+    private String separator = "\n\n---\n\n";
+    private String truncatedMarker = "[TRUNCATED]";
 
     public int getMaxChunks() {
         return maxChunks;
@@ -20,5 +24,21 @@ public class RagContextProperties {
 
     public int getMaxContextChars() {
         return maxContextChars;
+    }
+
+    public boolean isIncludeSource() {
+        return includeSource;
+    }
+
+    public boolean isIncludeScore() {
+        return includeScore;
+    }
+
+    public String getSeparator() {
+        return separator;
+    }
+
+    public String getTruncatedMarker() {
+        return truncatedMarker;
     }
 }
