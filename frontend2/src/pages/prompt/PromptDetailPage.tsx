@@ -829,7 +829,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </button>
                             <button
                                 onClick={() => createMutation.mutate()}
-                                disabled={
+                                disabled={Boolean(
                                     !form.model.trim() ||
                                     !isTemplateValid ||
                                     createMutation.isPending ||
@@ -837,9 +837,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     isAllowlistLoading ||
                                     isAllowlistError ||
                                     providerModels.length === 0 ||
-                                    (form.secondaryProvider && !form.secondaryModel.trim()) ||
+                                    (!!form.secondaryProvider && !form.secondaryModel.trim()) ||
                                     (form.secondaryProvider && secondaryProviderModels.length === 0)
-                                }
+                                )}
                                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
                             >
                                 {createMutation.isPending ? '생성 중...' : '버전 생성'}

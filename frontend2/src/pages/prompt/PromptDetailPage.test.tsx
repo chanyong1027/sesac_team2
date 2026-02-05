@@ -80,6 +80,8 @@ beforeEach(() => {
       title: 'v1',
       provider: 'OPENAI',
       model: 'gpt-4o-mini',
+      secondaryProvider: null,
+      secondaryModel: null,
       systemPrompt: 'system',
       userTemplate: '질문: {{question}}',
       modelConfig: {},

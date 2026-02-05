@@ -114,20 +114,20 @@ function ProviderCard({
         )}
       </div>
 
-      {isConnected ? (
-        <div className="space-y-3">
-          <div className="p-3 bg-white/50 border border-black/5 rounded-lg">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
-              등록일
-            </p>
-            <p className="text-sm font-medium text-gray-900">
-              {new Date(credential.createdAt).toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </p>
-          </div>
+       {isConnected && credential ? (
+         <div className="space-y-3">
+           <div className="p-3 bg-white/50 border border-black/5 rounded-lg">
+             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+               등록일
+             </p>
+             <p className="text-sm font-medium text-gray-900">
+               {new Date(credential.createdAt).toLocaleDateString('ko-KR', {
+                 year: 'numeric',
+                 month: 'long',
+                 day: 'numeric',
+               })}
+             </p>
+           </div>
           <div className="flex gap-2">
             <button
               onClick={onUpdate}
@@ -384,11 +384,12 @@ function UpdateProviderModal({
 }
 
 export function SettingsProviderKeysPage() {
-  const [addingProvider, setAddingProvider] = useState<string | null>(null);
-  const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const toastTimerRef = useRef<number | null>(null);
-  const { currentOrgId } = useOrganizationStore();
+   const [addingProvider, setAddingProvider] = useState<string | null>(null);
+   const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
+   const [toastMessage, setToastMessage] = useState<string | null>(null);
+   const toastTimerRef = useRef<number | null>(null);
+   const { currentOrgId } = useOrganizationStore();
+   const queryClient = useQueryClient();
 
   const showToast = (message: string) => {
     if (toastTimerRef.current) {
