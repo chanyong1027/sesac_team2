@@ -1,0 +1,1 @@
+ALTER TABLE request_logs ALTER COLUMN currency TYPE VARCHAR(3);
