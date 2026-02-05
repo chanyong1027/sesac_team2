@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
 
     -- 비용
     estimated_cost NUMERIC(18, 8),
-    currency CHAR(3) DEFAULT 'USD',
+    currency VARCHAR(3) DEFAULT 'USD',
     pricing_version VARCHAR(64),
 
     -- RAG 관측
