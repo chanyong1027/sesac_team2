@@ -36,10 +36,26 @@ out/
 ### VS Code ###
 .vscode/
 
+### Local AI Docs ###
+.ai/
+.DS_Store
+.sisyphus/
+
 ### Spring Boot ###
 application-local.yml
-application-prod.yml
+
+### Local Env ###
+.env
+.env.local
+
+### Gradle Local ###
+.gradle-user-home/
 
 ### Frontend ###
 frontend/node_modules/
 frontend/dist/
+SpringAI_Overview.md
+frontend2/node_modules/
+
+# local study notes
+study/

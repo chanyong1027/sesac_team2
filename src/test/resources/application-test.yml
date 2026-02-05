@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE DOMAIN IF NOT EXISTS jsonb AS OTHER
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -10,6 +10,36 @@ spring:
       ddl-auto: create-drop
     show-sql: true
 
+  flyway:
+    enabled: false
+  
+  # CI 환경에서 환경변수 없이도 실행되도록 더미 값 설정
+  ai:
+    openai:
+      api-key: test-openai-key
+      chat:
+        options:
+          model: gpt-3.5-turbo
+    anthropic:
+      api-key: test-anthropic-key
+    vertexai:
+      gemini:
+        api-key: test-gemini-key
+        project-id: test-project
+        location: us-central1
+
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.vectorstore.pgvector.PgVectorStoreAutoConfiguration
+      - org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration
+      - org.springframework.ai.autoconfigure.anthropic.AnthropicAutoConfiguration
+      - org.springframework.ai.autoconfigure.vertexai.gemini.VertexAiGeminiAutoConfiguration
+
+jwt:
+  secret: test-secret-key-for-unit-testing-32chars
+  expiration-sec: 60
+  refresh-expiration-sec: 300
+
 management:
   endpoint:
     health:
@@ -18,3 +48,47 @@ management:
 logging:
   level:
     root: WARN
+
+PROVIDER_KEY_ENC_KEY: test-secret
+
+gateway:
+  prompt-providers:
+    - prompt-key: "hello {{name}}"
+      provider: openai
+    - prompt-key: "환불 정책을 알려줘"
+      provider: openai
+    - prompt-key: "질문: {{question}}"
+      provider: openai
+    - prompt-key: "상품 A의 가격은 얼마인가요?"
+      provider: openai
+
+prompt:
+  model-allowlist:
+    openai:
+      - gpt-4o
+      - gpt-4o-mini
+      - gpt-4.1
+      - gpt-4.1-mini
+      - gpt-4.1-nano
+      - gpt-4
+      - gpt-3.5-turbo
+    anthropic:
+      - claude-3-5-sonnet
+      - claude-3-5-haiku
+      - claude-3-opus
+      - claude-3-sonnet
+      - claude-3-haiku
+      - claude-3-haiku-20240307
+    gemini:
+      - gemini-2.0-flash
+      - gemini-2.5-flash-lite
+
+# 테스트 환경용 S3 설정 (비활성화)
+storage:
+  s3:
+    enabled: false
+    endpoint: http://localhost:9000
+    bucket: test-bucket
+    access-key: test-access-key
+    secret-key: test-secret-key
+    path-style-access: true
