@@ -139,9 +139,6 @@ export function WorkspaceDashboardPage() {
         enabled: !!firstPromptId,
     });
 
-    if (isWorkspaceLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
-    if (!workspace) return <div className="p-8 text-gray-500">워크스페이스를 찾을 수 없습니다.</div>;
-
     const hasProviderKeys = (credentials?.length ?? 0) > 0;
     const hasGatewayApiKeys = (apiKeys?.length ?? 0) > 0;
     const hasPrompts = (prompts?.length ?? 0) > 0;
@@ -177,6 +174,9 @@ export function WorkspaceDashboardPage() {
             alert('클립보드 복사에 실패했습니다.');
         });
     };
+
+    if (isWorkspaceLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
+    if (!workspace) return <div className="p-8 text-gray-500">워크스페이스를 찾을 수 없습니다.</div>;
 
     const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.luminaops.com';
