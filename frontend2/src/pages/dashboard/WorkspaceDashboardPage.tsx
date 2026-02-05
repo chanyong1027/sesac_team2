@@ -1,10 +1,11 @@
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { organizationApi } from '@/api/organization.api';
 import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
+import { logsApi } from '@/api/logs.api';
 import {
     MessageSquare,
     FileText,
@@ -14,8 +15,41 @@ import {
     CheckCircle2,
     Circle,
     Copy,
-    Check
+    Check,
+    RefreshCw,
+    ExternalLink
 } from 'lucide-react';
+import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
+
+function formatShortDateTime(iso: string) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString('ko-KR', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function statusBadgeClass(status: RequestLogStatus) {
+    const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border';
+    switch (status) {
+        case 'SUCCESS':
+            return `${base} bg-emerald-50 text-emerald-800 border-emerald-200`;
+        case 'FAIL':
+            return `${base} bg-rose-50 text-rose-800 border-rose-200`;
+        case 'BLOCKED':
+            return `${base} bg-amber-50 text-amber-900 border-amber-200`;
+        case 'IN_PROGRESS':
+        default:
+            return `${base} bg-gray-50 text-gray-700 border-gray-200`;
+    }
+}
+
+function modelLabel(log: RequestLogResponse) {
+    return log.usedModel || log.requestedModel || '-';
+}
 
 export function WorkspaceDashboardPage() {
     const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
@@ -32,6 +66,7 @@ export function WorkspaceDashboardPage() {
 
     const workspaceId = parsedWorkspaceId;
     const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
+    const navigate = useNavigate();
 
     // 워크스페이스 정보 조회 (캐시 활용)
     const { data: workspaces, isLoading: isWorkspaceLoading } = useOrganizationWorkspaces(resolvedOrgId);
@@ -78,6 +113,7 @@ export function WorkspaceDashboardPage() {
     });
 
     const firstPromptId = prompts?.[0]?.id;
+    const promptKey = prompts?.[0]?.promptKey || '';
 
     const { data: versions } = useQuery({
         queryKey: ['prompt-versions', firstPromptId],
@@ -114,6 +150,23 @@ export function WorkspaceDashboardPage() {
     const hasDocuments = (documents?.length ?? 0) > 0;
     const allStepsCompleted = hasProviderKeys && hasGatewayApiKeys && hasPrompts && hasVersions && hasRelease;
 
+    const {
+        data: recentLogs,
+        isLoading: isRecentLogsLoading,
+        isError: isRecentLogsError,
+        refetch: refetchRecentLogs,
+    } = useQuery({
+        queryKey: ['recent-logs', workspaceId, promptKey],
+        queryFn: async () =>
+            logsApi.list(workspaceId, {
+                promptKey,
+                page: 0,
+                size: 5,
+            }),
+        enabled: !!workspaceId && !!promptKey,
+        retry: false,
+    });
+
     const [copied, setCopied] = useState(false);
     
     const handleCopyToClipboard = (text: string) => {
@@ -127,18 +180,18 @@ export function WorkspaceDashboardPage() {
 
     const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.luminaops.com';
-    const promptKey = prompts?.[0]?.promptKey || 'your-prompt-key';
+    const safePromptKey = promptKey || 'your-prompt-key';
     
     const curlExample = `curl -X POST "${apiBaseUrl}/v1/chat/completions" \\
-  -H "X-API-Key: ${gatewayApiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "workspaceId": ${workspaceId},
-    "promptKey": "${promptKey}",
-    "variables": {
-      "question": "안녕하세요!"
-    },
-    "ragEnabled": false
+	  -H "X-API-Key: ${gatewayApiKey}" \\
+	  -H "Content-Type: application/json" \\
+	  -d '{
+	    "workspaceId": ${workspaceId},
+	    "promptKey": "${safePromptKey}",
+	    "variables": {
+	      "question": "안녕하세요!"
+	    },
+	    "ragEnabled": false
   }'`;
 
     return (
@@ -210,6 +263,115 @@ export function WorkspaceDashboardPage() {
                                 color="indigo"
                             />
                         </div>
+                    </section>
+
+                    <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                        <div className="flex items-start justify-between gap-4 mb-4">
+                            <div>
+                                <h2 className="text-lg font-medium text-gray-900">최근 요청 (이 프롬프트)</h2>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    메인 프롬프트(<span className="font-mono text-xs">{promptKey || '-'}</span>)의 최신 5개 요청입니다.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => refetchRecentLogs()}
+                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                >
+                                    <RefreshCw size={16} />
+                                    새로고침
+                                </button>
+                                <Link
+                                    to={`${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`}
+                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                >
+                                    전체 보기
+                                    <ExternalLink size={16} />
+                                </Link>
+                            </div>
+                        </div>
+
+                        {!promptKey ? (
+                            <div className="text-sm text-gray-600">
+                                아직 프롬프트가 없습니다. 프롬프트를 먼저 생성하세요.
+                                <Link to={`${basePath}/prompts`} className="ml-2 text-indigo-600 font-medium hover:underline">
+                                    프롬프트 설정
+                                </Link>
+                            </div>
+                        ) : isRecentLogsLoading ? (
+                            <div className="space-y-3">
+                                {Array.from({ length: 5 }).map((_, idx) => (
+                                    <div key={idx} className="h-14 rounded-lg bg-gray-100 animate-pulse" />
+                                ))}
+                            </div>
+                        ) : isRecentLogsError ? (
+                            <div className="text-sm text-gray-700">
+                                로그를 불러오지 못했습니다.
+                                <button
+                                    type="button"
+                                    onClick={() => refetchRecentLogs()}
+                                    className="ml-2 text-indigo-600 font-medium hover:underline"
+                                >
+                                    재시도
+                                </button>
+                            </div>
+                        ) : (recentLogs?.content?.length ?? 0) === 0 ? (
+                            <div className="text-sm text-gray-500">최근 요청이 없습니다. API 호출 후 확인하세요.</div>
+                        ) : (
+                            <div className="space-y-2">
+                                {recentLogs!.content.map((log) => (
+                                    <button
+                                        key={log.traceId}
+                                        type="button"
+                                        onClick={() => navigate(`${basePath}/logs/${log.traceId}`)}
+                                        className="w-full text-left rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors px-4 py-3"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                    <span className={statusBadgeClass(log.status)}>{log.status}</span>
+                                                    <span className="text-xs text-gray-500">{formatShortDateTime(log.createdAt)}</span>
+                                                    <span className="text-xs text-gray-500">
+                                                        {log.provider || '-'} · {modelLabel(log)} · HTTP {log.httpStatus ?? '-'}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                                                    <span className="font-mono truncate max-w-[420px]">{log.traceId}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigator.clipboard.writeText(log.traceId);
+                                                        }}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                                                    >
+                                                        <Copy size={14} />
+                                                        복사
+                                                    </button>
+                                                    <span>latency {log.latencyMs ?? '-'}ms</span>
+                                                    <span>tokens {log.totalTokens ?? '-'}</span>
+                                                    <span
+                                                        className={
+                                                            log.ragEnabled
+                                                                ? 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                                                : 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200'
+                                                        }
+                                                    >
+                                                        RAG {log.ragEnabled ? 'on' : 'off'}
+                                                    </span>
+                                                    {log.ragEnabled ? (
+                                                        <span className="text-gray-500">
+                                                            (chunks {log.ragChunksCount ?? '-'} · rag {log.ragLatencyMs ?? '-'}ms)
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </section>
                 </div>
 
@@ -294,7 +456,7 @@ export function WorkspaceDashboardPage() {
                                     <p className="text-xs font-semibold text-amber-900 mb-2">✏️ 수정 가능한 부분</p>
                                     <ul className="space-y-1.5 text-xs text-amber-900">
                                         <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">X-API-Key</code>: Settings에서 생성한 실제 API 키로 교체</li>
-                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">promptKey</code>: 사용할 프롬프트 키로 변경 (현재: {promptKey})</li>
+                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">promptKey</code>: 사용할 프롬프트 키로 변경 (현재: {safePromptKey})</li>
                                         <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">variables</code>: 프롬프트 템플릿에 맞는 변수로 수정</li>
                                         <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">ragEnabled</code>: RAG 사용 시 <code className="font-mono">true</code>로 변경</li>
                                     </ul>
