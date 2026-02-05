@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { organizationApi } from '@/api/organization.api';
+import { workspaceApi } from '@/api/workspace.api';
 import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
 import {
@@ -11,7 +13,10 @@ import {
     Activity,
     Plus,
     CheckCircle2,
-    Circle
+    Circle,
+    Pencil,
+    Check,
+    X
 } from 'lucide-react';
 
 export function WorkspaceDashboardPage() {
@@ -23,6 +28,12 @@ export function WorkspaceDashboardPage() {
         ? parsedOrgId
         : undefined;
 
+    // 편집 상태
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editError, setEditError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
+
     if (!isValidWorkspaceId) {
         return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
     }
@@ -33,6 +44,43 @@ export function WorkspaceDashboardPage() {
     // 워크스페이스 정보 조회 (캐시 활용)
     const { data: workspaces, isLoading: isWorkspaceLoading } = useOrganizationWorkspaces(resolvedOrgId);
     const workspace = workspaces?.find(w => w.id === workspaceId);
+
+    // 워크스페이스 수정 mutation
+    const updateMutation = useMutation({
+        mutationFn: (displayName: string) => {
+            if (!resolvedOrgId) throw new Error('Organization not found');
+            return workspaceApi.updateWorkspace(resolvedOrgId, workspaceId, { displayName });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['organization-workspaces', resolvedOrgId] });
+            queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+            setIsEditing(false);
+            setEditError(null);
+        },
+        onError: () => {
+            setEditError('이름 수정에 실패했습니다. 다시 시도해주세요.');
+        },
+    });
+
+    const handleStartEdit = () => {
+        if (workspace) {
+            setEditName(workspace.displayName);
+            setEditError(null);
+            setIsEditing(true);
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setEditError(null);
+    };
+
+    const handleSaveEdit = () => {
+        if (editName.trim()) {
+            setEditError(null);
+            updateMutation.mutate(editName.trim());
+        }
+    };
 
     // 프롬프트 목록 조회 (통계용)
     const { data: prompts } = useQuery({
@@ -73,7 +121,53 @@ export function WorkspaceDashboardPage() {
         <div className="space-y-8">
             {/* Header */}
             <div>
-                <h1 className="text-2xl font-semibold text-gray-900">{workspace.displayName}</h1>
+                {isEditing ? (
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="text-2xl font-semibold text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveEdit();
+                                    if (e.key === 'Escape') handleCancelEdit();
+                                }}
+                            />
+                            <button
+                                onClick={handleSaveEdit}
+                                disabled={!editName.trim() || updateMutation.isPending}
+                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                                title="저장"
+                            >
+                                <Check size={20} />
+                            </button>
+                            <button
+                                onClick={handleCancelEdit}
+                                disabled={updateMutation.isPending}
+                                className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="취소"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        {editError && (
+                            <p className="text-sm text-red-600">{editError}</p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 group">
+                        <h1 className="text-2xl font-semibold text-gray-900">{workspace.displayName}</h1>
+                        <button
+                            onClick={handleStartEdit}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                            title="이름 수정"
+                        >
+                            <Pencil size={16} />
+                        </button>
+                    </div>
+                )}
                 <p className="text-sm text-gray-500 mt-1 font-mono">{workspace.name}</p>
             </div>
 
