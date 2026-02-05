@@ -157,6 +157,6 @@ class DocumentControllerTest {
 
         verify(s3ApiClient).deleteDocument("workspaces/1/documents/sample.txt");
         verify(ragDocumentDeleteService).markDeleting(workspaceId, documentId);
-        verify(ragDocumentVectorStoreDeleteService).deleteByDocumentId(documentId);
+        verify(ragDocumentVectorStoreDeleteService).deleteForDocument(workspaceId, documentId, "sample.txt");
     }
 }
