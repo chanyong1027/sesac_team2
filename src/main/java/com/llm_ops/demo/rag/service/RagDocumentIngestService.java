@@ -3,6 +3,7 @@ package com.llm_ops.demo.rag.service;
 import com.llm_ops.demo.rag.domain.RagDocument;
 import com.llm_ops.demo.rag.domain.RagDocumentStatus;
 import com.llm_ops.demo.rag.repository.RagDocumentRepository;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +24,11 @@ import org.springframework.stereotype.Service;
 public class RagDocumentIngestService {
 
     private final RagDocumentExtractService ragDocumentExtractService;
+    private final RagTextNormalizer ragTextNormalizer;
     private final RagDocumentChunkService ragDocumentChunkService;
     private final RagDocumentVectorStoreSaveService ragDocumentVectorStoreSaveService;
     private final RagDocumentRepository ragDocumentRepository;
+    private final WorkspaceRagSettingsService workspaceRagSettingsService;
 
     public int ingest(Long workspaceId, Long documentId, Resource resource) {
         long startNs = System.nanoTime();
@@ -35,13 +38,14 @@ public class RagDocumentIngestService {
             stage = "extract";
             long extractStartNs = System.nanoTime();
             List<Document> extracted = ragDocumentExtractService.extract(workspaceId, resource);
+            List<Document> normalized = ragTextNormalizer.normalize(extracted);
             long extractMs = (System.nanoTime() - extractStartNs) / 1_000_000;
             log.info(
                     "RAG ingest extract done workspaceId={} documentId={} resource={} extractedCount={} tookMs={}",
                     workspaceId,
                     documentId,
                     resource != null ? resource.getFilename() : null,
-                    extracted.size(),
+                    normalized.size(),
                     extractMs
             );
 
@@ -49,7 +53,15 @@ public class RagDocumentIngestService {
             stage = "chunk";
             long chunkStartNs = System.nanoTime();
             String documentName = resource != null ? resource.getFilename() : null;
-            List<Document> chunks = ragDocumentChunkService.chunk(extracted, documentId, documentName);
+            WorkspaceRagSettingsService.RagRuntimeSettings ragSettings =
+                    workspaceRagSettingsService.resolveRuntimeSettings(workspaceId);
+            List<Document> chunks = ragDocumentChunkService.chunk(
+                    normalized,
+                    documentId,
+                    documentName,
+                    ragSettings.chunkSize(),
+                    ragSettings.chunkOverlapTokens()
+            );
             long chunkMs = (System.nanoTime() - chunkStartNs) / 1_000_000;
             log.info(
                     "RAG ingest chunk done workspaceId={} documentId={} documentName={} chunkCount={} tookMs={}",

@@ -62,7 +62,9 @@ class RequestLogWriterTest {
                                 2,
                                 1234,
                                 true,
-                                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"));
+                                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                                5,
+                                0.7));
 
                 // 비동기 처리 완료 대기
                 Thread.sleep(1000);
@@ -82,6 +84,8 @@ class RequestLogWriterTest {
                 assertThat(saved.getRagContextTruncated()).isTrue();
                 assertThat(saved.getRagContextHash())
                                 .isEqualTo("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+                assertThat(saved.getRagTopK()).isEqualTo(5);
+                assertThat(saved.getRagSimilarityThreshold()).isEqualTo(0.7);
         }
 
         @Test
@@ -117,7 +121,9 @@ class RequestLogWriterTest {
                                 0,
                                 0,
                                 false,
-                                null));
+                                null,
+                                3,
+                                0.5));
 
                 // 비동기 처리 완료 대기
                 Thread.sleep(1000);

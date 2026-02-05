@@ -6,6 +6,7 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
@@ -23,23 +24,36 @@ public class RagSearchFacade {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final UserRepository userRepository;
+    private final WorkspaceRagSettingsService workspaceRagSettingsService;
 
     public RagSearchFacade(
         RagSearchService ragSearchService,
         WorkspaceRepository workspaceRepository,
         WorkspaceMemberRepository workspaceMemberRepository,
-        UserRepository userRepository
+        UserRepository userRepository,
+        WorkspaceRagSettingsService workspaceRagSettingsService
     ) {
         this.ragSearchService = ragSearchService;
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.userRepository = userRepository;
+        this.workspaceRagSettingsService = workspaceRagSettingsService;
     }
 
     public RagSearchResponse search(Long workspaceId, Long userId, String query, Integer topK, Double similarityThreshold) {
         validateIds(workspaceId, userId);
         validateWorkspaceAccess(workspaceId, userId);
-        return ragSearchService.search(workspaceId, query, topK, similarityThreshold);
+        WorkspaceRagSettingsService.RagRuntimeSettings runtime = workspaceRagSettingsService.resolveRuntimeSettings(workspaceId);
+        int resolvedTopK = topK != null ? topK : runtime.topK();
+        double resolvedThreshold = similarityThreshold != null ? similarityThreshold : runtime.similarityThreshold();
+        RagSearchService.RagSearchOptions options = new RagSearchService.RagSearchOptions(
+            resolvedTopK,
+            resolvedThreshold,
+            runtime.hybridEnabled(),
+            runtime.rerankEnabled(),
+            runtime.rerankTopN()
+        );
+        return ragSearchService.search(workspaceId, query, options);
     }
 
     private void validateIds(Long workspaceId, Long userId) {

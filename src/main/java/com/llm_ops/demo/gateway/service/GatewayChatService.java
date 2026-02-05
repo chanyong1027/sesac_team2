@@ -18,9 +18,10 @@ import com.llm_ops.demo.prompt.domain.PromptStatus;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import com.llm_ops.demo.prompt.repository.PromptRepository;
-import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
+import com.llm_ops.demo.rag.service.RagContextBuilder;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.rag.service.RagSearchService.RagSearchOptions;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
@@ -62,7 +63,6 @@ public class GatewayChatService {
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-    private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
     private static final String RAG_CONTEXT_TEMPLATE = """
             다음은 질문과 관련된 참고 문서입니다:
 
@@ -77,6 +77,7 @@ public class GatewayChatService {
     private final ProviderCredentialService providerCredentialService;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
+    private final RagContextBuilder ragContextBuilder;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceRagSettingsService workspaceRagSettingsService;
     private final RequestLogWriter requestLogWriter;
@@ -89,6 +90,7 @@ public class GatewayChatService {
             ProviderCredentialService providerCredentialService,
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
+            RagContextBuilder ragContextBuilder,
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
             RequestLogWriter requestLogWriter,
@@ -99,6 +101,7 @@ public class GatewayChatService {
         this.providerCredentialService = providerCredentialService;
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
+        this.ragContextBuilder = ragContextBuilder;
         this.workspaceRepository = workspaceRepository;
         this.workspaceRagSettingsService = workspaceRagSettingsService;
         this.requestLogWriter = requestLogWriter;
@@ -137,6 +140,8 @@ public class GatewayChatService {
         Integer ragContextChars = null;
         Boolean ragContextTruncated = null;
         String ragContextHash = null;
+        Integer ragTopK = null;
+        Double ragSimilarityThreshold = null;
         ProviderType usedProvider = null;
         String usedRequestedModel = null;
         boolean isFailover = false;
@@ -162,26 +167,33 @@ public class GatewayChatService {
                 if (ragSearchService != null) {
                     WorkspaceRagSettingsService.RagRuntimeSettings ragSettings =
                             workspaceRagSettingsService.resolveRuntimeSettings(workspace.getId());
+                    ragTopK = ragSettings.topK();
+                    ragSimilarityThreshold = ragSettings.similarityThreshold();
                     long ragStartedAtNanos = System.nanoTime();
                     RagSearchResponse ragResponse = ragSearchService.search(
                             request.workspaceId(),
-                            renderedUserPrompt,
-                            ragSettings.topK(),
-                            ragSettings.similarityThreshold()
+                            resolveRagQuery(renderedUserPrompt, request.variables()),
+                            new RagSearchOptions(
+                                    ragSettings.topK(),
+                                    ragSettings.similarityThreshold(),
+                                    ragSettings.hybridEnabled(),
+                                    ragSettings.rerankEnabled(),
+                                    ragSettings.rerankTopN()
+                            )
                     );
                     ragLatencyMs = toLatencyMs(ragStartedAtNanos);
 
                     if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
-                        RagContextResult result = buildRagContextWithMetrics(
+                        RagContextBuilder.RagContextResult result = ragContextBuilder.build(
                                 ragResponse.chunks(),
                                 ragSettings.maxChunks(),
                                 ragSettings.maxContextChars()
                         );
-                        ragChunksCount = result.chunksIncluded;
-                        ragContextChars = result.contextChars;
-                        ragContextTruncated = result.truncated;
-                        ragContextHash = sha256HexOrNull(result.context);
-                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context) + prompt;
+                        ragChunksCount = result.chunksIncluded();
+                        ragContextChars = result.contextChars();
+                        ragContextTruncated = result.truncated();
+                        ragContextHash = sha256HexOrNull(result.context());
+                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context()) + prompt;
                     }
                 }
             }
@@ -249,7 +261,9 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash));
+                    ragContextHash,
+                    ragTopK,
+                    ragSimilarityThreshold));
 
             return GatewayChatResponse.from(
                     traceId,
@@ -277,7 +291,9 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash));
+                    ragContextHash,
+                    ragTopK,
+                    ragSimilarityThreshold));
             throw e;
         } catch (Exception e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
@@ -299,78 +315,13 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash));
+                    ragContextHash,
+                    ragTopK,
+                    ragSimilarityThreshold));
             throw e;
         }
     }
 
-    private static class RagContextResult {
-        private final String context;
-        private final int chunksIncluded;
-        private final int contextChars;
-        private final boolean truncated;
-
-        private RagContextResult(String context, int chunksIncluded, int contextChars, boolean truncated) {
-            this.context = context;
-            this.chunksIncluded = chunksIncluded;
-            this.contextChars = contextChars;
-            this.truncated = truncated;
-        }
-    }
-
-    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks, int maxChunks, int maxChars) {
-        if (chunks == null || chunks.isEmpty()) {
-            return new RagContextResult("", 0, 0, false);
-        }
-
-        StringBuilder builder = new StringBuilder();
-        int count = 0;
-        int totalChars = 0;
-        boolean truncated = false;
-
-        for (ChunkDetailResponse chunk : chunks) {
-            if (count >= maxChunks) {
-                truncated = true;
-                break;
-            }
-            if (chunk == null || chunk.content() == null || chunk.content().isBlank()) {
-                continue;
-            }
-
-            String content = chunk.content();
-            int remaining = maxChars - totalChars;
-            if (remaining <= 0) {
-                truncated = true;
-                break;
-            }
-
-            if (content.length() > remaining) {
-                content = content.substring(0, remaining);
-                truncated = true;
-            }
-
-            if (builder.length() > 0) {
-                builder.append("\n\n---\n\n");
-            }
-            builder.append(content);
-            totalChars += content.length();
-            count++;
-
-            if (totalChars >= maxChars) {
-                truncated = true;
-                break;
-            }
-        }
-
-        if (truncated) {
-            if (builder.length() > 0) {
-                builder.append("\n\n---\n\n");
-            }
-            builder.append(RAG_TRUNCATED_MARKER);
-        }
-
-        return new RagContextResult(builder.toString(), count, totalChars, truncated);
-    }
 
     private static String sha256HexOrNull(String value) {
         if (value == null || value.isBlank()) {
@@ -443,6 +394,16 @@ public class GatewayChatService {
             return null;
         }
         return renderPrompt(template, variables);
+    }
+
+    private String resolveRagQuery(String renderedUserPrompt, Map<String, String> variables) {
+        if (variables != null) {
+            String question = variables.get("question");
+            if (question != null && !question.isBlank()) {
+                return question;
+            }
+        }
+        return renderedUserPrompt;
     }
 
     /**

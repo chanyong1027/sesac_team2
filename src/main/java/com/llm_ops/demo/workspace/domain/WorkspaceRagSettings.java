@@ -48,6 +48,21 @@ public class WorkspaceRagSettings {
     @Column(name = "max_context_chars", nullable = false)
     private Integer maxContextChars;
 
+    @Column(name = "hybrid_enabled", nullable = false)
+    private Boolean hybridEnabled;
+
+    @Column(name = "rerank_enabled", nullable = false)
+    private Boolean rerankEnabled;
+
+    @Column(name = "rerank_top_n", nullable = false)
+    private Integer rerankTopN;
+
+    @Column(name = "chunk_size", nullable = false)
+    private Integer chunkSize;
+
+    @Column(name = "chunk_overlap_tokens", nullable = false)
+    private Integer chunkOverlapTokens;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -77,12 +92,37 @@ public class WorkspaceRagSettings {
         return maxContextChars;
     }
 
+    public Boolean getHybridEnabled() {
+        return hybridEnabled;
+    }
+
+    public Boolean getRerankEnabled() {
+        return rerankEnabled;
+    }
+
+    public Integer getRerankTopN() {
+        return rerankTopN;
+    }
+
+    public Integer getChunkSize() {
+        return chunkSize;
+    }
+
+    public Integer getChunkOverlapTokens() {
+        return chunkOverlapTokens;
+    }
+
     public static WorkspaceRagSettings create(
         Workspace workspace,
         Integer topK,
         Double similarityThreshold,
         Integer maxChunks,
-        Integer maxContextChars
+        Integer maxContextChars,
+        Boolean hybridEnabled,
+        Boolean rerankEnabled,
+        Integer rerankTopN,
+        Integer chunkSize,
+        Integer chunkOverlapTokens
     ) {
         WorkspaceRagSettings settings = new WorkspaceRagSettings();
         settings.workspace = workspace;
@@ -90,13 +130,33 @@ public class WorkspaceRagSettings {
         settings.similarityThreshold = similarityThreshold;
         settings.maxChunks = maxChunks;
         settings.maxContextChars = maxContextChars;
+        settings.hybridEnabled = hybridEnabled;
+        settings.rerankEnabled = rerankEnabled;
+        settings.rerankTopN = rerankTopN;
+        settings.chunkSize = chunkSize;
+        settings.chunkOverlapTokens = chunkOverlapTokens;
         return settings;
     }
 
-    public void update(Integer topK, Double similarityThreshold, Integer maxChunks, Integer maxContextChars) {
+    public void update(
+        Integer topK,
+        Double similarityThreshold,
+        Integer maxChunks,
+        Integer maxContextChars,
+        Boolean hybridEnabled,
+        Boolean rerankEnabled,
+        Integer rerankTopN,
+        Integer chunkSize,
+        Integer chunkOverlapTokens
+    ) {
         this.topK = topK;
         this.similarityThreshold = similarityThreshold;
         this.maxChunks = maxChunks;
         this.maxContextChars = maxContextChars;
+        this.hybridEnabled = hybridEnabled;
+        this.rerankEnabled = rerankEnabled;
+        this.rerankTopN = rerankTopN;
+        this.chunkSize = chunkSize;
+        this.chunkOverlapTokens = chunkOverlapTokens;
     }
 }

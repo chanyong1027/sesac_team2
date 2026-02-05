@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import com.llm_ops.demo.rag.metadata.RagMetadataKeys;
 import java.util.List;
 
 /**
@@ -19,9 +20,6 @@ import java.util.List;
 @ConditionalOnBean(VectorStore.class) // VectorStore 빈이 있을 때만 활성화
 @ConditionalOnProperty(prefix = "rag.vectorstore.pgvector", name = "enabled", havingValue = "true") // pgvector 사용 설정 시 활성화
 public class RagDocumentVectorStoreSaveService {
-
-    private static final String METADATA_WORKSPACE_ID = "workspace_id";
-    private static final String METADATA_DOCUMENT_ID = "document_id";
 
     private final VectorStore vectorStore;
 
@@ -67,12 +65,12 @@ public class RagDocumentVectorStoreSaveService {
 
     private void validateChunkMetadata(Long workspaceId, Long documentId, List<Document> chunks) {
         for (Document document : chunks) {
-            Object workspaceMeta = document.getMetadata().get(METADATA_WORKSPACE_ID);
+            Object workspaceMeta = document.getMetadata().get(RagMetadataKeys.WORKSPACE_ID);
             if (!(workspaceMeta instanceof Number) || ((Number) workspaceMeta).longValue() != workspaceId) {
                 throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "청크 메타데이터 workspace_id가 누락되었거나 올바르지 않습니다.");
             }
             if (documentId != null) {
-                Object documentMeta = document.getMetadata().get(METADATA_DOCUMENT_ID);
+                Object documentMeta = document.getMetadata().get(RagMetadataKeys.DOCUMENT_ID);
                 if (!(documentMeta instanceof Number) || ((Number) documentMeta).longValue() != documentId) {
                     throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "청크 메타데이터 document_id가 누락되었거나 올바르지 않습니다.");
                 }

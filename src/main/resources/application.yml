@@ -30,13 +30,28 @@ server:
   port: 8080
 
 rag:
+  context:
+    max-chunks: 10
+    max-context-chars: 4000
+    include-source: true
+    include-score: false
+    separator: "\n\n---\n\n"
+    truncated-marker: "[TRUNCATED]"
   chunking:
     chunk-size: 500
     min-chunk-size-chars: 200
     min-chunk-length-to-embed: 80
     max-num-chunks: 10000
     keep-separator: true
+    chunk-overlap-tokens: 50
+    paragraph-max-chars: 2000
   embedding:
+    openai:
+      enabled: false
+      api-key:
+      base-url:
+      model: text-embedding-3-small
+      dimensions: 1536
     google-genai:
       enabled: false
       api-key:
@@ -45,14 +60,31 @@ rag:
     pgvector:
       enabled: false
       schema-name: public
-      table-name: doc_chunks
+      table-name: doc_chunks_v2
       initialize-schema: false
-    distance-type: COSINE_DISTANCE
-    index-type: HNSW
-    max-document-batch-size: 10000
+      dimensions: 1536
+      distance-type: COSINE_DISTANCE
+      index-type: HNSW
+      max-document-batch-size: 10000
   search:
     top-k: 5
     similarity-threshold: 0.0
+  hybrid:
+    enabled: true
+    vector-top-k: 20
+    keyword-top-k: 20
+    candidate-top-k: 30
+    rrf-k: 60
+    min-keyword-query-length: 3
+  rerank:
+    cohere:
+      enabled: false
+      api-key:
+      base-url: https://api.cohere.com
+      model: rerank-v3.5
+      max-documents: 30
+      top-n: 10
+      client-name: luminaops
 
 prompt:
   model-allowlist:

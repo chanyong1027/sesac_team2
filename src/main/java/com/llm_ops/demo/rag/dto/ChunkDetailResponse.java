@@ -1,5 +1,6 @@
 package com.llm_ops.demo.rag.dto;
 
+import com.llm_ops.demo.rag.metadata.RagMetadataKeys;
 import org.springframework.ai.document.Document;
 
 import java.util.Map;
@@ -25,7 +26,7 @@ public record ChunkDetailResponse(
         if (metadata == null || metadata.isEmpty()) {
             return null;
         }
-        Object value = pickFirst(metadata, "document_name", "file_name", "resourceName", "filename");
+        Object value = pickFirst(metadata, RagMetadataKeys.DOCUMENT_NAME, "file_name", "resourceName", "filename");
         return value != null ? value.toString() : null;
     }
 
@@ -33,7 +34,7 @@ public record ChunkDetailResponse(
         if (metadata == null || metadata.isEmpty()) {
             return null;
         }
-        Object value = pickFirst(metadata, "document_id");
+        Object value = pickFirst(metadata, RagMetadataKeys.DOCUMENT_ID);
         if (value == null) {
             return null;
         }

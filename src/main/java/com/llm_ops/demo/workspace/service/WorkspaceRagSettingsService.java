@@ -5,6 +5,7 @@ import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.config.RagContextProperties;
+import com.llm_ops.demo.rag.config.RagChunkingProperties;
 import com.llm_ops.demo.rag.config.RagSearchProperties;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceRagSettings;
@@ -27,6 +28,7 @@ public class WorkspaceRagSettingsService {
     private final UserRepository userRepository;
     private final RagSearchProperties ragSearchProperties;
     private final RagContextProperties ragContextProperties;
+    private final RagChunkingProperties ragChunkingProperties;
 
     public WorkspaceRagSettingsService(
         WorkspaceRepository workspaceRepository,
@@ -34,7 +36,8 @@ public class WorkspaceRagSettingsService {
         WorkspaceRagSettingsRepository workspaceRagSettingsRepository,
         UserRepository userRepository,
         RagSearchProperties ragSearchProperties,
-        RagContextProperties ragContextProperties
+        RagContextProperties ragContextProperties,
+        RagChunkingProperties ragChunkingProperties
     ) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
@@ -42,6 +45,7 @@ public class WorkspaceRagSettingsService {
         this.userRepository = userRepository;
         this.ragSearchProperties = ragSearchProperties;
         this.ragContextProperties = ragContextProperties;
+        this.ragChunkingProperties = ragChunkingProperties;
     }
 
     @Transactional(readOnly = true)
@@ -58,7 +62,12 @@ public class WorkspaceRagSettingsService {
             ragSearchProperties.getTopK(),
             ragSearchProperties.getSimilarityThreshold(),
             ragContextProperties.getMaxChunks(),
-            ragContextProperties.getMaxContextChars()
+            ragContextProperties.getMaxContextChars(),
+            true,
+            false,
+            10,
+            ragChunkingProperties.getChunkSize(),
+            ragChunkingProperties.getChunkOverlapTokens()
         );
     }
 
@@ -67,20 +76,34 @@ public class WorkspaceRagSettingsService {
         Workspace workspace = findActiveWorkspace(workspaceId);
         validateWorkspaceMembership(workspace, userId);
 
+        if (request.rerankTopN() < request.topK()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "rerankTopN은 topK 이상이어야 합니다.");
+        }
+
         WorkspaceRagSettings settings = workspaceRagSettingsRepository.findByWorkspaceId(workspaceId)
             .orElseGet(() -> WorkspaceRagSettings.create(
                 workspace,
                 request.topK(),
                 request.similarityThreshold(),
                 request.maxChunks(),
-                request.maxContextChars()
+                request.maxContextChars(),
+                request.hybridEnabled(),
+                request.rerankEnabled(),
+                request.rerankTopN(),
+                request.chunkSize(),
+                request.chunkOverlapTokens()
             ));
 
         settings.update(
             request.topK(),
             request.similarityThreshold(),
             request.maxChunks(),
-            request.maxContextChars()
+            request.maxContextChars(),
+            request.hybridEnabled(),
+            request.rerankEnabled(),
+            request.rerankTopN(),
+            request.chunkSize(),
+            request.chunkOverlapTokens()
         );
 
         WorkspaceRagSettings saved = workspaceRagSettingsRepository.save(settings);
@@ -94,7 +117,12 @@ public class WorkspaceRagSettingsService {
             settings.map(WorkspaceRagSettings::getTopK).orElse(ragSearchProperties.getTopK()),
             settings.map(WorkspaceRagSettings::getSimilarityThreshold).orElse(ragSearchProperties.getSimilarityThreshold()),
             settings.map(WorkspaceRagSettings::getMaxChunks).orElse(ragContextProperties.getMaxChunks()),
-            settings.map(WorkspaceRagSettings::getMaxContextChars).orElse(ragContextProperties.getMaxContextChars())
+            settings.map(WorkspaceRagSettings::getMaxContextChars).orElse(ragContextProperties.getMaxContextChars()),
+            settings.map(WorkspaceRagSettings::getHybridEnabled).orElse(true),
+            settings.map(WorkspaceRagSettings::getRerankEnabled).orElse(false),
+            settings.map(WorkspaceRagSettings::getRerankTopN).orElse(10),
+            settings.map(WorkspaceRagSettings::getChunkSize).orElse(ragChunkingProperties.getChunkSize()),
+            settings.map(WorkspaceRagSettings::getChunkOverlapTokens).orElse(ragChunkingProperties.getChunkOverlapTokens())
         );
     }
 
@@ -122,7 +150,12 @@ public class WorkspaceRagSettingsService {
         int topK,
         double similarityThreshold,
         int maxChunks,
-        int maxContextChars
+        int maxContextChars,
+        boolean hybridEnabled,
+        boolean rerankEnabled,
+        int rerankTopN,
+        int chunkSize,
+        int chunkOverlapTokens
     ) {
     }
 }
