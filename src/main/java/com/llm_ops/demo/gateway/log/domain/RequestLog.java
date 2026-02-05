@@ -105,7 +105,7 @@ public class RequestLog {
     @Column(name = "estimated_cost", precision = 18, scale = 8)
     private BigDecimal estimatedCost;
 
-    @Column(name = "currency")
+    @Column(name = "currency", length = 3)
     private String currency;
 
     @Column(name = "pricing_version", length = 64)
