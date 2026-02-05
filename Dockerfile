@@ -7,10 +7,10 @@ COPY build/libs/app.jar app.jar
 ENV TZ=Asia/Seoul
 ENV SPRING_PROFILES_ACTIVE=prod
 
-ENTRYPOINT ["java",
-  "-XX:+UseContainerSupport",
-  "-XX:MaxRAMPercentage=75.0",
-  "-XX:+UseG1GC",
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-XX:+UseG1GC", \
   "-jar", "app.jar"]
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 \
