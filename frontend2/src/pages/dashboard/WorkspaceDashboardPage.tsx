@@ -53,6 +53,7 @@ function modelLabel(log: RequestLogResponse) {
 
 export function WorkspaceDashboardPage() {
     const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
+    const navigate = useNavigate();
     const parsedWorkspaceId = Number(workspaceIdParam);
     const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
     const parsedOrgId = orgId ? Number(orgId) : undefined;
@@ -66,7 +67,6 @@ export function WorkspaceDashboardPage() {
 
     const workspaceId = parsedWorkspaceId;
     const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
-    const navigate = useNavigate();
 
     // 워크스페이스 정보 조회 (캐시 활용)
     const { data: workspaces, isLoading: isWorkspaceLoading } = useOrganizationWorkspaces(resolvedOrgId);
