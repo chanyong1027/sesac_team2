@@ -43,7 +43,6 @@ out/
 
 ### Spring Boot ###
 application-local.yml
-application-prod.yml
 
 ### Local Env ###
 .env
