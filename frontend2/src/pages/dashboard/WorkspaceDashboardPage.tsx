@@ -6,6 +6,7 @@ import { organizationApi } from '@/api/organization.api';
 import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
 import { logsApi } from '@/api/logs.api';
+import { statisticsApi } from '@/api/statistics.api';
 import {
     MessageSquare,
     FileText,
@@ -49,6 +50,12 @@ function statusBadgeClass(status: RequestLogStatus) {
 
 function modelLabel(log: RequestLogResponse) {
     return log.usedModel || log.requestedModel || '-';
+}
+
+function formatNumber(num: number) {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+    return num.toString();
 }
 
 export function WorkspaceDashboardPage() {
@@ -139,6 +146,16 @@ export function WorkspaceDashboardPage() {
         enabled: !!firstPromptId,
     });
 
+    const { data: overviewData, isLoading: isOverviewLoading, isError: isOverviewError } = useQuery({
+        queryKey: ['stats-overview', resolvedOrgId, 'daily', workspaceId],
+        queryFn: () => statisticsApi.getOverview(resolvedOrgId!, {
+            period: 'daily',
+            workspaceId
+        }),
+        enabled: !!resolvedOrgId,
+        retry: false,
+    });
+
     const hasProviderKeys = (credentials?.length ?? 0) > 0;
     const hasGatewayApiKeys = (apiKeys?.length ?? 0) > 0;
     const hasPrompts = (prompts?.length ?? 0) > 0;
@@ -177,6 +194,15 @@ export function WorkspaceDashboardPage() {
 
     if (isWorkspaceLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
     if (!workspace) return <div className="p-8 text-gray-500">워크스페이스를 찾을 수 없습니다.</div>;
+
+    const overview = overviewData?.data;
+    const apiUsageValue = overview ? formatNumber(Number(overview.totalRequests ?? 0)) : '-';
+    const apiUsageTrend = isOverviewLoading
+        ? '집계 중'
+        : isOverviewError || !overview
+            ? '데이터 없음'
+            : `성공률 ${(overview.successRate ?? 0).toFixed(1)}%`;
+    const statsLink = orgId ? `/orgs/${orgId}/stats` : undefined;
 
     const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.luminaops.com';
@@ -221,9 +247,9 @@ export function WorkspaceDashboardPage() {
                 <StatCard
                     icon={<Activity className="text-emerald-600" />}
                     label="API 사용량"
-                    value="-"
-                    trend="집계 중"
-                // to 없으면 클릭 안됨
+                    value={apiUsageValue}
+                    trend={apiUsageTrend}
+                    to={statsLink}
                 />
             </div>
 
