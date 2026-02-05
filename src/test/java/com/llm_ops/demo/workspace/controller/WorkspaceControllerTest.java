@@ -3,9 +3,10 @@ package com.llm_ops.demo.workspace.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +17,7 @@ import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateResponse;
+import com.llm_ops.demo.workspace.dto.WorkspaceDeleteResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceSummaryResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateResponse;
@@ -28,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -218,5 +219,25 @@ class WorkspaceControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andDo(print())
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("워크스페이스 삭제 API 성공")
+    void deleteWorkspace_Success() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 1L;
+        WorkspaceDeleteResponse response = new WorkspaceDeleteResponse(workspaceId, "워크스페이스가 비활성화되었습니다.");
+
+        given(workspaceService.delete(eq(orgId), eq(workspaceId), eq(userId)))
+                .willReturn(response);
+
+        // when & then
+        mockMvc.perform(delete("/api/v1/organizations/{orgId}/workspaces/{workspaceId}", orgId, workspaceId)
+                .header("X-User-Id", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workspaceId").value(workspaceId))
+                .andExpect(jsonPath("$.message").value("워크스페이스가 비활성화되었습니다."));
     }
 }

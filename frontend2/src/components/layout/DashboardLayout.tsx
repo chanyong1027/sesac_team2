@@ -19,7 +19,8 @@ import {
   Shield,
   BarChart3,
   MoreHorizontal,
-  Pencil
+  Pencil,
+  Trash2
 } from 'lucide-react';
 import { CreateOrganizationModal } from '@/features/organization/components/CreateOrganizationModal';
 
@@ -218,8 +219,10 @@ function Sidebar({ isOpen, onCreateOrg, orgId }: { isOpen: boolean; onCreateOrg:
 function WorkspaceItem({ workspace, isActive, isOpen }: { workspace: WorkspaceSummaryResponse; isActive: boolean; isOpen: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -250,6 +253,19 @@ function WorkspaceItem({ workspace, isActive, isOpen }: { workspace: WorkspaceSu
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      workspaceApi.deleteWorkspace(workspace.organizationId, workspace.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organization-workspaces', workspace.organizationId] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      setDeleteModalOpen(false);
+    },
+    onError: () => {
+      setDeleteError('삭제에 실패했습니다.');
+    },
+  });
+
   const handleEditClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -257,6 +273,14 @@ function WorkspaceItem({ workspace, isActive, isOpen }: { workspace: WorkspaceSu
     setEditError(null);
     setMenuOpen(false);
     setEditModalOpen(true);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteError(null);
+    setMenuOpen(false);
+    setDeleteModalOpen(true);
   };
 
   const handleSave = () => {
@@ -309,6 +333,13 @@ function WorkspaceItem({ workspace, isActive, isOpen }: { workspace: WorkspaceSu
                   <Pencil size={14} />
                   이름 수정
                 </button>
+                <button
+                  onClick={handleDeleteClick}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  삭제
+                </button>
               </div>
             )}
           </div>
@@ -349,6 +380,49 @@ function WorkspaceItem({ workspace, isActive, isOpen }: { workspace: WorkspaceSu
                 className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
               >
                 {updateMutation.isPending ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 삭제 확인 모달 */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteModalOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 flex items-center justify-center bg-red-100 text-red-600 rounded-full shrink-0">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">워크스페이스 삭제</h3>
+                <p className="text-sm text-gray-500 mt-1">
+                  <strong>{workspace.displayName}</strong>을(를) 삭제하시겠습니까?
+                </p>
+              </div>
+            </div>
+            <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">
+                ⚠️ 이 작업은 취소할 수 없습니다. 워크스페이스의 모든 프롬프트와 데이터가 비활성화됩니다.
+              </p>
+            </div>
+            {deleteError && (
+              <p className="text-sm text-red-600 mb-4">{deleteError}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteMutation.isPending ? '삭제 중...' : '삭제'}
               </button>
             </div>
           </div>

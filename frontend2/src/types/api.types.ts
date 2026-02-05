@@ -147,6 +147,11 @@ export interface WorkspaceUpdateResponse {
   status: string;
 }
 
+export interface WorkspaceDeleteResponse {
+  workspaceId: number;
+  message: string;
+}
+
 // ========================================
 // Invitation
 // ========================================

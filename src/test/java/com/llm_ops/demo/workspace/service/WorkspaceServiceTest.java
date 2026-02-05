@@ -24,6 +24,7 @@ import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateResponse;
+import com.llm_ops.demo.workspace.dto.WorkspaceDeleteResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateResponse;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
@@ -395,6 +396,121 @@ class WorkspaceServiceTest {
 
         // when & then
         assertThatThrownBy(() -> workspaceService.update(orgId, workspaceId, userId, new WorkspaceUpdateRequest("이름")))
+            .isInstanceOf(BusinessException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    }
+
+    // ─── delete 테스트 ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("워크스페이스 OWNER가 워크스페이스를 비활성화한다")
+    void delete_Success_AsWorkspaceOwner() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 1L;
+
+        User mockUser = createMockUser(userId);
+        Organization mockOrg = createMockOrganization(orgId, mockUser);
+        Workspace mockWorkspace = createMockWorkspace(workspaceId, mockOrg);
+        WorkspaceMember ownerMember = WorkspaceMember.create(mockWorkspace, mockUser, WorkspaceRole.OWNER);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(organizationRepository.findByIdAndStatus(orgId, OrganizationStatus.ACTIVE))
+            .willReturn(Optional.of(mockOrg));
+        given(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, orgId, WorkspaceStatus.ACTIVE))
+            .willReturn(Optional.of(mockWorkspace));
+        given(workspaceMemberRepository.findByWorkspaceAndUser(mockWorkspace, mockUser))
+            .willReturn(Optional.of(ownerMember));
+
+        // when
+        WorkspaceDeleteResponse response = workspaceService.delete(orgId, workspaceId, userId);
+
+        // then
+        assertThat(response.workspaceId()).isEqualTo(workspaceId);
+        assertThat(mockWorkspace.getStatus()).isEqualTo(WorkspaceStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("조직 ADMIN이 워크스페이스를 비활성화한다")
+    void delete_Success_AsOrgAdmin() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 2L;
+
+        User mockUser = createMockUser(userId);
+        Organization mockOrg = createMockOrganization(orgId, mockUser);
+        Workspace mockWorkspace = createMockWorkspace(workspaceId, mockOrg);
+        OrganizationMember adminMember = OrganizationMember.create(mockOrg, mockUser, OrganizationRole.ADMIN);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(organizationRepository.findByIdAndStatus(orgId, OrganizationStatus.ACTIVE))
+            .willReturn(Optional.of(mockOrg));
+        given(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, orgId, WorkspaceStatus.ACTIVE))
+            .willReturn(Optional.of(mockWorkspace));
+        given(workspaceMemberRepository.findByWorkspaceAndUser(mockWorkspace, mockUser))
+            .willReturn(Optional.empty());
+        given(organizationMemberRepository.findByOrganizationAndUser(mockOrg, mockUser))
+            .willReturn(Optional.of(adminMember));
+
+        // when
+        WorkspaceDeleteResponse response = workspaceService.delete(orgId, workspaceId, userId);
+
+        // then
+        assertThat(response.workspaceId()).isEqualTo(workspaceId);
+        assertThat(mockWorkspace.getStatus()).isEqualTo(WorkspaceStatus.INACTIVE);
+    }
+
+    @Test
+    @DisplayName("비활성화된 워크스페이스 삭제 시 예외가 발생한다")
+    void delete_InactiveWorkspace_ThrowsException() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 1L;
+
+        User mockUser = createMockUser(userId);
+        Organization mockOrg = createMockOrganization(orgId, mockUser);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(organizationRepository.findByIdAndStatus(orgId, OrganizationStatus.ACTIVE))
+            .willReturn(Optional.of(mockOrg));
+        given(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, orgId, WorkspaceStatus.ACTIVE))
+            .willReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> workspaceService.delete(orgId, workspaceId, userId))
+            .isInstanceOf(BusinessException.class)
+            .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("권한 없는 사용자가 워크스페이스 삭제 시 예외가 발생한다")
+    void delete_NoPermission_ThrowsException() throws Exception {
+        // given
+        Long orgId = 1L;
+        Long workspaceId = 1L;
+        Long userId = 3L;
+
+        User mockUser = createMockUser(userId);
+        Organization mockOrg = createMockOrganization(orgId, mockUser);
+        Workspace mockWorkspace = createMockWorkspace(workspaceId, mockOrg);
+        WorkspaceMember memberRole = WorkspaceMember.create(mockWorkspace, mockUser, WorkspaceRole.MEMBER);
+        OrganizationMember orgMemberRole = OrganizationMember.create(mockOrg, mockUser, OrganizationRole.MEMBER);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(mockUser));
+        given(organizationRepository.findByIdAndStatus(orgId, OrganizationStatus.ACTIVE))
+            .willReturn(Optional.of(mockOrg));
+        given(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, orgId, WorkspaceStatus.ACTIVE))
+            .willReturn(Optional.of(mockWorkspace));
+        given(workspaceMemberRepository.findByWorkspaceAndUser(mockWorkspace, mockUser))
+            .willReturn(Optional.of(memberRole));
+        given(organizationMemberRepository.findByOrganizationAndUser(mockOrg, mockUser))
+            .willReturn(Optional.of(orgMemberRole));
+
+        // when & then
+        assertThatThrownBy(() -> workspaceService.delete(orgId, workspaceId, userId))
             .isInstanceOf(BusinessException.class)
             .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
     }

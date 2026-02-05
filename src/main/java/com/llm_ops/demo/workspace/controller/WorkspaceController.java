@@ -2,6 +2,7 @@ package com.llm_ops.demo.workspace.controller;
 
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceCreateResponse;
+import com.llm_ops.demo.workspace.dto.WorkspaceDeleteResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceSummaryResponse;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceUpdateResponse;
@@ -12,6 +13,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,6 +56,16 @@ public class WorkspaceController {
         @Valid @RequestBody WorkspaceUpdateRequest request
     ) {
         WorkspaceUpdateResponse response = workspaceService.update(orgId, workspaceId, userId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/organizations/{orgId}/workspaces/{workspaceId}")
+    public ResponseEntity<WorkspaceDeleteResponse> deleteWorkspace(
+        @PathVariable Long orgId,
+        @PathVariable Long workspaceId,
+        @AuthenticationPrincipal Long userId
+    ) {
+        WorkspaceDeleteResponse response = workspaceService.delete(orgId, workspaceId, userId);
         return ResponseEntity.ok(response);
     }
 }
