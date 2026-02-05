@@ -85,6 +85,8 @@ beforeEach(() => {
       modelConfig: {},
       createdBy: 1,
       createdAt: '2026-02-01T00:00:00Z',
+      secondaryProvider: null,
+      secondaryModel: null,
     })
   );
   mockedPromptApi.getRelease.mockResolvedValue(

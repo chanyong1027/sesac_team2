@@ -140,15 +140,8 @@ function AddProviderModal({
   provider: string | null;
 }) {
   const [apiKey, setApiKey] = useState('');
-  const [updateError, setUpdateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentOrgId } = useOrganizationStore();
-
-  const handleClose = () => {
-    setUpdateError(null);
-    setApiKey('');
-    onClose();
-  };
 
   const createMutation = useMutation({
     mutationFn: () => {
