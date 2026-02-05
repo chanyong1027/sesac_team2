@@ -35,6 +35,29 @@ public class RagDocumentVectorStoreDeleteService {
         return jdbcTemplate.update(sql, documentId.toString());
     }
 
+    public int deleteForDocument(Long workspaceId, Long documentId, String documentName) {
+        if (workspaceId == null || workspaceId <= 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "workspaceId가 필요합니다.");
+        }
+        int deleted = deleteByDocumentId(documentId);
+        if (deleted > 0) {
+            return deleted;
+        }
+        if (documentName == null || documentName.isBlank()) {
+            return 0;
+        }
+        String table = properties.getSchemaName() + "." + properties.getTableName();
+        String sql = "DELETE FROM " + table
+            + " WHERE metadata->>'workspace_id' = ? AND (metadata->>'document_name' = ? OR metadata->>'file_name' = ? OR metadata->>'resourceName' = ? OR metadata->>'filename' = ?)";
+        return jdbcTemplate.update(sql,
+            workspaceId.toString(),
+            documentName,
+            documentName,
+            documentName,
+            documentName
+        );
+    }
+
     private void validateIdentifier(String identifier, String fieldName) {
         if (identifier == null || identifier.trim().isEmpty()) {
             throw new IllegalArgumentException(fieldName + " must not be null or empty");

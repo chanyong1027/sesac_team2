@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { organizationApi } from '@/api/organization.api';
 import { promptApi } from '@/api/prompt.api';
@@ -11,7 +12,9 @@ import {
     Activity,
     Plus,
     CheckCircle2,
-    Circle
+    Circle,
+    Copy,
+    Check
 } from 'lucide-react';
 
 export function WorkspaceDashboardPage() {
@@ -54,6 +57,16 @@ export function WorkspaceDashboardPage() {
         enabled: !!resolvedOrgId,
     });
 
+    const { data: apiKeys } = useQuery({
+        queryKey: ['organization-api-keys', resolvedOrgId],
+        queryFn: async () => {
+            if (!resolvedOrgId) return [];
+            const response = await organizationApi.getApiKeys(resolvedOrgId);
+            return response.data;
+        },
+        enabled: !!resolvedOrgId,
+    });
+
     // 문서 목록 조회 (통계용)
     const { data: documents } = useQuery({
         queryKey: ['documents', workspaceId],
@@ -64,10 +77,69 @@ export function WorkspaceDashboardPage() {
         enabled: !!workspaceId,
     });
 
+    const firstPromptId = prompts?.[0]?.id;
+
+    const { data: versions } = useQuery({
+        queryKey: ['prompt-versions', firstPromptId],
+        queryFn: async () => {
+            if (!firstPromptId) return [];
+            const response = await promptApi.getVersions(firstPromptId);
+            return response.data;
+        },
+        enabled: !!firstPromptId,
+    });
+
+    const { data: release } = useQuery({
+        queryKey: ['prompt-release', firstPromptId],
+        queryFn: async () => {
+            if (!firstPromptId) return null;
+            try {
+                const response = await promptApi.getRelease(firstPromptId);
+                return response.data;
+            } catch {
+                return null;
+            }
+        },
+        enabled: !!firstPromptId,
+    });
+
     if (isWorkspaceLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
     if (!workspace) return <div className="p-8 text-gray-500">워크스페이스를 찾을 수 없습니다.</div>;
 
     const hasProviderKeys = (credentials?.length ?? 0) > 0;
+    const hasGatewayApiKeys = (apiKeys?.length ?? 0) > 0;
+    const hasPrompts = (prompts?.length ?? 0) > 0;
+    const hasVersions = (versions?.length ?? 0) > 0;
+    const hasRelease = !!release;
+    const hasDocuments = (documents?.length ?? 0) > 0;
+    const allStepsCompleted = hasProviderKeys && hasGatewayApiKeys && hasPrompts && hasVersions && hasRelease;
+
+    const [copied, setCopied] = useState(false);
+    
+    const handleCopyToClipboard = (text: string) => {
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }).catch(() => {
+            alert('클립보드 복사에 실패했습니다.');
+        });
+    };
+
+    const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.luminaops.com';
+    const promptKey = prompts?.[0]?.promptKey || 'your-prompt-key';
+    
+    const curlExample = `curl -X POST "${apiBaseUrl}/v1/chat/completions" \\
+  -H "X-API-Key: ${gatewayApiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "workspaceId": ${workspaceId},
+    "promptKey": "${promptKey}",
+    "variables": {
+      "question": "안녕하세요!"
+    },
+    "ragEnabled": false
+  }'`;
 
     return (
         <div className="space-y-8">
@@ -155,39 +227,96 @@ export function WorkspaceDashboardPage() {
                                 )}
                             />
                             <CheckListItem
-                                checked={!!prompts && prompts.length > 0}
+                                checked={hasGatewayApiKeys}
+                                label="Gateway API 키 생성"
+                                subtext="외부 시스템에서 호출할 API 키를 생성합니다."
+                                action={!hasGatewayApiKeys && (
+                                    <Link to={orgId ? `/orgs/${orgId}/settings/api-keys` : '/settings/api-keys'} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>
+                                )}
+                            />
+                            <CheckListItem
+                                checked={hasPrompts}
                                 label="프롬프트 설정 확인"
                                 subtext="메인 프롬프트는 1개만 관리합니다."
-                                action={(!prompts || prompts.length === 0) && <Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">설정</Link>}
+                                action={!hasPrompts && <Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">설정</Link>}
                             />
                             <CheckListItem
-                                checked={false}
+                                checked={hasVersions}
                                 label="첫 버전 생성"
                                 subtext="이전 버전 내용을 복사해 빠르게 시작합니다."
-                                action={<Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
+                                action={!hasVersions && hasPrompts && <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
                             />
                             <CheckListItem
-                                checked={false}
+                                checked={hasRelease}
                                 label="배포하기"
                                 subtext="릴리즈 탭에서 운영 버전을 선택합니다."
-                                action={<Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">배포</Link>}
+                                action={!hasRelease && hasVersions && <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-indigo-600 font-medium hover:underline">배포</Link>}
                             />
                             <CheckListItem
-                                checked={!!documents && documents.length > 0}
-                                label="지식 데이터 업로드"
+                                checked={hasDocuments}
+                                label="(선택) 지식 데이터 업로드"
                                 subtext="RAG 기반 답변이 필요할 때만 추가하세요."
-                                action={(!documents || documents.length === 0) && <Link to={`${basePath}/documents`} className="text-xs text-indigo-600 font-medium hover:underline">업로드</Link>}
+                                action={!hasDocuments && <Link to={`${basePath}/documents`} className="text-xs text-indigo-600 font-medium hover:underline">업로드</Link>}
                             />
                         </div>
                     </section>
-                    <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h2 className="text-lg font-medium text-gray-900 mb-3">LLM 초심자 가이드</h2>
-                        <ol className="space-y-2 text-sm text-gray-600">
-                            <li>1. Provider 키 등록 → 사용할 모델 선택</li>
-                            <li>2. 버전 생성 → {'{{question}}'} 템플릿 입력</li>
-                            <li>3. 릴리즈 → 운영 버전 지정 후 테스트</li>
-                        </ol>
-                    </section>
+                    {allStepsCompleted ? (
+                        <section className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200 shadow-sm">
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <h2 className="text-lg font-medium text-gray-900 mb-1">설정 완료! 🎉</h2>
+                                    <p className="text-sm text-gray-600">아래 예시를 상황에 맞게 수정해서 사용하세요</p>
+                                </div>
+                                <button
+                                    onClick={() => handleCopyToClipboard(curlExample)}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                                >
+                                    {copied ? (
+                                        <>
+                                            <Check size={16} className="text-green-600" />
+                                            <span>복사됨</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy size={16} />
+                                            <span>복사</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                                <pre className="text-xs text-gray-100 font-mono">
+                                    <code>{curlExample}</code>
+                                </pre>
+                            </div>
+                            <div className="mt-4 space-y-3">
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                    <p className="text-xs font-semibold text-amber-900 mb-2">✏️ 수정 가능한 부분</p>
+                                    <ul className="space-y-1.5 text-xs text-amber-900">
+                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">X-API-Key</code>: Settings에서 생성한 실제 API 키로 교체</li>
+                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">promptKey</code>: 사용할 프롬프트 키로 변경 (현재: {promptKey})</li>
+                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">variables</code>: 프롬프트 템플릿에 맞는 변수로 수정</li>
+                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">ragEnabled</code>: RAG 사용 시 <code className="font-mono">true</code>로 변경</li>
+                                    </ul>
+                                </div>
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <p className="text-xs text-blue-900">
+                                        <strong>RAG 사용하기:</strong> <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono">"ragEnabled": true</code>로 변경하면 업로드한 문서를 기반으로 답변합니다.
+                                    </p>
+                                </div>
+                            </div>
+                        </section>
+                    ) : (
+                        <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
+                            <h2 className="text-lg font-medium text-gray-900 mb-3">빠른 시작 가이드</h2>
+                            <ol className="space-y-2 text-sm text-gray-600">
+                                <li>1. Provider 키 등록 → 사용할 모델 선택</li>
+                                <li>2. Gateway API 키 생성 → 외부 호출용</li>
+                                <li>3. 버전 생성 → {'{{question}}'} 템플릿 입력</li>
+                                <li>4. 릴리즈 → 운영 버전 지정 후 테스트</li>
+                            </ol>
+                        </section>
+                    )}
                 </div>
             </div>
         </div>

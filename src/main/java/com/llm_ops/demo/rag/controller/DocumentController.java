@@ -160,7 +160,7 @@ public class DocumentController {
         RagDocumentVectorStoreDeleteService vectorStoreDeleteService =
                 ragDocumentVectorStoreDeleteServiceProvider.getIfAvailable();
         if (vectorStoreDeleteService != null) {
-            vectorStoreDeleteService.deleteByDocumentId(documentId);
+            vectorStoreDeleteService.deleteForDocument(workspaceId, documentId, deleted.getFileName());
         }
 
         return ResponseEntity.ok(DocumentDeleteResponse.of(documentId, "삭제되었습니다."));
