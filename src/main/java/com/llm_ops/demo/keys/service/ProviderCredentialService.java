@@ -37,6 +37,8 @@ public class ProviderCredentialService {
 
         validateDuplicate(organizationId, providerType);
 
+        providerCredentialVerifier.verify(providerType, request.apiKey());
+
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         ProviderCredential credential = ProviderCredential.create(
                 organizationId,
@@ -102,6 +104,8 @@ public class ProviderCredentialService {
         if (!credential.getOrganizationId().equals(organizationId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "조직에 대한 권한이 없습니다.");
         }
+
+        providerCredentialVerifier.verify(credential.getProvider(), request.apiKey());
 
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         credential.updateKey(ciphertext);

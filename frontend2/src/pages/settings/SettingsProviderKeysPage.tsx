@@ -494,6 +494,25 @@ export function SettingsProviderKeysPage() {
     };
   }, []);
 
+  const showToast = (message: string) => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   const { data: credentials, isLoading } = useQuery({
     queryKey: ['provider-credentials', currentOrgId],
     queryFn: async () => {
