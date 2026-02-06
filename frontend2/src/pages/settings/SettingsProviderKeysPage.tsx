@@ -170,6 +170,7 @@ function ProviderCard({
   const isVerifying = status === 'VERIFYING';
   const isInvalid = status === 'INVALID';
   const isEnterpriseOnly = !!info.isEnterpriseOnly && !credential;
+  const supportsBudget = provider !== 'AZURE_OPENAI';
   const providerSlug = providerToSlug(provider);
 
   const { data: budgetUsage } = useQuery({
@@ -178,7 +179,7 @@ function ProviderCard({
       const res = await budgetApi.getProviderUsage(orgId, providerSlug);
       return res.data;
     },
-    enabled: !!credential && !isEnterpriseOnly,
+    enabled: supportsBudget && !!credential && !isEnterpriseOnly,
     retry: false,
   });
 
@@ -188,7 +189,7 @@ function ProviderCard({
       const res = await budgetApi.getProviderPolicy(orgId, providerSlug);
       return res.data;
     },
-    enabled: !!credential && !isEnterpriseOnly,
+    enabled: supportsBudget && !!credential && !isEnterpriseOnly,
     retry: false,
   });
 
@@ -271,6 +272,7 @@ function ProviderCard({
                  <button
                    type="button"
                    onClick={onConfigureBudget}
+                   disabled={!supportsBudget}
                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
                  >
                    예산 설정
@@ -747,7 +749,13 @@ export function SettingsProviderKeysPage() {
                   reverifyMutation.mutate(credentialId);
                 }
               }}
-              onConfigureBudget={() => setBudgetProvider(provider)}
+              onConfigureBudget={() => {
+                if (provider === 'AZURE_OPENAI') {
+                  showToast('Azure OpenAI는 현재 예산 가드레일을 지원하지 않습니다.');
+                  return;
+                }
+                setBudgetProvider(provider);
+              }}
               isReverifyPending={reverifyMutation.isPending}
             />
           ))}
