@@ -55,14 +55,14 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl border border-gray-100">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">새 워크스페이스 만들기</h2>
-        <p className="text-sm text-gray-500 mb-6">
+      <div className="glass-card rounded-2xl p-8 w-full max-w-md text-white">
+        <h2 className="text-2xl font-bold text-white mb-2">새 워크스페이스 만들기</h2>
+        <p className="text-sm text-[var(--text-secondary)] mb-6">
           새로운 프로젝트를 위한 작업 공간을 생성합니다.
         </p>
 
         {!currentOrgId && (
-          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+          <div className="mb-5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
             현재 조직이 선택되지 않아 워크스페이스를 만들 수 없습니다.
           </div>
         )}
@@ -70,18 +70,18 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* 1. Workspace Display Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white/90 mb-2">
               워크스페이스 이름
             </label>
             <input
               {...register('workspaceDisplayName')}
               type="text"
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
               placeholder="예: 내 프로젝트"
               autoFocus
             />
             {errors.workspaceDisplayName && (
-              <p className="mt-1 text-sm text-red-500">
+              <p className="mt-1 text-sm text-red-400">
                 {errors.workspaceDisplayName.message}
               </p>
             )}
@@ -89,20 +89,20 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
 
           {/* 2. Workspace ID (Name) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-white/90 mb-2">
               URL 식별자 (ID)
             </label>
             <div className="relative">
               <input
                 {...register('workspaceName')}
                 type="text"
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
                 placeholder="my-project"
               />
             </div>
-            <p className="mt-1 text-xs text-gray-500">영문 소문자, 숫자, 하이픈(-)만 사용 가능합니다.</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">영문 소문자, 숫자, 하이픈(-)만 사용 가능합니다.</p>
             {errors.workspaceName && (
-              <p className="mt-1 text-sm text-red-500">
+              <p className="mt-1 text-sm text-red-400">
                 {errors.workspaceName.message}
               </p>
             )}
@@ -113,14 +113,14 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex-1 py-3 bg-white/[0.02] border border-white/10 text-white/90 font-semibold rounded-xl hover:bg-white/[0.06] transition-colors"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending || !currentOrgId}
-              className="flex-1 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
+              className="flex-1 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] disabled:opacity-50 transition-colors shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-white/10"
             >
               {createMutation.isPending ? '생성 중...' : '워크스페이스 생성'}
             </button>

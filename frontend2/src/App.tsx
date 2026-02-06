@@ -16,10 +16,11 @@ import { OrganizationDashboardPage } from '@/pages/dashboard/OrganizationDashboa
 	import { WorkspaceLogsPage } from '@/pages/logs/WorkspaceLogsPage';
 	import { WorkspaceLogDetailPage } from '@/pages/logs/WorkspaceLogDetailPage';
 	import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
-	import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
-	import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
-	import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
-	import { SettingsProviderKeysPage } from '@/pages/settings/SettingsProviderKeysPage';
+import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
+import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
+import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
+import { SettingsProviderKeysPage } from '@/pages/settings/SettingsProviderKeysPage';
+import { OrganizationSecurityPage } from '@/pages/settings/OrganizationSecurityPage';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
@@ -118,10 +119,11 @@ function App() {
 	              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceLogsPage />} />
 	              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceLogDetailPage />} />
 
-	              {/* Settings Routes (Integrated) */}
-	              <Route path="settings/members" element={<SettingsMembersPage />} />
-	              <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
-	              <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
+              {/* Settings Routes (Integrated) */}
+              <Route path="settings/security" element={<OrganizationSecurityPage />} />
+              <Route path="settings/members" element={<SettingsMembersPage />} />
+              <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
+              <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
               {/* Statistics Dashboard */}
               <Route path="stats" element={<DashboardPage />} />
             </Route>

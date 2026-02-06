@@ -6,14 +6,8 @@ import { promptApi } from '@/api/prompt.api';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import {
-    ArrowLeft,
-    MessageSquare,
-    GitBranch,
     Rocket,
     Play,
-    Clock,
-    CheckCircle2,
-    AlertCircle,
     Copy,
     Save
 } from 'lucide-react';
@@ -71,61 +65,64 @@ export function PromptDetailPage() {
     if (!prompt) return <div className="p-8 text-gray-500">프롬프트를 찾을 수 없습니다.</div>;
 
     return (
-        <div className="space-y-6">
+        <div className="max-w-7xl mx-auto space-y-8">
             {/* Header */}
-            <div className="flex flex-col gap-4">
+            <div className="space-y-6">
                 <Link
                     to={basePath}
-                    className="inline-flex items-center text-sm text-gray-500 hover:text-gray-900 transition-colors w-fit"
+                    className="flex items-center gap-2 mb-2 group cursor-pointer w-fit"
                 >
-                    <ArrowLeft size={16} className="mr-1" />
-                    워크스페이스로 돌아가기
+                    <span className="material-symbols-outlined text-gray-500 text-sm group-hover:text-[var(--primary)] transition-colors">
+                        arrow_back
+                    </span>
+                    <span className="text-xs text-gray-500 group-hover:text-gray-300 transition-colors">
+                        워크스페이스로 돌아가기
+                    </span>
                 </Link>
 
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
-                            <MessageSquare size={24} />
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center">
+                        <span className="material-symbols-outlined text-2xl text-white">chat_bubble</span>
+                    </div>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-bold text-white tracking-tight truncate">{prompt.promptKey}</h1>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]">
+                                {prompt.status}
+                            </span>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-                                {prompt.promptKey}
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-100">
-                                    {prompt.status}
-                                </span>
-                            </h1>
-                            <p className="text-gray-500 mt-1">{prompt.description}</p>
-                        </div>
+                        <p className="text-gray-400 text-sm mt-1">Prompt Configuration &amp; Version Control</p>
                     </div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-gray-200">
-                <nav className="flex items-center gap-6">
+            <div className="border-b border-white/10 flex items-center gap-8 text-sm font-medium">
+                <nav className="flex items-center gap-8">
                     <TabButton
                         active={activeTab === 'overview'}
                         onClick={() => setActiveTab('overview')}
-                        icon={<MessageSquare size={18} />}
+                        iconName="settings"
                         label="개요 (Overview)"
                     />
                     <TabButton
                         active={activeTab === 'versions'}
                         onClick={() => setActiveTab('versions')}
-                        icon={<GitBranch size={18} />}
+                        iconName="history"
                         label="버전 (Versions)"
                     />
                     <TabButton
                         active={activeTab === 'release'}
                         onClick={() => setActiveTab('release')}
-                        icon={<Rocket size={18} />}
+                        iconName="rocket_launch"
                         label="배포 (Release)"
                     />
                     <TabButton
                         active={activeTab === 'playground'}
                         onClick={() => setActiveTab('playground')}
-                        icon={<Play size={18} />}
+                        iconName="play_circle"
                         label="Playground"
+                        kind="playground"
                     />
                 </nav>
             </div>
@@ -135,9 +132,11 @@ export function PromptDetailPage() {
                 {activeTab === 'overview' && (
                     <OverviewTab
                         prompt={prompt}
+                        promptId={promptId}
                         release={release ?? null}
                         isReleaseLoading={isReleaseLoading}
                         isReleaseError={isReleaseError}
+                        onGoRelease={() => setActiveTab('release')}
                     />
                 )}
                 {activeTab === 'versions' && <VersionsTab promptId={promptId} />}
@@ -148,19 +147,33 @@ export function PromptDetailPage() {
     );
 }
 
-function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function TabButton({
+    active,
+    onClick,
+    iconName,
+    label,
+    kind = 'default',
+}: {
+    active: boolean;
+    onClick: () => void;
+    iconName: string;
+    label: string;
+    kind?: 'default' | 'playground';
+}) {
     return (
         <button
             onClick={onClick}
-            className={`
-        flex items-center gap-2 py-4 border-b-2 transition-colors font-medium text-sm
-        ${active
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
-      `}
+            className={`relative py-3 flex items-center gap-2 transition-colors ${kind === 'playground' ? 'ml-4' : ''} ${active ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-gray-200'} group`}
         >
-            {icon}
+            <span
+                className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300')} transition-colors`}
+            >
+                {iconName}
+            </span>
             {label}
+            {active ? (
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[var(--primary)] shadow-[0_0_10px_rgba(168,85,247,0.8)]" />
+            ) : null}
         </button>
     );
 }
@@ -169,75 +182,265 @@ function TabButton({ active, onClick, icon, label }: { active: boolean; onClick:
 
 function OverviewTab({
     prompt,
+    promptId,
     release,
     isReleaseLoading,
     isReleaseError,
+    onGoRelease,
 }: {
     prompt: PromptDetailResponse;
+    promptId: number;
     release: PromptReleaseResponse | null;
     isReleaseLoading: boolean;
     isReleaseError: boolean;
+    onGoRelease: () => void;
 }) {
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">기본 정보</h3>
-                <dl className="space-y-4">
-                    <div>
-                        <dt className="text-sm font-medium text-gray-500">Prompt Key</dt>
-                        <dd className="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded flex justify-between items-center group">
-                            {prompt.promptKey}
-                            <button className="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Copy size={14} />
-                            </button>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-sm font-medium text-gray-500">Description</dt>
-                        <dd className="mt-1 text-sm text-gray-900">{prompt.description}</dd>
-                    </div>
-                    <div>
-                        <dt className="text-sm font-medium text-gray-500">Created At</dt>
-                        <dd className="mt-1 text-sm text-gray-900">{new Date(prompt.createdAt).toLocaleString()}</dd>
-                    </div>
-                </dl>
-            </div>
+    const queryClient = useQueryClient();
+    const [isEditing, setIsEditing] = useState(false);
+    const [draftDescription, setDraftDescription] = useState(prompt.description ?? '');
 
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">최신 배포 상태</h3>
-                <div className="flex items-center gap-4 mb-6">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${release ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-500'}`}>
-                        {release ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500">현재 서비스 중인 버전</p>
-                        {isReleaseLoading ? (
-                            <p className="text-2xl font-bold text-gray-900">불러오는 중...</p>
+    useEffect(() => {
+        // Keep local draft in sync when navigating between prompts.
+        setDraftDescription(prompt.description ?? '');
+        setIsEditing(false);
+    }, [prompt.id, prompt.description]);
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            return promptApi.updatePrompt(prompt.workspaceId, prompt.id, {
+                description: draftDescription,
+            });
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['prompt', prompt.workspaceId, prompt.id] });
+            setIsEditing(false);
+        },
+        onError: () => {
+            alert('설명 저장에 실패했습니다.');
+        },
+    });
+
+    const { data: releaseHistory } = useQuery({
+        queryKey: ['promptReleaseHistory', promptId],
+        queryFn: async () => {
+            try {
+                const response = await promptApi.getReleaseHistory(promptId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return [];
+                }
+                return [];
+            }
+        },
+        enabled: !!promptId,
+        retry: false,
+    });
+
+    const latestReleaseEvent = useMemo(() => {
+        if (!releaseHistory || releaseHistory.length === 0) return null;
+        return [...releaseHistory].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+    }, [releaseHistory]);
+
+    const { data: activeVersionDetail } = useQuery({
+        queryKey: ['promptVersionDetail', promptId, release?.activeVersionId ?? null],
+        queryFn: async () => {
+            if (!release?.activeVersionId) return null;
+            try {
+                const response = await promptApi.getVersion(promptId, release.activeVersionId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return null;
+                }
+                return null;
+            }
+        },
+        enabled: !!release?.activeVersionId,
+        retry: false,
+    });
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="glass-card rounded-2xl p-8 h-full flex flex-col">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">기본 정보</h2>
+                    <div className="flex items-center gap-2">
+                        {isEditing ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setDraftDescription(prompt.description ?? '');
+                                        setIsEditing(false);
+                                    }}
+                                    className="text-xs text-gray-300 hover:text-white transition-colors border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/5"
+                                >
+                                    취소
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={saveMutation.isPending}
+                                    onClick={() => saveMutation.mutate()}
+                                    className="text-xs text-[var(--primary)] hover:text-white transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20 disabled:opacity-50 inline-flex items-center gap-1"
+                                >
+                                    <Save size={14} />
+                                    저장
+                                </button>
+                            </>
                         ) : (
-                            <p className="text-2xl font-bold text-gray-900">
-                                {release ? `v${release.activeVersionNo}` : '릴리즈 없음'}
-                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditing(true)}
+                                className="text-xs text-[var(--primary)] hover:text-white transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20"
+                            >
+                                수정하기
+                            </button>
                         )}
                     </div>
                 </div>
-                <div className="space-y-2 text-sm">
-                    <div className="flex justify-between py-2 border-b border-gray-100">
-                        <span className="text-gray-500">배포 일시</span>
-                        <span className="text-gray-900">
-                            {release ? new Date(release.releasedAt).toLocaleString('ko-KR') : '-'}
+
+                <div className="space-y-6 flex-1">
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Prompt Key</label>
+                        <div className="relative group">
+                            <input
+                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all font-mono tracking-wide"
+                                readOnly
+                                value={prompt.promptKey}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => navigator.clipboard.writeText(prompt.promptKey)}
+                                className="absolute right-3 top-3 text-gray-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                aria-label="copy prompt key"
+                            >
+                                <Copy size={16} />
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-gray-500 pl-1">Use this key in your API calls to reference this prompt.</p>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Description</label>
+                        <textarea
+                            className={`w-full border rounded-xl px-4 py-3 text-sm h-24 resize-none transition-all ${isEditing
+                                ? 'bg-black/40 border-white/10 text-white focus:ring-1 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)]'
+                                : 'bg-black/20 border-white/5 text-gray-300'
+                                }`}
+                            readOnly={!isEditing}
+                            value={draftDescription}
+                            onChange={(e) => setDraftDescription(e.target.value)}
+                        />
+                    </div>
+
+                    <div className="pt-4 mt-auto border-t border-white/5">
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Created At</span>
+                            <span className="text-gray-300 font-mono">{new Date(prompt.createdAt).toLocaleString('ko-KR')}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-8 h-full relative overflow-hidden group">
+                <div className="absolute -right-20 -top-20 w-64 h-64 bg-green-500/5 rounded-full blur-[80px] pointer-events-none" />
+
+                <div className="flex items-center justify-between mb-8 relative z-10">
+                    <h2 className="text-lg font-bold text-white">최신 배포 상태</h2>
+                    <div className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${release ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${release ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
+                        <span className={`text-[10px] font-bold tracking-wide ${release ? 'text-green-400' : 'text-amber-300'}`}>
+                            {release ? 'OPERATIONAL' : 'NO RELEASE'}
                         </span>
                     </div>
                 </div>
-                {isReleaseError && (
-                    <p className="mt-4 text-xs text-rose-600">
+
+                <div className="flex flex-col h-[calc(100%-4rem)] justify-center relative z-10">
+                    <div className="flex items-center gap-6 mb-8">
+                        <div className="relative">
+                            <div className={`w-20 h-20 rounded-full border-2 flex items-center justify-center relative shadow-[0_0_30px_rgba(34,197,94,0.1)] ${release ? 'border-green-500/20 bg-green-500/5' : 'border-amber-500/20 bg-amber-500/5'}`}>
+                                {release ? (
+                                    <span className="material-symbols-outlined text-4xl text-green-400">check_circle</span>
+                                ) : (
+                                    <span className="material-symbols-outlined text-4xl text-amber-300">warning</span>
+                                )}
+                            </div>
+                            {release ? (
+                                <div className="absolute inset-0 border-2 border-green-500/40 rounded-full animate-[ping_3s_ease-in-out_infinite] opacity-20" />
+                            ) : null}
+                        </div>
+                        <div>
+                            <p className="text-sm text-gray-400 font-medium mb-1">현재 서비스 중인 버전</p>
+                            <div className="text-6xl font-bold text-white tracking-tighter flex items-baseline gap-1">
+                                {isReleaseLoading ? (
+                                    <span className="text-2xl text-gray-300">Loading...</span>
+                                ) : release ? (
+                                    <>
+                                        v{release.activeVersionNo}
+                                        <span className="text-lg font-medium text-gray-500 tracking-normal">latest</span>
+                                    </>
+                                ) : (
+                                    <span className="text-2xl text-gray-300">-</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4 border-t border-white/5 pt-6">
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 text-gray-400 text-sm">
+                                <span className="material-symbols-outlined text-sm">schedule</span>
+                                <span>Last Deployed</span>
+                            </div>
+                            <span className="text-white font-mono text-sm">
+                                {release ? new Date(release.releasedAt).toLocaleString('ko-KR') : '-'}
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 text-gray-400 text-sm">
+                                <span className="material-symbols-outlined text-sm">person</span>
+                                <span>Deployed By</span>
+                            </div>
+                            <span className="text-white text-sm">
+                                {latestReleaseEvent?.changedByName ?? '-'}
+                            </span>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-2 text-gray-400 text-sm">
+                                <span className="material-symbols-outlined text-sm">model_training</span>
+                                <span>Model</span>
+                            </div>
+                            <span className="text-[var(--primary)] font-mono text-sm bg-[var(--primary)]/10 px-2 py-0.5 rounded border border-[var(--primary)]/20">
+                                {activeVersionDetail ? `${activeVersionDetail.provider} / ${activeVersionDetail.model}` : '-'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="mt-8">
+                        <button
+                            type="button"
+                            onClick={onGoRelease}
+                            className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 group"
+                        >
+                            <span className="material-symbols-outlined group-hover:-translate-y-0.5 transition-transform">history</span>
+                            배포 이력 보기
+                        </button>
+                    </div>
+                </div>
+
+                {isReleaseError ? (
+                    <p className="mt-4 text-xs text-red-400 relative z-10">
                         릴리즈 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
                     </p>
-                )}
-                {!isReleaseLoading && !release && !isReleaseError && (
-                    <p className="mt-4 text-xs text-amber-600">
+                ) : null}
+                {!isReleaseLoading && !release && !isReleaseError ? (
+                    <p className="mt-4 text-xs text-amber-300 relative z-10">
                         릴리즈된 버전이 없습니다. 버전 탭에서 새 버전을 만든 뒤 릴리즈 탭에서 배포 버전을 선택하세요.
                     </p>
-                )}
+                ) : null}
             </div>
         </div>
     );
@@ -396,6 +599,23 @@ function VersionsTab({ promptId }: { promptId: number }) {
         }
     }, [form.secondaryProvider, form.secondaryModel, secondaryProviderModels]);
 
+    const { data: currentRelease } = useQuery({
+        queryKey: ['promptRelease', promptId],
+        queryFn: async () => {
+            try {
+                const response = await promptApi.getRelease(promptId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return null;
+                }
+                return null;
+            }
+        },
+        enabled: !!promptId,
+        retry: false,
+    });
+
     const { data: versions, isLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
         queryFn: async () => {
@@ -530,52 +750,126 @@ function VersionsTab({ promptId }: { promptId: number }) {
         },
     });
 
-    if (isLoading) return <div className="text-gray-500">버전 정보를 불러오는 중...</div>;
+    const providerDotClass = (provider: string) => {
+        if (provider === 'OPENAI') return 'bg-blue-400';
+        if (provider === 'GEMINI') return 'bg-emerald-400';
+        if (provider === 'ANTHROPIC') return 'bg-amber-400';
+        return 'bg-gray-500';
+    };
+
+    const prettyModel = (model: string) => {
+        const raw = model ?? '';
+        if (!raw) return '-';
+        const lowered = raw.toLowerCase();
+        if (lowered.startsWith('gpt')) return raw.replace(/^gpt/i, 'GPT').replace(/-/g, '-');
+        if (lowered.startsWith('gemini')) return raw.replace(/^gemini/i, 'Gemini').replace(/-/g, ' ');
+        if (lowered.startsWith('claude')) return raw.replace(/^claude/i, 'Claude').replace(/-/g, ' ');
+        return raw;
+    };
+
+    const formatKoDateTime = (iso: string) => {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return iso;
+        return d.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    if (isLoading) return <div className="text-gray-400">버전 정보를 불러오는 중...</div>;
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-                <h3 className="font-medium text-gray-900">버전 히스토리</h3>
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-lg font-bold text-white">버전 히스토리</h2>
                 <button
+                    type="button"
                     onClick={() => setIsCreateOpen(true)}
-                    className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    className="bg-[var(--primary)] hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center gap-2"
                 >
-                    + 새 버전 생성
+                    <span className="material-symbols-outlined text-lg">add</span>
+                    새 버전 생성
                 </button>
             </div>
-            <div className="divide-y divide-gray-100">
+
+            <div className="space-y-4">
                 {versions && versions.length > 0 ? (
-                    versions.map((ver) => (
-                        <div key={ver.id} className="p-4 hover:bg-gray-50 transition-colors flex items-start gap-4">
-                            <div className="mt-1">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold bg-gray-100 text-gray-600`}>
-                                    v{ver.versionNumber}
+                    versions.map((ver) => {
+                        const isCurrent = !!currentRelease?.activeVersionId && ver.id === currentRelease.activeVersionId;
+                        return (
+                            <div
+                                key={ver.id}
+                                className={`glass-card rounded-xl p-0 overflow-hidden transition-all group ${isCurrent ? 'hover:border-[var(--primary)]/40' : 'opacity-80 hover:opacity-100 hover:border-white/20'}`}
+                            >
+                                <div className="p-5 flex items-center justify-between gap-6">
+                                    <div className="flex items-center gap-6 min-w-0">
+                                        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center text-sm font-bold ${isCurrent ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500'}`}>
+                                            v{ver.versionNumber}
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                <span className={`text-base font-bold ${isCurrent ? 'text-white' : 'text-gray-300'} truncate`}>
+                                                    {ver.title || '(untitled)'}
+                                                </span>
+                                                {isCurrent ? (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--primary)]/20 text-[var(--primary)] border border-[var(--primary)]/30">
+                                                        CURRENT
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                            <div className={`flex items-center gap-2 text-xs ${isCurrent ? 'text-gray-400' : 'text-gray-500'} flex-wrap`}>
+                                                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${providerDotClass(ver.provider)}`} />
+                                                    {prettyModel(ver.model)}
+                                                </span>
+                                                {ver.secondaryProvider && ver.secondaryModel ? (
+                                                    <>
+                                                        <span className="text-gray-600">/</span>
+                                                        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${providerDotClass(ver.secondaryProvider)}`} />
+                                                            {prettyModel(ver.secondaryModel)}
+                                                        </span>
+                                                    </>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-8 flex-shrink-0">
+                                        <div className="text-right">
+                                            <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>Last Updated</div>
+                                            <div className={`text-sm text-gray-300 font-mono ${isCurrent ? '' : 'opacity-80'}`}>
+                                                {formatKoDateTime(ver.createdAt)}
+                                            </div>
+                                        </div>
+
+                                        <div className="text-right hidden md:block">
+                                            <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>Author</div>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] text-white ${isCurrent ? 'bg-gradient-to-br from-purple-600 to-indigo-700' : 'bg-gray-700 text-gray-300'}`}>
+                                                    {(ver.createdByName || '?').slice(0, 1)}
+                                                </div>
+                                                <span className={`text-sm ${isCurrent ? 'text-gray-300' : 'text-gray-400'}`}>{ver.createdByName || '-'}</span>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setDetailVersionId(ver.id)}
+                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${isCurrent ? 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500' : 'text-gray-500 hover:text-white border-gray-800 hover:border-gray-600'}`}
+                                        >
+                                            상세 보기
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h4 className="text-sm font-semibold text-gray-900">
-                                        {ver.title}
-                                    </h4>
-                                    <span className="text-xs text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded">{ver.provider} / {ver.model}</span>
-                                </div>
-                                <div className="flex items-center gap-4 text-xs text-gray-400">
-                                    <span className="flex items-center gap-1"><Clock size={12} /> {new Date(ver.createdAt).toLocaleDateString()}</span>
-                                    <span>by {ver.createdByName}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <button
-                                    onClick={() => setDetailVersionId(ver.id)}
-                                    className="text-gray-400 hover:text-indigo-600 p-2 border border-gray-200 rounded-lg hover:border-indigo-200 transition-colors text-xs font-medium"
-                                >
-                                    상세 보기
-                                </button>
-                            </div>
-                        </div>
-                    ))
+                        );
+                    })
                 ) : (
-                    <div className="p-8 text-center text-gray-500 text-sm">
+                    <div className="p-8 text-center text-gray-400 text-sm glass-card rounded-xl">
                         생성된 버전이 없습니다.
                     </div>
                 )}
@@ -587,21 +881,21 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setIsCreateOpen(false)}
                     />
-                    <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900 max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-gray-100">
-                            <h4 className="text-lg font-semibold text-gray-900">새 버전 생성</h4>
-                            <p className="text-sm text-gray-500 mt-1">
+                    <div className="relative w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-xl border border-white/10 text-gray-100 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-white/10">
+                            <h4 className="text-lg font-semibold text-white">새 버전 생성</h4>
+                            <p className="text-sm text-gray-400 mt-1">
                                 버전은 테스트/개발용 시나리오를 관리하고, 릴리즈 탭에서 배포 버전을 선택합니다.
                             </p>
                         </div>
                         <div className="p-6 space-y-4">
                             {!isCredsLoading && availableProviders.length === 0 && (
-                                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
                                     등록된 Provider 키가 없습니다. 먼저 Provider 키를 등록해주세요.
                                     <div className="mt-2">
                                         <Link
                                             to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'}
-                                            className="text-amber-800 font-semibold hover:underline"
+                                            className="text-amber-100 font-semibold hover:underline"
                                         >
                                             Provider 키 등록하러 가기
                                         </Link>
@@ -620,7 +914,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             });
                                             setConfigError(null);
                                         }}
-                                        className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-full transition-colors"
+                                        className="px-3 py-1.5 text-xs font-medium text-gray-200 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/10"
                                     >
                                         예시 적용: {preset.label}
                                     </button>
@@ -631,14 +925,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </span>
                                 )}
                             </div>
-                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
                                 <div className="flex flex-col sm:flex-row items-end gap-3">
                                     <div className="flex-1">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">기존 버전 불러오기</label>
+                                        <label className="block text-sm font-medium text-gray-200 mb-1">기존 버전 불러오기</label>
                                         <select
                                             value={baseVersionId ?? ''}
                                             onChange={(e) => setBaseVersionId(Number(e.target.value) || null)}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
                                             disabled={!versions?.length}
                                         >
                                             <option value="">
@@ -655,33 +949,33 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         type="button"
                                         onClick={() => applyBaseVersion(baseVersionDetail ?? null)}
                                         disabled={!baseVersionDetail || isBaseVersionLoading}
-                                        className="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 bg-white rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                                        className="px-4 py-2 text-sm font-medium text-[var(--primary)] border border-[var(--primary)]/30 bg-white/5 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
                                     >
                                         {isBaseVersionLoading ? '불러오는 중...' : '내용 불러오기'}
                                     </button>
                                 </div>
-                                <p className="mt-2 text-xs text-gray-500">
+                                <p className="mt-2 text-xs text-gray-400">
                                     이전 버전의 설정을 가져와 빠르게 수정할 수 있습니다.
                                 </p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
+                                <label className="block text-sm font-medium text-gray-200 mb-1">제목</label>
                                 <input
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
                                     placeholder="예: 2026-02-01 실험용"
                                 />
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-200 mb-1">Provider</label>
                                     <select
                                         id="prompt-provider"
                                         value={form.provider}
                                         onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
                                         disabled={availableProviders.length === 0}
                                     >
                                         {availableProviders.length === 0 && (
@@ -695,12 +989,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-200 mb-1">Model</label>
                                     <select
                                         id="prompt-model"
                                         value={form.model}
                                         onChange={(e) => setForm({ ...form, model: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
                                         disabled={isAllowlistLoading || isAllowlistError || providerModels.length === 0}
                                     >
                                         {isAllowlistLoading && <option value="">모델 목록 불러오는 중...</option>}
@@ -714,13 +1008,13 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         ))}
                                     </select>
                                     {isAllowlistError && (
-                                        <p className="mt-1 text-xs text-rose-600">모델 목록을 불러오지 못했습니다.</p>
+                                        <p className="mt-1 text-xs text-rose-300">모델 목록을 불러오지 못했습니다.</p>
                                     )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="secondary-provider" className="block text-sm font-medium text-gray-700 mb-1">예비 Provider (선택)</label>
+                                    <label htmlFor="secondary-provider" className="block text-sm font-medium text-gray-200 mb-1">예비 Provider (선택)</label>
                                     <select
                                         id="secondary-provider"
                                         value={form.secondaryProvider}
@@ -730,7 +1024,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                 secondaryProvider: e.target.value as ProviderType | '',
                                                 secondaryModel: '',
                                             })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
                                         disabled={availableProviders.length === 0}
                                     >
                                         <option value="">예비 모델 없음</option>
@@ -742,12 +1036,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="secondary-model" className="block text-sm font-medium text-gray-700 mb-1">예비 Model (선택)</label>
+                                    <label htmlFor="secondary-model" className="block text-sm font-medium text-gray-200 mb-1">예비 Model (선택)</label>
                                     <select
                                         id="secondary-model"
                                         value={form.secondaryModel}
                                         onChange={(e) => setForm({ ...form, secondaryModel: e.target.value })}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
                                         disabled={!form.secondaryProvider || isAllowlistLoading || isAllowlistError || secondaryProviderModels.length === 0}
                                     >
                                         {!form.secondaryProvider && <option value="">예비 Provider를 먼저 선택하세요</option>}
@@ -766,17 +1060,17 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                                <label className="block text-sm font-medium text-gray-200 mb-1">System Prompt</label>
                                 <textarea
                                     value={form.systemPrompt}
                                     onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
                                     rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none resize-none"
                                     placeholder="시스템 프롬프트를 입력하세요."
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">User Template (필수)</label>
+                                <label className="block text-sm font-medium text-gray-200 mb-1">User Template (필수)</label>
                                 <textarea
                                     value={form.userTemplate}
                                     onChange={(e) => {
@@ -784,46 +1078,46 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         setTemplateError(null);
                                     }}
                                     rows={4}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none"
+                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none resize-none"
                                     placeholder="예: 사용자 질문: {{question}}"
                                 />
                                 <p className="mt-1 text-xs text-gray-400">{'{{question}}'} 변수가 반드시 포함되어야 합니다.</p>
                                 {templateError && (
-                                    <p className="mt-1 text-xs text-rose-600">{templateError}</p>
+                                    <p className="mt-1 text-xs text-rose-300">{templateError}</p>
                                 )}
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">관련 링크 (선택)</label>
+                                <label className="block text-sm font-medium text-gray-200 mb-1">관련 링크 (선택)</label>
                                 <input
                                     value={form.contextUrl}
                                     onChange={(e) => setForm({ ...form, contextUrl: e.target.value })}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none text-sm"
                                     placeholder="Jira/Notion 링크를 입력하세요"
                                 />
                                 <p className="mt-1 text-xs text-gray-400">변경 근거를 남겨두면 추적이 쉬워집니다.</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Model Config (JSON)</label>
+                                <label className="block text-sm font-medium text-gray-200 mb-1">Model Config (JSON)</label>
                                 <textarea
                                     value={form.modelConfig}
                                     onChange={(e) => setForm({ ...form, modelConfig: e.target.value })}
                                     rows={3}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none font-mono text-xs resize-none"
+                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none font-mono text-xs resize-none"
                                     placeholder='예: {"temperature":0.2,"topP":0.9}'
                                 />
                                 <p className="mt-1 text-xs text-gray-400">JSON 형식으로 입력하세요. 비워두면 기본값이 사용됩니다.</p>
                                 {configError && (
-                                    <p className="mt-1 text-xs text-rose-600">{configError}</p>
+                                    <p className="mt-1 text-xs text-rose-300">{configError}</p>
                                 )}
                                 {createError && (
-                                    <p className="mt-2 text-xs text-rose-600">{createError}</p>
+                                    <p className="mt-2 text-xs text-rose-300">{createError}</p>
                                 )}
                             </div>
                         </div>
-                        <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
+                        <div className="p-6 border-t border-white/10 flex justify-end gap-3">
                             <button
                                 onClick={() => setIsCreateOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-gray-200 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
                             >
                                 취소
                             </button>
@@ -840,7 +1134,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     (!!form.secondaryProvider && !form.secondaryModel.trim()) ||
                                     (form.secondaryProvider && secondaryProviderModels.length === 0)
                                 )}
-                                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                                className="px-4 py-2 text-sm font-semibold text-white bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-white/10"
                             >
                                 {createMutation.isPending ? '생성 중...' : '버전 생성'}
                             </button>
@@ -855,67 +1149,67 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setDetailVersionId(null)}
                     />
-                    <div className="relative w-full max-w-3xl mx-4 bg-white rounded-xl shadow-xl border border-gray-100 text-gray-900">
-                        <div className="p-6 border-b border-gray-100 flex items-start justify-between">
+                    <div className="relative w-full max-w-3xl mx-4 glass-card rounded-2xl shadow-xl border border-white/10 text-gray-100">
+                        <div className="p-6 border-b border-white/10 flex items-start justify-between">
                             <div>
-                                <h4 className="text-lg font-semibold text-gray-900">버전 상세</h4>
-                                <p className="text-sm text-gray-500 mt-1">버전의 설정과 템플릿을 확인합니다.</p>
+                                <h4 className="text-lg font-semibold text-white">버전 상세</h4>
+                                <p className="text-sm text-gray-400 mt-1">버전의 설정과 템플릿을 확인합니다.</p>
                             </div>
                             <button
                                 onClick={() => setDetailVersionId(null)}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-white"
                             >
                                 ✕
                             </button>
                         </div>
                         <div className="p-6 space-y-4">
                             {isDetailLoading || !versionDetail ? (
-                                <div className="text-sm text-gray-500">버전 정보를 불러오는 중...</div>
+                                <div className="text-sm text-gray-400">버전 정보를 불러오는 중...</div>
                             ) : (
                                 <>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
-                                            <div className="text-xs text-gray-500">Version</div>
-                                            <div className="text-sm font-semibold text-gray-900">v{versionDetail.versionNumber}</div>
+                                            <div className="text-xs text-gray-400">Version</div>
+                                            <div className="text-sm font-semibold text-white">v{versionDetail.versionNumber}</div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-500">Provider / Model</div>
-                                            <div className="text-sm font-semibold text-gray-900">
+                                            <div className="text-xs text-gray-400">Provider / Model</div>
+                                            <div className="text-sm font-semibold text-white">
                                                 {versionDetail.provider} / {versionDetail.model}
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-500">Secondary Provider / Model</div>
-                                            <div className="text-sm font-semibold text-gray-900">
+                                            <div className="text-xs text-gray-400">Secondary Provider / Model</div>
+                                            <div className="text-sm font-semibold text-white">
                                                 {versionDetail.secondaryProvider && versionDetail.secondaryModel
                                                     ? `${versionDetail.secondaryProvider} / ${versionDetail.secondaryModel}`
                                                     : '-'}
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-500">Title</div>
-                                            <div className="text-sm text-gray-900">{versionDetail.title || '-'}</div>
+                                            <div className="text-xs text-gray-400">Title</div>
+                                            <div className="text-sm text-gray-100">{versionDetail.title || '-'}</div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-gray-500">Created At</div>
-                                            <div className="text-sm text-gray-900">{new Date(versionDetail.createdAt).toLocaleString()}</div>
+                                            <div className="text-xs text-gray-400">Created At</div>
+                                            <div className="text-sm text-gray-100">{new Date(versionDetail.createdAt).toLocaleString()}</div>
                                         </div>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-500 mb-2">System Prompt</div>
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                        <div className="text-xs text-gray-400 mb-2">System Prompt</div>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-200 bg-black/40 border border-white/10 rounded-lg p-3">
                                             {versionDetail.systemPrompt || '-'}
                                         </pre>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-500 mb-2">User Template</div>
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                        <div className="text-xs text-gray-400 mb-2">User Template</div>
+                                        <pre className="whitespace-pre-wrap text-sm text-gray-200 bg-black/40 border border-white/10 rounded-lg p-3">
                                             {versionDetail.userTemplate || '-'}
                                         </pre>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-500 mb-2">Model Config</div>
-                                        <pre className="whitespace-pre-wrap text-xs text-gray-800 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                        <div className="text-xs text-gray-400 mb-2">Model Config</div>
+                                        <pre className="whitespace-pre-wrap text-xs text-gray-200 bg-black/40 border border-white/10 rounded-lg p-3">
                                             {versionDetail.modelConfig ? JSON.stringify(versionDetail.modelConfig, null, 2) : '-'}
                                         </pre>
                                     </div>
@@ -926,7 +1220,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                 href={versionDetail.contextUrl}
                                                 target="_blank"
                                                 rel="noreferrer"
-                                                className="text-sm text-indigo-600 hover:text-indigo-700 break-all"
+                                                className="text-sm text-[var(--primary)] hover:text-white break-all"
                                             >
                                                 {versionDetail.contextUrl}
                                             </a>
@@ -937,10 +1231,10 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 </>
                             )}
                         </div>
-                        <div className="p-6 border-t border-gray-100 flex justify-end">
+                        <div className="p-6 border-t border-white/10 flex justify-end">
                             <button
                                 onClick={() => setDetailVersionId(null)}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-gray-200 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
                             >
                                 닫기
                             </button>

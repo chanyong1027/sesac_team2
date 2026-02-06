@@ -37,19 +37,19 @@ export function PromptEntryPage() {
   }, [orderedPrompts, basePath, navigate]);
 
   if (isLoading) {
-    return <div className="p-8 text-gray-500">메인 프롬프트를 찾는 중...</div>;
+    return <div className="p-8 text-gray-400">메인 프롬프트를 찾는 중...</div>;
   }
 
   if (!prompts || prompts.length === 0) {
     return (
-      <div className="bg-white p-8 rounded-xl border border-gray-200 shadow-sm text-center space-y-4">
-        <h1 className="text-xl font-semibold text-gray-900">프롬프트가 없습니다</h1>
-        <p className="text-sm text-gray-500">
+      <div className="glass-card p-8 rounded-2xl text-center space-y-4 max-w-2xl mx-auto">
+        <h1 className="text-xl font-semibold text-white">프롬프트가 없습니다</h1>
+        <p className="text-sm text-gray-400">
           워크스페이스에 메인 프롬프트를 만들고 릴리즈 버전을 설정하세요.
         </p>
                 <Link
                     to={`${basePath}/prompts/new`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-xl hover:bg-[var(--primary-hover)] transition-colors text-sm font-semibold shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-white/10"
                 >
                     새 프롬프트 만들기
                     <ArrowRight size={16} />

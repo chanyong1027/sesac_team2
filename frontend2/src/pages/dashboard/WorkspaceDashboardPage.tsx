@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { organizationApi } from '@/api/organization.api';
 import { promptApi } from '@/api/prompt.api';
@@ -8,13 +8,6 @@ import { documentApi } from '@/api/document.api';
 import { logsApi } from '@/api/logs.api';
 import { statisticsApi } from '@/api/statistics.api';
 import {
-    MessageSquare,
-    FileText,
-    Play,
-    Activity,
-    Plus,
-    CheckCircle2,
-    Circle,
     Copy,
     Check,
     RefreshCw,
@@ -22,29 +15,29 @@ import {
 } from 'lucide-react';
 import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
 
-function formatShortDateTime(iso: string) {
+function formatTimeHHmmss(iso: string) {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString('ko-KR', {
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return d.toLocaleTimeString('ko-KR', { hour12: false });
 }
 
-function statusBadgeClass(status: RequestLogStatus) {
-    const base = 'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border';
+function activityStatusLabel(status: RequestLogStatus) {
+    if (status === 'FAIL') return 'FAILED';
+    return status;
+}
+
+function activityStatusBadgeClass(status: RequestLogStatus) {
+    const base = 'px-2 py-0.5 rounded text-[10px] font-bold shadow';
     switch (status) {
         case 'SUCCESS':
-            return `${base} bg-emerald-50 text-emerald-800 border-emerald-200`;
+            return `${base} bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]`;
         case 'FAIL':
-            return `${base} bg-rose-50 text-rose-800 border-rose-200`;
+            return `${base} bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]`;
         case 'BLOCKED':
-            return `${base} bg-amber-50 text-amber-900 border-amber-200`;
+            return `${base} bg-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.35)]`;
         case 'IN_PROGRESS':
         default:
-            return `${base} bg-gray-50 text-gray-700 border-gray-200`;
+            return `${base} bg-gray-700 text-gray-100 shadow-none`;
     }
 }
 
@@ -52,10 +45,18 @@ function modelLabel(log: RequestLogResponse) {
     return log.usedModel || log.requestedModel || '-';
 }
 
-function formatNumber(num: number) {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-    return num.toString();
+function formatLatency(latencyMs: number | null) {
+    if (!latencyMs || latencyMs <= 0) return '-';
+    return `${(latencyMs / 1000).toFixed(1)}s`;
+}
+
+function formatTokens(tokens: number | null) {
+    if (!tokens || tokens <= 0) return '-';
+    return `${tokens.toLocaleString('ko-KR')} tok`;
+}
+
+function isIndexingStatus(s: string) {
+    return ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'DELETING'].includes(s);
 }
 
 export function WorkspaceDashboardPage() {
@@ -146,7 +147,7 @@ export function WorkspaceDashboardPage() {
         enabled: !!firstPromptId,
     });
 
-    const { data: overviewData, isLoading: isOverviewLoading, isError: isOverviewError } = useQuery({
+    const { data: overviewData } = useQuery({
         queryKey: ['stats-overview', resolvedOrgId, 'daily', workspaceId],
         queryFn: () => statisticsApi.getOverview(resolvedOrgId!, {
             period: 'daily',
@@ -161,8 +162,6 @@ export function WorkspaceDashboardPage() {
     const hasPrompts = (prompts?.length ?? 0) > 0;
     const hasVersions = (versions?.length ?? 0) > 0;
     const hasRelease = !!release;
-    const hasDocuments = (documents?.length ?? 0) > 0;
-    const allStepsCompleted = hasProviderKeys && hasGatewayApiKeys && hasPrompts && hasVersions && hasRelease;
 
     const {
         data: recentLogs,
@@ -181,27 +180,21 @@ export function WorkspaceDashboardPage() {
         retry: false,
     });
 
-    const [copied, setCopied] = useState(false);
+    const [copiedCurl, setCopiedCurl] = useState(false);
     
     const handleCopyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            setCopiedCurl(true);
+            setTimeout(() => setCopiedCurl(false), 2000);
         }).catch(() => {
             alert('클립보드 복사에 실패했습니다.');
         });
     };
 
-    if (isWorkspaceLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
-    if (!workspace) return <div className="p-8 text-gray-500">워크스페이스를 찾을 수 없습니다.</div>;
+    if (isWorkspaceLoading) return <div className="p-8 text-gray-300">로딩 중...</div>;
+    if (!workspace) return <div className="p-8 text-gray-300">워크스페이스를 찾을 수 없습니다.</div>;
 
     const overview = overviewData?.data;
-    const apiUsageValue = overview ? formatNumber(Number(overview.totalRequests ?? 0)) : '-';
-    const apiUsageTrend = isOverviewLoading
-        ? '집계 중'
-        : isOverviewError || !overview
-            ? '데이터 없음'
-            : `성공률 ${(overview.successRate ?? 0).toFixed(1)}%`;
     const statsLink = orgId ? `/orgs/${orgId}/stats` : undefined;
 
     const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
@@ -221,348 +214,505 @@ export function WorkspaceDashboardPage() {
   }'`;
 
     return (
-        <div className="space-y-8">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-semibold text-gray-900">{workspace.displayName}</h1>
-                <p className="text-sm text-gray-500 mt-1 font-mono">{workspace.name}</p>
+        <div className="relative">
+            {/* Background orbs */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-[var(--primary)]/5 rounded-full blur-[120px]" />
+                <div className="absolute bottom-[-10%] right-[10%] w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px]" />
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard
-                    icon={<MessageSquare className="text-indigo-600" />}
-                    label="프롬프트 설정"
-                    value={prompts?.length.toString() || "0"}
-                    trend={prompts ? '버전 중심 관리' : "-"}
-                    to={`${basePath}/prompts`}
-                />
-                <StatCard
-                    icon={<FileText className="text-blue-600" />}
-                    label="RAG 문서"
-                    value={documents?.length.toString() || "0"}
-                    trend={documents?.length ? "연동 완료" : "준비 중"}
-                    to={`${basePath}/documents`}
-                />
-                <StatCard
-                    icon={<Activity className="text-emerald-600" />}
-                    label="API 사용량"
-                    value={apiUsageValue}
-                    trend={apiUsageTrend}
-                    to={statsLink}
-                />
-            </div>
+            <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+                {/* Workspace Header */}
+                <div className="flex justify-between items-end">
+                    <div>
+                        <h1 className="text-3xl font-bold mb-1 text-white neon-text tracking-tight">{workspace.displayName}</h1>
+                        <p className="text-gray-400 text-sm">LLMOps workspace settings &amp; overview</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
+                            SYSTEM OPERATIONAL
+                        </span>
+                    </div>
+                </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column: Quick Actions & Recent Activity */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Quick Actions */}
-                    <section>
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">빠른 작업</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <QuickActionButton
-                                to={`${basePath}/prompts`}
-                                icon={<Plus size={20} />}
-                                label="프롬프트 설정"
-                                description="기본 프롬프트 확인"
-                                color="indigo"
-                            />
-                            <QuickActionButton
-                                to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'}
-                                icon={<Activity size={20} />}
-                                label="API 키 등록"
-                                description="모델 키 먼저 준비"
-                                color="emerald"
-                            />
-                            <QuickActionButton
-                                to={`${basePath}/documents`}
-                                icon={<FileText size={20} />}
-                                label="문서 업로드"
-                                description="지식 베이스 추가"
-                                color="blue"
-                            />
-                            <QuickActionButton
-                                to={`${basePath}/prompts`}
-                                icon={<Play size={20} />}
-                                label="버전 관리"
-                                description="버전 생성/배포"
-                                color="indigo"
-                            />
+                {/* Top Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <Link to={`${basePath}/prompts`} className="block">
+                        <div className="glass-card rounded-2xl p-6 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <span className="material-symbols-outlined text-6xl text-[var(--primary)]">chat</span>
+                            </div>
+                            <div className="flex justify-between items-start mb-4 relative z-10">
+                                <div className="p-2.5 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-purple-900/40 text-[var(--primary)] border border-[var(--primary)]/20 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
+                                    <span className="material-symbols-outlined text-xl">chat</span>
+                                </div>
+                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/5">
+                                    버전 중심 관리
+                                </span>
+                            </div>
+                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">프롬프트 설정</h3>
+                            <div className="flex items-baseline gap-2">
+                                <p className="text-4xl font-bold text-white tracking-tight">{prompts?.length ?? 0}</p>
+                                {release?.activeVersionNo ? (
+                                    <span className="text-xs font-medium text-[var(--primary)] px-1.5 py-0.5 rounded bg-[var(--primary)]/10 border border-[var(--primary)]/20">
+                                        v{release.activeVersionNo} active
+                                    </span>
+                                ) : null}
+                            </div>
                         </div>
-                    </section>
+                    </Link>
 
-                    <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex items-start justify-between gap-4 mb-4">
-                            <div>
-                                <h2 className="text-lg font-medium text-gray-900">최근 요청 (이 프롬프트)</h2>
-                                <p className="text-sm text-gray-500 mt-1">
-                                    메인 프롬프트(<span className="font-mono text-xs">{promptKey || '-'}</span>)의 최신 5개 요청입니다.
+                    <Link to={`${basePath}/documents`} className="block">
+                        <div className="glass-card rounded-2xl p-6 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <span className="material-symbols-outlined text-6xl text-blue-500">description</span>
+                            </div>
+                            <div className="flex justify-between items-start mb-4 relative z-10">
+                                <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-900/40 text-blue-400 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
+                                    <span className="material-symbols-outlined text-xl">description</span>
+                                </div>
+                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/5">
+                                    {(documents ?? []).some(d => isIndexingStatus(d.status)) ? 'Indexing..' : 'Ready'}
+                                </span>
+                            </div>
+                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">RAG 문서</h3>
+                            <div className="flex items-baseline gap-2">
+                                <p className="text-4xl font-bold text-white tracking-tight">{documents?.length ?? 0}</p>
+                                <span className="text-xs text-gray-500">Documents</span>
+                            </div>
+                        </div>
+                    </Link>
+
+                    <Link to={statsLink ?? '#'} className="block">
+                        <div className="glass-card rounded-2xl p-6 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <span className="material-symbols-outlined text-6xl text-emerald-500">graphic_eq</span>
+                            </div>
+                            <div className="flex justify-between items-start mb-4 relative z-10">
+                                <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-900/40 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                                    <span className="material-symbols-outlined text-xl">graphic_eq</span>
+                                </div>
+                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                    Failover: {recentLogs?.content?.filter(l => l.isFailover).length ?? 0}
+                                </span>
+                            </div>
+                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">API Reliability</h3>
+                            <div className="flex items-baseline gap-2">
+                                <p className="text-4xl font-bold text-white tracking-tight">
+                                    {overview ? `${Math.round(overview.successRate ?? 0)}%` : '-'}
                                 </p>
+                                <span className="text-xs text-gray-500">Success</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => refetchRecentLogs()}
-                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                                >
-                                    <RefreshCw size={16} />
-                                    새로고침
-                                </button>
-                                <Link
-                                    to={`${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`}
-                                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                                >
-                                    전체 보기
-                                    <ExternalLink size={16} />
-                                </Link>
+                        </div>
+                    </Link>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column */}
+                    <div className="lg:col-span-2 space-y-8">
+                        {/* Quick Actions */}
+                        <div>
+                            <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">Quick Actions</h2>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <QuickActionCard
+                                    to={`${basePath}/prompts`}
+                                    icon="add"
+                                    title="프롬프트 설정"
+                                    subtitle="기본 프롬프트 확인"
+                                    color="purple"
+                                />
+                                <QuickActionCard
+                                    to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'}
+                                    icon="vpn_key"
+                                    title="API 키 등록"
+                                    subtitle="모델 키 먼저 준비"
+                                    color="teal"
+                                />
+                                <QuickActionCard
+                                    to={`${basePath}/documents`}
+                                    icon="upload_file"
+                                    title="문서 업로드"
+                                    subtitle="지식 베이스 추가"
+                                    color="blue"
+                                />
+                                <QuickActionCard
+                                    to={`${basePath}/prompts`}
+                                    icon="history"
+                                    title="버전 관리"
+                                    subtitle="버전 생성/배포"
+                                    color="pink"
+                                />
                             </div>
                         </div>
 
-                        {!promptKey ? (
-                            <div className="text-sm text-gray-600">
-                                아직 프롬프트가 없습니다. 프롬프트를 먼저 생성하세요.
-                                <Link to={`${basePath}/prompts`} className="ml-2 text-indigo-600 font-medium hover:underline">
-                                    프롬프트 설정
-                                </Link>
-                            </div>
-                        ) : isRecentLogsLoading ? (
-                            <div className="space-y-3">
-                                {Array.from({ length: 5 }).map((_, idx) => (
-                                    <div key={idx} className="h-14 rounded-lg bg-gray-100 animate-pulse" />
-                                ))}
-                            </div>
-                        ) : isRecentLogsError ? (
-                            <div className="text-sm text-gray-700">
-                                로그를 불러오지 못했습니다.
-                                <button
-                                    type="button"
-                                    onClick={() => refetchRecentLogs()}
-                                    className="ml-2 text-indigo-600 font-medium hover:underline"
-                                >
-                                    재시도
-                                </button>
-                            </div>
-                        ) : (recentLogs?.content?.length ?? 0) === 0 ? (
-                            <div className="text-sm text-gray-500">최근 요청이 없습니다. API 호출 후 확인하세요.</div>
-                        ) : (
-                            <div className="space-y-2">
-                                {recentLogs!.content.map((log) => (
+                        {/* Recent Activity */}
+                        <section className="glass-card rounded-2xl overflow-hidden">
+                            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                                <div>
+                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                        Recent Activity
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                    </h2>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Monitoring real-time requests for '{promptKey || workspace.displayName}'
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
                                     <button
-                                        key={log.traceId}
                                         type="button"
-                                        onClick={() => navigate(`${basePath}/logs/${log.traceId}`)}
-                                        className="w-full text-left rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition-colors px-4 py-3"
+                                        onClick={() => refetchRecentLogs()}
+                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                                        aria-label="refresh recent logs"
                                     >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                    <span className={statusBadgeClass(log.status)}>{log.status}</span>
-                                                    <span className="text-xs text-gray-500">{formatShortDateTime(log.createdAt)}</span>
-                                                    <span className="text-xs text-gray-500">
-                                                        {log.provider || '-'} · {modelLabel(log)} · HTTP {log.httpStatus ?? '-'}
-                                                    </span>
+                                        <RefreshCw size={18} />
+                                    </button>
+                                    <Link
+                                        to={`${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`}
+                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                                        aria-label="open logs page"
+                                    >
+                                        <ExternalLink size={18} />
+                                    </Link>
+                                </div>
+                            </div>
+
+                            {!promptKey ? (
+                                <div className="p-4 text-sm text-gray-400">
+                                    아직 프롬프트가 없습니다. 프롬프트를 먼저 생성하세요.
+                                    <Link to={`${basePath}/prompts`} className="ml-2 text-[var(--primary)] font-medium hover:underline">
+                                        프롬프트 설정
+                                    </Link>
+                                </div>
+                            ) : isRecentLogsLoading ? (
+                                <div className="p-4 space-y-3">
+                                    {Array.from({ length: 5 }).map((_, idx) => (
+                                        <div key={idx} className="h-16 rounded-xl bg-white/[0.03] animate-pulse" />
+                                    ))}
+                                </div>
+                            ) : isRecentLogsError ? (
+                                <div className="p-4 text-sm text-gray-200">
+                                    로그를 불러오지 못했습니다.
+                                    <button
+                                        type="button"
+                                        onClick={() => refetchRecentLogs()}
+                                        className="ml-2 text-[var(--primary)] font-medium hover:underline"
+                                    >
+                                        재시도
+                                    </button>
+                                </div>
+                            ) : (recentLogs?.content?.length ?? 0) === 0 ? (
+                                <div className="p-4 text-sm text-gray-400">최근 요청이 없습니다. API 호출 후 확인하세요.</div>
+                            ) : (
+                                <div className="divide-y divide-white/5">
+                                    {recentLogs!.content.map((log) => (
+                                        <button
+                                            key={log.traceId}
+                                            type="button"
+                                            onClick={() => navigate(`${basePath}/logs/${log.traceId}`)}
+                                            className="w-full text-left p-4 hover:bg-white/[0.02] transition-colors group"
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    <span className={activityStatusBadgeClass(log.status)}>{activityStatusLabel(log.status)}</span>
+                                                    <span className="text-xs text-gray-500">{formatTimeHHmmss(log.createdAt)}</span>
+                                                    <span className="text-xs text-gray-600 mx-1">|</span>
+                                                    <span className="text-xs text-gray-300 font-medium">{modelLabel(log)}</span>
                                                 </div>
-                                                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
-                                                    <span className="font-mono truncate max-w-[420px]">{log.traceId}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigator.clipboard.writeText(log.traceId);
-                                                        }}
-                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
-                                                    >
-                                                        <Copy size={14} />
-                                                        복사
-                                                    </button>
-                                                    <span>latency {log.latencyMs ?? '-'}ms</span>
-                                                    <span>tokens {log.totalTokens ?? '-'}</span>
+                                                <div className="flex items-center gap-2">
                                                     <span
                                                         className={
                                                             log.ragEnabled
-                                                                ? 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                                                : 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200'
+                                                                ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--primary)]/20 text-[var(--primary)] border border-[var(--primary)]/30 flex items-center gap-1'
+                                                                : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-800 text-gray-500 border border-gray-700 flex items-center gap-1'
                                                         }
                                                     >
-                                                        RAG {log.ragEnabled ? 'on' : 'off'}
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${log.ragEnabled ? 'bg-[var(--primary)] animate-pulse' : 'bg-gray-500'}`} />
+                                                        RAG {log.ragEnabled ? 'ON' : 'OFF'}
                                                     </span>
-                                                    {log.ragEnabled ? (
-                                                        <span className="text-gray-500">
-                                                            (chunks {log.ragChunksCount ?? '-'} · rag {log.ragLatencyMs ?? '-'}ms)
-                                                        </span>
-                                                    ) : null}
                                                 </div>
                                             </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                </div>
-
-                {/* Right Column: Getting Started */}
-                <div className="space-y-6">
-                    <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">시작하기 가이드</h2>
-                        <div className="space-y-4">
-                            <CheckListItem
-                                checked={hasProviderKeys}
-                                label="Provider 키 등록"
-                                subtext="OpenAI/Claude/Gemini 키를 먼저 등록합니다."
-                                action={!hasProviderKeys && (
-                                    <Link to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'} className="text-xs text-indigo-600 font-medium hover:underline">등록</Link>
-                                )}
-                            />
-                            <CheckListItem
-                                checked={hasGatewayApiKeys}
-                                label="Gateway API 키 생성"
-                                subtext="외부 시스템에서 호출할 API 키를 생성합니다."
-                                action={!hasGatewayApiKeys && (
-                                    <Link to={orgId ? `/orgs/${orgId}/settings/api-keys` : '/settings/api-keys'} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>
-                                )}
-                            />
-                            <CheckListItem
-                                checked={hasPrompts}
-                                label="프롬프트 설정 확인"
-                                subtext="메인 프롬프트는 1개만 관리합니다."
-                                action={!hasPrompts && <Link to={`${basePath}/prompts`} className="text-xs text-indigo-600 font-medium hover:underline">설정</Link>}
-                            />
-                            <CheckListItem
-                                checked={hasVersions}
-                                label="첫 버전 생성"
-                                subtext="이전 버전 내용을 복사해 빠르게 시작합니다."
-                                action={!hasVersions && hasPrompts && <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-indigo-600 font-medium hover:underline">생성</Link>}
-                            />
-                            <CheckListItem
-                                checked={hasRelease}
-                                label="배포하기"
-                                subtext="릴리즈 탭에서 운영 버전을 선택합니다."
-                                action={!hasRelease && hasVersions && <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-indigo-600 font-medium hover:underline">배포</Link>}
-                            />
-                            <CheckListItem
-                                checked={hasDocuments}
-                                label="(선택) 지식 데이터 업로드"
-                                subtext="RAG 기반 답변이 필요할 때만 추가하세요."
-                                action={!hasDocuments && <Link to={`${basePath}/documents`} className="text-xs text-indigo-600 font-medium hover:underline">업로드</Link>}
-                            />
-                        </div>
-                    </section>
-                    {allStepsCompleted ? (
-                        <section className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-200 shadow-sm">
-                            <div className="flex items-start justify-between mb-4">
-                                <div>
-                                    <h2 className="text-lg font-medium text-gray-900 mb-1">설정 완료! 🎉</h2>
-                                    <p className="text-sm text-gray-600">아래 예시를 상황에 맞게 수정해서 사용하세요</p>
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-6">
+                                                    <div className="flex items-center gap-2">
+                                                        <code className={`text-[11px] font-mono text-gray-400 transition-colors ${log.status === 'FAIL' ? 'group-hover:text-red-400' : 'group-hover:text-[var(--primary)]'}`}>
+                                                            {log.traceId.slice(0, 8)}...
+                                                        </code>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                navigator.clipboard.writeText(log.traceId);
+                                                            }}
+                                                            className="text-gray-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                                            aria-label="copy trace id"
+                                                        >
+                                                            <Copy size={14} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 text-xs font-mono text-gray-500">
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="text-gray-400">⏱</span> <span className="text-gray-300">{formatLatency(log.latencyMs)}</span>
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <span className="text-gray-400">∑</span> <span className="text-gray-300">{formatTokens(log.totalTokens)}</span>
+                                                        </span>
+                                                        {log.status === 'FAIL' ? (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="text-gray-400">!</span>{' '}
+                                                                <span className="text-red-400">{log.failReason || log.errorCode || 'Error'}</span>
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
                                 </div>
+                            )}
+                        </section>
+                    </div>
+
+                    {/* Right Column */}
+                    <div className="space-y-6">
+                        <MonthlyBudgetCard totalCost={overview?.totalCost ?? 0} />
+
+                        <section className="glass-card rounded-2xl p-6">
+                            <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
+                                Quick Setup
+                            </h2>
+                            <div className="relative space-y-4">
+                                <div className="absolute left-[9px] top-2 bottom-4 w-0.5 bg-gray-800 -z-10" />
+                                <SetupStep
+                                    idx={1}
+                                    checked={hasProviderKeys}
+                                    title="Provider 키 등록"
+                                    description="OpenAI/Claude/Gemini API keys"
+                                    action={!hasProviderKeys ? (
+                                        <Link to={orgId ? `/orgs/${orgId}/settings/provider-keys` : '/settings/provider-keys'} className="text-xs text-[var(--primary)] font-medium hover:underline">
+                                            등록
+                                        </Link>
+                                    ) : null}
+                                />
+                                <SetupStep
+                                    idx={2}
+                                    checked={hasGatewayApiKeys}
+                                    title="Gateway 키 생성"
+                                    description="Service API Access Key"
+                                    action={!hasGatewayApiKeys ? (
+                                        <Link to={orgId ? `/orgs/${orgId}/settings/api-keys` : '/settings/api-keys'} className="text-xs text-[var(--primary)] font-medium hover:underline">
+                                            생성
+                                        </Link>
+                                    ) : null}
+                                />
+                                <SetupStep
+                                    idx={3}
+                                    checked={hasVersions}
+                                    title="첫 버전 생성"
+                                    description="Create v1.0 prompt"
+                                    action={!hasVersions && hasPrompts ? (
+                                        <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-[var(--primary)] font-medium hover:underline">
+                                            생성
+                                        </Link>
+                                    ) : null}
+                                />
+                                <SetupStep
+                                    idx={4}
+                                    checked={hasRelease}
+                                    title="배포"
+                                    description="Publish to production"
+                                    dim={!hasVersions}
+                                    action={!hasRelease && hasVersions ? (
+                                        <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-[var(--primary)] font-medium hover:underline">
+                                            배포
+                                        </Link>
+                                    ) : null}
+                                />
+                            </div>
+                        </section>
+
+                        <section className="glass-card rounded-2xl p-6 flex flex-col h-auto border border-[var(--primary)]/20 shadow-[0_0_20px_rgba(0,0,0,0.3)]">
+                            <div className="flex justify-between items-center mb-3">
+                                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                                    Unified API Endpoint
+                                </h2>
                                 <button
+                                    type="button"
                                     onClick={() => handleCopyToClipboard(curlExample)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
                                 >
-                                    {copied ? (
+                                    {copiedCurl ? (
                                         <>
-                                            <Check size={16} className="text-green-600" />
-                                            <span>복사됨</span>
+                                            <Check size={12} />
+                                            COPIED
                                         </>
                                     ) : (
                                         <>
-                                            <Copy size={16} />
-                                            <span>복사</span>
+                                            <Copy size={12} />
+                                            COPY
                                         </>
                                     )}
                                 </button>
                             </div>
-                            <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                                <pre className="text-xs text-gray-100 font-mono">
-                                    <code>{curlExample}</code>
-                                </pre>
+
+                            <div className="bg-[#0B0A10] rounded-xl p-4 font-mono text-[11px] text-gray-300 overflow-x-auto border border-gray-800 shadow-inner relative">
+                                <div className="absolute top-2 right-2 text-[10px] text-gray-600 font-bold uppercase select-none">BASH</div>
+                                <pre><code>{curlExample}</code></pre>
                             </div>
-                            <div className="mt-4 space-y-3">
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <p className="text-xs font-semibold text-amber-900 mb-2">✏️ 수정 가능한 부분</p>
-                                    <ul className="space-y-1.5 text-xs text-amber-900">
-                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">X-API-Key</code>: Settings에서 생성한 실제 API 키로 교체</li>
-                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">promptKey</code>: 사용할 프롬프트 키로 변경 (현재: {safePromptKey})</li>
-                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">variables</code>: 프롬프트 템플릿에 맞는 변수로 수정</li>
-                                        <li>• <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono">ragEnabled</code>: RAG 사용 시 <code className="font-mono">true</code>로 변경</li>
-                                    </ul>
-                                </div>
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                    <p className="text-xs text-blue-900">
-                                        <strong>RAG 사용하기:</strong> <code className="bg-blue-100 px-1.5 py-0.5 rounded font-mono">"ragEnabled": true</code>로 변경하면 업로드한 문서를 기반으로 답변합니다.
+
+                            <div className="mt-3 flex gap-2">
+                                <div className="flex-1 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-[10px] font-bold text-blue-300">Tip</span>
+                                    </div>
+                                    <p className="text-[10px] text-blue-200/70 leading-relaxed">
+                                        Set <code className="bg-blue-900/50 px-1 rounded text-blue-200">ragEnabled</code> to <span className="text-white">true</span> to use your indexed documents context.
                                     </p>
                                 </div>
                             </div>
                         </section>
-                    ) : (
-                        <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                            <h2 className="text-lg font-medium text-gray-900 mb-3">빠른 시작 가이드</h2>
-                            <ol className="space-y-2 text-sm text-gray-600">
-                                <li>1. Provider 키 등록 → 사용할 모델 선택</li>
-                                <li>2. Gateway API 키 생성 → 외부 호출용</li>
-                                <li>3. 버전 생성 → {'{{question}}'} 템플릿 입력</li>
-                                <li>4. 릴리즈 → 운영 버전 지정 후 테스트</li>
-                            </ol>
-                        </section>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
 
-function StatCard({ icon, label, value, trend, to }: { icon: React.ReactNode, label: string, value: string, trend: string, to?: string }) {
-    const content = (
-        <div className={`bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all ${to ? 'hover:border-indigo-300 hover:shadow-md cursor-pointer group' : ''}`}>
-            <div className="flex items-start justify-between mb-4">
-                <div className={`p-2 bg-gray-50 rounded-lg group-hover:bg-indigo-50 transition-colors`}>{icon}</div>
-                <span className="text-xs font-medium text-gray-400 bg-gray-50 px-2 py-1 rounded-full">{trend}</span>
-            </div>
-            <p className="text-sm text-gray-500 font-medium group-hover:text-indigo-600 transition-colors">{label}</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-        </div>
-    );
+function QuickActionCard({
+    to,
+    icon,
+    title,
+    subtitle,
+    color,
+}: {
+    to: string;
+    icon: string;
+    title: string;
+    subtitle: string;
+    color: 'purple' | 'teal' | 'blue' | 'pink';
+}) {
+    const iconBoxClass = (() => {
+        switch (color) {
+            case 'teal':
+                return 'from-teal-500/20 to-teal-800/20 text-teal-400 group-hover:shadow-[0_0_15px_rgba(45,212,191,0.3)]';
+            case 'blue':
+                return 'from-blue-500/20 to-blue-800/20 text-blue-400 group-hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]';
+            case 'pink':
+                return 'from-pink-500/20 to-pink-800/20 text-pink-400 group-hover:shadow-[0_0_15px_rgba(236,72,153,0.3)]';
+            case 'purple':
+            default:
+                return 'from-[var(--primary)]/20 to-purple-800/20 text-[var(--primary)] group-hover:shadow-[0_0_15px_rgba(168,85,247,0.3)]';
+        }
+    })();
 
-    if (to) {
-        return <Link to={to} className="block">{content}</Link>;
-    }
-
-    return content;
-}
-
-function QuickActionButton({ to, icon, label, description, color }: { to: string, icon: React.ReactNode, label: string, description: string, color: 'indigo' | 'blue' | 'emerald' }) {
-    const colorClasses = {
-        indigo: 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100',
-        blue: 'bg-blue-50 text-blue-600 group-hover:bg-blue-100',
-        emerald: 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100',
-    };
+    const hoverBorderClass = (() => {
+        switch (color) {
+            case 'teal':
+                return 'hover:border-teal-500/40';
+            case 'blue':
+                return 'hover:border-blue-500/40';
+            case 'pink':
+                return 'hover:border-pink-500/40';
+            case 'purple':
+            default:
+                return 'hover:border-[var(--primary)]/40';
+        }
+    })();
 
     return (
-        <Link to={to} className="group p-4 bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all flex flex-col items-start text-left">
-            <div className={`p-2 rounded-lg mb-3 transition-colors ${colorClasses[color]}`}>
-                {icon}
+        <Link
+            to={to}
+            className={`glass-card p-4 rounded-xl text-left hover:bg-white/5 transition-all group border border-white/5 ${hoverBorderClass}`}
+        >
+            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${iconBoxClass} flex items-center justify-center mb-3 transition-all`}>
+                <span className="material-symbols-outlined">{icon}</span>
             </div>
-            <span className="font-semibold text-gray-900 mb-1">{label}</span>
-            <span className="text-xs text-gray-500">{description}</span>
+            <div className="font-medium text-sm text-gray-200">{title}</div>
+            <div className="text-[11px] text-gray-500 mt-1">{subtitle}</div>
         </Link>
     );
 }
 
+function MonthlyBudgetCard({ totalCost }: { totalCost: number }) {
+    const budget = 100;
+    const spent = Number.isFinite(totalCost) ? Math.max(0, totalCost) : 0;
+    const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
 
-function CheckListItem({ checked, label, subtext, action }: { checked: boolean, label: string, subtext?: string, action?: React.ReactNode }) {
+    const now = new Date();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const daysLeft = Math.max(0, Math.ceil((endOfMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+
     return (
-        <div className="flex items-start gap-3">
-            <div className={`mt-0.5 ${checked ? 'text-green-500' : 'text-gray-300'}`}>
-                {checked ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+        <section className="glass-card rounded-2xl p-5 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 z-0" />
+            <div className="relative z-10">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <span className="material-symbols-outlined text-base text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">monetization_on</span>
+                        Monthly Budget
+                    </h3>
+                    <span className="text-xs font-mono font-bold text-gray-300">
+                        ${spent.toFixed(2)} / ${budget.toFixed(0)}
+                    </span>
+                </div>
+
+                <div className="w-full bg-gray-800 rounded-full h-2 mb-2 overflow-hidden shadow-inner border border-white/5">
+                    <div
+                        className="h-2 rounded-full relative bg-gradient-to-r from-blue-500 to-[var(--primary)] shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                        style={{ width: `${pct}%` }}
+                    >
+                        <div className="absolute right-0 top-0 h-full w-2 bg-white blur-[2px]" />
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-gray-400">{Math.round(pct)}% Used</span>
+                    <span className="text-gray-400">Resets in {daysLeft} days</span>
+                </div>
             </div>
+        </section>
+    );
+}
+
+function SetupStep({
+    idx,
+    checked,
+    title,
+    description,
+    action,
+    dim = false,
+}: {
+    idx: number;
+    checked: boolean;
+    title: string;
+    description: string;
+    action?: ReactNode;
+    dim?: boolean;
+}) {
+    const opacity = dim ? 'opacity-50' : '';
+
+    return (
+        <div className={`flex gap-3 relative ${opacity}`}>
+            {checked ? (
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500 text-black flex items-center justify-center shadow-[0_0_10px_rgba(34,197,94,0.4)] z-10">
+                    <span className="material-symbols-outlined text-[14px] font-bold">check</span>
+                </span>
+            ) : (
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-800 border border-gray-600 text-gray-400 flex items-center justify-center z-10 text-[10px] font-bold">
+                    {idx}
+                </span>
+            )}
+
             <div className="flex-1">
-                <div className="flex items-center justify-between">
-                    <p className={`text-sm font-medium ${checked ? 'text-gray-900 line-through opacity-50' : 'text-gray-900'}`}>
-                        {label}
-                    </p>
+                <div className="flex items-center justify-between gap-3">
+                    <div className={`text-sm font-medium ${checked ? 'text-gray-200' : 'text-white'}`}>
+                        {title}
+                    </div>
                     {action}
                 </div>
-                {subtext && <p className="text-xs text-gray-500 mt-0.5">{subtext}</p>}
+                <div className={`text-[11px] ${checked ? 'text-gray-500' : 'text-gray-400'}`}>
+                    {description}
+                </div>
             </div>
         </div>
     );

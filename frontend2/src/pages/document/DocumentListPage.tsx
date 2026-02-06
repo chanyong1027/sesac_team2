@@ -412,9 +412,9 @@ export function DocumentListPage() {
                         </div>
                     )}
 
-                    <div className="flex flex-wrap gap-2 pt-1">
-                        <button
-                            type="button"
+	                    <div className="flex flex-wrap gap-2 pt-1">
+	                        <button
+	                            type="button"
                             onClick={() => {
                                 setSettingsForm({
                                     ...settingsForm,
@@ -426,14 +426,14 @@ export function DocumentListPage() {
                                     rerankEnabled: false,
                                     rerankTopN: 10,
                                 });
-                                setSettingsMessage('프리셋(균형)이 적용되었습니다. 저장을 눌러 반영하세요.');
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                        >
-                            프리셋: 균형
-                        </button>
-                        <button
-                            type="button"
+	                                setSettingsMessage('프리셋(균형)이 적용되었습니다. 저장을 눌러 반영하세요.');
+	                            }}
+	                            className="px-3 py-1.5 text-xs font-semibold text-gray-200 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-colors"
+	                        >
+	                            프리셋: 균형
+	                        </button>
+	                        <button
+	                            type="button"
                             onClick={() => {
                                 setSettingsForm({
                                     ...settingsForm,
@@ -445,14 +445,14 @@ export function DocumentListPage() {
                                     rerankEnabled: false,
                                     rerankTopN: 10,
                                 });
-                                setSettingsMessage('프리셋(리콜 우선)이 적용되었습니다. 저장을 눌러 반영하세요.');
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                        >
-                            프리셋: 리콜 우선
-                        </button>
-                        <button
-                            type="button"
+	                                setSettingsMessage('프리셋(리콜 우선)이 적용되었습니다. 저장을 눌러 반영하세요.');
+	                            }}
+	                            className="px-3 py-1.5 text-xs font-semibold text-gray-200 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-colors"
+	                        >
+	                            프리셋: 리콜 우선
+	                        </button>
+	                        <button
+	                            type="button"
                             onClick={() => {
                                 setSettingsForm({
                                     ...settingsForm,
@@ -464,14 +464,14 @@ export function DocumentListPage() {
                                     rerankEnabled: true,
                                     rerankTopN: 20,
                                 });
-                                setSettingsMessage('프리셋(정확도 우선)이 적용되었습니다. 저장을 눌러 반영하세요.');
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                        >
-                            프리셋: 정확도 우선
-                        </button>
-                        <button
-                            type="button"
+	                                setSettingsMessage('프리셋(정확도 우선)이 적용되었습니다. 저장을 눌러 반영하세요.');
+	                            }}
+	                            className="px-3 py-1.5 text-xs font-semibold text-gray-200 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-colors"
+	                        >
+	                            프리셋: 정확도 우선
+	                        </button>
+	                        <button
+	                            type="button"
                             onClick={() => {
                                 setSettingsForm({
                                     ...settingsForm,
@@ -483,13 +483,13 @@ export function DocumentListPage() {
                                     rerankEnabled: false,
                                     rerankTopN: 10,
                                 });
-                                setSettingsMessage('프리셋(비용 절약)이 적용되었습니다. 저장을 눌러 반영하세요.');
-                            }}
-                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
-                        >
-                            프리셋: 비용 절약
-                        </button>
-                    </div>
+	                                setSettingsMessage('프리셋(비용 절약)이 적용되었습니다. 저장을 눌러 반영하세요.');
+	                            }}
+	                            className="px-3 py-1.5 text-xs font-semibold text-gray-200 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 hover:text-white transition-colors"
+	                        >
+	                            프리셋: 비용 절약
+	                        </button>
+	                    </div>
                     <div className="text-xs text-gray-500 space-y-2">
                         <p className="text-gray-600 font-medium">설정이 의미하는 것</p>
                         <p>
