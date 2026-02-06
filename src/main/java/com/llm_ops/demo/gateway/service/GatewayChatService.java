@@ -2,6 +2,11 @@ package com.llm_ops.demo.gateway.service;
 
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
+import com.llm_ops.demo.budget.domain.BudgetScopeType;
+import com.llm_ops.demo.budget.service.BudgetDecision;
+import com.llm_ops.demo.budget.service.BudgetDecisionAction;
+import com.llm_ops.demo.budget.service.BudgetGuardrailService;
+import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
@@ -13,6 +18,7 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
 import com.llm_ops.demo.prompt.domain.PromptRelease;
 import com.llm_ops.demo.prompt.domain.PromptStatus;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
@@ -52,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.time.YearMonth;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -83,6 +90,8 @@ public class GatewayChatService {
     private final RequestLogWriter requestLogWriter;
     private final PromptRepository promptRepository;
     private final PromptReleaseRepository promptReleaseRepository;
+    private final BudgetGuardrailService budgetGuardrailService;
+    private final BudgetUsageService budgetUsageService;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -94,8 +103,10 @@ public class GatewayChatService {
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
             RequestLogWriter requestLogWriter,
-        PromptRepository promptRepository,
-            PromptReleaseRepository promptReleaseRepository) {
+            PromptRepository promptRepository,
+            PromptReleaseRepository promptReleaseRepository,
+            BudgetGuardrailService budgetGuardrailService,
+            BudgetUsageService budgetUsageService) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.providerCredentialService = providerCredentialService;
@@ -107,6 +118,8 @@ public class GatewayChatService {
         this.requestLogWriter = requestLogWriter;
         this.promptRepository = promptRepository;
         this.promptReleaseRepository = promptReleaseRepository;
+        this.budgetGuardrailService = budgetGuardrailService;
+        this.budgetUsageService = budgetUsageService;
     }
 
     /**
@@ -145,8 +158,11 @@ public class GatewayChatService {
         ProviderType usedProvider = null;
         String usedRequestedModel = null;
         boolean isFailover = false;
+        Long usedProviderCredentialId = null;
+        String budgetFailReason = null;
         Long promptId = null;
         Long promptVersionId = null;
+        YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -163,7 +179,38 @@ public class GatewayChatService {
                     ? renderedUserPrompt
                     : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
 
-            if (request.isRagEnabled()) {
+            ProviderType providerType = activeVersion.getProvider();
+            String requestedModel = activeVersion.getModel();
+            ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
+            String secondaryModel = activeVersion.getSecondaryModel();
+            usedProvider = providerType;
+            usedRequestedModel = requestedModel;
+
+            // Workspace soft-limit 초과 시 Degrade(저가모델 강제 / 토큰캡 / RAG off 등)
+            boolean ragEnabledEffective = request.isRagEnabled();
+            String modelOverride = null;
+            Integer maxOutputTokensOverride = null;
+            BudgetDecision wsDecision = budgetGuardrailService.evaluateWorkspaceDegrade(
+                    workspace.getId(),
+                    providerType != null ? providerType.getValue() : null
+            );
+            if (wsDecision.action() == BudgetDecisionAction.DEGRADE && wsDecision.overrides() != null) {
+                BudgetDecision.Overrides o = wsDecision.overrides();
+                if (o.modelOverride() != null && !o.modelOverride().isBlank()) {
+                    modelOverride = o.modelOverride();
+                }
+                if (o.maxOutputTokens() != null && o.maxOutputTokens() > 0) {
+                    maxOutputTokensOverride = o.maxOutputTokens();
+                }
+                if (Boolean.TRUE.equals(o.disableRag())) {
+                    ragEnabledEffective = false;
+                }
+            }
+
+            String requestedModelEffective = (modelOverride != null ? modelOverride : requestedModel);
+            usedRequestedModel = requestedModelEffective;
+
+            if (ragEnabledEffective) {
                 ragChunksCount = 0;
                 ragContextChars = 0;
                 ragContextTruncated = false;
@@ -203,16 +250,50 @@ public class GatewayChatService {
                 }
             }
 
-            ProviderType providerType = activeVersion.getProvider();
-            String requestedModel = activeVersion.getModel();
-            ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
-            String secondaryModel = activeVersion.getSecondaryModel();
-            usedProvider = providerType;
-            usedRequestedModel = requestedModel;
-
             ChatResponse response;
             try {
-                response = callProvider(organizationId, providerType, requestedModel, prompt);
+                ResolvedProviderApiKey primaryKey = providerCredentialService.resolveApiKey(organizationId, providerType);
+                usedProviderCredentialId = primaryKey.credentialId();
+
+                BudgetDecision providerDecision = budgetGuardrailService.evaluateProviderCredential(primaryKey.credentialId());
+                if (providerDecision.action() == BudgetDecisionAction.BLOCK) {
+                    if (hasSecondaryModel(secondaryProvider, secondaryModel)) {
+                        ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
+                        BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
+                        if (secondaryBudget.action() != BudgetDecisionAction.BLOCK) {
+                            isFailover = true;
+                            usedProvider = secondaryProvider;
+                            usedProviderCredentialId = secondaryKey.credentialId();
+                            // failover 시에도 workspace degrade를 provider 기준으로 재평가하여 cheap model 적용
+                            BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
+                                    workspace.getId(),
+                                    secondaryProvider != null ? secondaryProvider.getValue() : null
+                            );
+                            String secondaryOverride = null;
+                            Integer secondaryMaxTokens = maxOutputTokensOverride;
+                            if (wsDecisionSecondary.action() == BudgetDecisionAction.DEGRADE && wsDecisionSecondary.overrides() != null) {
+                                BudgetDecision.Overrides o2 = wsDecisionSecondary.overrides();
+                                if (o2.modelOverride() != null && !o2.modelOverride().isBlank()) {
+                                    secondaryOverride = o2.modelOverride();
+                                }
+                                if (o2.maxOutputTokens() != null && o2.maxOutputTokens() > 0) {
+                                    secondaryMaxTokens = o2.maxOutputTokens();
+                                }
+                            }
+                            String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
+                            usedRequestedModel = secondaryModelEffective;
+                            response = callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
+                        } else {
+                            budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                            throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
+                        }
+                    } else {
+                        budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                        throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
+                    }
+                }
+
+                response = callProvider(primaryKey, requestedModelEffective, prompt, maxOutputTokensOverride);
             } catch (Exception primaryException) {
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
                     throw primaryException;
@@ -220,10 +301,36 @@ public class GatewayChatService {
                 if (!isRetryableException(primaryException)) {
                     throw primaryException;
                 }
+                // primary 실패 후 failover 시도 전, secondary 예산 확인
+                ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
+                BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
+                if (secondaryBudget.action() == BudgetDecisionAction.BLOCK) {
+                    // secondary를 사용할 수 없으면 primary 에러를 그대로 반환
+                    throw primaryException;
+                }
+
                 isFailover = true;
                 usedProvider = secondaryProvider;
-                usedRequestedModel = secondaryModel;
-                response = callProvider(organizationId, secondaryProvider, secondaryModel, prompt);
+                usedProviderCredentialId = secondaryKey.credentialId();
+
+                BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
+                        workspace.getId(),
+                        secondaryProvider != null ? secondaryProvider.getValue() : null
+                );
+                String secondaryOverride = null;
+                Integer secondaryMaxTokens = maxOutputTokensOverride;
+                if (wsDecisionSecondary.action() == BudgetDecisionAction.DEGRADE && wsDecisionSecondary.overrides() != null) {
+                    BudgetDecision.Overrides o2 = wsDecisionSecondary.overrides();
+                    if (o2.modelOverride() != null && !o2.modelOverride().isBlank()) {
+                        secondaryOverride = o2.modelOverride();
+                    }
+                    if (o2.maxOutputTokens() != null && o2.maxOutputTokens() > 0) {
+                        secondaryMaxTokens = o2.maxOutputTokens();
+                    }
+                }
+                String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
+                usedRequestedModel = secondaryModelEffective;
+                response = callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
             }
 
             String answer = response.getResult().getOutput().getText();
@@ -272,6 +379,22 @@ public class GatewayChatService {
                     totalTokens != null ? totalTokens.longValue() : null,
                     estimatedCost);
 
+            // 예산 집계는 로그 async에 의존하지 않고 요청 스레드에서 동기 기록합니다.
+            budgetUsageService.recordUsage(
+                    BudgetScopeType.WORKSPACE,
+                    request.workspaceId(),
+                    budgetMonth,
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+            );
+            budgetUsageService.recordUsage(
+                    BudgetScopeType.PROVIDER_CREDENTIAL,
+                    usedProviderCredentialId,
+                    budgetMonth,
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+            );
+
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
                     toLatencyMs(startedAtNanos),
@@ -301,30 +424,57 @@ public class GatewayChatService {
                     usedModel,
                     usage);
         } catch (BusinessException e) {
-            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
-                    e.getErrorCode().getStatus().value(),
-                    toLatencyMs(startedAtNanos),
-                    promptId,
-                    promptVersionId,
-                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
-                    usedRequestedModel,
-                    null,
-                    isFailover,
-                    null,
-                    null,
-                    null,
-                    null, // cost
-                    null, // version
-                    e.getErrorCode().name(),
-                    e.getMessage(),
-                    "BUSINESS_EXCEPTION",
-                    ragLatencyMs,
-                    ragChunksCount,
-                    ragContextChars,
-                    ragContextTruncated,
-                    ragContextHash,
-                    ragTopK,
-                    ragSimilarityThreshold));
+            if (e.getErrorCode() == ErrorCode.BUDGET_EXCEEDED) {
+                requestLogWriter.markBlocked(requestId, new RequestLogWriter.BlockUpdate(
+                        e.getErrorCode().getStatus().value(),
+                        toLatencyMs(startedAtNanos),
+                        promptId,
+                        promptVersionId,
+                        usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                        usedRequestedModel,
+                        null,
+                        isFailover,
+                        null,
+                        null,
+                        null,
+                        null, // cost
+                        null, // version
+                        e.getErrorCode().name(),
+                        e.getMessage(),
+                        budgetFailReason != null ? budgetFailReason : "BUDGET_EXCEEDED",
+                        ragLatencyMs,
+                        ragChunksCount,
+                        ragContextChars,
+                        ragContextTruncated,
+                        ragContextHash,
+                        ragTopK,
+                        ragSimilarityThreshold));
+            } else {
+                requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                        e.getErrorCode().getStatus().value(),
+                        toLatencyMs(startedAtNanos),
+                        promptId,
+                        promptVersionId,
+                        usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                        usedRequestedModel,
+                        null,
+                        isFailover,
+                        null,
+                        null,
+                        null,
+                        null, // cost
+                        null, // version
+                        e.getErrorCode().name(),
+                        e.getMessage(),
+                        "BUSINESS_EXCEPTION",
+                        ragLatencyMs,
+                        ragChunksCount,
+                        ragContextChars,
+                        ragContextTruncated,
+                        ragContextHash,
+                        ragTopK,
+                        ragSimilarityThreshold));
+            }
             throw e;
         } catch (Exception e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
@@ -463,7 +613,35 @@ public class GatewayChatService {
         return rendered;
     }
 
-    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride) {
+    private static void applyMaxOutputTokensBestEffort(Object chatOptions, Integer maxOutputTokens) {
+        if (chatOptions == null || maxOutputTokens == null || maxOutputTokens <= 0) {
+            return;
+        }
+        // Spring AI 옵션 타입별 API 차이를 흡수하기 위해 reflection으로 best-effort 적용합니다.
+        // (모델/라이브러리 버전 변경 시에도 컴파일 의존성을 최소화)
+        tryInvokeSetter(chatOptions, "setMaxTokens", maxOutputTokens);
+        tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxOutputTokens);
+        tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxOutputTokens);
+    }
+
+    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
+        try {
+            var m = target.getClass().getMethod(methodName, Integer.class);
+            m.invoke(target, value);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // fallthrough
+        } catch (Exception ignored) {
+            return;
+        }
+        try {
+            var m = target.getClass().getMethod(methodName, int.class);
+            m.invoke(target, value.intValue());
+        } catch (Exception ignored) {
+        }
+    }
+
+    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
         ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
         if (chatModel == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
@@ -472,19 +650,20 @@ public class GatewayChatService {
         if (modelOverride != null && !modelOverride.isBlank()) {
             chatOptions.setModel(modelOverride);
         }
+        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
         return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 
     private ChatResponse callProvider(
-            Long organizationId,
-            ProviderType providerType,
+            ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt
+            String prompt,
+            Integer maxOutputTokensOverride
     ) {
-        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-        return switch (providerType) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
+        String providerApiKey = resolved.apiKey();
+        return switch (resolved.providerType()) {
+            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
+            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
             case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
         };
     }
@@ -516,12 +695,13 @@ public class GatewayChatService {
         return false;
     }
 
-    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride) {
+    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
         AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
         var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
         if (modelOverride != null && !modelOverride.isBlank()) {
             chatOptions.setModel(modelOverride);
         }
+        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
         return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 

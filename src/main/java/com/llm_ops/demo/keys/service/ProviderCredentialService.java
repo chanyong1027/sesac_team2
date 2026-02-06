@@ -66,6 +66,26 @@ public class ProviderCredentialService {
         return providerKeyEncryptor.decrypt(credential.getKeyCiphertext());
     }
 
+    @Transactional(readOnly = true)
+    public Long resolveCredentialId(Long organizationId, ProviderType providerType) {
+        ProviderCredential credential = providerCredentialRepository
+            .findByOrganizationIdAndProvider(organizationId, providerType)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+        return credential.getId();
+    }
+
+    @Transactional(readOnly = true)
+    public ResolvedProviderApiKey resolveApiKey(Long organizationId, ProviderType providerType) {
+        ProviderCredential credential = providerCredentialRepository
+            .findByOrganizationIdAndProvider(organizationId, providerType)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+        String apiKey = providerKeyEncryptor.decrypt(credential.getKeyCiphertext());
+        return new ResolvedProviderApiKey(credential.getId(), providerType, apiKey);
+    }
+
+    public record ResolvedProviderApiKey(Long credentialId, ProviderType providerType, String apiKey) {
+    }
+
     @Transactional
     public ProviderCredentialCreateResponse update(
             Long organizationId,
