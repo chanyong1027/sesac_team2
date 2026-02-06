@@ -24,7 +24,6 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
-    Legend
 } from 'recharts';
 import { statisticsApi } from '@/api/statistics.api';
 import type { OverviewResponse, TimeseriesDataPoint, ModelUsage, PromptUsage } from '@/api/statistics.api';
@@ -120,9 +119,9 @@ export default function DashboardPage() {
     if (overviewError) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="text-center">
-                    <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-                    <p className="text-gray-600">통계 데이터를 불러오는데 실패했습니다.</p>
+                <div className="text-center glass-card rounded-2xl border border-white/10 px-8 py-7">
+                    <AlertCircle className="w-12 h-12 text-rose-300 mx-auto mb-4" />
+                    <p className="text-gray-200 font-medium">통계 데이터를 불러오는데 실패했습니다.</p>
                     <p className="text-sm text-gray-400 mt-2">잠시 후 다시 시도해주세요.</p>
                 </div>
             </div>
@@ -132,76 +131,98 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-                    <p className="text-sm text-gray-500 mt-1">API 사용량 및 성능 현황을 한눈에 확인하세요</p>
+                    <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+                    <p className="text-sm text-gray-400 mt-1">API 사용량 및 성능 현황을 한눈에 확인하세요</p>
                 </div>
 
                 {/* Filters */}
                 <div className="flex items-center gap-3">
-                    {/* Workspace Filter Dropdown */}
-                    <div className="relative">
-                        <button
-                            onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
-                        >
-                            {selectedWorkspaceId ? <Layers size={16} className="text-gray-500" /> : <Building2 size={16} className="text-gray-500" />}
-                            <span>{selectedWorkspaceId ? workspaces.find(w => w.id === selectedWorkspaceId)?.displayName : '전체 조직'}</span>
-                            <ChevronDown size={16} className={`text-gray-400 transition-transform ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {isWorkspaceDropdownOpen && (
-                            <>
-                                <div
-                                    className="fixed inset-0 z-10"
-                                    onClick={() => setIsWorkspaceDropdownOpen(false)}
+                    <div className="flex items-center bg-white/[0.03] rounded-lg p-1 border border-white/5">
+                        {/* Workspace Filter Dropdown (left slot, like "전체 조직") */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsWorkspaceDropdownOpen((v) => !v)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/15 transition-colors shadow-sm"
+                                aria-haspopup="menu"
+                                aria-expanded={isWorkspaceDropdownOpen}
+                                title="워크스페이스 범위"
+                            >
+                                {selectedWorkspaceId ? (
+                                    <Layers size={14} className="text-gray-300" />
+                                ) : (
+                                    <Building2 size={14} className="text-gray-300" />
+                                )}
+                                <span className="max-w-[140px] truncate">
+                                    {selectedWorkspaceId
+                                        ? (workspaces.find((w) => w.id === selectedWorkspaceId)?.displayName ?? `workspace#${selectedWorkspaceId}`)
+                                        : '전체 조직'}
+                                </span>
+                                <ChevronDown
+                                    size={14}
+                                    className={`text-gray-400 transition-transform ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`}
                                 />
-                                <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
+                            </button>
+
+                            {isWorkspaceDropdownOpen && (
+                                <>
                                     <button
-                                        onClick={() => {
-                                            setSelectedWorkspaceId(undefined);
-                                            setIsWorkspaceDropdownOpen(false);
-                                        }}
-                                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${!selectedWorkspaceId
-                                            ? 'bg-indigo-50 text-indigo-700'
-                                            : 'text-gray-700 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <Building2 size={16} className={!selectedWorkspaceId ? 'text-indigo-500' : 'text-gray-400'} />
-                                        <span className={!selectedWorkspaceId ? 'font-medium' : ''}>전체 조직</span>
-                                        <span className="ml-auto text-xs text-gray-400">모든 워크스페이스</span>
-                                    </button>
-                                    {workspaces.map((ws) => (
+                                        type="button"
+                                        className="fixed inset-0 z-10"
+                                        onClick={() => setIsWorkspaceDropdownOpen(false)}
+                                        aria-label="close workspace dropdown overlay"
+                                    />
+                                    <div className="absolute right-0 mt-2 w-64 bg-[#141522]/95 border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl">
                                         <button
-                                            key={ws.id}
+                                            type="button"
                                             onClick={() => {
-                                                setSelectedWorkspaceId(ws.id);
+                                                setSelectedWorkspaceId(undefined);
                                                 setIsWorkspaceDropdownOpen(false);
                                             }}
-                                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors ${selectedWorkspaceId === ws.id
-                                                ? 'bg-indigo-50 text-indigo-700'
-                                                : 'text-gray-700 hover:bg-gray-50'
+                                            className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${!selectedWorkspaceId
+                                                ? 'bg-[var(--primary)]/10 text-white'
+                                                : 'text-gray-200 hover:bg-white/5'
                                                 }`}
                                         >
-                                            <Layers size={16} className={selectedWorkspaceId === ws.id ? 'text-indigo-500' : 'text-gray-400'} />
-                                            <span className={selectedWorkspaceId === ws.id ? 'font-medium' : ''}>{ws.displayName}</span>
+                                            <Building2 size={16} className={!selectedWorkspaceId ? 'text-[var(--primary)]' : 'text-gray-400'} />
+                                            <span className={!selectedWorkspaceId ? 'font-semibold' : ''}>전체 조직</span>
+                                            <span className="ml-auto text-xs text-gray-500">모든 워크스페이스</span>
                                         </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                                        {workspaces.map((ws) => (
+                                            <button
+                                                key={ws.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    setSelectedWorkspaceId(ws.id);
+                                                    setIsWorkspaceDropdownOpen(false);
+                                                }}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${selectedWorkspaceId === ws.id
+                                                    ? 'bg-[var(--primary)]/10 text-white'
+                                                    : 'text-gray-200 hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                <Layers size={16} className={selectedWorkspaceId === ws.id ? 'text-[var(--primary)]' : 'text-gray-400'} />
+                                                <span className={selectedWorkspaceId === ws.id ? 'font-semibold' : ''}>{ws.displayName}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
 
-                    {/* Period Filter */}
-                    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                        <div className="mx-1 h-6 w-px bg-white/10" />
+
+                        {/* Period Filter */}
                         {(['daily', 'weekly', 'monthly'] as Period[]).map((p) => (
                             <button
                                 key={p}
+                                type="button"
                                 onClick={() => setPeriod(p)}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${period === p
-                                    ? 'bg-white text-gray-900 shadow-sm'
-                                    : 'text-gray-600 hover:text-gray-900'
+                                className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${period === p
+                                    ? 'bg-white/10 text-white shadow-sm'
+                                    : 'text-gray-400 hover:text-white'
                                     }`}
                             >
                                 {p === 'daily' ? '일간' : p === 'weekly' ? '주간' : '월간'}
@@ -214,8 +235,8 @@ export default function DashboardPage() {
             {/* Loading Indicator */}
             {isLoading && (
                 <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-                    <span className="ml-2 text-gray-500">데이터를 불러오는 중...</span>
+                    <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
+                    <span className="ml-2 text-gray-400">데이터를 불러오는 중...</span>
                 </div>
             )}
 
@@ -225,7 +246,8 @@ export default function DashboardPage() {
                     title="총 요청 수"
                     value={formatNumber(overview?.totalRequests || 0)}
                     change={overview?.requestsChange || 0}
-                    icon={<Activity className="text-indigo-600" size={24} />}
+                    icon={<Activity className="text-[var(--primary)]" size={18} />}
+                    iconWrapClassName="bg-[var(--primary)]/10 border border-[var(--primary)]/20"
                     subtitle={`성공률 ${overview?.successRate.toFixed(1) || 0}%`}
                     isLoading={isOverviewLoading}
                 />
@@ -233,7 +255,8 @@ export default function DashboardPage() {
                     title="토큰 사용량"
                     value={formatNumber(overview?.totalTokens || 0)}
                     change={overview?.tokensChange || 0}
-                    icon={<Zap className="text-amber-500" size={24} />}
+                    icon={<Zap className="text-yellow-300" size={18} />}
+                    iconWrapClassName="bg-yellow-500/10 border border-yellow-500/20"
                     subtitle="입력 + 출력 합계"
                     isLoading={isOverviewLoading}
                 />
@@ -241,7 +264,8 @@ export default function DashboardPage() {
                     title="평균 응답 속도"
                     value={`${overview?.avgLatencyMs || 0}ms`}
                     change={overview?.latencyChange || 0}
-                    icon={<Clock className="text-emerald-600" size={24} />}
+                    icon={<Clock className="text-emerald-300" size={18} />}
+                    iconWrapClassName="bg-emerald-500/10 border border-emerald-500/20"
                     subtitle={`P95: ${overview?.p95LatencyMs || 0}ms`}
                     invertChange
                     isLoading={isOverviewLoading}
@@ -250,26 +274,27 @@ export default function DashboardPage() {
                     title="예상 비용"
                     value={formatCurrency(overview?.totalCost || 0)}
                     change={overview?.costChange || 0}
-                    icon={<Coins className="text-rose-500" size={24} />}
+                    icon={<Coins className="text-pink-300" size={18} />}
+                    iconWrapClassName="bg-pink-500/10 border border-pink-500/20"
                     subtitle="USD 기준"
                     isLoading={isOverviewLoading}
                 />
             </div>
 
             {/* Time Series Chart */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div className="glass-card rounded-xl border border-white/5 p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-lg font-semibold text-gray-900">사용량 추이</h2>
-                        <p className="text-sm text-gray-500">일별 요청 수 및 토큰 사용량</p>
+                        <h2 className="text-lg font-bold text-white">사용량 추이</h2>
+                        <p className="text-xs text-gray-500 mt-1">일별 요청 수 및 토큰 사용량</p>
                     </div>
-                    <div className="flex gap-4 text-sm">
-                        <span className="flex items-center gap-2">
-                            <span className="w-3 h-3 bg-indigo-500 rounded-full"></span>
+                    <div className="flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-2 text-gray-400">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary)] shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
                             요청 수
                         </span>
-                        <span className="flex items-center gap-2">
-                            <span className="w-3 h-3 bg-emerald-500 rounded-full"></span>
+                        <span className="flex items-center gap-2 text-gray-400">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                             토큰 (K)
                         </span>
                     </div>
@@ -282,24 +307,24 @@ export default function DashboardPage() {
                             <AreaChart data={timeseries.map(d => ({ ...d, date: formatDate(d.date) }))} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorRequests" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="rgb(168,85,247)" stopOpacity={0.22} />
+                                        <stop offset="95%" stopColor="rgb(168,85,247)" stopOpacity={0} />
                                     </linearGradient>
                                     <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="rgb(16,185,129)" stopOpacity={0.18} />
+                                        <stop offset="95%" stopColor="rgb(16,185,129)" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
                                 <XAxis
                                     dataKey="date"
-                                    tick={{ fontSize: 12, fill: '#9ca3af' }}
-                                    axisLine={{ stroke: '#e5e7eb' }}
+                                    tick={{ fontSize: 12, fill: 'rgba(148,163,184,0.70)' }}
+                                    axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
                                     tickLine={false}
                                 />
                                 <YAxis
                                     yAxisId="left"
-                                    tick={{ fontSize: 12, fill: '#9ca3af' }}
+                                    tick={{ fontSize: 12, fill: 'rgba(148,163,184,0.70)' }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value}
@@ -307,18 +332,20 @@ export default function DashboardPage() {
                                 <YAxis
                                     yAxisId="right"
                                     orientation="right"
-                                    tick={{ fontSize: 12, fill: '#9ca3af' }}
+                                    tick={{ fontSize: 12, fill: 'rgba(148,163,184,0.70)' }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                                 />
                                 <Tooltip
+                                    cursor={{ stroke: 'rgba(255,255,255,0.10)', strokeDasharray: '4 3' }}
                                     contentStyle={{
-                                        backgroundColor: 'white',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px',
-                                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                                        backgroundColor: 'rgba(11,10,16,0.90)',
+                                        border: '1px solid rgba(255,255,255,0.10)',
+                                        borderRadius: '12px',
+                                        boxShadow: '0 10px 30px rgba(0,0,0,0.35)'
                                     }}
+                                    labelStyle={{ color: 'rgba(148,163,184,0.85)' }}
                                     formatter={(value, name) => {
                                         const numValue = value as number;
                                         if (name === 'requests') return [`${numValue.toLocaleString()} 요청`, '요청 수'];
@@ -326,28 +353,25 @@ export default function DashboardPage() {
                                         return [numValue, name];
                                     }}
                                 />
-                                <Legend
-                                    verticalAlign="top"
-                                    height={36}
-                                    formatter={(value) => value === 'requests' ? '요청 수' : '토큰 (K)'}
-                                />
                                 <Area
                                     yAxisId="left"
                                     type="monotone"
                                     dataKey="requests"
-                                    stroke="#6366f1"
+                                    stroke="rgb(168,85,247)"
                                     strokeWidth={2}
                                     fillOpacity={1}
                                     fill="url(#colorRequests)"
+                                    style={{ filter: 'drop-shadow(0 0 4px rgba(168,85,247,0.40))' }}
                                 />
                                 <Area
                                     yAxisId="right"
                                     type="monotone"
                                     dataKey="tokens"
-                                    stroke="#10b981"
+                                    stroke="rgb(16,185,129)"
                                     strokeWidth={2}
                                     fillOpacity={1}
                                     fill="url(#colorTokens)"
+                                    style={{ filter: 'drop-shadow(0 0 4px rgba(16,185,129,0.35))' }}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -365,36 +389,39 @@ export default function DashboardPage() {
             {/* Bottom Grid: Model Breakdown + Prompt Usage */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Model Breakdown */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="glass-card rounded-xl border border-white/5 p-6 h-full">
                     <div className="flex items-center gap-2 mb-6">
-                        <BarChart3 size={20} className="text-gray-600" />
-                        <h2 className="text-lg font-semibold text-gray-900">모델별 사용량</h2>
+                        <BarChart3 size={18} className="text-gray-400" />
+                        <h2 className="font-bold text-white text-base">모델별 사용량</h2>
                     </div>
 
                     {models.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             {models.map((model, i) => (
                                 <div key={i} className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-gray-900">{model.modelName}</span>
-                                            <span className="text-xs text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
+                                            <span className="text-sm font-semibold text-white">{model.modelName}</span>
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/5">
                                                 {model.provider}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-4 text-gray-500">
-                                            <span>{formatNumber(model.requests)} req</span>
-                                            <span>{formatCurrency(model.cost)}</span>
+                                        <div className="flex items-center gap-4 text-xs">
+                                            <span className="text-gray-400">{formatNumber(model.requests)} req</span>
+                                            <span className="text-gray-200 font-mono">{formatCurrency(model.cost)}</span>
                                         </div>
                                     </div>
-                                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
                                         <div
-                                            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all"
+                                            className="h-full bg-gradient-to-r from-[var(--primary)] to-purple-400 rounded-full transition-all shadow-[0_0_10px_rgba(168,85,247,0.4)]"
                                             style={{ width: `${model.percentage}%` }}
                                         />
                                     </div>
                                 </div>
                             ))}
+                            <div className="py-2 flex items-center justify-center text-gray-600 text-xs italic opacity-50">
+                                No more data available
+                            </div>
                         </div>
                     ) : (
                         <div className="flex items-center justify-center h-32 text-gray-400">
@@ -404,45 +431,44 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Prompt Usage */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                <div className="glass-card rounded-xl border border-white/5 p-6 h-full flex flex-col">
                     <div className="flex items-center gap-2 mb-6">
-                        <FileText size={20} className="text-gray-600" />
-                        <h2 className="text-lg font-semibold text-gray-900">프롬프트별 사용량</h2>
+                        <FileText size={18} className="text-gray-400" />
+                        <h2 className="font-bold text-white text-base">프롬프트별 사용량</h2>
                     </div>
 
                     {prompts.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="text-left text-gray-500 border-b border-gray-100">
-                                        <th className="pb-3 font-medium">프롬프트</th>
-                                        <th className="pb-3 font-medium text-right">요청</th>
-                                        <th className="pb-3 font-medium text-right">토큰</th>
-                                        <th className="pb-3 font-medium text-right">비용</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {prompts.map((prompt) => (
-                                        <tr key={prompt.promptId} className="hover:bg-gray-50 transition-colors">
-                                            <td className="py-3">
-                                                <div>
-                                                    <div className="font-medium text-gray-900">{prompt.promptKey}</div>
-                                                    <div className="text-xs text-gray-400">ID: {prompt.promptId}</div>
-                                                </div>
-                                            </td>
-                                            <td className="py-3 text-right text-gray-600">
-                                                {formatNumber(prompt.requests)}
-                                            </td>
-                                            <td className="py-3 text-right text-gray-600">
-                                                {formatNumber(prompt.tokens)}
-                                            </td>
-                                            <td className="py-3 text-right text-gray-600">
-                                                {formatCurrency(prompt.cost)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="w-full">
+                            <div className="grid grid-cols-12 gap-4 pb-3 border-b border-white/10 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                <div className="col-span-5">프롬프트</div>
+                                <div className="col-span-2 text-right">요청</div>
+                                <div className="col-span-2 text-right">토큰</div>
+                                <div className="col-span-3 text-right">비용</div>
+                            </div>
+                            <div className="space-y-1">
+                                {prompts.map((prompt) => (
+                                    <div
+                                        key={prompt.promptId}
+                                        className="grid grid-cols-12 gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-white/5 transition-colors items-center group cursor-default"
+                                    >
+                                        <div className="col-span-5 flex items-center gap-2 overflow-hidden">
+                                            <span className="text-xs text-gray-500 font-mono">ID:</span>
+                                            <span className="text-xs text-gray-300 truncate group-hover:text-white transition-colors">
+                                                {prompt.promptKey}
+                                            </span>
+                                        </div>
+                                        <div className="col-span-2 text-right text-sm text-gray-300 font-mono">
+                                            {formatNumber(prompt.requests)}
+                                        </div>
+                                        <div className="col-span-2 text-right text-sm text-gray-300 font-mono">
+                                            {formatNumber(prompt.tokens)}
+                                        </div>
+                                        <div className="col-span-3 text-right text-sm text-white font-mono">
+                                            {formatCurrency(prompt.cost)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     ) : (
                         <div className="flex items-center justify-center h-32 text-gray-400">
@@ -453,8 +479,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Footer Note */}
-            <div className="text-center text-sm text-gray-400 py-4">
-                데이터는 실시간으로 업데이트됩니다
+            <div className="mt-2 text-center pb-4 border-t border-white/5 pt-6">
+                <p className="text-[10px] text-gray-500">데이터는 실시간으로 업데이트됩니다</p>
             </div>
         </div>
     );
@@ -466,6 +492,7 @@ function KPICard({
     value,
     change,
     icon,
+    iconWrapClassName,
     subtitle,
     invertChange = false,
     isLoading = false
@@ -474,6 +501,7 @@ function KPICard({
     value: string;
     change: number;
     icon: React.ReactNode;
+    iconWrapClassName?: string;
     subtitle: string;
     invertChange?: boolean;
     isLoading?: boolean;
@@ -481,29 +509,36 @@ function KPICard({
     const isPositive = invertChange ? change < 0 : change > 0;
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow">
+        <div className="glass-card p-5 rounded-xl hover:border-white/10 transition-all duration-300 relative overflow-hidden">
             <div className="flex items-start justify-between">
-                <div className="p-2 bg-gray-50 rounded-lg">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconWrapClassName ?? 'bg-white/5 border border-white/5'}`}>
                     {icon}
                 </div>
                 {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-300" />
+                    <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
                 ) : (
-                    <div className={`flex items-center gap-1 text-sm font-medium ${isPositive ? 'text-emerald-600' : 'text-rose-600'
-                        }`}>
-                        {isPositive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
+                    <div
+                        className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${isPositive
+                            ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+                            : 'text-rose-300 bg-rose-500/10 border-rose-500/20'
+                            }`}
+                    >
+                        {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                         {Math.abs(change).toFixed(1)}%
                     </div>
                 )}
             </div>
+
             <div className="mt-4">
                 {isLoading ? (
-                    <div className="h-8 w-24 bg-gray-100 rounded animate-pulse" />
+                    <div className="h-9 w-24 bg-white/5 rounded animate-pulse" />
                 ) : (
-                    <div className="text-2xl font-bold text-gray-900">{value}</div>
+                    <div className="text-3xl font-bold text-white mb-1 tracking-tight">{value}</div>
                 )}
-                <div className="text-sm text-gray-500 mt-1">{title}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{subtitle}</div>
+                <div className="flex flex-col">
+                    <p className="text-xs text-gray-400 font-medium mb-0.5">{title}</p>
+                    <p className="text-[10px] text-gray-600">{subtitle}</p>
+                </div>
             </div>
         </div>
     );
