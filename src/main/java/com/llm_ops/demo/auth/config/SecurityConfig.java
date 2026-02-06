@@ -5,8 +5,10 @@ import com.llm_ops.demo.auth.jwt.JwtTokenProvider;
 import com.llm_ops.demo.auth.service.TokenBlacklistService;
 import com.llm_ops.demo.auth.jwt.JwtAuthenticationEntryPoint;
 import com.llm_ops.demo.auth.jwt.JwtAccessDeniedHandler;
+import java.util.Arrays;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -36,6 +38,9 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
+    @Value("${cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://localhost:5174}")
+    private String corsAllowedOrigins;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -50,7 +55,7 @@ public class SecurityConfig {
                         .permitAll()
                         // 게이트웨이 외부 호출(조직 API 키로 인증)
                         .requestMatchers("/v1/chat/**").permitAll()
-                        .requestMatchers("/health").permitAll() // 개발 중 서버 상태 체크 -> 클로드가 제시해줌
+                        .requestMatchers("/health", "/actuator/health").permitAll()
                         // 그 외 모든 요청(로그아웃 포함)은 인증 필요
                         .anyRequest().authenticated())
                 // H2 Console을 위한 frameOptions 설정
@@ -75,11 +80,11 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:3000",
-                "http://localhost:5174"
-        ));
+        List<String> origins = Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("X-API-Key", "Content-Type", "Authorization"));
         configuration.setAllowCredentials(true);

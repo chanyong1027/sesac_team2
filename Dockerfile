@@ -1,14 +1,17 @@
-# 1. Base 이미지 설정 (Java 17 사용 시)
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jre-alpine
 
-# 2. 작업 디렉토리 설정
 WORKDIR /app
 
-# 3. JAR 파일 복사
 COPY build/libs/app.jar app.jar
 
-# 4. 시간대 설정 (선택 사항: RDS와 시간대를 맞추기 위해 추천)
 ENV TZ=Asia/Seoul
+ENV SPRING_PROFILES_ACTIVE=prod
 
-# 5. 애플리케이션 실행
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-XX:+UseG1GC", \
+  "-jar", "app.jar"]
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 \
+  CMD wget -qO- http://localhost:8080/health || exit 1
