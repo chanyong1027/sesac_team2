@@ -38,9 +38,15 @@ export function DocumentListPage() {
         topK: 5,
         similarityThreshold: 0,
         maxChunks: 5,
-        maxContextChars: 2000,
+        maxContextChars: 4000,
+        hybridEnabled: true,
+        rerankEnabled: false,
+        rerankTopN: 10,
+        chunkSize: 500,
+        chunkOverlapTokens: 50,
     });
     const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+    const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
     // 문서 목록 조회
     const { data: documents, isLoading } = useQuery({
@@ -70,6 +76,11 @@ export function DocumentListPage() {
             similarityThreshold: ragSettings.similarityThreshold,
             maxChunks: ragSettings.maxChunks,
             maxContextChars: ragSettings.maxContextChars,
+            hybridEnabled: ragSettings.hybridEnabled,
+            rerankEnabled: ragSettings.rerankEnabled,
+            rerankTopN: ragSettings.rerankTopN,
+            chunkSize: ragSettings.chunkSize,
+            chunkOverlapTokens: ragSettings.chunkOverlapTokens,
         });
     }, [ragSettings]);
 
@@ -300,9 +311,223 @@ export function DocumentListPage() {
                             />
                         </label>
                     </div>
-                    <div className="text-xs text-gray-500 space-y-1">
-                        <p>Top K를 높이면 더 많은 문서를 참고하고, 임계값을 높이면 정확도가 상승합니다.</p>
-                        <p>컨텍스트 길이가 길어질수록 답변 근거가 늘어나지만 비용도 증가합니다.</p>
+
+                    <div className="flex items-center justify-between pt-2">
+                        <button
+                            type="button"
+                            onClick={() => setShowAdvancedSettings((prev) => !prev)}
+                            className="text-xs font-medium text-gray-700 hover:underline"
+                        >
+                            {showAdvancedSettings ? '고급 설정 숨기기' : '고급 설정 보기'}
+                        </button>
+                        <div className="text-xs text-gray-500">
+                            전문가용: 하이브리드/리랭크/청킹
+                        </div>
+                    </div>
+
+                    {showAdvancedSettings && (
+                        <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={settingsForm.hybridEnabled}
+                                        onChange={(e) => {
+                                            setSettingsForm({ ...settingsForm, hybridEnabled: e.target.checked });
+                                            setSettingsMessage(null);
+                                        }}
+                                    />
+                                    <span className="text-gray-700">하이브리드 검색 사용</span>
+                                </label>
+                                <label className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={settingsForm.rerankEnabled}
+                                        onChange={(e) => {
+                                            setSettingsForm({ ...settingsForm, rerankEnabled: e.target.checked });
+                                            setSettingsMessage(null);
+                                        }}
+                                    />
+                                    <span className="text-gray-700">리랭크 사용</span>
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <label className="space-y-1">
+                                    <span className="text-gray-600">리랭크 Top N</span>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={30}
+                                        value={settingsForm.rerankTopN}
+                                        onChange={(e) => {
+                                            setSettingsForm({ ...settingsForm, rerankTopN: Number(e.target.value) });
+                                            setSettingsMessage(null);
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                                    />
+                                </label>
+                                <div className="text-xs text-gray-500 flex items-center">
+                                    리랭크는 정확도를 높이지만 비용/지연이 늘 수 있습니다.
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <label className="space-y-1">
+                                    <span className="text-gray-600">청크 크기(토큰)</span>
+                                    <input
+                                        type="number"
+                                        min={100}
+                                        max={2000}
+                                        step={50}
+                                        value={settingsForm.chunkSize}
+                                        onChange={(e) => {
+                                            setSettingsForm({ ...settingsForm, chunkSize: Number(e.target.value) });
+                                            setSettingsMessage(null);
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                                    />
+                                </label>
+                                <label className="space-y-1">
+                                    <span className="text-gray-600">오버랩(토큰)</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={500}
+                                        step={10}
+                                        value={settingsForm.chunkOverlapTokens}
+                                        onChange={(e) => {
+                                            setSettingsForm({ ...settingsForm, chunkOverlapTokens: Number(e.target.value) });
+                                            setSettingsMessage(null);
+                                        }}
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg"
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="text-xs text-gray-500">
+                                청킹 설정(청크 크기/오버랩)은 <span className="font-medium text-gray-700">새로 업로드/재인게스트</span>되는 문서부터
+                                적용됩니다. 이미 업로드된 문서에는 적용되지 않으니 변경 후 문서를 재업로드하세요.
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSettingsForm({
+                                    ...settingsForm,
+                                    topK: 5,
+                                    similarityThreshold: 0.0,
+                                    maxChunks: 5,
+                                    maxContextChars: 4000,
+                                    hybridEnabled: true,
+                                    rerankEnabled: false,
+                                    rerankTopN: 10,
+                                });
+                                setSettingsMessage('프리셋(균형)이 적용되었습니다. 저장을 눌러 반영하세요.');
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                        >
+                            프리셋: 균형
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSettingsForm({
+                                    ...settingsForm,
+                                    topK: 10,
+                                    similarityThreshold: 0.0,
+                                    maxChunks: 7,
+                                    maxContextChars: 6000,
+                                    hybridEnabled: true,
+                                    rerankEnabled: false,
+                                    rerankTopN: 10,
+                                });
+                                setSettingsMessage('프리셋(리콜 우선)이 적용되었습니다. 저장을 눌러 반영하세요.');
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                        >
+                            프리셋: 리콜 우선
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSettingsForm({
+                                    ...settingsForm,
+                                    topK: 10,
+                                    similarityThreshold: 0.0,
+                                    maxChunks: 4,
+                                    maxContextChars: 4000,
+                                    hybridEnabled: true,
+                                    rerankEnabled: true,
+                                    rerankTopN: 20,
+                                });
+                                setSettingsMessage('프리셋(정확도 우선)이 적용되었습니다. 저장을 눌러 반영하세요.');
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                        >
+                            프리셋: 정확도 우선
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSettingsForm({
+                                    ...settingsForm,
+                                    topK: 3,
+                                    similarityThreshold: 0.2,
+                                    maxChunks: 2,
+                                    maxContextChars: 2000,
+                                    hybridEnabled: false,
+                                    rerankEnabled: false,
+                                    rerankTopN: 10,
+                                });
+                                setSettingsMessage('프리셋(비용 절약)이 적용되었습니다. 저장을 눌러 반영하세요.');
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-gray-900 rounded-lg border border-gray-200 bg-white hover:bg-gray-50"
+                        >
+                            프리셋: 비용 절약
+                        </button>
+                    </div>
+                    <div className="text-xs text-gray-500 space-y-2">
+                        <p className="text-gray-600 font-medium">설정이 의미하는 것</p>
+                        <p>
+                            <span className="font-medium text-gray-700">Top K</span>: 검색 후보로 가져올 청크 개수입니다. 높일수록 더 많은 후보를
+                            찾지만, 노이즈가 늘 수 있고(미리 검색 결과가 많아짐) 검색 시간이 늘 수 있습니다.
+                            <span className="ml-1 text-gray-500">(추천 시작값: 5)</span>
+                        </p>
+                        <p>
+                            <span className="font-medium text-gray-700">유사도 임계값</span>: 벡터 검색에서 “이 값보다 덜 비슷한 청크”는
+                            제외합니다. 높이면 더 엄격해져서 관련 없는 결과가 줄 수 있지만,{' '}
+                            <span className="font-medium text-gray-700">검색 결과가 아예 비는 경우</span>가 크게 늘어납니다.
+                            <span className="ml-1 text-gray-500">(추천 시작값: 0.0~0.2)</span>
+                        </p>
+                        <p>
+                            <span className="font-medium text-gray-700">하이브리드 검색</span>: 벡터 검색 + 키워드 검색(오타/짧은 질의에 강함)을
+                            함께 사용합니다. 약어(예: S3/VPN)나 오타가 많으면 켜는 것을 추천합니다.
+                        </p>
+                        <p>
+                            <span className="font-medium text-gray-700">리랭크</span>: 검색 후보를 한 번 더 재정렬해서 “정답에 가까운 청크”를
+                            위로 올립니다. 정확도를 높이지만 추가 비용/지연이 생길 수 있습니다.
+                        </p>
+                        <p>
+                            <span className="font-medium text-gray-700">컨텍스트 청크 수</span>: 실제 답변 생성 시 LLM에게 전달할 참고 문서
+                            청크 개수입니다. 높이면 근거가 늘지만, 프롬프트가 길어져 비용/지연이 증가하고 헷갈릴 수 있습니다.
+                            <span className="ml-1 text-gray-500">(추천 시작값: 3~5)</span>
+                        </p>
+                        <p>
+                            <span className="font-medium text-gray-700">최대 컨텍스트 문자</span>: 참고 문서 컨텍스트의 최대 길이(문자 수)입니다.
+                            길수록 근거가 늘지만 비용이 증가합니다.
+                            <span className="ml-1 text-gray-500">(추천 시작값: 4000)</span>
+                        </p>
+                        <p className="text-gray-500">
+                            참고: 아래 “RAG 미리 검색”은 검색 결과(Top K/임계값)에 영향을 받고, 컨텍스트(청크 수/최대 문자)는 실제 답변 생성 단계에서
+                            적용됩니다.
+                        </p>
+                        <p className="text-gray-500">
+                            팁: 결과가 비면 먼저 <span className="font-medium text-gray-700">유사도 임계값</span>을 0.0으로 낮춰보세요.
+                        </p>
                     </div>
                     {settingsMessage && (
                         <p className="text-xs text-indigo-600">{settingsMessage}</p>

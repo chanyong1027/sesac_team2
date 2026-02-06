@@ -30,7 +30,7 @@ public class RagVectorStoreProperties {
     /**
      * 벡터 데이터를 저장할 테이블 이름입니다.
      */
-    private String tableName = "doc_chunks";
+    private String tableName = "doc_chunks_v2";
 
     /**
      * 최초 구동 시 스키마/테이블을 자동 생성할지 여부입니다.

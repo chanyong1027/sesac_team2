@@ -71,7 +71,9 @@ public class RequestLogWriter {
                                         update.ragChunksCount(),
                                         update.ragContextChars(),
                                         update.ragContextTruncated(),
-                                        update.ragContextHash());
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
 
                         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs());
                 } catch (Exception e) {
@@ -107,7 +109,9 @@ public class RequestLogWriter {
                                         update.ragChunksCount(),
                                         update.ragContextChars(),
                                         update.ragContextTruncated(),
-                                        update.ragContextHash());
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
 
                         requestLog.markFail(
                                         LocalDateTime.now(clock),
@@ -150,7 +154,9 @@ public class RequestLogWriter {
                         Integer ragChunksCount,
                         Integer ragContextChars,
                         Boolean ragContextTruncated,
-                        String ragContextHash) {
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
         }
 
         public record FailUpdate(
@@ -172,6 +178,8 @@ public class RequestLogWriter {
                         Integer ragChunksCount,
                         Integer ragContextChars,
                         Boolean ragContextTruncated,
-                        String ragContextHash) {
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
         }
 }

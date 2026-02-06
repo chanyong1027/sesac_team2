@@ -212,12 +212,16 @@ public class RequestLog {
             Integer ragChunksCount,
             Integer ragContextChars,
             Boolean ragContextTruncated,
-            String ragContextHash) {
+            String ragContextHash,
+            Integer ragTopK,
+            Double ragSimilarityThreshold) {
         this.ragLatencyMs = ragLatencyMs;
         this.ragChunksCount = ragChunksCount;
         this.ragContextChars = ragContextChars;
         this.ragContextTruncated = ragContextTruncated;
         this.ragContextHash = ragContextHash;
+        this.ragTopK = ragTopK;
+        this.ragSimilarityThreshold = ragSimilarityThreshold;
     }
 
 }

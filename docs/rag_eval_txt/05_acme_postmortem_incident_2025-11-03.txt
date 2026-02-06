@@ -1,0 +1,23 @@
+Postmortem: Incident INC-2025-11-03 (RAG Search Regression)
+
+Date: 2025-11-03
+Severity: P2
+Summary: RAG search returned irrelevant chunks after a silent embedding model change.
+
+What Happened
+- The embedding model was switched and the embedding dimensions changed.
+- Old vectors remained in the table, causing distance computations to behave unexpectedly.
+- Users reported "confident but wrong" answers.
+
+Root Cause
+Mismatch between embedding dimensions and the vector column definition.
+
+Fix
+1. Create a new table with the correct vector dimensions.
+2. Re-ingest all documents into the new table.
+3. Add monitoring for "NO_CONTEXT rate" and "avg similarity score".
+
+Prevention
+- Pin embedding model + dimensions in config.
+- Add a startup check to validate the vector column dimension.
+

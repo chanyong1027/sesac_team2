@@ -3,6 +3,7 @@ package com.llm_ops.demo.rag.service;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.config.RagVectorStoreProperties;
+import com.llm_ops.demo.rag.metadata.RagMetadataKeys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -31,7 +32,7 @@ public class RagDocumentVectorStoreDeleteService {
         }
 
         String table = properties.getSchemaName() + "." + properties.getTableName();
-        String sql = "DELETE FROM " + table + " WHERE metadata->>'document_id' = ?";
+        String sql = "DELETE FROM " + table + " WHERE metadata->>'" + RagMetadataKeys.DOCUMENT_ID + "' = ?";
         return jdbcTemplate.update(sql, documentId.toString());
     }
 
@@ -48,7 +49,7 @@ public class RagDocumentVectorStoreDeleteService {
         }
         String table = properties.getSchemaName() + "." + properties.getTableName();
         String sql = "DELETE FROM " + table
-            + " WHERE metadata->>'workspace_id' = ? AND (metadata->>'document_name' = ? OR metadata->>'file_name' = ? OR metadata->>'resourceName' = ? OR metadata->>'filename' = ?)";
+            + " WHERE metadata->>'" + RagMetadataKeys.WORKSPACE_ID + "' = ? AND (metadata->>'" + RagMetadataKeys.DOCUMENT_NAME + "' = ? OR metadata->>'file_name' = ? OR metadata->>'resourceName' = ? OR metadata->>'filename' = ?)";
         return jdbcTemplate.update(sql,
             workspaceId.toString(),
             documentName,

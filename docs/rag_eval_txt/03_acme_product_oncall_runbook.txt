@@ -1,0 +1,39 @@
+ACME Product On-call Runbook
+
+Runbook Owner: SRE
+Last Updated: 2025-12-10
+
+1) Service Names
+
+- API Gateway: luminaops-gateway
+- RAG Ingest Worker: luminaops-rag-ingest
+- Postgres (pgvector): luminaops-postgres
+- Object Storage: MinIO / S3 compatible
+
+2) Common Alerts
+
+2.1) Elevated 5xx on Gateway
+
+Immediate actions:
+1. Check upstream provider outage (OpenAI/Anthropic/Gemini).
+2. If retryable errors spike, verify failover settings on the prompt version.
+3. Inspect request logs for fail_reason and response codes.
+
+2.2) RAG returns NO_CONTEXT too often
+
+Checklist:
+1. Confirm documents were re-ingested after embedding model changes.
+2. Verify pgvector table is doc_chunks_v2.
+3. Increase rag.search.top-k or lower similarity threshold.
+4. Consider enabling hybrid search + rerank.
+
+3) RAG Query Tips
+
+- Short queries like "S3" or "VPN" may need keyword/trigram fallback.
+- Typos like "passwrod" should still match via trigram if enabled.
+
+4) Escalation
+
+- P1: page SRE + Security
+- P2: page on-call engineer
+

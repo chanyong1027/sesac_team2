@@ -9,6 +9,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import com.llm_ops.demo.rag.metadata.RagMetadataKeys;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -17,7 +18,6 @@ import java.util.Map;
 @Service
 public class RagDocumentExtractService {
 
-    private static final String METADATA_WORKSPACE_ID = "workspace_id";
 
     public List<Document> extract(Long workspaceId, Resource resource) {
         validateInput(workspaceId, resource);
@@ -85,7 +85,7 @@ public class RagDocumentExtractService {
 
     private Document applyWorkspaceMetadata(Long workspaceId, Document document) {
         Map<String, Object> metadata = new HashMap<>(document.getMetadata());
-        metadata.put(METADATA_WORKSPACE_ID, workspaceId);
+        metadata.put(RagMetadataKeys.WORKSPACE_ID, workspaceId);
         return new Document(document.getContent(), metadata);
     }
 

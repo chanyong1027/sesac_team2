@@ -7,7 +7,12 @@ public record WorkspaceRagSettingsResponse(
     Integer topK,
     Double similarityThreshold,
     Integer maxChunks,
-    Integer maxContextChars
+    Integer maxContextChars,
+    Boolean hybridEnabled,
+    Boolean rerankEnabled,
+    Integer rerankTopN,
+    Integer chunkSize,
+    Integer chunkOverlapTokens
 ) {
     public static WorkspaceRagSettingsResponse from(WorkspaceRagSettings settings) {
         if (settings == null || settings.getWorkspace() == null) {
@@ -18,7 +23,12 @@ public record WorkspaceRagSettingsResponse(
             settings.getTopK(),
             settings.getSimilarityThreshold(),
             settings.getMaxChunks(),
-            settings.getMaxContextChars()
+            settings.getMaxContextChars(),
+            settings.getHybridEnabled(),
+            settings.getRerankEnabled(),
+            settings.getRerankTopN(),
+            settings.getChunkSize(),
+            settings.getChunkOverlapTokens()
         );
     }
 }

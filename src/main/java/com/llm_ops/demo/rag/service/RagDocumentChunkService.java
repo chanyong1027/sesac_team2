@@ -3,29 +3,24 @@ package com.llm_ops.demo.rag.service;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.stereotype.Service;
 
+import com.llm_ops.demo.rag.metadata.RagMetadataKeys;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 추출된 문서를 TokenTextSplitter로 토큰 단위 청킹하는 서비스입니다.
+ * 추출된 문서를 문단 우선 + 토큰 오버랩 방식으로 청킹하는 서비스입니다.
  */
 @Service
 public class RagDocumentChunkService {
 
-    private static final String METADATA_CHUNK_INDEX = "chunk_index";
-    private static final String METADATA_CHUNK_TOTAL = "chunk_total";
-    private static final String METADATA_DOCUMENT_ID = "document_id";
-    private static final String METADATA_DOCUMENT_NAME = "document_name";
+    private final RagTextSplitter ragTextSplitter;
 
-    private final TokenTextSplitter tokenTextSplitter;
-
-    public RagDocumentChunkService(TokenTextSplitter tokenTextSplitter) {
-        this.tokenTextSplitter = tokenTextSplitter;
+    public RagDocumentChunkService(RagTextSplitter ragTextSplitter) {
+        this.ragTextSplitter = ragTextSplitter;
     }
 
     /**
@@ -36,11 +31,21 @@ public class RagDocumentChunkService {
      * @return 청크 단위로 분할된 문서 목록
      */
     public List<Document> chunk(List<Document> documents, Long documentId, String documentName) {
+        return chunk(documents, documentId, documentName, null, null);
+    }
+
+    public List<Document> chunk(
+        List<Document> documents,
+        Long documentId,
+        String documentName,
+        Integer chunkSizeOverride,
+        Integer chunkOverlapTokensOverride
+    ) {
         validateInput(documents, documentId);
 
         List<Document> results = new ArrayList<>();
         for (Document document : documents) {
-            List<Document> chunks = tokenTextSplitter.split(document);
+            List<Document> chunks = ragTextSplitter.split(document, chunkSizeOverride, chunkOverlapTokensOverride);
             int total = chunks.size();
             for (int index = 0; index < total; index++) {
                 Document chunk = chunks.get(index);
@@ -65,13 +70,13 @@ public class RagDocumentChunkService {
 
     private Document applyChunkMetadata(Document document, int chunkIndex, int chunkTotal, Long documentId, String documentName) {
         Map<String, Object> metadata = new HashMap<>(document.getMetadata());
-        metadata.put(METADATA_CHUNK_INDEX, chunkIndex);
-        metadata.put(METADATA_CHUNK_TOTAL, chunkTotal);
+        metadata.put(RagMetadataKeys.CHUNK_INDEX, chunkIndex);
+        metadata.put(RagMetadataKeys.CHUNK_TOTAL, chunkTotal);
         if (documentId != null) {
-            metadata.put(METADATA_DOCUMENT_ID, documentId);
+            metadata.put(RagMetadataKeys.DOCUMENT_ID, documentId);
         }
         if (documentName != null && !documentName.isBlank()) {
-            metadata.put(METADATA_DOCUMENT_NAME, documentName);
+            metadata.put(RagMetadataKeys.DOCUMENT_NAME, documentName);
         }
         Document chunk = new Document(document.getContent(), metadata);
         chunk.setContentFormatter(document.getContentFormatter());
