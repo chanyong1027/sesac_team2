@@ -1,47 +1,109 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { AxiosError } from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import type { ProviderCredentialSummaryResponse } from '@/types/api.types';
-import { Shield, Check, Terminal, ExternalLink, Plus } from 'lucide-react';
 
-const providerInfo: Record<string, { name: string; color: string; bgColor: string; borderColor: string; icon: string }> = {
+type ProviderKey = 'OPENAI' | 'GEMINI' | 'ANTHROPIC' | 'AZURE_OPENAI';
+
+const providers: ProviderKey[] = ['OPENAI', 'GEMINI', 'ANTHROPIC', 'AZURE_OPENAI'];
+
+const providerInfo: Record<
+  ProviderKey,
+  {
+    label: string;
+    subtitle: string;
+    // Visual style knobs used to match the provided dark/glass mock.
+    accentText: string;
+    iconNode: ReactNode;
+    isEnterpriseOnly?: boolean;
+  }
+> = {
   OPENAI: {
-    name: 'OpenAI',
-    color: '#000000',
-    bgColor: '#FFFFFF',
-    borderColor: '#E5E5E5',
-    icon: 'text-gray-900',
-  },
-  ANTHROPIC: {
-    name: 'Anthropic',
-    color: '#D4A574',
-    bgColor: '#FFFBF5',
-    borderColor: '#E8DCCB',
-    icon: 'text-amber-700',
+    label: 'OpenAI',
+    subtitle: 'GPT-4, GPT-3.5 Turbo',
+    accentText: 'text-white',
+    iconNode: (
+      <div className="size-12 rounded-xl bg-white text-black flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.10)]">
+        <span className="text-lg font-black">O</span>
+      </div>
+    ),
   },
   GEMINI: {
-    name: 'Gemini',
-    color: '#8B5CF6',
-    bgColor: '#F5F3FF',
-    borderColor: '#DDD6FE',
-    icon: 'text-purple-600',
+    label: 'Gemini',
+    subtitle: 'Gemini Pro, Ultra',
+    accentText: 'text-white',
+    iconNode: (
+      <div className="size-12 rounded-xl bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 p-[1px] shadow-[0_0_15px_rgba(168,85,247,0.20)]">
+        <div className="size-full rounded-[11px] bg-[#0f0814] flex items-center justify-center">
+          <span className="text-base font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+            G
+          </span>
+        </div>
+      </div>
+    ),
+  },
+  ANTHROPIC: {
+    label: 'Anthropic',
+    subtitle: 'Claude 3 Opus, Sonnet',
+    accentText: 'text-gray-200',
+    iconNode: (
+      <div className="size-12 rounded-xl bg-[#d09b73] text-[#1a1022] flex items-center justify-center font-serif font-black text-xl shadow-[0_0_15px_rgba(208,155,115,0.20)]">
+        A
+      </div>
+    ),
+  },
+  AZURE_OPENAI: {
+    label: 'Azure OpenAI',
+    subtitle: 'Enterprise Only',
+    accentText: 'text-gray-400',
+    isEnterpriseOnly: true,
+    iconNode: (
+      <div className="size-12 rounded-xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center">
+        <span className="material-symbols-outlined text-2xl">cloud_circle</span>
+      </div>
+    ),
   },
 };
 
-const providers = ['OPENAI', 'ANTHROPIC', 'GEMINI'];
-const statusMeta: Record<string, { label: string; badge: string; text: string }> = {
-  ACTIVE: { label: '연결 완료', badge: 'bg-green-100 text-green-700', text: 'text-gray-500' },
-  VERIFYING: { label: '검증 중', badge: 'bg-amber-100 text-amber-700', text: 'text-amber-600' },
-  INVALID: { label: '검증 실패', badge: 'bg-rose-100 text-rose-700', text: 'text-rose-600' },
-  REVOKED: { label: '비활성', badge: 'bg-gray-100 text-gray-600', text: 'text-gray-500' },
+const statusMeta: Record<
+  string,
+  { label: string; badgeClass: string; textClass: string; dotClass: string; pulse?: boolean }
+> = {
+  ACTIVE: {
+    label: 'ACTIVE',
+    badgeClass: 'bg-emerald-500/10 border-emerald-400/30 text-emerald-300 pulse-badge',
+    textClass: 'text-emerald-300',
+    dotClass: 'bg-emerald-400',
+    pulse: true,
+  },
+  VERIFYING: {
+    label: 'VERIFYING',
+    badgeClass: 'bg-amber-500/10 border-amber-400/30 text-amber-300',
+    textClass: 'text-amber-300',
+    dotClass: 'bg-amber-400',
+  },
+  INVALID: {
+    label: 'INVALID',
+    badgeClass: 'bg-rose-500/10 border-rose-400/30 text-rose-300',
+    textClass: 'text-rose-300',
+    dotClass: 'bg-rose-400',
+  },
+  REVOKED: {
+    label: 'REVOKED',
+    badgeClass: 'bg-white/5 border-white/10 text-gray-400',
+    textClass: 'text-gray-400',
+    dotClass: 'bg-gray-500',
+  },
 };
 
 const normalizeProviderKey = (raw: string) => {
   const normalized = raw.trim().toLowerCase();
   if (normalized === 'google') return 'GEMINI';
   if (normalized === 'claude') return 'ANTHROPIC';
+  if (normalized === 'azure' || normalized === 'azure_openai' || normalized === 'azure-openai') return 'AZURE_OPENAI';
   return normalized.toUpperCase();
 };
 
@@ -53,6 +115,12 @@ const resolveCredentialError = (error: unknown, fallback: string) => {
   return axiosError.response?.data?.message || fallback;
 };
 
+const formatKoreanDate = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
 function ProviderCard({
   provider,
   credential,
@@ -61,86 +129,85 @@ function ProviderCard({
   onReverify,
   isReverifyPending,
 }: {
-  provider: string;
+  provider: ProviderKey;
   credential?: ProviderCredentialSummaryResponse;
   onAdd: () => void;
   onUpdate: () => void;
   onReverify: () => void;
   isReverifyPending: boolean;
 }) {
-  const info = providerInfo[provider] || {
-    name: provider,
-    color: '#525252',
-    bgColor: '#FFFFFF',
-    borderColor: '#E5E5E5',
-    icon: 'text-gray-500',
-  };
+  const info = providerInfo[provider];
 
   const status = credential?.status || 'UNKNOWN';
-  const meta = statusMeta[status] || { label: '미확인', badge: 'bg-gray-100 text-gray-600', text: 'text-gray-500' };
+  const meta = statusMeta[status] || {
+    label: '미확인',
+    badgeClass: 'bg-white/5 border-white/10 text-gray-400',
+    textClass: 'text-gray-400',
+    dotClass: 'bg-gray-500',
+  };
   const isConnected = status === 'ACTIVE';
   const isVerifying = status === 'VERIFYING';
   const isInvalid = status === 'INVALID';
+  const isEnterpriseOnly = !!info.isEnterpriseOnly && !credential;
 
   return (
     <div
-      className={`p-6 rounded-xl border transition-all ${isConnected ? 'shadow-sm' : 'hover:shadow-md hover:border-indigo-200'
-        }`}
-      style={{
-        background: info.bgColor,
-        borderColor: isConnected ? '#10B981' : info.borderColor,
-      }}
+      className={[
+        'glass-card rounded-2xl p-6 relative overflow-hidden',
+        'border border-white/10',
+        isConnected ? 'border-emerald-400/30' : 'hover:border-white/20',
+        isEnterpriseOnly ? 'opacity-60 hover:opacity-100 border-dashed' : '',
+      ].join(' ')}
     >
       <div className="flex items-start justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-lg flex items-center justify-center bg-white shadow-sm border border-gray-100`}>
-            <span className={`text-xl font-bold ${info.icon}`}>{info.name.charAt(0)}</span>
-          </div>
+          {info.iconNode}
           <div>
-            <h3 className="text-base font-bold text-gray-900">
-              {info.name}
-            </h3>
-            <p className={`text-xs mt-0.5 ${isConnected ? 'text-gray-500' : meta.text}`}>
-              {isConnected ? '연결 완료' : meta.label}
-            </p>
+            <h3 className={`text-lg font-bold ${info.accentText}`}>{info.label}</h3>
+            <p className="text-xs text-gray-500 font-medium">{info.subtitle}</p>
           </div>
         </div>
 
-        {credential && (
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ${meta.badge}`}>
-            {isConnected ? <Check size={12} /> : null}
-            {isConnected ? 'Active' : meta.label}
+        {credential ? (
+          <span
+            className={[
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold tracking-wide border',
+              meta.badgeClass,
+            ].join(' ')}
+          >
+            <span className={`size-1.5 rounded-full ${meta.dotClass}`} />
+            {meta.label}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium tracking-wide border bg-white/5 border-white/10 text-gray-400">
+            미확인
           </span>
         )}
       </div>
 
        {isConnected && credential ? (
          <div className="space-y-3">
-           <div className="p-3 bg-white/50 border border-black/5 rounded-lg">
-             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+           <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
+             <p className="text-xs font-medium text-gray-500 mb-1">
                등록일
              </p>
-             <p className="text-sm font-medium text-gray-900">
-               {new Date(credential.createdAt).toLocaleDateString('ko-KR', {
-                 year: 'numeric',
-                 month: 'long',
-                 day: 'numeric',
-               })}
-             </p>
+             <p className="font-mono text-sm text-gray-300">{formatKoreanDate(credential.createdAt)}</p>
            </div>
           <div className="flex gap-2">
             <button
               onClick={onUpdate}
-              className="flex-1 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              className="flex-1 py-3 rounded-xl border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
             >
+              <span className="material-symbols-outlined text-lg">refresh</span>
               키 업데이트
             </button>
             {(isInvalid || isVerifying) && (
               <button
                 onClick={onReverify}
                 disabled={isVerifying || isReverifyPending}
-                className="flex-1 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors disabled:opacity-50"
+                className="flex-1 py-3 rounded-xl border border-white/10 text-sm font-medium text-[var(--primary)] hover:bg-white/5 hover:border-[color:rgba(168,85,247,0.25)] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
+                <span className="material-symbols-outlined text-lg">sync</span>
                 {isVerifying || isReverifyPending ? '검증 중...' : '재검증'}
               </button>
             )}
@@ -148,16 +215,27 @@ function ProviderCard({
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-gray-500 leading-relaxed min-h-[40px]">
-            {info.name} 모델을 사용하려면 API 키를 등록하세요.
-          </p>
-          <button
-            onClick={onAdd}
-            className="w-full py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm flex items-center justify-center gap-2"
-          >
-            <Plus size={16} />
-            API 키 등록
-          </button>
+          {isEnterpriseOnly ? (
+            <div className="flex items-center justify-center h-24">
+              <span className="text-sm text-gray-600 group-hover:text-gray-400 transition-colors flex items-center gap-2">
+                <span className="material-symbols-outlined text-lg">lock</span>
+                Contact Sales
+              </span>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500 leading-relaxed min-h-[40px]">
+                {info.label} 모델을 사용하려면 API 키를 등록하세요.
+              </p>
+              <button
+                onClick={onAdd}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-[var(--primary)] to-fuchsia-500 text-white text-sm font-bold shadow-[0_0_20px_rgba(168,85,247,0.30)] hover:shadow-[0_0_30px_rgba(168,85,247,0.50)] hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">add</span>
+                API 키 등록
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -172,7 +250,7 @@ function AddProviderModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  provider: string | null;
+  provider: ProviderKey | null;
   onSuccessMessage: (message: string) => void;
 }) {
   const [apiKey, setApiKey] = useState('');
@@ -199,7 +277,7 @@ function AddProviderModal({
       setUpdateError(null);
       setApiKey('');
       onSuccessMessage('검증이 시작되었습니다. 잠시 후 상태가 갱신됩니다.');
-      handleClose();
+      onClose();
     },
     onError: (error) => {
       setUpdateError(resolveCredentialError(error, 'API 키 검증에 실패했습니다.'));
@@ -208,7 +286,7 @@ function AddProviderModal({
 
   if (!isOpen || !provider) return null;
 
-  const info = providerInfo[provider];
+  const info = providerInfo[provider] ?? { label: provider, subtitle: '', accentText: 'text-white', iconNode: null };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -216,23 +294,23 @@ function AddProviderModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+      <div className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-[color:rgba(19,17,28,0.65)] backdrop-blur-xl shadow-xl overflow-hidden">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
-            <Shield size={24} />
+          <div className="w-12 h-12 flex items-center justify-center bg-white/5 text-[var(--primary)] rounded-xl shrink-0 border border-white/10">
+            <span className="material-symbols-outlined text-2xl">vpn_key</span>
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-900">
-              {info?.name} 연결
+            <h3 className="text-lg font-bold text-white">
+              {info.label} 연결
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-400">
               API 키를 안전하게 암호화하여 저장합니다.
             </p>
           </div>
         </div>
 
         <div className="mb-6">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
             API Key
           </label>
           <input
@@ -242,30 +320,30 @@ function AddProviderModal({
               setApiKey(e.target.value);
               if (updateError) setUpdateError(null);
             }}
-            placeholder={`sk-... (${info?.name} API Key)`}
-            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono"
+            placeholder={`sk-... (${info.label} API Key)`}
+            className="w-full px-4 py-3 text-sm text-white bg-black/30 border border-white/10 rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-gray-600"
             autoFocus
           />
           <p className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
-            <Shield size={12} />
+            <span className="material-symbols-outlined text-sm">lock</span>
             키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
           {updateError && (
-            <p className="mt-2 text-xs text-rose-600">{updateError}</p>
+            <p className="mt-2 text-xs text-rose-300">{updateError}</p>
           )}
         </div>
 
         <div className="flex gap-3">
           <button
             onClick={handleClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-200 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
           >
             취소
           </button>
           <button
             onClick={() => createMutation.mutate()}
             disabled={!apiKey.trim() || createMutation.isPending}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
+            className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-[var(--primary)] rounded-xl hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50 shadow-[0_0_20px_rgba(168,85,247,0.25)]"
           >
             {createMutation.isPending ? '검증 중...' : '연결 및 검증'}
           </button>
@@ -316,7 +394,13 @@ function UpdateProviderModal({
 
   if (!isOpen || !credential) return null;
 
-  const info = providerInfo[normalizeProviderKey(credential.provider)];
+  const normalizedKey = normalizeProviderKey(credential.provider) as ProviderKey;
+  const info = providerInfo[normalizedKey] ?? {
+    label: credential.provider,
+    subtitle: '',
+    accentText: 'text-white',
+    iconNode: null,
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -324,23 +408,23 @@ function UpdateProviderModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={handleClose}
       />
-      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+      <div className="relative w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-[color:rgba(19,17,28,0.65)] backdrop-blur-xl shadow-xl overflow-hidden">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-12 h-12 flex items-center justify-center bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
-            <Shield size={24} />
+          <div className="w-12 h-12 flex items-center justify-center bg-white/5 text-[var(--primary)] rounded-xl shrink-0 border border-white/10">
+            <span className="material-symbols-outlined text-2xl">vpn_key</span>
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-900">
-              {info?.name} 키 업데이트
+            <h3 className="text-lg font-bold text-white">
+              {info.label} 키 업데이트
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-400">
               기존 키를 새 키로 교체합니다.
             </p>
           </div>
         </div>
 
         <div className="mb-6">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
             새 API Key
           </label>
           <input
@@ -350,30 +434,30 @@ function UpdateProviderModal({
               setApiKey(e.target.value);
               if (updateError) setUpdateError(null);
             }}
-            placeholder={`sk-... (${info?.name} API Key)`}
-            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all font-mono"
+            placeholder={`sk-... (${info.label} API Key)`}
+            className="w-full px-4 py-3 text-sm text-white bg-black/30 border border-white/10 rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-gray-600"
             autoFocus
           />
           <p className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
-            <Shield size={12} />
+            <span className="material-symbols-outlined text-sm">lock</span>
             키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
           {updateError && (
-            <p className="mt-2 text-xs text-rose-600">{updateError}</p>
+            <p className="mt-2 text-xs text-rose-300">{updateError}</p>
           )}
         </div>
 
         <div className="flex gap-3">
           <button
             onClick={handleClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-200 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors"
           >
             취소
           </button>
           <button
             onClick={() => updateMutation.mutate()}
             disabled={!apiKey.trim() || updateMutation.isPending}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 shadow-sm"
+            className="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-[var(--primary)] rounded-xl hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50 shadow-[0_0_20px_rgba(168,85,247,0.25)]"
           >
             {updateMutation.isPending ? '검증 중...' : '업데이트 및 검증'}
           </button>
@@ -384,7 +468,7 @@ function UpdateProviderModal({
 }
 
 export function SettingsProviderKeysPage() {
-   const [addingProvider, setAddingProvider] = useState<string | null>(null);
+   const [addingProvider, setAddingProvider] = useState<ProviderKey | null>(null);
    const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
    const [toastMessage, setToastMessage] = useState<string | null>(null);
    const toastTimerRef = useRef<number | null>(null);
@@ -448,42 +532,62 @@ export function SettingsProviderKeysPage() {
     return acc;
   }, {} as Record<string, ProviderCredentialSummaryResponse>);
 
-  if (!currentOrgId) return <div>조직을 선택해주세요.</div>;
+  if (!currentOrgId) {
+    return (
+      <div className="glass-card rounded-2xl p-6 text-sm text-gray-400 border border-white/10">
+        조직을 선택해주세요.
+      </div>
+    );
+  }
 
   return (
-    <div>
+    <div className="space-y-8">
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg">
+        <div className="fixed top-6 right-6 z-50 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-4 py-3 text-sm font-medium text-emerald-200 shadow-lg backdrop-blur-xl">
           {toastMessage}
         </div>
       )}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
-          Provider 키
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          LLM 제공업체(OpenAI, Anthropic 등)의 API 키를 등록하여 서비스를 연동합니다.
-        </p>
+
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tight">
+            Provider 키
+          </h1>
+          <p className="text-gray-400 max-w-2xl">
+            LLM 제공업체(OpenAI, Anthropic 등)의 API 키를 등록하여 Dynamic Auth 서비스를 연동합니다.
+          </p>
+        </div>
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--primary)]/10 border border-[var(--primary)]/20 text-xs text-purple-200 font-medium">
+          <span className="material-symbols-outlined text-sm">lock</span>
+          AES-256 Encrypted
+        </div>
       </div>
 
-      <div className="p-5 mb-8 flex items-start gap-4 bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl">
-        <div className="p-2 bg-white rounded-lg shadow-sm text-indigo-600">
-          <Terminal size={20} />
+      <div className="glass-card rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-start md:items-center relative overflow-hidden border border-white/10">
+        <div className="absolute -left-10 -top-10 w-40 h-40 bg-[var(--primary)]/20 rounded-full blur-[60px] pointer-events-none" />
+        <div className="relative size-14 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 backdrop-blur-md shadow-inner">
+          <span className="material-symbols-outlined text-[var(--primary)] text-3xl drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
+            key_vertical
+          </span>
         </div>
-        <div>
-          <p className="text-sm font-bold text-indigo-900 mb-1">
-            BYOK (Bring Your Own Key)
-          </p>
-          <p className="text-xs text-indigo-700 leading-relaxed max-w-2xl">
-            LuminaOps는 사용자의 API 키를 중계하는 역할만 수행합니다.
-            모든 요청은 등록된 키를 사용하여 각 LLM 제공자에게 직접 전송되므로,
-            비용과 사용량을 각 제공자 대시보드에서 투명하게 관리할 수 있습니다.
+        <div className="flex-1 z-10">
+          <h3 className="text-lg font-bold text-white mb-1">BYOK (Bring Your Own Key) 정책</h3>
+          <p className="text-sm text-gray-400 leading-relaxed">
+            LuminaOps는 사용자의 API 키를 중계하는 역할만 수행합니다. 모든 키는{' '}
+            <span className="text-purple-200 font-medium">Tenant Isolation</span> 원칙에 따라 암호화되어 각 LLM 제공자에게 직접 전송되며,
+            저장된 키는 누구도 열람할 수 없습니다.
           </p>
         </div>
+        <a
+          className="text-sm font-medium text-[var(--primary)] hover:text-white flex items-center gap-1 transition-colors z-10 whitespace-nowrap"
+          href="#"
+        >
+          보안 백서 보기 <span className="material-symbols-outlined text-base">arrow_forward</span>
+        </a>
       </div>
 
       {isLoading ? (
-        <div className="py-12 text-center text-sm text-gray-500">
+        <div className="py-12 text-center text-sm text-gray-400">
           Provider 목록을 불러오는 중...
         </div>
       ) : (
@@ -507,14 +611,11 @@ export function SettingsProviderKeysPage() {
         </div>
       )}
 
-      <div className="mt-8 pt-8 border-t border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+      <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
           <span>{Object.keys(credentialMap).length}개 연결됨</span>
         </div>
-        <a href="#" className="hidden text-xs text-indigo-600 hover:underline flex items-center gap-1">
-          지원하는 모델 목록 보기 <ExternalLink size={10} />
-        </a>
       </div>
 
       <AddProviderModal

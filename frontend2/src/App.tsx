@@ -8,16 +8,19 @@ import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { OrganizationDashboardPage } from '@/pages/dashboard/OrganizationDashboardPage';
-import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
-import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
-import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
-import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
-import { DocumentListPage } from '@/pages/document/DocumentListPage';
-import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
+	import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
+	import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
+	import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
+	import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
+	import { DocumentListPage } from '@/pages/document/DocumentListPage';
+	import { WorkspaceLogsPage } from '@/pages/logs/WorkspaceLogsPage';
+	import { WorkspaceLogDetailPage } from '@/pages/logs/WorkspaceLogDetailPage';
+	import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
 import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
 import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
 import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
 import { SettingsProviderKeysPage } from '@/pages/settings/SettingsProviderKeysPage';
+import { OrganizationSecurityPage } from '@/pages/settings/OrganizationSecurityPage';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
@@ -109,12 +112,15 @@ function App() {
             <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
               <Route path="dashboard" element={<OrganizationDashboardPage />} />
               <Route path="workspaces/:workspaceId" element={<WorkspaceDashboardPage />} />
-              <Route path="workspaces/:workspaceId/prompts" element={<PromptEntryPage />} />
-              <Route path="workspaces/:workspaceId/prompts/new" element={<PromptCreatePage />} />
-              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<PromptDetailPage />} />
-              <Route path="workspaces/:workspaceId/documents" element={<DocumentListPage />} />
+	              <Route path="workspaces/:workspaceId/prompts" element={<PromptEntryPage />} />
+	              <Route path="workspaces/:workspaceId/prompts/new" element={<PromptCreatePage />} />
+	              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<PromptDetailPage />} />
+	              <Route path="workspaces/:workspaceId/documents" element={<DocumentListPage />} />
+	              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceLogsPage />} />
+	              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceLogDetailPage />} />
 
               {/* Settings Routes (Integrated) */}
+              <Route path="settings/security" element={<OrganizationSecurityPage />} />
               <Route path="settings/members" element={<SettingsMembersPage />} />
               <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
               <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />

@@ -45,8 +45,8 @@ rag:
   embedding:
     openai:
       enabled: false
-      api-key:
-      base-url:
+      api-key: ${RAG_EMBEDDING_OPENAI_API_KEY:}
+      base-url: ${RAG_EMBEDDING_OPENAI_BASE_URL:}
       model: text-embedding-3-small
       dimensions: 1536
     google-genai:
