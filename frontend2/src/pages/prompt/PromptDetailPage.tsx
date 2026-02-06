@@ -456,6 +456,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
     const isResolvedOrgId = typeof resolvedOrgId === 'number' && !Number.isNaN(resolvedOrgId);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [detailVersionId, setDetailVersionId] = useState<number | null>(null);
+    const [isDetailCopied, setIsDetailCopied] = useState(false);
     const [baseVersionId, setBaseVersionId] = useState<number | null>(null);
     const [form, setForm] = useState({
         title: '',
@@ -645,6 +646,10 @@ function VersionsTab({ promptId }: { promptId: number }) {
     });
 
     useEffect(() => {
+        setIsDetailCopied(false);
+    }, [detailVersionId]);
+
+    useEffect(() => {
         if (isCreateOpen) {
             if (!baseVersionId && versions && versions.length > 0) {
                 setBaseVersionId(versions[0].id);
@@ -790,7 +795,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                     className="bg-[var(--primary)] hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center gap-2"
                 >
                     <span className="material-symbols-outlined text-lg">add</span>
-                    새 버전 생성
+                    + 새 버전 생성
                 </button>
             </div>
 
@@ -880,14 +885,65 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setIsCreateOpen(false)}
                     />
-                    <div className="relative w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-xl border border-white/10 text-gray-100 max-h-[90vh] overflow-y-auto">
-                        <div className="p-6 border-b border-white/10">
-                            <h4 className="text-lg font-semibold text-white">새 버전 생성</h4>
-                            <p className="text-sm text-gray-400 mt-1">
-                                버전은 테스트/개발용 시나리오를 관리하고, 릴리즈 탭에서 배포 버전을 선택합니다.
-                            </p>
+                    <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden border border-[var(--primary)]/30 shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(168,85,247,0.15),0_25px_50px_-12px_rgba(0,0,0,0.80)] bg-[radial-gradient(140%_140%_at_50%_0%,rgba(22,25,35,0.95)_0%,rgba(10,10,12,0.98)_100%)] backdrop-blur-2xl">
+                        <div className="px-8 py-6 border-b border-white/5 flex flex-col gap-2 shrink-0 bg-white/[0.02]">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h4 className="text-xl font-semibold text-white tracking-tight flex items-center gap-2">
+                                        <span className="w-1.5 h-6 rounded-full bg-[var(--primary)] shadow-[0_0_10px_rgba(168,85,247,0.50)]" />
+                                        새 버전 생성
+                                    </h4>
+                                    <p className="text-sm text-gray-400 font-light mt-1 pl-3.5">
+                                        버전은 테스트/개발용 시나리오를 관리하고, 릴리즈 탭에서 배포 버전을 선택합니다.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreateOpen(false)}
+                                    className="text-gray-400 hover:text-white transition-colors"
+                                    aria-label="close create version modal"
+                                    title="닫기"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+
+                            <div className="flex gap-3 mt-3 pl-3.5 flex-wrap">
+                                {filteredPresets.map((preset) => {
+                                    const icon = preset.label.toLowerCase().includes('rag')
+                                        ? 'database'
+                                        : preset.label.toLowerCase().includes('cs')
+                                            ? 'smart_toy'
+                                            : 'smart_toy';
+                                    return (
+                                        <button
+                                            key={preset.label}
+                                            type="button"
+                                            onClick={() => {
+                                                setForm({
+                                                    ...form,
+                                                    ...preset.data,
+                                                });
+                                                setConfigError(null);
+                                            }}
+                                            className="px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900/50 hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/10 text-xs text-gray-300 transition-all duration-300 flex items-center gap-1.5 group"
+                                        >
+                                            <span className="material-symbols-outlined text-[14px] text-gray-400 group-hover:text-purple-300 transition-colors">
+                                                {icon}
+                                            </span>
+                                            예시 적용: {preset.label}
+                                        </button>
+                                    );
+                                })}
+                                {!filteredPresets.length && (
+                                    <span className="text-xs text-gray-400">
+                                        등록된 Provider 기준으로 사용할 수 있는 예시가 없습니다.
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                        <div className="p-6 space-y-4">
+
+                        <div className="px-8 py-6 overflow-y-auto flex-1 space-y-6">
                             {!isCredsLoading && availableProviders.length === 0 && (
                                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
                                     등록된 Provider 키가 없습니다. 먼저 Provider 키를 등록해주세요.
@@ -901,37 +957,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </div>
                                 </div>
                             )}
-                            <div className="flex flex-wrap gap-2">
-                                {filteredPresets.map((preset) => (
-                                    <button
-                                        key={preset.label}
-                                        type="button"
-                                        onClick={() => {
-                                            setForm({
-                                                ...form,
-                                                ...preset.data,
-                                            });
-                                            setConfigError(null);
-                                        }}
-                                        className="px-3 py-1.5 text-xs font-medium text-gray-200 bg-white/5 hover:bg-white/10 rounded-full transition-colors border border-white/10"
-                                    >
-                                        예시 적용: {preset.label}
-                                    </button>
-                                ))}
-                                {!filteredPresets.length && (
-                                    <span className="text-xs text-gray-400">
-                                        등록된 Provider 기준으로 사용할 수 있는 예시가 없습니다.
-                                    </span>
-                                )}
-                            </div>
-                            <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                            <div className="bg-gray-900/60 border border-gray-800/80 rounded-xl p-5 backdrop-blur-sm">
                                 <div className="flex flex-col sm:flex-row items-end gap-3">
                                     <div className="flex-1">
-                                        <label className="block text-sm font-medium text-gray-200 mb-1">기존 버전 불러오기</label>
+                                        <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">기존 버전 불러오기</label>
                                         <select
                                             value={baseVersionId ?? ''}
                                             onChange={(e) => setBaseVersionId(Number(e.target.value) || null)}
-                                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
+                                            className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                             disabled={!versions?.length}
                                         >
                                             <option value="">
@@ -948,64 +981,75 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         type="button"
                                         onClick={() => applyBaseVersion(baseVersionDetail ?? null)}
                                         disabled={!baseVersionDetail || isBaseVersionLoading}
-                                        className="px-4 py-2 text-sm font-medium text-[var(--primary)] border border-[var(--primary)]/30 bg-white/5 rounded-lg hover:bg-white/10 transition-colors disabled:opacity-50"
+                                        className="px-4 py-2 bg-gray-800/80 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 rounded-md text-xs font-medium text-gray-300 transition-colors shrink-0 shadow-lg disabled:opacity-50"
                                     >
                                         {isBaseVersionLoading ? '불러오는 중...' : '내용 불러오기'}
                                     </button>
                                 </div>
-                                <p className="mt-2 text-xs text-gray-400">
+                                <p className="text-[11px] text-gray-500 mt-2 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">info</span>
                                     이전 버전의 설정을 가져와 빠르게 수정할 수 있습니다.
                                 </p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-200 mb-1">제목</label>
+                                <label className="block text-sm font-medium text-gray-300">제목</label>
                                 <input
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
+                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm text-gray-100 placeholder-gray-600 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder="예: 2026-02-01 실험용"
                                 />
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-200 mb-1">Provider</label>
-                                    <select
-                                        id="prompt-provider"
-                                        value={form.provider}
-                                        onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
-                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
-                                        disabled={availableProviders.length === 0}
-                                    >
-                                        {availableProviders.length === 0 && (
-                                            <option value="">등록된 Provider 없음</option>
-                                        )}
-                                        {availableProviders.map((provider) => (
-                                            <option key={provider} value={provider}>
-                                                {providerLabel[provider] || provider}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-300 mb-1">Provider</label>
+                                    <div className="relative group">
+                                        <select
+                                            id="prompt-provider"
+                                            value={form.provider}
+                                            onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
+                                            className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm appearance-none pr-10 cursor-pointer text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all disabled:opacity-50"
+                                            disabled={availableProviders.length === 0}
+                                        >
+                                            {availableProviders.length === 0 && (
+                                                <option value="">등록된 Provider 없음</option>
+                                            )}
+                                            {availableProviders.map((provider) => (
+                                                <option key={provider} value={provider}>
+                                                    {providerLabel[provider] || provider}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 group-hover:text-purple-300 transition-colors">
+                                            <span className="material-symbols-outlined text-sm">dns</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-200 mb-1">Model</label>
-                                    <select
-                                        id="prompt-model"
-                                        value={form.model}
-                                        onChange={(e) => setForm({ ...form, model: e.target.value })}
-                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
-                                        disabled={isAllowlistLoading || isAllowlistError || providerModels.length === 0}
-                                    >
-                                        {isAllowlistLoading && <option value="">모델 목록 불러오는 중...</option>}
-                                        {!isAllowlistLoading && providerModels.length === 0 && (
-                                            <option value="">사용 가능한 모델 없음</option>
-                                        )}
-                                        {providerModels.map((model) => (
-                                            <option key={model} value={model}>
-                                                {model}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-300 mb-1">Model</label>
+                                    <div className="relative group">
+                                        <select
+                                            id="prompt-model"
+                                            value={form.model}
+                                            onChange={(e) => setForm({ ...form, model: e.target.value })}
+                                            className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm appearance-none pr-10 cursor-pointer text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all disabled:opacity-50"
+                                            disabled={isAllowlistLoading || isAllowlistError || providerModels.length === 0}
+                                        >
+                                            {isAllowlistLoading && <option value="">모델 목록 불러오는 중...</option>}
+                                            {!isAllowlistLoading && providerModels.length === 0 && (
+                                                <option value="">사용 가능한 모델 없음</option>
+                                            )}
+                                            {providerModels.map((model) => (
+                                                <option key={model} value={model}>
+                                                    {model}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500 group-hover:text-purple-300 transition-colors">
+                                            <span className="material-symbols-outlined text-sm">neurology</span>
+                                        </div>
+                                    </div>
                                     {isAllowlistError && (
                                         <p className="mt-1 text-xs text-rose-300">모델 목록을 불러오지 못했습니다.</p>
                                     )}
@@ -1013,98 +1057,138 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="secondary-provider" className="block text-sm font-medium text-gray-200 mb-1">예비 Provider (선택)</label>
-                                    <select
-                                        id="secondary-provider"
-                                        value={form.secondaryProvider}
-                                        onChange={(e) =>
-                                            setForm({
-                                                ...form,
-                                                secondaryProvider: e.target.value as ProviderType | '',
-                                                secondaryModel: '',
-                                            })}
-                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
-                                        disabled={availableProviders.length === 0}
-                                    >
-                                        <option value="">예비 모델 없음</option>
-                                        {availableProviders.map((provider) => (
-                                            <option key={provider} value={provider}>
-                                                {providerLabel[provider] || provider}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <label htmlFor="secondary-provider" className="block text-sm font-medium text-gray-400">
+                                        예비 Provider <span className="text-gray-600 text-xs font-normal">(선택)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            id="secondary-provider"
+                                            value={form.secondaryProvider}
+                                            onChange={(e) =>
+                                                setForm({
+                                                    ...form,
+                                                    secondaryProvider: e.target.value as ProviderType | '',
+                                                    secondaryModel: '',
+                                                })}
+                                            className="w-full rounded-md py-2.5 px-3 text-sm text-gray-300 appearance-none pr-10 border border-gray-800 bg-gray-900/30 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all disabled:opacity-50 cursor-pointer"
+                                            disabled={availableProviders.length === 0}
+                                        >
+                                            <option value="">예비 모델 없음</option>
+                                            {availableProviders.map((provider) => (
+                                                <option key={provider} value={provider}>
+                                                    {providerLabel[provider] || provider}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-600">
+                                            <span className="material-symbols-outlined text-sm">expand_more</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="secondary-model" className="block text-sm font-medium text-gray-200 mb-1">예비 Model (선택)</label>
-                                    <select
-                                        id="secondary-model"
-                                        value={form.secondaryModel}
-                                        onChange={(e) => setForm({ ...form, secondaryModel: e.target.value })}
-                                        className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none"
-                                        disabled={!form.secondaryProvider || isAllowlistLoading || isAllowlistError || secondaryProviderModels.length === 0}
-                                    >
-                                        {!form.secondaryProvider && <option value="">예비 Provider를 먼저 선택하세요</option>}
-                                        {form.secondaryProvider && isAllowlistLoading && (
-                                            <option value="">모델 목록 불러오는 중...</option>
-                                        )}
-                                        {form.secondaryProvider && !isAllowlistLoading && secondaryProviderModels.length === 0 && (
-                                            <option value="">사용 가능한 모델 없음</option>
-                                        )}
-                                        {secondaryProviderModels.map((model) => (
-                                            <option key={model} value={model}>
-                                                {model}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <label htmlFor="secondary-model" className="block text-sm font-medium text-gray-400">
+                                        예비 Model <span className="text-gray-600 text-xs font-normal">(선택)</span>
+                                    </label>
+                                    <div className="relative">
+                                        <select
+                                            id="secondary-model"
+                                            value={form.secondaryModel}
+                                            onChange={(e) => setForm({ ...form, secondaryModel: e.target.value })}
+                                            className="w-full rounded-md py-2.5 px-3 text-sm text-gray-300 appearance-none pr-10 border border-gray-800 bg-gray-900/30 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all disabled:opacity-50 cursor-pointer"
+                                            disabled={!form.secondaryProvider || isAllowlistLoading || isAllowlistError || secondaryProviderModels.length === 0}
+                                        >
+                                            {!form.secondaryProvider && <option value="">예비 Provider를 먼저 선택하세요</option>}
+                                            {form.secondaryProvider && isAllowlistLoading && (
+                                                <option value="">모델 목록 불러오는 중...</option>
+                                            )}
+                                            {form.secondaryProvider && !isAllowlistLoading && secondaryProviderModels.length === 0 && (
+                                                <option value="">사용 가능한 모델 없음</option>
+                                            )}
+                                            {secondaryProviderModels.map((model) => (
+                                                <option key={model} value={model}>
+                                                    {model}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-600">
+                                            <span className="material-symbols-outlined text-sm">expand_more</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-200 mb-1">System Prompt</label>
-                                <textarea
-                                    value={form.systemPrompt}
-                                    onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none resize-none"
-                                    placeholder="시스템 프롬프트를 입력하세요."
-                                />
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-sm text-purple-300">terminal</span>
+                                    System Prompt
+                                </label>
+                                <div className="relative">
+                                    <textarea
+                                        value={form.systemPrompt}
+                                        onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
+                                        rows={5}
+                                        className="w-full rounded-md py-3 px-4 text-sm text-gray-300 placeholder-gray-600 resize-none shadow-inner font-mono bg-[#050507] border border-[#1f2937] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                        placeholder="// 시스템 프롬프트를 입력하세요."
+                                    />
+                                    <div className="absolute bottom-2 right-3 text-[10px] text-gray-600 font-mono">markdown supported</div>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-200 mb-1">User Template (필수)</label>
+
+                            <div className="space-y-2">
+                                <label className="block text-sm font-medium text-gray-300 flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-sm text-purple-300">code</span>
+                                        User Template <span className="text-purple-300 text-xs ml-1">(필수)</span>
+                                    </span>
+                                </label>
                                 <textarea
                                     value={form.userTemplate}
                                     onChange={(e) => {
                                         setForm({ ...form, userTemplate: e.target.value });
                                         setTemplateError(null);
                                     }}
-                                    rows={4}
-                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none resize-none"
+                                    rows={5}
+                                    className="w-full rounded-md py-3 px-4 text-sm text-gray-300 placeholder-gray-600 resize-none font-mono bg-[#050507] border border-[var(--primary)]/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder="예: 사용자 질문: {{question}}"
                                 />
-                                <p className="mt-1 text-xs text-gray-400">{'{{question}}'} 변수가 반드시 포함되어야 합니다.</p>
+                                <p className="text-[11px] text-gray-400 flex items-center gap-1.5 pl-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_5px_rgba(168,85,247,0.8)]"></span>
+                                    <code className="bg-gray-800 px-1 py-0.5 rounded text-purple-200 font-mono text-[10px]">{'{{question}}'}</code>
+                                    변수가 반드시 포함되어야 합니다.
+                                </p>
                                 {templateError && (
                                     <p className="mt-1 text-xs text-rose-300">{templateError}</p>
                                 )}
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-200 mb-1">관련 링크 (선택)</label>
-                                <input
-                                    value={form.contextUrl}
-                                    onChange={(e) => setForm({ ...form, contextUrl: e.target.value })}
-                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none text-sm"
-                                    placeholder="Jira/Notion 링크를 입력하세요"
-                                />
-                                <p className="mt-1 text-xs text-gray-400">변경 근거를 남겨두면 추적이 쉬워집니다.</p>
+
+                            <div className="h-px bg-white/5 my-2"></div>
+
+                            <div className="space-y-1.5">
+                                <label className="block text-sm font-medium text-gray-300">
+                                    관련 링크 <span className="text-gray-500 text-xs font-normal">(선택)</span>
+                                </label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 material-symbols-outlined text-gray-600 text-sm">link</span>
+                                    <input
+                                        value={form.contextUrl}
+                                        onChange={(e) => setForm({ ...form, contextUrl: e.target.value })}
+                                        className="w-full rounded-md py-2.5 pl-9 pr-3 text-sm placeholder-gray-600 bg-[#0c0c0e] border border-[#27272a] text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                        placeholder="Jira/Notion 링크를 입력하세요"
+                                        type="text"
+                                    />
+                                </div>
+                                <p className="text-[11px] text-gray-500 pl-1">변경 근거를 남겨두면 추적이 쉬워집니다.</p>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-200 mb-1">Model Config (JSON)</label>
+
+                            <div className="space-y-1.5">
+                                <label className="block text-sm font-medium text-gray-300 font-mono text-xs">Model Config (JSON)</label>
                                 <textarea
                                     value={form.modelConfig}
                                     onChange={(e) => setForm({ ...form, modelConfig: e.target.value })}
-                                    rows={3}
-                                    className="w-full px-4 py-2 border border-white/10 rounded-lg bg-black/30 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] outline-none font-mono text-xs resize-none"
-                                    placeholder='예: {"temperature":0.2,"topP":0.9}'
+                                    rows={2}
+                                    className="w-full rounded-md py-3 px-4 text-xs text-gray-300 placeholder-gray-600 resize-none font-mono bg-[#050507] border border-[#1f2937] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                    placeholder='예: {"temperature":0.2, "topP":0.9}'
                                 />
-                                <p className="mt-1 text-xs text-gray-400">JSON 형식으로 입력하세요. 비워두면 기본값이 사용됩니다.</p>
+                                <p className="text-[11px] text-gray-500 pl-1">JSON 형식으로 입력하세요. 비워두면 기본값이 사용됩니다.</p>
                                 {configError && (
                                     <p className="mt-1 text-xs text-rose-300">{configError}</p>
                                 )}
@@ -1113,14 +1197,16 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 )}
                             </div>
                         </div>
-                        <div className="p-6 border-t border-white/10 flex justify-end gap-3">
+                        <div className="px-8 py-5 border-t border-white/5 bg-[#0a0a0c]/80 flex justify-end gap-3 shrink-0 backdrop-blur-md">
                             <button
+                                type="button"
                                 onClick={() => setIsCreateOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-200 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+                                className="px-6 py-2.5 rounded-lg border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white hover:border-white/20 transition-all duration-200"
                             >
                                 취소
                             </button>
                             <button
+                                type="button"
                                 onClick={() => createMutation.mutate()}
                                 disabled={Boolean(
                                     !form.model.trim() ||
@@ -1133,8 +1219,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     (!!form.secondaryProvider && !form.secondaryModel.trim()) ||
                                     (form.secondaryProvider && secondaryProviderModels.length === 0)
                                 )}
-                                className="px-4 py-2 text-sm font-semibold text-white bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-hover)] transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-white/10"
+                                className="px-6 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm font-medium text-white transition-all duration-300 border border-purple-500 flex items-center gap-2 disabled:opacity-50 shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:shadow-[0_0_30px_rgba(139,92,246,0.6)]"
                             >
+                                <span className="material-symbols-outlined text-sm">rocket_launch</span>
                                 {createMutation.isPending ? '생성 중...' : '버전 생성'}
                             </button>
                         </div>
@@ -1148,92 +1235,190 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                         onClick={() => setDetailVersionId(null)}
                     />
-                    <div className="relative w-full max-w-3xl mx-4 glass-card rounded-2xl shadow-xl border border-white/10 text-gray-100">
-                        <div className="p-6 border-b border-white/10 flex items-start justify-between">
+                    <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col glass-card rounded-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.50),0_0_0_1px_rgba(255,255,255,0.10)_inset] overflow-hidden border border-white/10">
+                        <div className="px-8 py-5 border-b border-white/5 flex items-start justify-between bg-white/[0.01]">
                             <div>
-                                <h4 className="text-lg font-semibold text-white">버전 상세</h4>
-                                <p className="text-sm text-gray-400 mt-1">버전의 설정과 템플릿을 확인합니다.</p>
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[var(--primary)] text-2xl">settings_suggest</span>
+                                        버전 상세
+                                    </h4>
+                                    {currentRelease?.activeVersionId && detailVersionId === currentRelease.activeVersionId ? (
+                                        <span className="px-2 py-0.5 rounded-full bg-[var(--primary)]/10 border border-[var(--primary)]/20 text-[10px] font-mono text-[var(--primary)] font-semibold tracking-wider uppercase">
+                                            Active
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <p className="text-sm text-gray-400 mt-1 pl-9">버전의 설정과 템플릿을 확인하고 관리합니다.</p>
                             </div>
                             <button
+                                type="button"
                                 onClick={() => setDetailVersionId(null)}
-                                className="text-gray-400 hover:text-white"
+                                className="group text-gray-500 hover:text-white transition-all p-2 rounded-full hover:bg-white/5 border border-transparent hover:border-white/10"
+                                aria-label="close version detail modal"
+                                title="닫기"
                             >
-                                ✕
+                                <span className="material-symbols-outlined text-xl group-hover:rotate-90 transition-transform duration-300">close</span>
                             </button>
                         </div>
-                        <div className="p-6 space-y-4">
+
+                        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gradient-to-b from-transparent to-black/20">
                             {isDetailLoading || !versionDetail ? (
                                 <div className="text-sm text-gray-400">버전 정보를 불러오는 중...</div>
                             ) : (
                                 <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div>
-                                            <div className="text-xs text-gray-400">Version</div>
-                                            <div className="text-sm font-semibold text-white">v{versionDetail.versionNumber}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400">Provider / Model</div>
-                                            <div className="text-sm font-semibold text-white">
-                                                {versionDetail.provider} / {versionDetail.model}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Version ID</div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-lg font-bold text-white tracking-tight">v{versionDetail.versionNumber}</span>
+                                                <span
+                                                    className="material-symbols-outlined text-green-500 text-sm"
+                                                    style={{ fontVariationSettings: "'FILL' 1" }}
+                                                >
+                                                    check_circle
+                                                </span>
                                             </div>
                                         </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400">Secondary Provider / Model</div>
-                                            <div className="text-sm font-semibold text-white">
-                                                {versionDetail.secondaryProvider && versionDetail.secondaryModel
-                                                    ? `${versionDetail.secondaryProvider} / ${versionDetail.secondaryModel}`
-                                                    : '-'}
+
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Primary Model</div>
+                                            <div className="flex items-center text-sm font-medium text-white">
+                                                <span className="px-2 py-1 rounded bg-purple-500/10 text-[10px] font-bold text-purple-300 mr-2 border border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.10)]">
+                                                    {versionDetail.provider}
+                                                </span>
+                                                <span className="font-mono text-gray-200">{versionDetail.model}</span>
                                             </div>
                                         </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400">Title</div>
-                                            <div className="text-sm text-gray-100">{versionDetail.title || '-'}</div>
+
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</div>
+                                            <div className="text-sm font-medium text-gray-200 truncate">{versionDetail.title || '-'}</div>
                                         </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400">Created At</div>
-                                            <div className="text-sm text-gray-100">{new Date(versionDetail.createdAt).toLocaleString()}</div>
+
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Created At</div>
+                                            <div className="font-mono text-sm text-gray-400">{formatKoDateTime(versionDetail.createdAt)}</div>
+                                        </div>
+
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Fallback Model</div>
+                                            <div className="flex items-center text-sm font-medium text-white">
+                                                {versionDetail.secondaryProvider && versionDetail.secondaryModel ? (
+                                                    <>
+                                                        <span className="px-2 py-1 rounded bg-emerald-500/10 text-[10px] font-bold text-emerald-300 mr-2 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.10)]">
+                                                            {versionDetail.secondaryProvider}
+                                                        </span>
+                                                        <span className="font-mono text-gray-200">{versionDetail.secondaryModel}</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-gray-500">-</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5 opacity-60">
+                                            <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Tokens</div>
+                                            <div className="font-mono text-sm text-gray-500">
+                                                {(() => {
+                                                    const raw = `${versionDetail.systemPrompt || ''}\n${versionDetail.userTemplate || ''}\n${JSON.stringify(versionDetail.modelConfig || {})}`;
+                                                    const est = Math.max(1, Math.ceil(raw.length / 4));
+                                                    return `~${est.toLocaleString('ko-KR')} est.`;
+                                                })()}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="text-xs text-gray-400 mb-2">System Prompt</div>
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-200 bg-black/40 border border-white/10 rounded-lg p-3">
-                                            {versionDetail.systemPrompt || '-'}
-                                        </pre>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-gray-400 mb-2">User Template</div>
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-200 bg-black/40 border border-white/10 rounded-lg p-3">
-                                            {versionDetail.userTemplate || '-'}
-                                        </pre>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-gray-400 mb-2">Model Config</div>
-                                        <pre className="whitespace-pre-wrap text-xs text-gray-200 bg-black/40 border border-white/10 rounded-lg p-3">
-                                            {versionDetail.modelConfig ? JSON.stringify(versionDetail.modelConfig, null, 2) : '-'}
-                                        </pre>
-                                    </div>
-                                    <div>
-                                        <div className="text-xs text-gray-500 mb-2">관련 링크</div>
-                                        {versionDetail.contextUrl ? (
-                                            <a
-                                                href={versionDetail.contextUrl}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="text-sm text-[var(--primary)] hover:text-white break-all"
+
+                                    <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent w-full"></div>
+
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center">
+                                                <span className="material-symbols-outlined text-sm mr-2 text-[var(--primary)]">terminal</span>
+                                                System Prompt
+                                            </label>
+                                            <span className="text-[10px] text-gray-600 font-mono bg-white/5 px-2 py-0.5 rounded border border-white/5">READ ONLY</span>
+                                        </div>
+
+                                        <div className="relative group">
+                                            <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--primary)]/30 to-blue-600/30 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+                                            <div className="relative w-full rounded-xl p-0 font-mono text-sm leading-relaxed text-gray-300 h-80 overflow-hidden flex flex-col bg-black/30 border border-white/10 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                                                <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                                                    <div className="flex space-x-1.5">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50"></div>
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50"></div>
+                                                    </div>
+                                                    <span className="text-[10px] text-gray-500 font-sans">prompt_v{versionDetail.versionNumber}.txt</span>
+                                                </div>
+                                                <div className="overflow-y-auto p-5 h-full">
+                                                    <pre className="whitespace-pre-wrap">{versionDetail.systemPrompt || '(empty)'}</pre>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        await navigator.clipboard.writeText(versionDetail.systemPrompt || '');
+                                                        setIsDetailCopied(true);
+                                                        window.setTimeout(() => setIsDetailCopied(false), 1200);
+                                                    } catch {
+                                                        // ignore
+                                                    }
+                                                }}
+                                                className="absolute top-12 right-4 p-2 rounded-lg bg-white/5 hover:bg-[var(--primary)]/20 text-gray-400 hover:text-white border border-white/5 hover:border-[var(--primary)]/30 opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-md"
+                                                aria-label="copy system prompt"
+                                                title="copy"
                                             >
-                                                {versionDetail.contextUrl}
-                                            </a>
-                                        ) : (
-                                            <div className="text-sm text-gray-400">-</div>
-                                        )}
+                                                <span className="material-symbols-outlined text-sm">
+                                                    {isDetailCopied ? 'check' : 'content_copy'}
+                                                </span>
+                                            </button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">User Template</label>
+                                                <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl p-4 font-mono text-sm text-purple-200 shadow-inner min-h-[72px] whitespace-pre-wrap">
+                                                    {versionDetail.userTemplate || '(empty)'}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Model Config</label>
+                                                <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl p-4 font-mono text-xs text-gray-400 shadow-inner min-h-[72px] whitespace-pre-wrap">
+                                                    {versionDetail.modelConfig && Object.keys(versionDetail.modelConfig).length
+                                                        ? JSON.stringify(versionDetail.modelConfig, null, 2)
+                                                        : 'No overrides configured'}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-2">
+                                            <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">관련 링크</div>
+                                            {versionDetail.contextUrl ? (
+                                                <a
+                                                    href={versionDetail.contextUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-sm text-[var(--primary)] hover:underline break-all"
+                                                >
+                                                    {versionDetail.contextUrl}
+                                                </a>
+                                            ) : (
+                                                <div className="text-sm text-gray-400">-</div>
+                                            )}
+                                        </div>
                                     </div>
                                 </>
                             )}
                         </div>
-                        <div className="p-6 border-t border-white/10 flex justify-end">
+
+                        <div className="px-8 py-5 border-t border-white/5 bg-[#0a0a0c]/50 flex justify-end items-center shrink-0 backdrop-blur-md">
                             <button
+                                type="button"
                                 onClick={() => setDetailVersionId(null)}
-                                className="px-4 py-2 text-sm font-medium text-gray-200 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
+                                className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 shadow-lg"
                             >
                                 닫기
                             </button>
