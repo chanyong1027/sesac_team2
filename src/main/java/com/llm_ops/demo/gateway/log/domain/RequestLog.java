@@ -193,6 +193,17 @@ public class RequestLog {
         this.failReason = failReason;
     }
 
+    public void fillPromptInfo(Long promptId, Long promptVersionId) {
+        // start 시점에는 prompt_id/version_id를 모르는 경우가 있어, 성공/실패 업데이트 시 채웁니다.
+        // 이미 값이 존재하면(예: 추후 확장으로 start에서 세팅) 덮어쓰지 않습니다.
+        if (this.promptId == null && promptId != null) {
+            this.promptId = promptId;
+        }
+        if (this.promptVersionId == null && promptVersionId != null) {
+            this.promptVersionId = promptVersionId;
+        }
+    }
+
     public void fillModelUsage(String provider, String requestedModel, String usedModel, boolean isFailover,
             Integer inputTokens, Integer outputTokens, Integer totalTokens, BigDecimal estimatedCost,
             String pricingVersion) {

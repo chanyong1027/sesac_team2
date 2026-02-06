@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 /**
  * RequestLogWriter 통합 테스트.
- * 
+ *
  * @Async + REQUIRES_NEW 트랜잭션 테스트를 위해 @Transactional 없이 실행.
  */
 @SpringBootTest
@@ -49,6 +49,8 @@ class RequestLogWriterTest {
                 requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                                 200,
                                 123,
+                                101L,
+                                201L,
                                 "openai",
                                 "gpt-4o-mini",
                                 "gpt-4o-mini",
@@ -78,6 +80,8 @@ class RequestLogWriterTest {
                 assertThat(saved.getFinishedAt()).isNotNull();
                 assertThat(saved.getApiKeyId()).isEqualTo(30L);
                 assertThat(saved.getApiKeyPrefix()).isEqualTo("prefix-123");
+                assertThat(saved.getPromptId()).isEqualTo(101L);
+                assertThat(saved.getPromptVersionId()).isEqualTo(201L);
                 assertThat(saved.getRagLatencyMs()).isEqualTo(50);
                 assertThat(saved.getRagChunksCount()).isEqualTo(2);
                 assertThat(saved.getRagContextChars()).isEqualTo(1234);
@@ -105,6 +109,8 @@ class RequestLogWriterTest {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                                 502,
                                 999,
+                                102L,
+                                202L,
                                 "openai",
                                 "gpt-4o-mini",
                                 "gpt-4o-mini",
@@ -136,6 +142,8 @@ class RequestLogWriterTest {
                 assertThat(saved.getFinishedAt()).isNotNull();
                 assertThat(saved.getApiKeyId()).isEqualTo(30L);
                 assertThat(saved.getApiKeyPrefix()).isEqualTo("prefix-err");
+                assertThat(saved.getPromptId()).isEqualTo(102L);
+                assertThat(saved.getPromptVersionId()).isEqualTo(202L);
                 assertThat(saved.getRagLatencyMs()).isEqualTo(77);
                 assertThat(saved.getRagChunksCount()).isEqualTo(0);
                 assertThat(saved.getRagContextChars()).isEqualTo(0);
@@ -143,3 +151,4 @@ class RequestLogWriterTest {
                 assertThat(saved.getRagContextHash()).isNull();
         }
 }
+
