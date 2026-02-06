@@ -6,12 +6,15 @@ import { documentApi } from '@/api/document.api';
 import { ragApi } from '@/api/rag.api';
 import {
   AlertCircle,
+  Brain,
   CheckCircle2,
+  Database,
   Eye,
   File,
   FileText,
   Loader2,
   Search,
+  Scissors,
   SlidersHorizontal,
   Trash2,
   Upload,
@@ -38,6 +41,11 @@ export function DocumentListPage() {
   const [previewQuery, setPreviewQuery] = useState('');
   const [previewResults, setPreviewResults] = useState<ChunkDetailResponse[]>([]);
   const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const [settingsForm, setSettingsForm] = useState<WorkspaceRagSettingsUpdateRequest>({
     topK: 5,
@@ -130,11 +138,14 @@ export function DocumentListPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents', workspaceId] });
+      setIsUploadOpen(false);
+      setUploadFile(null);
+      setUploadError(null);
       alert('문서 업로드가 시작되었습니다.');
     },
     onError: (error) => {
       console.error('Upload failed:', error);
-      alert('문서 업로드에 실패했습니다.');
+      setUploadError('문서 업로드에 실패했습니다.');
     },
   });
 
@@ -187,12 +198,38 @@ export function DocumentListPage() {
     },
   });
 
+  const MAX_UPLOAD_MB = 50;
+
+  const validateAndSetUploadFile = (file: File) => {
+    const maxBytes = MAX_UPLOAD_MB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setUploadError(`파일이 너무 큽니다. 최대 ${MAX_UPLOAD_MB}MB까지 업로드할 수 있습니다.`);
+      setUploadFile(null);
+      return;
+    }
+    setUploadError(null);
+    setUploadFile(file);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      uploadMutation.mutate(file);
+      validateAndSetUploadFile(e.target.files[0]);
       e.target.value = '';
     }
+  };
+
+  const handleStartUpload = () => {
+    if (!uploadFile || uploadMutation.isPending) return;
+    uploadMutation.mutate(uploadFile);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    validateAndSetUploadFile(file);
   };
 
   const handleDelete = (docId: number) => {
@@ -297,12 +334,15 @@ export function DocumentListPage() {
           />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadMutation.isPending}
+            onClick={() => {
+              setIsUploadOpen(true);
+              setUploadError(null);
+              setIsDragOver(false);
+            }}
             className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white px-5 py-2.5 rounded-lg shadow-[0_0_15px_rgba(168,85,247,0.30)] transition-all transform hover:-translate-y-0.5 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {uploadMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Upload size={18} />}
-            {uploadMutation.isPending ? '업로드 중...' : '문서 업로드'}
+            <Upload size={18} />
+            문서 업로드
           </button>
         </div>
       </div>
@@ -719,6 +759,188 @@ export function DocumentListPage() {
           </div>
         </div>
       )}
+
+      {isUploadOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              if (uploadMutation.isPending) return;
+              setIsUploadOpen(false);
+              setUploadError(null);
+              setIsDragOver(false);
+            }}
+          />
+          <div className="relative w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-white/[0.02]">
+              <div>
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Upload className="text-[var(--primary)]" size={20} />
+                  문서 업로드 파이프라인
+                </h2>
+                <p className="text-sm text-gray-400 mt-1">No-Code RAG ETL 처리를 위한 파일을 업로드하세요.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (uploadMutation.isPending) return;
+                  setIsUploadOpen(false);
+                  setUploadError(null);
+                  setIsDragOver(false);
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="close upload modal"
+                title="닫기"
+              >
+                <span className="text-xl leading-none">×</span>
+              </button>
+            </div>
+
+            <div className="p-8">
+              <div
+                className={[
+                  'w-full h-56 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all group relative overflow-hidden',
+                  isDragOver ? 'border-[var(--primary)] bg-[var(--primary)]/10' : 'border-[var(--primary)]/50 bg-[var(--primary)]/5 hover:bg-[var(--primary)]/10',
+                ].join(' ')}
+                onClick={() => fileInputRef.current?.click()}
+                onDragEnter={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragOver(true);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragOver(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragOver(false);
+                }}
+                onDrop={handleDrop}
+                role="button"
+                tabIndex={0}
+              >
+                <div className="absolute inset-0 bg-gradient-to-tr from-[var(--primary)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="relative z-10 flex flex-col items-center text-center p-6">
+                  <div className="w-16 h-16 bg-black/20 rounded-full shadow-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-white/10">
+                    <FileText className="text-[var(--primary)]" size={30} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white mb-1">
+                    파일을 드래그하거나{' '}
+                    <span className="text-[var(--primary)] underline decoration-[var(--primary)] decoration-2 underline-offset-2">
+                      클릭하여 선택
+                    </span>
+                  </h3>
+                  <p className="text-sm text-gray-400 max-w-xs">
+                    PDF, DOCX, TXT, MD 파일을 지원합니다. (최대 {MAX_UPLOAD_MB}MB)
+                  </p>
+                  {uploadFile && (
+                    <div className="mt-4 flex items-center gap-3 px-4 py-2 rounded-xl bg-black/20 border border-white/10">
+                      <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[var(--primary)]">
+                        <FileText size={18} />
+                      </div>
+                      <div className="text-left min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{uploadFile.name}</div>
+                        <div className="text-xs text-gray-400">
+                          {(uploadFile.size / (1024 * 1024)).toFixed(1)} MB
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="ml-auto text-xs text-gray-300 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUploadFile(null);
+                          setUploadError(null);
+                        }}
+                      >
+                        제거
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {uploadError && (
+                <div className="mt-4 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                  {uploadError}
+                </div>
+              )}
+
+              <div className="mt-10">
+                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4 px-2">
+                  <span>Pipeline Stages</span>
+                  <span className="text-[var(--primary)]">{uploadMutation.isPending ? 'UPLOADING...' : 'READY TO START'}</span>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 w-full px-2">
+                  <PipelineStep
+                    active
+                    label="Tika 추출"
+                    icon={<FileText size={18} />}
+                    muted={false}
+                  />
+                  <PipelineConnector active={uploadMutation.isPending} />
+                  <PipelineStep
+                    active={false}
+                    label="토큰 청킹"
+                    icon={<Scissors size={18} />}
+                    muted
+                  />
+                  <PipelineConnector active={false} />
+                  <PipelineStep
+                    active={false}
+                    label="임베딩 변환"
+                    icon={<Brain size={18} />}
+                    muted
+                  />
+                  <PipelineConnector active={false} />
+                  <PipelineStep
+                    active={false}
+                    label="PgVector 저장"
+                    icon={<Database size={18} />}
+                    muted
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-white/10 bg-black/20">
+              <button
+                type="button"
+                onClick={() => {
+                  if (uploadMutation.isPending) return;
+                  setIsUploadOpen(false);
+                  setUploadError(null);
+                  setIsDragOver(false);
+                }}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 disabled:opacity-50"
+                disabled={uploadMutation.isPending}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleStartUpload}
+                disabled={!uploadFile || uploadMutation.isPending}
+                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-lg shadow-[color:rgba(168,85,247,0.30)] hover:shadow-[color:rgba(168,85,247,0.45)] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploadMutation.isPending ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" /> 업로드 중...
+                  </>
+                ) : (
+                  <>
+                    처리 시작 <span className="text-base leading-none">→</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -772,3 +994,36 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
   return <span className={`${base} bg-gray-500/10 text-gray-200 border-gray-500/20`}>{status}</span>;
 }
 
+function PipelineConnector({ active }: { active: boolean }) {
+  return (
+    <div
+      className={[
+        'flex-1 h-[2px] mt-5 rounded-full',
+        active ? 'bg-[var(--primary)]' : 'bg-white/10',
+      ].join(' ')}
+    />
+  );
+}
+
+function PipelineStep({
+  active,
+  muted,
+  icon,
+  label,
+}: {
+  active: boolean;
+  muted: boolean;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  const ring = active ? 'border-[var(--primary)] text-[var(--primary)] shadow-[0_0_14px_rgba(168,85,247,0.25)]' : 'border-white/10 text-gray-400';
+  const opacity = muted ? 'opacity-60' : 'opacity-100';
+  return (
+    <div className={`flex flex-col items-center relative z-10 ${opacity} min-w-[72px]`}>
+      <div className={`w-10 h-10 rounded-full bg-black/20 border-2 flex items-center justify-center ${ring}`}>
+        {icon}
+      </div>
+      <span className={`mt-2 text-xs font-medium ${active ? 'text-white' : 'text-gray-400'}`}>{label}</span>
+    </div>
+  );
+}
