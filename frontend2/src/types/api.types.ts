@@ -7,6 +7,43 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+// ========================================
+// Logs
+// ========================================
+export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED';
+
+export interface RequestLogResponse {
+  requestId: string;
+  traceId: string;
+  status: RequestLogStatus;
+  httpStatus: number | null;
+  latencyMs: number | null;
+  provider: string | null;
+  requestedModel: string | null;
+  usedModel: string | null;
+  isFailover: boolean;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  promptKey: string | null;
+  ragEnabled: boolean;
+  ragLatencyMs: number | null;
+  ragChunksCount: number | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  failReason: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface RequestLogListResponse {
+  content: RequestLogResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
 // 에러 응답
 export interface ErrorResponse {
   code: string;
@@ -436,6 +473,11 @@ export interface WorkspaceRagSettingsResponse {
   similarityThreshold: number;
   maxChunks: number;
   maxContextChars: number;
+  hybridEnabled: boolean;
+  rerankEnabled: boolean;
+  rerankTopN: number;
+  chunkSize: number;
+  chunkOverlapTokens: number;
 }
 
 export interface WorkspaceRagSettingsUpdateRequest {
@@ -443,4 +485,9 @@ export interface WorkspaceRagSettingsUpdateRequest {
   similarityThreshold: number;
   maxChunks: number;
   maxContextChars: number;
+  hybridEnabled: boolean;
+  rerankEnabled: boolean;
+  rerankTopN: number;
+  chunkSize: number;
+  chunkOverlapTokens: number;
 }

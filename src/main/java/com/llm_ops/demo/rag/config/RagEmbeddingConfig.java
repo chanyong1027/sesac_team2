@@ -2,7 +2,11 @@ package com.llm_ops.demo.rag.config;
 
 import com.google.genai.Client;
 import com.llm_ops.demo.rag.embedding.GoogleGenAiEmbeddingModel;
+import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.openai.OpenAiEmbeddingModel;
+import org.springframework.ai.openai.OpenAiEmbeddingOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +23,26 @@ import org.springframework.util.StringUtils;
 @Configuration
 public class RagEmbeddingConfig {
 
+    @Bean
+    @Primary
+    @ConditionalOnProperty(prefix = "rag.embedding.openai", name = "enabled", havingValue = "true")
+    public EmbeddingModel ragOpenAiEmbeddingModel(RagEmbeddingOpenAiProperties properties) {
+        if (!StringUtils.hasText(properties.getApiKey())) {
+            throw new IllegalStateException("OpenAI embedding api-key가 필요합니다.");
+        }
+
+        OpenAiApi openAiApi = StringUtils.hasText(properties.getBaseUrl())
+                ? new OpenAiApi(properties.getBaseUrl(), properties.getApiKey())
+                : new OpenAiApi(properties.getApiKey());
+
+        OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
+                .model(properties.getModel())
+                .dimensions(properties.getDimensions())
+                .build();
+
+        return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options);
+    }
+
     /**
      * Google GenAI 기반 {@link EmbeddingModel} 빈을 생성합니다.
      * 'rag.embedding.google-genai.enabled' 속성이 'true'일 때만 활성화되며,
@@ -29,7 +53,6 @@ public class RagEmbeddingConfig {
      * @throws IllegalStateException Google GenAI 임베딩 API 키가 설정되지 않은 경우
      */
     @Bean
-    @Primary // 여러 EmbeddingModel 빈이 존재할 경우 이 빈을 우선적으로 주입
     @ConditionalOnProperty(prefix = "rag.embedding.google-genai", name = "enabled", havingValue = "true") // 특정 프로퍼티 설정 시 활성화
     public EmbeddingModel googleGenAiEmbeddingModel(RagEmbeddingProperties properties) {
         if (!StringUtils.hasText(properties.getApiKey())) {

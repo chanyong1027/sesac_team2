@@ -1,0 +1,27 @@
+ACME Pricing and Limits (Internal)
+
+Last Updated: 2025-10-20
+
+1) Plans
+
+Starter
+- Monthly API calls: 50,000
+- Rate limit: 20 requests / second
+- RAG: enabled
+
+Pro
+- Monthly API calls: 500,000
+- Rate limit: 100 requests / second
+- RAG: enabled + priority indexing
+
+2) RAG Defaults (Product)
+
+- Default topK: 5
+- Default similarity threshold: 0.0 (keep broad recall, rely on rerank)
+- Suggested chunk size: 300-600 tokens
+- Suggested overlap: 10-20% tokens
+
+3) Notes
+
+For strict grounding, instruct the assistant to answer ONLY from provided references and say "NO_CONTEXT" otherwise.
+

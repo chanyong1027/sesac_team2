@@ -10,6 +10,11 @@ public record WorkspaceRagSettingsUpdateRequest(
     @NotNull @Min(1) @Max(10) Integer topK,
     @NotNull @DecimalMin("0.0") @DecimalMax("1.0") Double similarityThreshold,
     @NotNull @Min(1) @Max(10) Integer maxChunks,
-    @NotNull @Min(500) @Max(8000) Integer maxContextChars
+    @NotNull @Min(500) @Max(8000) Integer maxContextChars,
+    @NotNull Boolean hybridEnabled,
+    @NotNull Boolean rerankEnabled,
+    @NotNull @Min(1) @Max(30) Integer rerankTopN,
+    @NotNull @Min(100) @Max(2000) Integer chunkSize,
+    @NotNull @Min(0) @Max(500) Integer chunkOverlapTokens
 ) {
 }

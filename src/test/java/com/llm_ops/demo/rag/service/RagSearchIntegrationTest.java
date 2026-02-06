@@ -21,11 +21,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("local")
 @TestPropertySource(properties = {
+        "rag.embedding.openai.enabled=false",
         "rag.embedding.google-genai.enabled=true",
         "rag.embedding.google-genai.output-dimensionality=${RAG_EMBEDDING_DIM:768}",
         "rag.vectorstore.pgvector.enabled=true",
         "rag.vectorstore.pgvector.initialize-schema=true",
-        "rag.vectorstore.pgvector.dimensions=${RAG_EMBEDDING_DIM:768}"
+        "rag.vectorstore.pgvector.dimensions=${RAG_EMBEDDING_DIM:768}",
+        "rag.vectorstore.pgvector.table-name=doc_chunks_v2"
 })
 @EnabledIfEnvironmentVariable(named = "GEMINI_API_KEY", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "RAG_SEARCH_IT", matches = "true")
@@ -45,7 +47,7 @@ class RagSearchIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        jdbcTemplate.update("DELETE FROM doc_chunks WHERE metadata->>'workspace_id' IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM doc_chunks_v2 WHERE metadata->>'workspace_id' IN (?, ?)",
                 WORKSPACE_ID.toString(),
                 OTHER_WORKSPACE_ID.toString()
         );

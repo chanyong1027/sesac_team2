@@ -1,0 +1,37 @@
+# RAG Test Queries
+
+Upload all files in `docs/rag_eval/` to the same workspace, then test these queries.
+
+## Grounding / Versioning
+
+Q: "What is the minimum password length and rotation policy?"  
+Expected: v2 should win (16 chars, 180 days) if retrieved.  
+Expected source: `02_acme_employee_handbook_v2.md`
+
+Q: "As of 2025-06-01, what is the password rotation policy?"  
+Expected: v1 should win (90 days) because query references v1 date.  
+Expected source: `01_acme_employee_handbook_v1.md`
+
+## Acronyms / Short Queries (Hybrid)
+
+Q: "VPN requirement?"  
+Expected source: handbook v1/v2
+
+Q: "S3"  
+Expected source: runbook (`03_acme_product_oncall_runbook.md`)
+
+## Typos (Trigram)
+
+Q: "passwrod policy"  
+Expected: still retrieve password policy sections
+
+## Procedural
+
+Q: "RAG returns NO_CONTEXT too often. What should I check first?"  
+Expected source: `03_acme_product_oncall_runbook.md`
+
+## Limits / Defaults
+
+Q: "What are suggested chunk size and overlap for RAG?"  
+Expected source: `04_acme_pricing_and_limits.md`
+

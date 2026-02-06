@@ -2,11 +2,12 @@ package com.llm_ops.demo.rag.service;
 
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.rag.config.RagChunkingProperties;
+import com.llm_ops.demo.rag.metadata.RagMetadataKeys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 
 import java.util.List;
 import java.util.Map;
@@ -22,16 +23,16 @@ class RagDocumentChunkServiceTest {
 
     @BeforeEach
     void setUp() {
-        // TokenTextSplitter 직접 생성 (기본값 또는 테스트용 설정)
-        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(
-                5,      // chunkSize (토큰 수)
-                1,      // minChunkSizeChars
-                1,      // minChunkLengthToEmbed
-                10000,  // maxNumChunks
-                true    // keepSeparator
-        );
+        RagChunkingProperties properties = new RagChunkingProperties();
+        properties.setChunkSize(5);
+        properties.setChunkOverlapTokens(0);
+        properties.setMinChunkLengthToEmbed(1);
+        properties.setMaxNumChunks(10000);
+        properties.setKeepSeparator(true);
+        properties.setParagraphMaxChars(2000);
 
-        ragDocumentChunkService = new RagDocumentChunkService(tokenTextSplitter);
+        RagTextSplitter splitter = new RagTextSplitter(properties);
+        ragDocumentChunkService = new RagDocumentChunkService(splitter);
     }
 
     @Test
@@ -47,7 +48,7 @@ class RagDocumentChunkServiceTest {
         // then
         assertThat(chunks).isNotEmpty();
         Document first = chunks.get(0);
-        assertThat(first.getMetadata()).containsKeys("chunk_index", "chunk_total");
+        assertThat(first.getMetadata()).containsKeys(RagMetadataKeys.CHUNK_INDEX, RagMetadataKeys.CHUNK_TOTAL);
     }
 
     @Test
@@ -63,7 +64,7 @@ class RagDocumentChunkServiceTest {
 
         // then
         assertThat(chunks).isNotEmpty();
-        assertThat(chunks.get(0).getMetadata()).containsEntry("document_id", documentId);
+        assertThat(chunks.get(0).getMetadata()).containsEntry(RagMetadataKeys.DOCUMENT_ID, documentId);
     }
 
     @Test
@@ -78,7 +79,7 @@ class RagDocumentChunkServiceTest {
 
         // then
         assertThat(chunks).isNotEmpty();
-        assertThat(chunks.get(0).getMetadata()).containsEntry("document_name", "sample.txt");
+        assertThat(chunks.get(0).getMetadata()).containsEntry(RagMetadataKeys.DOCUMENT_NAME, "sample.txt");
     }
 
     @Test

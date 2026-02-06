@@ -21,6 +21,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -44,6 +45,12 @@ class RagDocumentIngestServiceTest {
     @MockBean
     private RagDocumentExtractService ragDocumentExtractService;
 
+    @MockBean
+    private RagTextNormalizer ragTextNormalizer;
+
+    @MockBean
+    private WorkspaceRagSettingsService workspaceRagSettingsService;
+
     @Test
     @DisplayName("문서를 인게스트하면 벡터 저장 로직을 호출한다")
     void 문서를_인게스트하면_벡터_저장_로직을_호출한다() {
@@ -52,10 +59,14 @@ class RagDocumentIngestServiceTest {
         Long documentId = 10L;
         Resource resource = new ClassPathResource("rag/sample.txt");
         List<Document> extracted = List.of(new Document("hello", java.util.Map.of("workspace_id", workspaceId)));
+        List<Document> normalized = List.of(new Document("hello", java.util.Map.of("workspace_id", workspaceId)));
         List<Document> chunks = List.of(new Document("chunk", java.util.Map.of("workspace_id", workspaceId)));
 
         when(ragDocumentExtractService.extract(workspaceId, resource)).thenReturn(extracted);
-        when(ragDocumentChunkService.chunk(extracted, documentId, "sample.txt")).thenReturn(chunks);
+        when(ragTextNormalizer.normalize(extracted)).thenReturn(normalized);
+        when(workspaceRagSettingsService.resolveRuntimeSettings(workspaceId))
+            .thenReturn(new WorkspaceRagSettingsService.RagRuntimeSettings(5, 0.0, 5, 2000, true, false, 10, 500, 50));
+        when(ragDocumentChunkService.chunk(normalized, documentId, "sample.txt", 500, 50)).thenReturn(chunks);
         when(ragDocumentVectorStoreSaveService.save(workspaceId, documentId, chunks)).thenReturn(chunks.size());
 
         // when

@@ -2,6 +2,11 @@ package com.llm_ops.demo.gateway.service;
 
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
+import com.llm_ops.demo.budget.domain.BudgetScopeType;
+import com.llm_ops.demo.budget.service.BudgetDecision;
+import com.llm_ops.demo.budget.service.BudgetDecisionAction;
+import com.llm_ops.demo.budget.service.BudgetGuardrailService;
+import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
@@ -13,14 +18,16 @@ import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
 import com.llm_ops.demo.prompt.domain.PromptRelease;
 import com.llm_ops.demo.prompt.domain.PromptStatus;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import com.llm_ops.demo.prompt.repository.PromptRepository;
-import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
+import com.llm_ops.demo.rag.service.RagContextBuilder;
 import com.llm_ops.demo.rag.service.RagSearchService;
+import com.llm_ops.demo.rag.service.RagSearchService.RagSearchOptions;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
@@ -51,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.time.YearMonth;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -62,7 +70,6 @@ public class GatewayChatService {
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-    private static final String RAG_TRUNCATED_MARKER = "[TRUNCATED]";
     private static final String RAG_CONTEXT_TEMPLATE = """
             다음은 질문과 관련된 참고 문서입니다:
 
@@ -77,11 +84,14 @@ public class GatewayChatService {
     private final ProviderCredentialService providerCredentialService;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
     private final RagSearchService ragSearchService;
+    private final RagContextBuilder ragContextBuilder;
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceRagSettingsService workspaceRagSettingsService;
     private final RequestLogWriter requestLogWriter;
     private final PromptRepository promptRepository;
     private final PromptReleaseRepository promptReleaseRepository;
+    private final BudgetGuardrailService budgetGuardrailService;
+    private final BudgetUsageService budgetUsageService;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -89,21 +99,27 @@ public class GatewayChatService {
             ProviderCredentialService providerCredentialService,
             @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
             @Autowired(required = false) RagSearchService ragSearchService,
+            RagContextBuilder ragContextBuilder,
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
             RequestLogWriter requestLogWriter,
-        PromptRepository promptRepository,
-            PromptReleaseRepository promptReleaseRepository) {
+            PromptRepository promptRepository,
+            PromptReleaseRepository promptReleaseRepository,
+            BudgetGuardrailService budgetGuardrailService,
+            BudgetUsageService budgetUsageService) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.providerCredentialService = providerCredentialService;
         this.openAiChatModelProvider = openAiChatModelProvider;
         this.ragSearchService = ragSearchService;
+        this.ragContextBuilder = ragContextBuilder;
         this.workspaceRepository = workspaceRepository;
         this.workspaceRagSettingsService = workspaceRagSettingsService;
         this.requestLogWriter = requestLogWriter;
         this.promptRepository = promptRepository;
         this.promptReleaseRepository = promptReleaseRepository;
+        this.budgetGuardrailService = budgetGuardrailService;
+        this.budgetUsageService = budgetUsageService;
     }
 
     /**
@@ -137,13 +153,23 @@ public class GatewayChatService {
         Integer ragContextChars = null;
         Boolean ragContextTruncated = null;
         String ragContextHash = null;
+        Integer ragTopK = null;
+        Double ragSimilarityThreshold = null;
         ProviderType usedProvider = null;
         String usedRequestedModel = null;
         boolean isFailover = false;
+        Long usedProviderCredentialId = null;
+        String budgetFailReason = null;
+        Long promptId = null;
+        Long promptVersionId = null;
+        YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
-            PromptVersion activeVersion = resolveActiveVersion(workspace, request.promptKey());
+            ActiveVersionResolution resolution = resolveActiveVersion(workspace, request.promptKey());
+            PromptVersion activeVersion = resolution.version();
+            promptId = resolution.promptId();
+            promptVersionId = resolution.promptVersionId();
 
             String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
                     request.variables());
@@ -153,7 +179,38 @@ public class GatewayChatService {
                     ? renderedUserPrompt
                     : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
 
-            if (request.isRagEnabled()) {
+            ProviderType providerType = activeVersion.getProvider();
+            String requestedModel = activeVersion.getModel();
+            ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
+            String secondaryModel = activeVersion.getSecondaryModel();
+            usedProvider = providerType;
+            usedRequestedModel = requestedModel;
+
+            // Workspace soft-limit 초과 시 Degrade(저가모델 강제 / 토큰캡 / RAG off 등)
+            boolean ragEnabledEffective = request.isRagEnabled();
+            String modelOverride = null;
+            Integer maxOutputTokensOverride = null;
+            BudgetDecision wsDecision = budgetGuardrailService.evaluateWorkspaceDegrade(
+                    workspace.getId(),
+                    providerType != null ? providerType.getValue() : null
+            );
+            if (wsDecision.action() == BudgetDecisionAction.DEGRADE && wsDecision.overrides() != null) {
+                BudgetDecision.Overrides o = wsDecision.overrides();
+                if (o.modelOverride() != null && !o.modelOverride().isBlank()) {
+                    modelOverride = o.modelOverride();
+                }
+                if (o.maxOutputTokens() != null && o.maxOutputTokens() > 0) {
+                    maxOutputTokensOverride = o.maxOutputTokens();
+                }
+                if (Boolean.TRUE.equals(o.disableRag())) {
+                    ragEnabledEffective = false;
+                }
+            }
+
+            String requestedModelEffective = (modelOverride != null ? modelOverride : requestedModel);
+            usedRequestedModel = requestedModelEffective;
+
+            if (ragEnabledEffective) {
                 ragChunksCount = 0;
                 ragContextChars = 0;
                 ragContextTruncated = false;
@@ -162,40 +219,81 @@ public class GatewayChatService {
                 if (ragSearchService != null) {
                     WorkspaceRagSettingsService.RagRuntimeSettings ragSettings =
                             workspaceRagSettingsService.resolveRuntimeSettings(workspace.getId());
+                    ragTopK = ragSettings.topK();
+                    ragSimilarityThreshold = ragSettings.similarityThreshold();
                     long ragStartedAtNanos = System.nanoTime();
                     RagSearchResponse ragResponse = ragSearchService.search(
                             request.workspaceId(),
-                            renderedUserPrompt,
-                            ragSettings.topK(),
-                            ragSettings.similarityThreshold()
+                            resolveRagQuery(renderedUserPrompt, request.variables()),
+                            new RagSearchOptions(
+                                    ragSettings.topK(),
+                                    ragSettings.similarityThreshold(),
+                                    ragSettings.hybridEnabled(),
+                                    ragSettings.rerankEnabled(),
+                                    ragSettings.rerankTopN()
+                            )
                     );
                     ragLatencyMs = toLatencyMs(ragStartedAtNanos);
 
                     if (ragResponse.chunks() != null && !ragResponse.chunks().isEmpty()) {
-                        RagContextResult result = buildRagContextWithMetrics(
+                        RagContextBuilder.RagContextResult result = ragContextBuilder.build(
                                 ragResponse.chunks(),
                                 ragSettings.maxChunks(),
                                 ragSettings.maxContextChars()
                         );
-                        ragChunksCount = result.chunksIncluded;
-                        ragContextChars = result.contextChars;
-                        ragContextTruncated = result.truncated;
-                        ragContextHash = sha256HexOrNull(result.context);
-                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context) + prompt;
+                        ragChunksCount = result.chunksIncluded();
+                        ragContextChars = result.contextChars();
+                        ragContextTruncated = result.truncated();
+                        ragContextHash = sha256HexOrNull(result.context());
+                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context()) + prompt;
                     }
                 }
             }
 
-            ProviderType providerType = activeVersion.getProvider();
-            String requestedModel = activeVersion.getModel();
-            ProviderType secondaryProvider = activeVersion.getSecondaryProvider();
-            String secondaryModel = activeVersion.getSecondaryModel();
-            usedProvider = providerType;
-            usedRequestedModel = requestedModel;
-
             ChatResponse response;
             try {
-                response = callProvider(organizationId, providerType, requestedModel, prompt);
+                ResolvedProviderApiKey primaryKey = providerCredentialService.resolveApiKey(organizationId, providerType);
+                usedProviderCredentialId = primaryKey.credentialId();
+
+                BudgetDecision providerDecision = budgetGuardrailService.evaluateProviderCredential(primaryKey.credentialId());
+                if (providerDecision.action() == BudgetDecisionAction.BLOCK) {
+                    if (hasSecondaryModel(secondaryProvider, secondaryModel)) {
+                        ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
+                        BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
+                        if (secondaryBudget.action() != BudgetDecisionAction.BLOCK) {
+                            isFailover = true;
+                            usedProvider = secondaryProvider;
+                            usedProviderCredentialId = secondaryKey.credentialId();
+                            // failover 시에도 workspace degrade를 provider 기준으로 재평가하여 cheap model 적용
+                            BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
+                                    workspace.getId(),
+                                    secondaryProvider != null ? secondaryProvider.getValue() : null
+                            );
+                            String secondaryOverride = null;
+                            Integer secondaryMaxTokens = maxOutputTokensOverride;
+                            if (wsDecisionSecondary.action() == BudgetDecisionAction.DEGRADE && wsDecisionSecondary.overrides() != null) {
+                                BudgetDecision.Overrides o2 = wsDecisionSecondary.overrides();
+                                if (o2.modelOverride() != null && !o2.modelOverride().isBlank()) {
+                                    secondaryOverride = o2.modelOverride();
+                                }
+                                if (o2.maxOutputTokens() != null && o2.maxOutputTokens() > 0) {
+                                    secondaryMaxTokens = o2.maxOutputTokens();
+                                }
+                            }
+                            String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
+                            usedRequestedModel = secondaryModelEffective;
+                            response = callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
+                        } else {
+                            budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                            throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
+                        }
+                    } else {
+                        budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                        throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
+                    }
+                }
+
+                response = callProvider(primaryKey, requestedModelEffective, prompt, maxOutputTokensOverride);
             } catch (Exception primaryException) {
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
                     throw primaryException;
@@ -203,10 +301,36 @@ public class GatewayChatService {
                 if (!isRetryableException(primaryException)) {
                     throw primaryException;
                 }
+                // primary 실패 후 failover 시도 전, secondary 예산 확인
+                ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
+                BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
+                if (secondaryBudget.action() == BudgetDecisionAction.BLOCK) {
+                    // secondary를 사용할 수 없으면 primary 에러를 그대로 반환
+                    throw primaryException;
+                }
+
                 isFailover = true;
                 usedProvider = secondaryProvider;
-                usedRequestedModel = secondaryModel;
-                response = callProvider(organizationId, secondaryProvider, secondaryModel, prompt);
+                usedProviderCredentialId = secondaryKey.credentialId();
+
+                BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
+                        workspace.getId(),
+                        secondaryProvider != null ? secondaryProvider.getValue() : null
+                );
+                String secondaryOverride = null;
+                Integer secondaryMaxTokens = maxOutputTokensOverride;
+                if (wsDecisionSecondary.action() == BudgetDecisionAction.DEGRADE && wsDecisionSecondary.overrides() != null) {
+                    BudgetDecision.Overrides o2 = wsDecisionSecondary.overrides();
+                    if (o2.modelOverride() != null && !o2.modelOverride().isBlank()) {
+                        secondaryOverride = o2.modelOverride();
+                    }
+                    if (o2.maxOutputTokens() != null && o2.maxOutputTokens() > 0) {
+                        secondaryMaxTokens = o2.maxOutputTokens();
+                    }
+                }
+                String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
+                usedRequestedModel = secondaryModelEffective;
+                response = callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
             }
 
             String answer = response.getResult().getOutput().getText();
@@ -222,10 +346,32 @@ public class GatewayChatService {
                 inputTokens = safeToInteger(response.getMetadata().getUsage().getPromptTokens());
                 outputTokens = safeToInteger(response.getMetadata().getUsage().getGenerationTokens());
                 totalTokens = safeToInteger(response.getMetadata().getUsage().getTotalTokens());
-                // 입력/출력 토큰 모두 있을 때만 비용 계산 (일부 프로바이더는 totalTokens만 반환)
-                if (inputTokens != null && outputTokens != null) {
-                    estimatedCost = ModelPricing.calculateCost(usedModel, inputTokens, outputTokens);
+            }
+
+            // 일부 프로바이더는 totalTokens만 반환하거나, input/output 일부만 반환합니다.
+            if (totalTokens == null && inputTokens != null && outputTokens != null) {
+                long sum = (long) inputTokens + (long) outputTokens;
+                totalTokens = sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
+            }
+            if (totalTokens != null) {
+                if (inputTokens != null && outputTokens == null) {
+                    int computed = totalTokens - inputTokens;
+                    if (computed >= 0) {
+                        outputTokens = computed;
+                    }
+                } else if (outputTokens != null && inputTokens == null) {
+                    int computed = totalTokens - outputTokens;
+                    if (computed >= 0) {
+                        inputTokens = computed;
+                    }
                 }
+            }
+
+            String pricingModel = usedModel != null ? usedModel : usedRequestedModel;
+            if (inputTokens != null && outputTokens != null) {
+                estimatedCost = ModelPricing.calculateCost(pricingModel, inputTokens, outputTokens);
+            } else if (totalTokens != null) {
+                estimatedCost = ModelPricing.calculateCostFromTotalTokens(pricingModel, totalTokens);
             }
 
             // API 응답용 DTO (클라이언트에게는 총 토큰과 비용만 전달)
@@ -233,9 +379,27 @@ public class GatewayChatService {
                     totalTokens != null ? totalTokens.longValue() : null,
                     estimatedCost);
 
+            // 예산 집계는 로그 async에 의존하지 않고 요청 스레드에서 동기 기록합니다.
+            budgetUsageService.recordUsage(
+                    BudgetScopeType.WORKSPACE,
+                    request.workspaceId(),
+                    budgetMonth,
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+            );
+            budgetUsageService.recordUsage(
+                    BudgetScopeType.PROVIDER_CREDENTIAL,
+                    usedProviderCredentialId,
+                    budgetMonth,
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+            );
+
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
                     toLatencyMs(startedAtNanos),
+                    promptId,
+                    promptVersionId,
                     usedProvider != null ? usedProvider.name().toLowerCase() : null,
                     usedRequestedModel,
                     usedModel,
@@ -249,7 +413,9 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash));
+                    ragContextHash,
+                    ragTopK,
+                    ragSimilarityThreshold));
 
             return GatewayChatResponse.from(
                     traceId,
@@ -258,31 +424,64 @@ public class GatewayChatService {
                     usedModel,
                     usage);
         } catch (BusinessException e) {
-            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
-                    e.getErrorCode().getStatus().value(),
-                    toLatencyMs(startedAtNanos),
-                    usedProvider != null ? usedProvider.name().toLowerCase() : null,
-                    usedRequestedModel,
-                    null,
-                    isFailover,
-                    null,
-                    null,
-                    null,
-                    null, // cost
-                    null, // version
-                    e.getErrorCode().name(),
-                    e.getMessage(),
-                    "BUSINESS_EXCEPTION",
-                    ragLatencyMs,
-                    ragChunksCount,
-                    ragContextChars,
-                    ragContextTruncated,
-                    ragContextHash));
+            if (e.getErrorCode() == ErrorCode.BUDGET_EXCEEDED) {
+                requestLogWriter.markBlocked(requestId, new RequestLogWriter.BlockUpdate(
+                        e.getErrorCode().getStatus().value(),
+                        toLatencyMs(startedAtNanos),
+                        promptId,
+                        promptVersionId,
+                        usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                        usedRequestedModel,
+                        null,
+                        isFailover,
+                        null,
+                        null,
+                        null,
+                        null, // cost
+                        null, // version
+                        e.getErrorCode().name(),
+                        e.getMessage(),
+                        budgetFailReason != null ? budgetFailReason : "BUDGET_EXCEEDED",
+                        ragLatencyMs,
+                        ragChunksCount,
+                        ragContextChars,
+                        ragContextTruncated,
+                        ragContextHash,
+                        ragTopK,
+                        ragSimilarityThreshold));
+            } else {
+                requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                        e.getErrorCode().getStatus().value(),
+                        toLatencyMs(startedAtNanos),
+                        promptId,
+                        promptVersionId,
+                        usedProvider != null ? usedProvider.name().toLowerCase() : null,
+                        usedRequestedModel,
+                        null,
+                        isFailover,
+                        null,
+                        null,
+                        null,
+                        null, // cost
+                        null, // version
+                        e.getErrorCode().name(),
+                        e.getMessage(),
+                        "BUSINESS_EXCEPTION",
+                        ragLatencyMs,
+                        ragChunksCount,
+                        ragContextChars,
+                        ragContextTruncated,
+                        ragContextHash,
+                        ragTopK,
+                        ragSimilarityThreshold));
+            }
             throw e;
         } catch (Exception e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    promptId,
+                    promptVersionId,
                     usedProvider != null ? usedProvider.name().toLowerCase() : null,
                     usedRequestedModel,
                     null,
@@ -299,78 +498,13 @@ public class GatewayChatService {
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
-                    ragContextHash));
+                    ragContextHash,
+                    ragTopK,
+                    ragSimilarityThreshold));
             throw e;
         }
     }
 
-    private static class RagContextResult {
-        private final String context;
-        private final int chunksIncluded;
-        private final int contextChars;
-        private final boolean truncated;
-
-        private RagContextResult(String context, int chunksIncluded, int contextChars, boolean truncated) {
-            this.context = context;
-            this.chunksIncluded = chunksIncluded;
-            this.contextChars = contextChars;
-            this.truncated = truncated;
-        }
-    }
-
-    private RagContextResult buildRagContextWithMetrics(List<ChunkDetailResponse> chunks, int maxChunks, int maxChars) {
-        if (chunks == null || chunks.isEmpty()) {
-            return new RagContextResult("", 0, 0, false);
-        }
-
-        StringBuilder builder = new StringBuilder();
-        int count = 0;
-        int totalChars = 0;
-        boolean truncated = false;
-
-        for (ChunkDetailResponse chunk : chunks) {
-            if (count >= maxChunks) {
-                truncated = true;
-                break;
-            }
-            if (chunk == null || chunk.content() == null || chunk.content().isBlank()) {
-                continue;
-            }
-
-            String content = chunk.content();
-            int remaining = maxChars - totalChars;
-            if (remaining <= 0) {
-                truncated = true;
-                break;
-            }
-
-            if (content.length() > remaining) {
-                content = content.substring(0, remaining);
-                truncated = true;
-            }
-
-            if (builder.length() > 0) {
-                builder.append("\n\n---\n\n");
-            }
-            builder.append(content);
-            totalChars += content.length();
-            count++;
-
-            if (totalChars >= maxChars) {
-                truncated = true;
-                break;
-            }
-        }
-
-        if (truncated) {
-            if (builder.length() > 0) {
-                builder.append("\n\n---\n\n");
-            }
-            builder.append(RAG_TRUNCATED_MARKER);
-        }
-
-        return new RagContextResult(builder.toString(), count, totalChars, truncated);
-    }
 
     private static String sha256HexOrNull(String value) {
         if (value == null || value.isBlank()) {
@@ -420,13 +554,17 @@ public class GatewayChatService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다."));
     }
 
-    private PromptVersion resolveActiveVersion(Workspace workspace, String promptKey) {
+    private record ActiveVersionResolution(Long promptId, Long promptVersionId, PromptVersion version) {
+    }
+
+    private ActiveVersionResolution resolveActiveVersion(Workspace workspace, String promptKey) {
         com.llm_ops.demo.prompt.domain.Prompt promptEntity = promptRepository
                 .findByWorkspaceAndPromptKeyAndStatus(workspace, promptKey, PromptStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "프롬프트를 찾을 수 없습니다."));
         PromptRelease release = promptReleaseRepository.findWithActiveVersionByPromptId(promptEntity.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다."));
-        return release.getActiveVersion();
+        PromptVersion activeVersion = release.getActiveVersion();
+        return new ActiveVersionResolution(promptEntity.getId(), activeVersion.getId(), activeVersion);
     }
 
     private String resolveUserTemplate(PromptVersion version, String fallbackPromptKey) {
@@ -443,6 +581,16 @@ public class GatewayChatService {
             return null;
         }
         return renderPrompt(template, variables);
+    }
+
+    private String resolveRagQuery(String renderedUserPrompt, Map<String, String> variables) {
+        if (variables != null) {
+            String question = variables.get("question");
+            if (question != null && !question.isBlank()) {
+                return question;
+            }
+        }
+        return renderedUserPrompt;
     }
 
     /**
@@ -465,7 +613,35 @@ public class GatewayChatService {
         return rendered;
     }
 
-    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride) {
+    private static void applyMaxOutputTokensBestEffort(Object chatOptions, Integer maxOutputTokens) {
+        if (chatOptions == null || maxOutputTokens == null || maxOutputTokens <= 0) {
+            return;
+        }
+        // Spring AI 옵션 타입별 API 차이를 흡수하기 위해 reflection으로 best-effort 적용합니다.
+        // (모델/라이브러리 버전 변경 시에도 컴파일 의존성을 최소화)
+        tryInvokeSetter(chatOptions, "setMaxTokens", maxOutputTokens);
+        tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxOutputTokens);
+        tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxOutputTokens);
+    }
+
+    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
+        try {
+            var m = target.getClass().getMethod(methodName, Integer.class);
+            m.invoke(target, value);
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // fallthrough
+        } catch (Exception ignored) {
+            return;
+        }
+        try {
+            var m = target.getClass().getMethod(methodName, int.class);
+            m.invoke(target, value.intValue());
+        } catch (Exception ignored) {
+        }
+    }
+
+    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
         ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
         if (chatModel == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
@@ -474,19 +650,20 @@ public class GatewayChatService {
         if (modelOverride != null && !modelOverride.isBlank()) {
             chatOptions.setModel(modelOverride);
         }
+        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
         return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 
     private ChatResponse callProvider(
-            Long organizationId,
-            ProviderType providerType,
+            ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt
+            String prompt,
+            Integer maxOutputTokensOverride
     ) {
-        String providerApiKey = providerCredentialService.getDecryptedApiKey(organizationId, providerType);
-        return switch (providerType) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel);
+        String providerApiKey = resolved.apiKey();
+        return switch (resolved.providerType()) {
+            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
+            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
             case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
         };
     }
@@ -518,12 +695,13 @@ public class GatewayChatService {
         return false;
     }
 
-    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride) {
+    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
         AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
         var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
         if (modelOverride != null && !modelOverride.isBlank()) {
             chatOptions.setModel(modelOverride);
         }
+        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
         return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 

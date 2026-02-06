@@ -56,6 +56,7 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
                         requestLog.fillModelUsage(
                                         update.provider(),
                                         update.requestedModel(),
@@ -71,7 +72,9 @@ public class RequestLogWriter {
                                         update.ragChunksCount(),
                                         update.ragContextChars(),
                                         update.ragContextTruncated(),
-                                        update.ragContextHash());
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
 
                         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs());
                 } catch (Exception e) {
@@ -92,6 +95,7 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
                         requestLog.fillModelUsage(
                                         update.provider(),
                                         update.requestedModel(),
@@ -107,7 +111,9 @@ public class RequestLogWriter {
                                         update.ragChunksCount(),
                                         update.ragContextChars(),
                                         update.ragContextTruncated(),
-                                        update.ragContextHash());
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
 
                         requestLog.markFail(
                                         LocalDateTime.now(clock),
@@ -118,6 +124,51 @@ public class RequestLogWriter {
                                         update.failReason());
                 } catch (Exception e) {
                         log.error("로그 실패 기록 실패: requestId={}", requestId, e);
+                }
+        }
+
+        /**
+         * 차단 로그를 비동기로 업데이트합니다.
+         * (예: 예산 초과 등)
+         */
+        @Async("logExecutor")
+        @Transactional
+        public void markBlocked(UUID requestId, BlockUpdate update) {
+                try {
+                        RequestLog requestLog = requestLogRepository.findById(requestId).orElse(null);
+                        if (requestLog == null) {
+                                log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
+                                return;
+                        }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
+                        requestLog.fillModelUsage(
+                                        update.provider(),
+                                        update.requestedModel(),
+                                        update.usedModel(),
+                                        update.isFailover(),
+                                        update.inputTokens(),
+                                        update.outputTokens(),
+                                        update.totalTokens(),
+                                        update.estimatedCost(),
+                                        update.pricingVersion());
+                        requestLog.fillRagMetrics(
+                                        update.ragLatencyMs(),
+                                        update.ragChunksCount(),
+                                        update.ragContextChars(),
+                                        update.ragContextTruncated(),
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
+
+                        requestLog.markBlocked(
+                                        LocalDateTime.now(clock),
+                                        update.httpStatus(),
+                                        update.latencyMs(),
+                                        update.errorCode(),
+                                        update.errorMessage(),
+                                        update.failReason());
+                } catch (Exception e) {
+                        log.error("로그 차단 기록 실패: requestId={}", requestId, e);
                 }
         }
 
@@ -137,6 +188,8 @@ public class RequestLogWriter {
         public record SuccessUpdate(
                         Integer httpStatus,
                         Integer latencyMs,
+                        Long promptId,
+                        Long promptVersionId,
                         String provider,
                         String requestedModel,
                         String usedModel,
@@ -150,12 +203,16 @@ public class RequestLogWriter {
                         Integer ragChunksCount,
                         Integer ragContextChars,
                         Boolean ragContextTruncated,
-                        String ragContextHash) {
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
         }
 
         public record FailUpdate(
                         Integer httpStatus,
                         Integer latencyMs,
+                        Long promptId,
+                        Long promptVersionId,
                         String provider,
                         String requestedModel,
                         String usedModel,
@@ -172,6 +229,34 @@ public class RequestLogWriter {
                         Integer ragChunksCount,
                         Integer ragContextChars,
                         Boolean ragContextTruncated,
-                        String ragContextHash) {
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
+        }
+
+        public record BlockUpdate(
+                        Integer httpStatus,
+                        Integer latencyMs,
+                        Long promptId,
+                        Long promptVersionId,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        boolean isFailover,
+                        Integer inputTokens,
+                        Integer outputTokens,
+                        Integer totalTokens,
+                        java.math.BigDecimal estimatedCost,
+                        String pricingVersion,
+                        String errorCode,
+                        String errorMessage,
+                        String failReason,
+                        Integer ragLatencyMs,
+                        Integer ragChunksCount,
+                        Integer ragContextChars,
+                        Boolean ragContextTruncated,
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
         }
 }

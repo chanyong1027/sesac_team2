@@ -59,6 +59,12 @@ export const organizationApi = {
       data
     ),
 
+  // Provider 자격증명 재검증 - POST /api/v1/organizations/{orgId}/credentials/{credentialId}/verify
+  verifyCredential: (orgId: number, credentialId: number) =>
+    api.post<ProviderCredentialCreateResponse>(
+      `/organizations/${orgId}/credentials/${credentialId}/verify`
+    ),
+
   // API 키 생성 - 현재 백엔드: POST /api/v1/organizations/{orgId}/api-keys
   createApiKey: (orgId: number, data: OrganizationApiKeyCreateRequest) =>
     api.post<OrganizationApiKeyCreateResponse>(
