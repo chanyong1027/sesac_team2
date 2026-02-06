@@ -3,8 +3,10 @@ import type { ReactNode } from 'react';
 import type { AxiosError } from 'axios';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
+import { budgetApi } from '@/api/budget.api';
+import { BudgetPolicyModal } from '@/components/budget/BudgetPolicyModal';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
-import type { ProviderCredentialSummaryResponse } from '@/types/api.types';
+import type { BudgetPolicyUpdateRequest, ProviderCredentialSummaryResponse } from '@/types/api.types';
 
 type ProviderKey = 'OPENAI' | 'GEMINI' | 'ANTHROPIC' | 'AZURE_OPENAI';
 
@@ -107,6 +109,21 @@ const normalizeProviderKey = (raw: string) => {
   return normalized.toUpperCase();
 };
 
+const providerToSlug = (provider: ProviderKey): string => {
+  switch (provider) {
+    case 'OPENAI':
+      return 'openai';
+    case 'GEMINI':
+      return 'gemini';
+    case 'ANTHROPIC':
+      return 'anthropic';
+    case 'AZURE_OPENAI':
+      return 'azure_openai';
+  }
+  // Exhaustiveness guard
+  throw new Error(`Unsupported provider: ${provider as never}`);
+};
+
 const resolveCredentialError = (error: unknown, fallback: string) => {
   if (!error) {
     return fallback;
@@ -122,18 +139,22 @@ const formatKoreanDate = (iso: string) => {
 };
 
 function ProviderCard({
+  orgId,
   provider,
   credential,
   onAdd,
   onUpdate,
   onReverify,
+  onConfigureBudget,
   isReverifyPending,
 }: {
+  orgId: number;
   provider: ProviderKey;
   credential?: ProviderCredentialSummaryResponse;
   onAdd: () => void;
   onUpdate: () => void;
   onReverify: () => void;
+  onConfigureBudget: () => void;
   isReverifyPending: boolean;
 }) {
   const info = providerInfo[provider];
@@ -149,6 +170,39 @@ function ProviderCard({
   const isVerifying = status === 'VERIFYING';
   const isInvalid = status === 'INVALID';
   const isEnterpriseOnly = !!info.isEnterpriseOnly && !credential;
+  const providerSlug = providerToSlug(provider);
+
+  const { data: budgetUsage } = useQuery({
+    queryKey: ['budget-usage', 'provider', orgId, providerSlug],
+    queryFn: async () => {
+      const res = await budgetApi.getProviderUsage(orgId, providerSlug);
+      return res.data;
+    },
+    enabled: !!credential && !isEnterpriseOnly,
+    retry: false,
+  });
+
+  const { data: budgetPolicy } = useQuery({
+    queryKey: ['budget-policy', 'provider', orgId, providerSlug],
+    queryFn: async () => {
+      const res = await budgetApi.getProviderPolicy(orgId, providerSlug);
+      return res.data;
+    },
+    enabled: !!credential && !isEnterpriseOnly,
+    retry: false,
+  });
+
+  const enabledBudget = !!budgetPolicy?.enabled;
+  const usedUsd = budgetUsage?.usedUsd ?? 0;
+  const hardLimitUsd = budgetUsage?.hardLimitUsd ?? null;
+  const remainingHardUsd = budgetUsage?.remainingHardUsd ?? null;
+  const isHardExceeded = enabledBudget && hardLimitUsd != null && remainingHardUsd != null && remainingHardUsd <= 0;
+
+  const formatUsd = (n: number) => {
+    if (!Number.isFinite(n)) return '-';
+    if (n >= 1) return `$${n.toFixed(2)}`;
+    return `$${n.toFixed(4)}`;
+  };
 
   return (
     <div
@@ -193,14 +247,57 @@ function ProviderCard({
              </p>
              <p className="font-mono text-sm text-gray-300">{formatKoreanDate(credential.createdAt)}</p>
            </div>
-          <div className="flex gap-2">
-            <button
-              onClick={onUpdate}
-              className="flex-1 py-3 rounded-xl border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-lg">refresh</span>
-              키 업데이트
-            </button>
+
+           <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
+             <div className="flex items-center justify-between mb-2">
+               <p className="text-xs font-medium text-gray-500">이번 달 사용량</p>
+               <div className="flex items-center gap-2">
+                 {enabledBudget ? (
+                   <span
+                     className={[
+                       'px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                       isHardExceeded
+                         ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+                         : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
+                     ].join(' ')}
+                   >
+                     {isHardExceeded ? 'BLOCK' : 'ON'}
+                   </span>
+                 ) : (
+                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 border-white/10 text-gray-300">
+                     OFF
+                   </span>
+                 )}
+                 <button
+                   type="button"
+                   onClick={onConfigureBudget}
+                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
+                 >
+                   예산 설정
+                 </button>
+               </div>
+             </div>
+             <div className="flex items-baseline justify-between">
+               <p className="font-mono text-sm text-gray-300">{formatUsd(usedUsd)}</p>
+               <p className="text-[11px] font-mono text-gray-500">
+                 {hardLimitUsd != null ? `${formatUsd(usedUsd)} / ${formatUsd(hardLimitUsd)}` : `${formatUsd(usedUsd)} / -`}
+               </p>
+             </div>
+             {enabledBudget && isHardExceeded ? (
+               <p className="mt-2 text-[11px] text-rose-200">
+                 Hard-limit을 초과했습니다. 이 Provider 키로 나가는 호출이 차단됩니다.
+               </p>
+             ) : null}
+           </div>
+
+           <div className="flex gap-2">
+             <button
+               onClick={onUpdate}
+               className="flex-1 py-3 rounded-xl border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
+             >
+               <span className="material-symbols-outlined text-lg">refresh</span>
+               키 업데이트
+             </button>
             {(isInvalid || isVerifying) && (
               <button
                 onClick={onReverify}
@@ -470,6 +567,7 @@ function UpdateProviderModal({
 export function SettingsProviderKeysPage() {
    const [addingProvider, setAddingProvider] = useState<ProviderKey | null>(null);
    const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
+   const [budgetProvider, setBudgetProvider] = useState<ProviderKey | null>(null);
    const [toastMessage, setToastMessage] = useState<string | null>(null);
    const toastTimerRef = useRef<number | null>(null);
    const { currentOrgId } = useOrganizationStore();
@@ -532,6 +630,38 @@ export function SettingsProviderKeysPage() {
     return acc;
   }, {} as Record<string, ProviderCredentialSummaryResponse>);
 
+  const budgetProviderSlug = budgetProvider ? providerToSlug(budgetProvider) : '';
+
+  const { data: providerBudgetPolicyForModal } = useQuery({
+    queryKey: ['budget-policy', 'provider', currentOrgId, budgetProviderSlug, 'modal'],
+    queryFn: async () => {
+      if (!currentOrgId || !budgetProviderSlug) return null;
+      const res = await budgetApi.getProviderPolicy(currentOrgId, budgetProviderSlug);
+      return res.data;
+    },
+    enabled: !!currentOrgId && !!budgetProviderSlug,
+    retry: false,
+  });
+
+  const updateProviderBudgetPolicyMutation = useMutation({
+    mutationFn: async (payload: BudgetPolicyUpdateRequest) => {
+      if (!currentOrgId || !budgetProviderSlug) throw new Error('No organization/provider selected');
+      const res = await budgetApi.updateProviderPolicy(currentOrgId, budgetProviderSlug, payload);
+      return res.data;
+    },
+    onSuccess: async () => {
+      if (!currentOrgId || !budgetProviderSlug) return;
+      await queryClient.invalidateQueries({ queryKey: ['budget-policy', 'provider', currentOrgId, budgetProviderSlug] });
+      await queryClient.invalidateQueries({ queryKey: ['budget-usage', 'provider', currentOrgId, budgetProviderSlug] });
+      await queryClient.invalidateQueries({ queryKey: ['budget-policy', 'provider', currentOrgId, budgetProviderSlug, 'modal'] });
+      showToast('예산 설정이 저장되었습니다.');
+      setBudgetProvider(null);
+    },
+    onError: () => {
+      showToast('예산 설정 저장에 실패했습니다.');
+    },
+  });
+
   if (!currentOrgId) {
     return (
       <div className="glass-card rounded-2xl p-6 text-sm text-gray-400 border border-white/10">
@@ -542,6 +672,17 @@ export function SettingsProviderKeysPage() {
 
   return (
     <div className="space-y-8">
+      <BudgetPolicyModal
+        open={!!budgetProvider}
+        mode="PROVIDER"
+        title={`${budgetProvider ? providerInfo[budgetProvider]?.label ?? budgetProvider : 'Provider'} 예산`}
+        description="Hard-limit 초과 시 해당 Provider 키로 나가는 호출이 차단됩니다."
+        policy={providerBudgetPolicyForModal ?? null}
+        onClose={() => setBudgetProvider(null)}
+        onSave={(payload) => updateProviderBudgetPolicyMutation.mutate(payload)}
+        isSaving={updateProviderBudgetPolicyMutation.isPending}
+      />
+
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-4 py-3 text-sm font-medium text-emerald-200 shadow-lg backdrop-blur-xl">
           {toastMessage}
@@ -595,6 +736,7 @@ export function SettingsProviderKeysPage() {
           {providers.map((provider) => (
             <ProviderCard
               key={provider}
+              orgId={currentOrgId}
               provider={provider}
               credential={credentialMap[provider]}
               onAdd={() => setAddingProvider(provider)}
@@ -605,6 +747,7 @@ export function SettingsProviderKeysPage() {
                   reverifyMutation.mutate(credentialId);
                 }
               }}
+              onConfigureBudget={() => setBudgetProvider(provider)}
               isReverifyPending={reverifyMutation.isPending}
             />
           ))}
