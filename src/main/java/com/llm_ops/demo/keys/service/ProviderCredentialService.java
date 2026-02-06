@@ -21,6 +21,7 @@ public class ProviderCredentialService {
 
     private final ProviderCredentialRepository providerCredentialRepository;
     private final ProviderKeyEncryptor providerKeyEncryptor;
+    private final ProviderCredentialVerifier providerCredentialVerifier;
 
     @Transactional
     public ProviderCredentialCreateResponse register(
@@ -33,6 +34,8 @@ public class ProviderCredentialService {
         // TODO: validate organization existence once organization domain is available.
 
         validateDuplicate(organizationId, providerType);
+
+        providerCredentialVerifier.verify(providerType, request.apiKey());
 
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         ProviderCredential credential = ProviderCredential.create(
@@ -78,6 +81,8 @@ public class ProviderCredentialService {
         if (!credential.getOrganizationId().equals(organizationId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "조직에 대한 권한이 없습니다.");
         }
+
+        providerCredentialVerifier.verify(credential.getProvider(), request.apiKey());
 
         String ciphertext = providerKeyEncryptor.encrypt(request.apiKey());
         credential.updateKey(ciphertext);
