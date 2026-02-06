@@ -6,7 +6,6 @@ import { promptApi } from '@/api/prompt.api';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import {
-    Rocket,
     Play,
     Copy,
     Save
@@ -1256,16 +1255,30 @@ function ReleaseTab({ promptId }: { promptId: number }) {
     const { data: versions, isLoading: isVersionsLoading } = useQuery({
         queryKey: ['promptVersions', promptId],
         queryFn: async () => {
-            const response = await promptApi.getVersions(promptId);
-            return response.data;
+            try {
+                const response = await promptApi.getVersions(promptId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return [];
+                }
+                throw error;
+            }
         },
     });
 
-    const { data: releaseHistory, isLoading: isHistoryLoading } = useQuery({
+    const { data: releaseHistory, isLoading: isHistoryLoading, refetch: refetchReleaseHistory } = useQuery({
         queryKey: ['promptReleaseHistory', promptId],
         queryFn: async () => {
-            const response = await promptApi.getReleaseHistory(promptId);
-            return response.data;
+            try {
+                const response = await promptApi.getReleaseHistory(promptId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return [];
+                }
+                return [];
+            }
         },
     });
 
@@ -1285,6 +1298,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
             setReleaseReason('');
             setReleaseMessage('배포가 완료되었습니다.');
             setReleaseError(null);
+            window.setTimeout(() => setReleaseMessage(null), 2500);
         },
         onError: (error) => {
             console.error('Release failed:', error);
@@ -1293,98 +1307,183 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
     });
 
+    const formatTimelineDate = (iso: string) => {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return iso;
+        return date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
     return (
         <div className="space-y-6">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Manual Release</h3>
-                <p className="text-sm text-gray-500 mb-6">
-                    특정 버전을 선택하여 운영 환경(Production)에 배포합니다.
-                    배포 즉시 API 응답에 반영됩니다.
+            <div className="glass-card rounded-2xl p-8 relative overflow-hidden group border border-white/10">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--primary)]/5 rounded-full blur-[80px] -mr-16 -mt-16 pointer-events-none" />
+
+                <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                    Manual Release
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
+                </h3>
+                <p className="text-gray-400 text-sm mb-8 leading-relaxed max-w-2xl">
+                    특정 버전을 선택하여 운영 환경(Production)에 배포합니다. 배포 즉시 API 응답에 반영됩니다.
                 </p>
 
-                <div className="flex items-end gap-4">
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            배포할 버전 선택
-                        </label>
-                        <select
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 outline-none focus:ring-2 focus:ring-indigo-500"
-                            value={selectedVersionId ?? ''}
-                            onChange={(e) => setSelectedVersionId(Number(e.target.value) || null)}
-                            disabled={isVersionsLoading || !versions?.length}
-                        >
-                            <option value="">
-                                {isVersionsLoading
-                                    ? '버전 목록을 불러오는 중...'
-                                    : versions?.length
-                                        ? '배포할 버전을 선택하세요'
-                                        : '등록된 버전이 없습니다'}
-                            </option>
-                            {versions?.map((ver) => (
-                                <option key={ver.id} value={ver.id}>
-                                    v{ver.versionNumber} · {ver.title || ver.model} ({ver.provider}/{ver.model})
-                                </option>
-                            ))}
-                        </select>
-                        <p className="mt-2 text-xs text-gray-400">
-                            배포할 버전을 선택하면 현재 서비스 버전이 즉시 변경됩니다.
-                        </p>
-                        {!isVersionsLoading && !versions?.length && (
-                            <p className="mt-2 text-xs text-amber-600">
-                                배포할 버전이 없습니다. 먼저 버전을 생성해주세요.
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-end">
+                    <div className="lg:col-span-3 space-y-6">
+                        <div className="group/input">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 group-hover/input:text-[var(--primary)] transition-colors">
+                                배포할 버전 선택
+                            </label>
+                            <div className="relative">
+                                <select
+                                    className="block w-full rounded-xl border border-white/10 bg-[#0F0E15]/80 text-gray-200 py-3 px-4 text-sm focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all cursor-pointer hover:border-white/20 appearance-none"
+                                    value={selectedVersionId ?? ''}
+                                    onChange={(e) => setSelectedVersionId(e.target.value ? Number(e.target.value) : null)}
+                                    disabled={isVersionsLoading || !versions?.length}
+                                >
+                                    <option value="">
+                                        {isVersionsLoading
+                                            ? '버전 목록을 불러오는 중...'
+                                            : versions?.length
+                                                ? '배포할 버전을 선택하세요'
+                                                : '등록된 버전이 없습니다'}
+                                    </option>
+                                    {versions?.map((ver) => (
+                                        <option key={ver.id} value={ver.id}>
+                                            v{ver.versionNumber} · {ver.title || ver.model} ({ver.provider}/{ver.model})
+                                        </option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
+                                    <span className="material-symbols-outlined text-gray-500">expand_more</span>
+                                </div>
+                            </div>
+                            <p className="mt-2 text-[11px] text-gray-500">
+                                배포할 버전을 선택하면 현재 서비스 버전이 즉시 변경됩니다.
                             </p>
-                        )}
+                            {!isVersionsLoading && !versions?.length ? (
+                                <p className="mt-2 text-[11px] text-amber-300">
+                                    배포할 버전이 없습니다. 먼저 버전을 생성해주세요.
+                                </p>
+                            ) : null}
+                        </div>
+
+                        <div className="group/input">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 group-hover/input:text-[var(--primary)] transition-colors">
+                                배포 사유 (선택)
+                            </label>
+                            <input
+                                value={releaseReason}
+                                onChange={(e) => setReleaseReason(e.target.value)}
+                                className="block w-full rounded-xl border border-white/10 bg-[#0F0E15]/80 text-gray-200 py-3 px-4 text-sm placeholder:text-gray-600 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all hover:border-white/20"
+                                placeholder="예: 최신 FAQ 반영"
+                                type="text"
+                            />
+                        </div>
+
+                        {releaseMessage ? (
+                            <div className="text-sm text-emerald-200 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+                                {releaseMessage}
+                            </div>
+                        ) : null}
+                        {releaseError ? (
+                            <div className="text-sm text-rose-200 bg-rose-500/10 border border-rose-500/20 rounded-xl px-4 py-3">
+                                {releaseError}
+                            </div>
+                        ) : null}
+                    </div>
+
+                    <div className="lg:col-span-1">
+                        <button
+                            type="button"
+                            onClick={() => releaseMutation.mutate()}
+                            disabled={!selectedVersionId || releaseMutation.isPending}
+                            className="w-full flex justify-center items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(168,85,247,0.35)] transition-all hover:shadow-[0_0_25px_rgba(168,85,247,0.50)] transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                        >
+                            <span className="material-symbols-outlined text-xl">rocket_launch</span>
+                            {releaseMutation.isPending ? '배포 중...' : '배포하기'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="glass-card rounded-2xl p-8 min-h-[400px] border border-white/10">
+                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
+                    <div>
+                        <h3 className="text-lg font-bold text-white mb-1">배포 이력</h3>
+                        <p className="text-gray-500 text-xs">운영 환경 배포 히스토리를 확인합니다.</p>
                     </div>
                     <button
-                        onClick={() => releaseMutation.mutate()}
-                        disabled={!selectedVersionId || releaseMutation.isPending}
-                        className="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                        type="button"
+                        onClick={() => refetchReleaseHistory()}
+                        className="p-2 text-gray-500 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                        aria-label="refresh release history"
                     >
-                        <Rocket size={18} />
-                        {releaseMutation.isPending ? '배포 중...' : '배포하기'}
+                        <span className="material-symbols-outlined text-xl">refresh</span>
                     </button>
                 </div>
 
-                <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">배포 사유 (선택)</label>
-                    <input
-                        value={releaseReason}
-                        onChange={(e) => setReleaseReason(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                        placeholder="예: 최신 FAQ 반영"
-                    />
-                </div>
-                {releaseMessage && (
-                    <p className="mt-3 text-sm text-emerald-600">{releaseMessage}</p>
-                )}
-                {releaseError && (
-                    <p className="mt-3 text-sm text-rose-600">{releaseError}</p>
-                )}
-            </div>
-            <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">배포 이력</h3>
-                <p className="text-sm text-gray-500">왜 버전이 바뀌었는지 확인할 수 있습니다.</p>
-                <hr className="my-4 border-gray-200" />
                 {isHistoryLoading ? (
                     <div className="text-sm text-gray-500">이력을 불러오는 중...</div>
                 ) : releaseHistory && releaseHistory.length > 0 ? (
-                    <div className="divide-y divide-gray-100">
-                        {releaseHistory.map((history: PromptReleaseHistoryResponse) => (
-                            <div key={history.id} className="py-4 flex flex-col gap-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="font-semibold text-gray-900">
-                                        {history.changeType === 'ROLLBACK'
-                                            ? `롤백 · v${history.toVersionNo}`
-                                            : `배포 · v${history.toVersionNo}`}
-                                    </span>
-                                    <span className="text-xs text-gray-400">{new Date(history.createdAt).toLocaleString()}</span>
+                    <div className="relative timeline-line ml-2 space-y-6">
+                        {releaseHistory.map((history: PromptReleaseHistoryResponse, idx: number) => {
+                            const isLatest = idx === 0;
+                            const badge =
+                                history.changeType === 'ROLLBACK'
+                                    ? { label: 'ROLLBACK', className: 'bg-amber-500/15 text-amber-200 border-amber-500/25' }
+                                    : isLatest
+                                        ? { label: 'SUCCESS', className: 'bg-green-500/20 text-green-300 border-green-500/20' }
+                                        : { label: 'ARCHIVED', className: 'bg-gray-700/40 text-gray-300 border-gray-600/30' };
+
+                            return (
+                                <div
+                                    key={history.id}
+                                    className={`relative flex gap-6 pl-8 group ${isLatest ? '' : 'opacity-80 hover:opacity-100 transition-opacity'}`}
+                                >
+                                    {isLatest ? (
+                                        <div className="absolute left-[11px] top-1 w-2.5 h-2.5 rounded-full bg-[var(--background)] border-2 border-[var(--primary)] z-10 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                                    ) : (
+                                        <div className="absolute left-[12px] top-1 w-2 h-2 rounded-full bg-gray-600 border border-[var(--background)] z-10" />
+                                    )}
+
+                                    <div className="flex-1 frosted-entry p-5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-[var(--primary)]/30 transition-all cursor-default">
+                                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                            <div>
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <h4 className={`font-bold ${isLatest ? 'text-white' : 'text-gray-300'} text-base`}>
+                                                        v{history.toVersionNo} Release
+                                                    </h4>
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.className}`}>
+                                                        {badge.label}
+                                                    </span>
+                                                </div>
+                                                <p className={`text-sm ${isLatest ? 'text-gray-400' : 'text-gray-500'} font-light`}>
+                                                    {history.reason || '배포 사유 없음'}
+                                                </p>
+                                            </div>
+                                            <div className="text-right flex flex-col items-end min-w-[140px]">
+                                                <span className={`text-xs font-mono ${isLatest ? 'text-gray-500' : 'text-gray-600'} mb-1`}>
+                                                    {formatTimelineDate(history.createdAt)}
+                                                </span>
+                                                <div className="flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/5">
+                                                    <div className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 text-[8px] flex items-center justify-center font-bold text-white">
+                                                        {(history.changedByName || 'S').slice(0, 1)}
+                                                    </div>
+                                                    <span className={`text-xs ${isLatest ? 'text-gray-300' : 'text-gray-400'}`}>
+                                                        {history.changedByName || 'System'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between text-xs text-gray-500">
-                                    <span>{history.reason || '배포 사유 없음'}</span>
-                                    <span>by {history.changedByName}</span>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 ) : (
                     <div className="text-sm text-gray-500">배포 이력이 없습니다.</div>
