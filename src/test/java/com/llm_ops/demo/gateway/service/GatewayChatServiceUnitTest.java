@@ -3,6 +3,9 @@ package com.llm_ops.demo.gateway.service;
 import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
+import com.llm_ops.demo.budget.service.BudgetDecision;
+import com.llm_ops.demo.budget.service.BudgetGuardrailService;
+import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
@@ -39,6 +42,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.openai.OpenAiChatOptions;
 
 import java.lang.reflect.Method;
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +96,12 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private RequestLogWriter requestLogWriter;
+
+    @Mock
+    private BudgetGuardrailService budgetGuardrailService;
+
+    @Mock
+    private BudgetUsageService budgetUsageService;
 
     @Mock
     private PromptRepository promptRepository;
@@ -282,7 +292,11 @@ class GatewayChatServiceUnitTest {
                     ));
             when(ragSearchService.search(eq(workspaceId), anyString(), any(com.llm_ops.demo.rag.service.RagSearchService.RagSearchOptions.class)))
                     .thenReturn(new com.llm_ops.demo.rag.dto.RagSearchResponse(chunks));
-            when(providerCredentialService.getDecryptedApiKey(eq(organizationId), eq(ProviderType.OPENAI))).thenReturn("provider-key");
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"));
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
             when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
             when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 

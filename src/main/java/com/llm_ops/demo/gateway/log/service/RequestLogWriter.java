@@ -127,6 +127,51 @@ public class RequestLogWriter {
                 }
         }
 
+        /**
+         * 차단 로그를 비동기로 업데이트합니다.
+         * (예: 예산 초과 등)
+         */
+        @Async("logExecutor")
+        @Transactional
+        public void markBlocked(UUID requestId, BlockUpdate update) {
+                try {
+                        RequestLog requestLog = requestLogRepository.findById(requestId).orElse(null);
+                        if (requestLog == null) {
+                                log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
+                                return;
+                        }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
+                        requestLog.fillModelUsage(
+                                        update.provider(),
+                                        update.requestedModel(),
+                                        update.usedModel(),
+                                        update.isFailover(),
+                                        update.inputTokens(),
+                                        update.outputTokens(),
+                                        update.totalTokens(),
+                                        update.estimatedCost(),
+                                        update.pricingVersion());
+                        requestLog.fillRagMetrics(
+                                        update.ragLatencyMs(),
+                                        update.ragChunksCount(),
+                                        update.ragContextChars(),
+                                        update.ragContextTruncated(),
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
+
+                        requestLog.markBlocked(
+                                        LocalDateTime.now(clock),
+                                        update.httpStatus(),
+                                        update.latencyMs(),
+                                        update.errorCode(),
+                                        update.errorMessage(),
+                                        update.failReason());
+                } catch (Exception e) {
+                        log.error("로그 차단 기록 실패: requestId={}", requestId, e);
+                }
+        }
+
         public record StartRequest(
                         UUID requestId,
                         String traceId,
@@ -164,6 +209,32 @@ public class RequestLogWriter {
         }
 
         public record FailUpdate(
+                        Integer httpStatus,
+                        Integer latencyMs,
+                        Long promptId,
+                        Long promptVersionId,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        boolean isFailover,
+                        Integer inputTokens,
+                        Integer outputTokens,
+                        Integer totalTokens,
+                        java.math.BigDecimal estimatedCost,
+                        String pricingVersion,
+                        String errorCode,
+                        String errorMessage,
+                        String failReason,
+                        Integer ragLatencyMs,
+                        Integer ragChunksCount,
+                        Integer ragContextChars,
+                        Boolean ragContextTruncated,
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
+        }
+
+        public record BlockUpdate(
                         Integer httpStatus,
                         Integer latencyMs,
                         Long promptId,
