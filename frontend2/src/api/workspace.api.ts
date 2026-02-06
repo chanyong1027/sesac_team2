@@ -3,6 +3,9 @@ import type {
   WorkspaceSummaryResponse,
   WorkspaceCreateRequest,
   WorkspaceCreateResponse,
+  WorkspaceUpdateRequest,
+  WorkspaceUpdateResponse,
+  WorkspaceDeleteResponse,
   WorkspaceInviteCreateRequest,
   WorkspaceInviteCreateResponse,
   WorkspaceInviteAcceptRequest,
@@ -19,6 +22,19 @@ export const workspaceApi = {
     api.post<WorkspaceCreateResponse>(
       `/organizations/${orgId}/workspaces`,
       data
+    ),
+
+  // 워크스페이스 수정 - 현재 백엔드: PATCH /api/v1/organizations/{orgId}/workspaces/{workspaceId}
+  updateWorkspace: (orgId: number, workspaceId: number, data: WorkspaceUpdateRequest) =>
+    api.patch<WorkspaceUpdateResponse>(
+      `/organizations/${orgId}/workspaces/${workspaceId}`,
+      data
+    ),
+
+  // 워크스페이스 삭제 - 현재 백엔드: DELETE /api/v1/organizations/{orgId}/workspaces/{workspaceId}
+  deleteWorkspace: (orgId: number, workspaceId: number) =>
+    api.delete<WorkspaceDeleteResponse>(
+      `/organizations/${orgId}/workspaces/${workspaceId}`
     ),
 
   // 초대 링크 생성 - 현재 백엔드: POST /api/v1/workspaces/{wsId}/invitation-links

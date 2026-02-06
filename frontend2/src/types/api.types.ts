@@ -136,6 +136,22 @@ export interface WorkspaceCreateResponse {
   status: string;
 }
 
+export interface WorkspaceUpdateRequest {
+  displayName: string;
+}
+
+export interface WorkspaceUpdateResponse {
+  id: number;
+  name: string;
+  displayName: string;
+  status: string;
+}
+
+export interface WorkspaceDeleteResponse {
+  workspaceId: number;
+  message: string;
+}
+
 // ========================================
 // Invitation
 // ========================================

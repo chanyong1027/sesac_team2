@@ -48,10 +48,6 @@ public class Workspace {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    public Long getId() {
-        return id;
-    }
-
     public static Workspace create(Organization organization, String name, String displayName) {
         Workspace workspace = new Workspace();
         workspace.organization = organization;
@@ -59,6 +55,10 @@ public class Workspace {
         workspace.displayName = displayName;
         workspace.status = WorkspaceStatus.ACTIVE;
         return workspace;
+    }
+
+    public void updateDisplayName(String displayName) {
+        this.displayName = displayName;
     }
 
     public void deactivate() {
