@@ -151,8 +151,15 @@ function AddProviderModal({
   onSuccessMessage: (message: string) => void;
 }) {
   const [apiKey, setApiKey] = useState('');
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { currentOrgId } = useOrganizationStore();
+
+  const handleClose = () => {
+    setUpdateError(null);
+    setApiKey('');
+    onClose();
+  };
 
   const createMutation = useMutation({
     mutationFn: () => {
@@ -167,7 +174,7 @@ function AddProviderModal({
       setUpdateError(null);
       setApiKey('');
       onSuccessMessage('검증 완료 - API 키가 저장되었습니다.');
-      onClose();
+      handleClose();
     },
     onError: (error) => {
       setUpdateError(resolveCredentialError(error, 'API 키 검증에 실패했습니다.'));
