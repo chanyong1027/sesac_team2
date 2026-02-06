@@ -448,7 +448,7 @@ export default function DashboardPage() {
                             <div className="space-y-1">
                                 {prompts.map((prompt) => (
                                     <div
-                                        key={prompt.promptId}
+                                        key={prompt.promptId ?? prompt.promptKey}
                                         className="grid grid-cols-12 gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-white/5 transition-colors items-center group cursor-default"
                                     >
                                         <div className="col-span-5 flex items-center gap-2 overflow-hidden">

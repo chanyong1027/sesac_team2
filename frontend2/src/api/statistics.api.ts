@@ -41,7 +41,7 @@ export interface ModelUsageResponse {
 }
 
 export interface PromptUsage {
-    promptId: number;
+    promptId: number | null;
     promptKey: string;
     requests: number;
     tokens: number;

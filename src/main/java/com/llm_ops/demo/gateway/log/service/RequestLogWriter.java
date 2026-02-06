@@ -56,6 +56,7 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
                         requestLog.fillModelUsage(
                                         update.provider(),
                                         update.requestedModel(),
@@ -94,6 +95,7 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
                         requestLog.fillModelUsage(
                                         update.provider(),
                                         update.requestedModel(),
@@ -141,6 +143,8 @@ public class RequestLogWriter {
         public record SuccessUpdate(
                         Integer httpStatus,
                         Integer latencyMs,
+                        Long promptId,
+                        Long promptVersionId,
                         String provider,
                         String requestedModel,
                         String usedModel,
@@ -162,6 +166,8 @@ public class RequestLogWriter {
         public record FailUpdate(
                         Integer httpStatus,
                         Integer latencyMs,
+                        Long promptId,
+                        Long promptVersionId,
                         String provider,
                         String requestedModel,
                         String usedModel,

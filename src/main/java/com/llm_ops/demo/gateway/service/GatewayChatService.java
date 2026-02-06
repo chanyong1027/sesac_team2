@@ -145,10 +145,15 @@ public class GatewayChatService {
         ProviderType usedProvider = null;
         String usedRequestedModel = null;
         boolean isFailover = false;
+        Long promptId = null;
+        Long promptVersionId = null;
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
-            PromptVersion activeVersion = resolveActiveVersion(workspace, request.promptKey());
+            ActiveVersionResolution resolution = resolveActiveVersion(workspace, request.promptKey());
+            PromptVersion activeVersion = resolution.version();
+            promptId = resolution.promptId();
+            promptVersionId = resolution.promptVersionId();
 
             String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
                     request.variables());
@@ -234,10 +239,32 @@ public class GatewayChatService {
                 inputTokens = safeToInteger(response.getMetadata().getUsage().getPromptTokens());
                 outputTokens = safeToInteger(response.getMetadata().getUsage().getGenerationTokens());
                 totalTokens = safeToInteger(response.getMetadata().getUsage().getTotalTokens());
-                // 입력/출력 토큰 모두 있을 때만 비용 계산 (일부 프로바이더는 totalTokens만 반환)
-                if (inputTokens != null && outputTokens != null) {
-                    estimatedCost = ModelPricing.calculateCost(usedModel, inputTokens, outputTokens);
+            }
+
+            // 일부 프로바이더는 totalTokens만 반환하거나, input/output 일부만 반환합니다.
+            if (totalTokens == null && inputTokens != null && outputTokens != null) {
+                long sum = (long) inputTokens + (long) outputTokens;
+                totalTokens = sum > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sum;
+            }
+            if (totalTokens != null) {
+                if (inputTokens != null && outputTokens == null) {
+                    int computed = totalTokens - inputTokens;
+                    if (computed >= 0) {
+                        outputTokens = computed;
+                    }
+                } else if (outputTokens != null && inputTokens == null) {
+                    int computed = totalTokens - outputTokens;
+                    if (computed >= 0) {
+                        inputTokens = computed;
+                    }
                 }
+            }
+
+            String pricingModel = usedModel != null ? usedModel : usedRequestedModel;
+            if (inputTokens != null && outputTokens != null) {
+                estimatedCost = ModelPricing.calculateCost(pricingModel, inputTokens, outputTokens);
+            } else if (totalTokens != null) {
+                estimatedCost = ModelPricing.calculateCostFromTotalTokens(pricingModel, totalTokens);
             }
 
             // API 응답용 DTO (클라이언트에게는 총 토큰과 비용만 전달)
@@ -248,6 +275,8 @@ public class GatewayChatService {
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
                     toLatencyMs(startedAtNanos),
+                    promptId,
+                    promptVersionId,
                     usedProvider != null ? usedProvider.name().toLowerCase() : null,
                     usedRequestedModel,
                     usedModel,
@@ -275,6 +304,8 @@ public class GatewayChatService {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     e.getErrorCode().getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    promptId,
+                    promptVersionId,
                     usedProvider != null ? usedProvider.name().toLowerCase() : null,
                     usedRequestedModel,
                     null,
@@ -299,6 +330,8 @@ public class GatewayChatService {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
                     toLatencyMs(startedAtNanos),
+                    promptId,
+                    promptVersionId,
                     usedProvider != null ? usedProvider.name().toLowerCase() : null,
                     usedRequestedModel,
                     null,
@@ -371,13 +404,17 @@ public class GatewayChatService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다."));
     }
 
-    private PromptVersion resolveActiveVersion(Workspace workspace, String promptKey) {
+    private record ActiveVersionResolution(Long promptId, Long promptVersionId, PromptVersion version) {
+    }
+
+    private ActiveVersionResolution resolveActiveVersion(Workspace workspace, String promptKey) {
         com.llm_ops.demo.prompt.domain.Prompt promptEntity = promptRepository
                 .findByWorkspaceAndPromptKeyAndStatus(workspace, promptKey, PromptStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "프롬프트를 찾을 수 없습니다."));
         PromptRelease release = promptReleaseRepository.findWithActiveVersionByPromptId(promptEntity.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "릴리즈된 버전이 없습니다."));
-        return release.getActiveVersion();
+        PromptVersion activeVersion = release.getActiveVersion();
+        return new ActiveVersionResolution(promptEntity.getId(), activeVersion.getId(), activeVersion);
     }
 
     private String resolveUserTemplate(PromptVersion version, String fallbackPromptKey) {

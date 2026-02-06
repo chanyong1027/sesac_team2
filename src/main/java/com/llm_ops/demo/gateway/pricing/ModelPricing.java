@@ -12,6 +12,7 @@ import java.util.Map;
 public class ModelPricing {
 
     private static final Map<String, PriceInfo> PRICING_TABLE = new HashMap<>();
+    private static final Map<String, String> MODEL_ALIASES = new HashMap<>();
     private static final String VERSION = "v1.0.0";
 
     static {
@@ -31,7 +32,13 @@ public class ModelPricing {
         // Google Gemini
         PRICING_TABLE.put("gemini-1.5-pro", new PriceInfo("0.00125", "0.005"));
         PRICING_TABLE.put("gemini-2.0-flash", new PriceInfo("0.0001", "0.0004"));
+        PRICING_TABLE.put("gemini-2.5-flash", new PriceInfo("0.00005", "0.0002"));
         PRICING_TABLE.put("gemini-2.5-flash-lite", new PriceInfo("0.00005", "0.0002"));
+
+        // Aliases (대표 키로 접어서 통계 비용이 0으로 붕괴되는 케이스 완화)
+        MODEL_ALIASES.put("gpt-4-turbo", "gpt-4");
+        MODEL_ALIASES.put("gpt-4-turbo-preview", "gpt-4");
+        MODEL_ALIASES.put("gemini-2.5-flash", "gemini-2.5-flash-lite");
     }
 
     /**
@@ -69,6 +76,30 @@ public class ModelPricing {
     }
 
     /**
+     * 일부 프로바이더는 totalTokens만 반환합니다.
+     * 이 경우 input/output를 비율로 추정하여 비용을 계산합니다.
+     *
+     * 기본 분해 비율: INPUT 70% / OUTPUT 30%
+     */
+    public static BigDecimal calculateCostFromTotalTokens(String modelName, Integer totalTokens) {
+        if (modelName == null || totalTokens == null || totalTokens <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        // INPUT 70% / OUTPUT 30% (하드코드 기본값)
+        int inputTokens = (int) Math.round(totalTokens * 0.7);
+        if (inputTokens < 0) {
+            inputTokens = 0;
+        }
+        if (inputTokens > totalTokens) {
+            inputTokens = totalTokens;
+        }
+        int outputTokens = totalTokens - inputTokens;
+
+        return calculateCost(modelName, inputTokens, outputTokens);
+    }
+
+    /**
      * 가격 버전 반환
      */
     public static String getPricingVersion() {
@@ -93,7 +124,8 @@ public class ModelPricing {
         // 버전 번호 제거 (예: -v1, -v2)
         normalized = normalized.replaceAll("-v\\d+$", "");
 
-        return normalized;
+        // alias 적용 (대표 키로 접기)
+        return MODEL_ALIASES.getOrDefault(normalized, normalized);
     }
 
     /**
