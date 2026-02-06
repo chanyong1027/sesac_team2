@@ -13,6 +13,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
     validate-on-migrate: true
+    out-of-order: true
 
 management:
   endpoints:
