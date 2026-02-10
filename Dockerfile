@@ -9,7 +9,8 @@ ENV SPRING_PROFILES_ACTIVE=prod
 
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
-  "-XX:MaxRAMPercentage=75.0", \
+  "-Xms256m", \
+  "-Xmx384m", \
   "-XX:+UseG1GC", \
   "-jar", "app.jar"]
 
