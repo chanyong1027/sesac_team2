@@ -44,6 +44,50 @@ export interface RequestLogListResponse {
   totalPages: number;
 }
 
+// ========================================
+// Budget Guardrail
+// ========================================
+export type BudgetScopeType = 'WORKSPACE' | 'PROVIDER_CREDENTIAL';
+export type BudgetSoftAction = 'DEGRADE';
+
+export interface BudgetPolicyResponse {
+  scopeType: BudgetScopeType;
+  scopeId: number;
+  monthLimitUsd: number | null;
+  softLimitUsd: number | null;
+  softAction: BudgetSoftAction;
+  degradeProviderModelMap: Record<string, string>;
+  degradeMaxOutputTokens: number | null;
+  degradeDisableRag: boolean | null;
+  enabled: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface BudgetPolicyUpdateRequest {
+  monthLimitUsd?: number | null;
+  softLimitUsd?: number | null;
+  softAction?: BudgetSoftAction;
+  degradeProviderModelMap?: Record<string, string>;
+  degradeMaxOutputTokens?: number | null;
+  degradeDisableRag?: boolean | null;
+  enabled?: boolean;
+}
+
+export interface BudgetUsageResponse {
+  scopeType: BudgetScopeType;
+  scopeId: number;
+  month: string; // YYYY-MM (UTC)
+  usedUsd: number;
+  hardLimitUsd: number | null;
+  softLimitUsd: number | null;
+  remainingHardUsd: number | null;
+  remainingSoftUsd: number | null;
+  requestCount: number;
+  totalTokens: number;
+  lastUpdatedAt: string | null;
+}
+
 // 에러 응답
 export interface ErrorResponse {
   code: string;

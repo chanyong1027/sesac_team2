@@ -34,6 +34,15 @@ public class ErrorResponse {
         );
     }
 
+    public static ErrorResponse of(String code, String message) {
+        return new ErrorResponse(
+                code,
+                message,
+                LocalDateTime.now(),
+                null
+        );
+    }
+
     public static ErrorResponse ofValidation(ErrorCode errorCode, Map<String, String> fieldErrors) {
         return new ErrorResponse(
                 errorCode.getCode(),

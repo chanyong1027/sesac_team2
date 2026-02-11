@@ -119,3 +119,10 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-sec: ${JWT_EXPIRATION:900}
   refresh-expiration-sec: 1209600
+
+gateway:
+  reliability:
+    request-timeout-ms: 20000
+    retry-backoff-ms: 200
+    min-retry-budget-ms: 1200
+    min-failover-budget-ms: 1200
