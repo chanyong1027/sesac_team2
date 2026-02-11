@@ -38,7 +38,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -92,7 +91,6 @@ public class PromptPlaygroundService {
         this.promptReleaseService = promptReleaseService;
     }
 
-    @Transactional
     public PlaygroundRunResponse run(Long promptId, Long userId, PlaygroundRunRequest request) {
         User user = findUser(userId);
         Prompt prompt = findActivePrompt(promptId);
@@ -180,7 +178,10 @@ public class PromptPlaygroundService {
             ChatResponse response = llmCallService.callProvider(
                     resolvedKey, request.model(), finalPrompt, configOverride);
 
-            String answer = response.getResult().getOutput().getText();
+            String answer = "";
+            if (response.getResult() != null && response.getResult().getOutput() != null) {
+                answer = response.getResult().getOutput().getText();
+            }
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
             Integer inputTokens = null;
@@ -319,7 +320,7 @@ public class PromptPlaygroundService {
     }
 
     private Prompt findActivePrompt(Long promptId) {
-        return promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE)
+        return promptRepository.findByIdAndStatusWithWorkspaceAndOrganization(promptId, PromptStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "프롬프트를 찾을 수 없습니다."));
     }
 

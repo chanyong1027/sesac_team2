@@ -155,7 +155,7 @@ public class LlmCallService {
                     metadata);
         }
 
-        String answer = response.text();
+        String answer = response.text() != null ? response.text() : "";
         String resolvedModel = response.modelVersion().orElse(model);
 
         ChatResponseMetadata.Builder metadataBuilder = ChatResponseMetadata.builder()
