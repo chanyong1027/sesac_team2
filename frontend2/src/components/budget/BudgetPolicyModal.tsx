@@ -227,7 +227,13 @@ export function BudgetPolicyModal({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowAdvanced((v) => !v)}
+                  onClick={() => {
+                    if (!showAdvanced) {
+                      setProviderMapJson(JSON.stringify(providerModelMap, null, 2));
+                      if (jsonError) setJsonError(null);
+                    }
+                    setShowAdvanced((v) => !v);
+                  }}
                   className="text-xs font-bold text-[var(--primary)] hover:text-white transition-colors"
                 >
                   {showAdvanced ? '간단 설정' : '고급(JSON)'}
@@ -330,4 +336,3 @@ export function BudgetPolicyModal({
     </div>
   );
 }
-

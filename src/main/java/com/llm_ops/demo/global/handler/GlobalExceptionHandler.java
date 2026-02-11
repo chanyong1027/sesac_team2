@@ -33,8 +33,11 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String GATEWAY_CHAT_PATH = "/v1/chat";
-    private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
-            "(?i)(api[_-]?key|authorization|bearer|token|secret|password)\\s*[:=]\\s*[^\\s,;]+"
+    private static final Pattern SENSITIVE_KEY_VALUE_PATTERN = Pattern.compile(
+            "(?i)(api[_-]?key|authorization|token|secret|password)\\s*[:=]\\s*(?:bearer\\s+)?[^\\s,;]+"
+    );
+    private static final Pattern SENSITIVE_BEARER_PATTERN = Pattern.compile(
+            "(?i)\\bbearer\\s+[^\\s,;]+"
     );
 
     @ExceptionHandler(GatewayException.class)
@@ -199,7 +202,8 @@ public class GlobalExceptionHandler {
         if (candidate == null || candidate.isBlank()) {
             candidate = fallback;
         }
-        String sanitized = SENSITIVE_PATTERN.matcher(candidate).replaceAll("$1=[REDACTED]");
+        String sanitized = SENSITIVE_KEY_VALUE_PATTERN.matcher(candidate).replaceAll("$1=[REDACTED]");
+        sanitized = SENSITIVE_BEARER_PATTERN.matcher(sanitized).replaceAll("Bearer [REDACTED]");
         if (sanitized.length() > 300) {
             return sanitized.substring(0, 300);
         }

@@ -194,13 +194,13 @@ function ProviderCard({
   });
 
   const enabledBudget = !!budgetPolicy?.enabled;
-  const usedUsd = budgetUsage?.usedUsd ?? 0;
+  const usedUsd = budgetUsage?.usedUsd ?? null;
   const hardLimitUsd = budgetUsage?.hardLimitUsd ?? null;
   const remainingHardUsd = budgetUsage?.remainingHardUsd ?? null;
   const isHardExceeded = enabledBudget && hardLimitUsd != null && remainingHardUsd != null && remainingHardUsd <= 0;
 
-  const formatUsd = (n: number) => {
-    if (!Number.isFinite(n)) return '-';
+  const formatUsd = (n: number | null | undefined) => {
+    if (n == null || !Number.isFinite(n)) return '-';
     if (n >= 1) return `$${n.toFixed(2)}`;
     return `$${n.toFixed(4)}`;
   };
