@@ -3,38 +3,64 @@ package com.llm_ops.demo.global.handler;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.global.error.ErrorResponse;
+import com.llm_ops.demo.global.error.GatewayException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.MethodParameter;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.FieldError;
 import org.springframework.validation.method.ParameterErrors;
 import org.springframework.validation.method.ParameterValidationResult;
-import org.springframework.validation.FieldError;
-import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.core.MethodParameter;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String GATEWAY_CHAT_PATH = "/v1/chat";
+    private static final Pattern SENSITIVE_PATTERN = Pattern.compile(
+            "(?i)(api[_-]?key|authorization|bearer|token|secret|password)\\s*[:=]\\s*[^\\s,;]+"
+    );
+
+    @ExceptionHandler(GatewayException.class)
+    public ResponseEntity<ErrorResponse> handleGatewayException(GatewayException e) {
+        String message = sanitizeMessage(e.getMessage(), "게이트웨이 요청 처리 중 오류가 발생했습니다.");
+        return ResponseEntity
+                .status(e.getStatus())
+                .body(ErrorResponse.of(e.getCode(), message));
+    }
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
+        if (isGatewayPath(request)) {
+            GatewayBusinessMapping mapping = mapGatewayBusiness(e);
+            return ResponseEntity
+                    .status(mapping.status())
+                    .body(ErrorResponse.of(
+                            mapping.code(),
+                            sanitizeMessage(mapping.message(), "게이트웨이 요청 처리 중 오류가 발생했습니다.")
+                    ));
+        }
+
         ErrorCode errorCode = e.getErrorCode();
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode, e.getMessage()));
+                .body(ErrorResponse.of(errorCode, sanitizeMessage(e.getMessage(), errorCode.getDefaultMessage())));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -150,5 +176,36 @@ public class GlobalExceptionHandler {
             return propertyPath.substring(lastDot + 1);
         }
         return propertyPath.isBlank() ? "parameter" : propertyPath;
+    }
+
+    private boolean isGatewayPath(HttpServletRequest request) {
+        return request != null && request.getRequestURI() != null && request.getRequestURI().startsWith(GATEWAY_CHAT_PATH);
+    }
+
+    private GatewayBusinessMapping mapGatewayBusiness(BusinessException e) {
+        ErrorCode errorCode = e.getErrorCode();
+        return switch (errorCode) {
+            case UNAUTHENTICATED -> new GatewayBusinessMapping("GW-REQ-UNAUTHORIZED", HttpStatus.UNAUTHORIZED, e.getMessage());
+            case FORBIDDEN -> new GatewayBusinessMapping("GW-REQ-FORBIDDEN", HttpStatus.FORBIDDEN, e.getMessage());
+            case BUDGET_EXCEEDED -> new GatewayBusinessMapping("GW-REQ-QUOTA_EXCEEDED", HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+            case INVALID_INPUT_VALUE, METHOD_NOT_ALLOWED, CONFLICT, NOT_FOUND ->
+                    new GatewayBusinessMapping("GW-REQ-INVALID_REQUEST", HttpStatus.BAD_REQUEST, e.getMessage());
+            default -> new GatewayBusinessMapping("GW-GW-POLICY_BLOCKED", errorCode.getStatus(), e.getMessage());
+        };
+    }
+
+    private String sanitizeMessage(String message, String fallback) {
+        String candidate = message;
+        if (candidate == null || candidate.isBlank()) {
+            candidate = fallback;
+        }
+        String sanitized = SENSITIVE_PATTERN.matcher(candidate).replaceAll("$1=[REDACTED]");
+        if (sanitized.length() > 300) {
+            return sanitized.substring(0, 300);
+        }
+        return sanitized;
+    }
+
+    private record GatewayBusinessMapping(String code, HttpStatus status, String message) {
     }
 }
