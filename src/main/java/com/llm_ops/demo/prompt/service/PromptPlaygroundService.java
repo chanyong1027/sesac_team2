@@ -5,6 +5,7 @@ import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.gateway.service.LlmCallService;
+import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
@@ -174,8 +175,10 @@ public class PromptPlaygroundService {
             ResolvedProviderApiKey resolvedKey = providerCredentialService.resolveApiKey(
                     organizationId, request.provider());
 
+            ModelConfigOverride configOverride = ModelConfigOverride.from(request.modelConfig());
+
             ChatResponse response = llmCallService.callProvider(
-                    resolvedKey, request.model(), finalPrompt, null);
+                    resolvedKey, request.model(), finalPrompt, configOverride);
 
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;

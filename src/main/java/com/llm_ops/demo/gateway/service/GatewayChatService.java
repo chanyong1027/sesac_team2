@@ -7,6 +7,7 @@ import com.llm_ops.demo.budget.service.BudgetGuardrailService;
 import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
+import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
@@ -264,7 +265,7 @@ public class GatewayChatService {
                             }
                             String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                             usedRequestedModel = secondaryModelEffective;
-                            response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
+                            response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, prompt, ModelConfigOverride.ofMaxTokens(secondaryMaxTokens));
                         } else {
                             budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
                             throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
@@ -275,7 +276,7 @@ public class GatewayChatService {
                     }
                 }
 
-                response = llmCallService.callProvider(primaryKey, requestedModelEffective, prompt, maxOutputTokensOverride);
+                response = llmCallService.callProvider(primaryKey, requestedModelEffective, prompt, ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride));
             } catch (Exception primaryException) {
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
                     throw primaryException;
@@ -312,7 +313,7 @@ public class GatewayChatService {
                 }
                 String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                 usedRequestedModel = secondaryModelEffective;
-                response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
+                response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, prompt, ModelConfigOverride.ofMaxTokens(secondaryMaxTokens));
             }
 
             String answer = response.getResult().getOutput().getText();
