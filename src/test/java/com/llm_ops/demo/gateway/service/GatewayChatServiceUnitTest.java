@@ -1,6 +1,5 @@
 package com.llm_ops.demo.gateway.service;
 
-import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.budget.service.BudgetDecision;
@@ -34,12 +33,8 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.ai.openai.OpenAiChatOptions;
 
 import java.lang.reflect.Method;
 import java.time.YearMonth;
@@ -68,22 +63,10 @@ class GatewayChatServiceUnitTest {
     private OrganizationApiKeyAuthService organizationApiKeyAuthService;
 
     @Mock
-    private GatewayChatProviderResolveService gatewayChatProviderResolveService;
-
-    @Mock
-    private GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
-
-    @Mock
     private ProviderCredentialService providerCredentialService;
 
     @Mock
-    private GatewayModelProperties gatewayModelProperties;
-
-    @Mock
-    private ObjectProvider<ChatModel> openAiChatModelProvider;
-
-    @Mock
-    private ChatModel chatModel;
+    private LlmCallService llmCallService;
 
     @Mock
     private RagSearchService ragSearchService;
@@ -297,15 +280,13 @@ class GatewayChatServiceUnitTest {
             when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                     .withModel("gpt-4o-mini")
                     .withUsage(new DefaultUsage(null, null, 10L))
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
-            when(chatModel.call(any(Prompt.class))).thenReturn(chatResponse);
+            when(llmCallService.callProvider(any(), anyString(), anyString(), any())).thenReturn(chatResponse);
 
             GatewayChatRequest request = new GatewayChatRequest(
                     workspaceId,
