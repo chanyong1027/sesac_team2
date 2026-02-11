@@ -392,6 +392,7 @@ export interface PromptVersionDetailResponse {
   secondaryModel: string | null;
   systemPrompt: string;
   userTemplate: string;
+  ragEnabled: boolean;
   contextUrl?: string;
   modelConfig: Record<string, any>;
   createdBy: number;

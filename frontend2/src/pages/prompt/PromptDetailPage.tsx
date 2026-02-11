@@ -1787,12 +1787,11 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
             setModel(v.model);
             setSystemPrompt(v.systemPrompt || '');
             setUserTemplate(v.userTemplate || '');
-            if (v.modelConfig) {
-                if (v.modelConfig.temperature != null) setTemperature(v.modelConfig.temperature);
-                if (v.modelConfig.maxTokens != null) setMaxTokens(v.modelConfig.maxTokens);
-                if (v.modelConfig.topP != null) setTopP(v.modelConfig.topP);
-                if (v.modelConfig.frequencyPenalty != null) setFrequencyPenalty(v.modelConfig.frequencyPenalty);
-            }
+            setRagEnabled(v.ragEnabled ?? false);
+            setTemperature(v.modelConfig?.temperature ?? 0.7);
+            setMaxTokens(v.modelConfig?.maxTokens ?? 2048);
+            setTopP(v.modelConfig?.topP ?? 1.0);
+            setFrequencyPenalty(v.modelConfig?.frequencyPenalty ?? 0.0);
         });
     }, [promptId]);
 
@@ -1861,7 +1860,10 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         return 'bg-gray-500';
     };
 
-    const canRun = userTemplate.trim().length > 0 && model.trim().length > 0;
+    const canRun = userTemplate.trim().length > 0
+        && model.trim().length > 0
+        && availableProviders.includes(provider)
+        && providerModels.includes(model);
 
     return (
         <div className="space-y-6">
