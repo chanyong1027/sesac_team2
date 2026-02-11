@@ -89,7 +89,7 @@ class PromptPlaygroundServiceTest {
         Long userId = 1L;
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE)).willReturn(Optional.of(prompt));
+        given(promptRepository.findByIdAndStatusWithWorkspaceAndOrganization(promptId, PromptStatus.ACTIVE)).willReturn(Optional.of(prompt));
         given(prompt.getWorkspace()).willReturn(workspace);
         given(prompt.getPromptKey()).willReturn("test-prompt");
         given(workspace.getOrganization()).willReturn(organization);
@@ -136,7 +136,7 @@ class PromptPlaygroundServiceTest {
         Long userId = 1L;
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE)).willReturn(Optional.empty());
+        given(promptRepository.findByIdAndStatusWithWorkspaceAndOrganization(promptId, PromptStatus.ACTIVE)).willReturn(Optional.empty());
 
         PlaygroundRunRequest request = new PlaygroundRunRequest(
                 ProviderType.OPENAI, "gpt-4o", null, "{{question}}",
@@ -155,7 +155,7 @@ class PromptPlaygroundServiceTest {
         Long userId = 1L;
 
         given(userRepository.findById(userId)).willReturn(Optional.of(user));
-        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE)).willReturn(Optional.of(prompt));
+        given(promptRepository.findByIdAndStatusWithWorkspaceAndOrganization(promptId, PromptStatus.ACTIVE)).willReturn(Optional.of(prompt));
         given(prompt.getWorkspace()).willReturn(workspace);
         given(workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user)).willReturn(false);
 

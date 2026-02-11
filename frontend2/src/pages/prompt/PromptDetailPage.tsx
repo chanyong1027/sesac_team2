@@ -1707,6 +1707,8 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
     const [releaseAfterSave, setReleaseAfterSave] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [outputCopied, setOutputCopied] = useState(false);
+    const [selectedVersionId, setSelectedVersionId] = useState<string>('');
+    const [versionLoadError, setVersionLoadError] = useState<string | null>(null);
 
     // --- Queries ---
     const { data: credentials } = useQuery({
@@ -1781,6 +1783,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
 
     // Load version into playground
     const loadVersion = useCallback((versionId: number) => {
+        setVersionLoadError(null);
         promptApi.getVersion(promptId, versionId).then((res) => {
             const v = res.data;
             setProvider(v.provider);
@@ -1792,6 +1795,11 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
             setMaxTokens(v.modelConfig?.maxTokens ?? 2048);
             setTopP(v.modelConfig?.topP ?? 1.0);
             setFrequencyPenalty(v.modelConfig?.frequencyPenalty ?? 0.0);
+        }).catch((err) => {
+            const msg = axios.isAxiosError(err)
+                ? err.response?.data?.message || err.message
+                : (err as Error).message;
+            setVersionLoadError(msg);
         });
     }, [promptId]);
 
@@ -1877,10 +1885,17 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                     {versions && versions.length > 0 && (
                         <select
                             className="bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-300 px-3 py-1.5 focus:outline-none focus:border-[var(--primary)]"
-                            defaultValue=""
-                            onChange={(e) => { if (e.target.value) loadVersion(Number(e.target.value)); }}
+                            value={selectedVersionId}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSelectedVersionId(val);
+                                if (val) {
+                                    loadVersion(Number(val));
+                                    setSelectedVersionId('');
+                                }
+                            }}
                         >
-                            <option value="" disabled>버전 불러오기...</option>
+                            <option value="">버전 불러오기...</option>
                             {versions.map((v) => (
                                 <option key={v.id} value={v.id}>v{v.versionNumber} — {v.title || '(untitled)'}</option>
                             ))}
@@ -1888,7 +1903,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                     )}
                     <button
                         type="button"
-                        onClick={() => setSaveOpen(true)}
+                        onClick={() => { setSaveError(null); setSaveOpen(true); }}
                         disabled={!canRun}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium border border-[#27272a] text-gray-300 hover:text-white hover:border-gray-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
@@ -1896,6 +1911,15 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                     </button>
                 </div>
             </div>
+
+            {versionLoadError && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center justify-between">
+                    <span>버전 불러오기 실패: {versionLoadError}</span>
+                    <button type="button" onClick={() => setVersionLoadError(null)} className="text-red-400 hover:text-red-300 ml-3">
+                        <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+            )}
 
             <div className="flex gap-5" style={{ minHeight: 560 }}>
                 {/* Left panel: settings */}
