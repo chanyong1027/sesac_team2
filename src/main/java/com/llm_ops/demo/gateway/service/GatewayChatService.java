@@ -694,26 +694,33 @@ public class GatewayChatService {
         }
         // Spring AI 옵션 타입별 API 차이를 흡수하기 위해 reflection으로 best-effort 적용합니다.
         // (모델/라이브러리 버전 변경 시에도 컴파일 의존성을 최소화)
-        tryInvokeSetter(chatOptions, "setMaxTokens", maxOutputTokens);
-        tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxOutputTokens);
+        // 동일 요청에 max_tokens/max_completion_tokens가 동시에 설정되지 않도록 1개만 적용합니다.
+        if (tryInvokeSetter(chatOptions, "setMaxTokens", maxOutputTokens)) {
+            return;
+        }
+        if (tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxOutputTokens)) {
+            return;
+        }
         tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxOutputTokens);
     }
 
-    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
+    private static boolean tryInvokeSetter(Object target, String methodName, Integer value) {
         try {
             var m = target.getClass().getMethod(methodName, Integer.class);
             m.invoke(target, value);
-            return;
+            return true;
         } catch (NoSuchMethodException ignored) {
             // fallthrough
         } catch (Exception ignored) {
-            return;
+            return false;
         }
         try {
             var m = target.getClass().getMethod(methodName, int.class);
             m.invoke(target, value.intValue());
+            return true;
         } catch (Exception ignored) {
         }
+        return false;
     }
 
     private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
