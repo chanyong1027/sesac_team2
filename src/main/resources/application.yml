@@ -126,3 +126,14 @@ gateway:
     retry-backoff-ms: 200
     min-retry-budget-ms: 1200
     min-failover-budget-ms: 1200
+
+eval:
+  judge:
+    provider: OPENAI
+    model: gpt-4.1-mini
+    temperature: 0.0
+    rejudge-on-fail: true
+    max-attempts: 2
+  worker:
+    poll-interval-ms: 3000
+    batch-size: 3

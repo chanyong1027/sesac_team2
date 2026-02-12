@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 
 import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.eval.service.EvalRunService;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
@@ -55,6 +56,9 @@ class PromptVersionServiceTest {
 
     @Mock
     private PromptModelAllowlistService promptModelAllowlistService;
+
+    @Mock
+    private EvalRunService evalRunService;
 
     @Test
     @DisplayName("프롬프트 버전을 생성한다")
