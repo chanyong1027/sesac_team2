@@ -144,6 +144,7 @@ GatewayRagIntegrationTest {
                 organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
+        activateCredential(organizationId, ProviderType.OPENAI);
 
         String promptKey = createReleasedPrompt("refund-policy", "환불 정책을 알려줘");
 
@@ -183,6 +184,7 @@ GatewayRagIntegrationTest {
                 organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
+        activateCredential(organizationId, ProviderType.OPENAI);
 
         String promptKey = createReleasedPrompt("refund-policy", "환불 정책을 알려줘");
 
@@ -217,6 +219,7 @@ GatewayRagIntegrationTest {
                 organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
+        activateCredential(organizationId, ProviderType.OPENAI);
 
         String promptKey = createReleasedPrompt("question-template", "질문: {{question}}");
 
@@ -255,6 +258,7 @@ GatewayRagIntegrationTest {
                 organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
+        activateCredential(organizationId, ProviderType.OPENAI);
 
         String promptKey = createReleasedPrompt("product-price", "상품 A의 가격은 얼마인가요?");
 
@@ -272,6 +276,13 @@ GatewayRagIntegrationTest {
                 // then
                 .andExpect(status().isOk());
         assertThat(testVectorStoreState.getLastQuery()).isNull();
+    }
+
+    private void activateCredential(Long orgId, ProviderType providerType) {
+        var credential = providerCredentialRepository
+                .findByOrganizationIdAndProvider(orgId, providerType).orElseThrow();
+        credential.markActive();
+        providerCredentialRepository.save(credential);
     }
 
     private String createReleasedPrompt(String promptKey, String userTemplate) {
