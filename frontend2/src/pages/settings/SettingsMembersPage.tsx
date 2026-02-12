@@ -15,9 +15,8 @@ const roleColors: Record<string, { bg: string; text: string; border: string }> =
 };
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  ACTIVATE: { bg: '#D1FAE5', text: '#065F46' },
-  INACTIVE: { bg: '#FEE2E2', text: '#991B1B' },
-  PENDING: { bg: '#FEF3C7', text: '#92400E' },
+  ACTIVE: { bg: '#D1FAE5', text: '#065F46' },
+  DELETED: { bg: '#FEE2E2', text: '#991B1B' },
 };
 
 function RoleBadge({ role }: { role: string }) {
@@ -37,7 +36,7 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 function StatusDot({ status }: { status: string }) {
-  const colors = statusColors[status] || statusColors.INACTIVE;
+  const colors = statusColors[status] || { bg: '#F3F4F6', text: '#6B7280' };
   return (
     <span className="flex items-center gap-1.5">
       <span
@@ -337,7 +336,7 @@ export function SettingsMembersPage() {
         {[
           { label: '전체 멤버', value: members?.length || 0, icon: User },
           { label: '관리자', value: members?.filter(m => m.role === 'ADMIN' || m.role === 'OWNER').length || 0, icon: Shield },
-          { label: '활성 멤버', value: members?.filter(m => m.status === 'ACTIVATE').length || 0, icon: User },
+          { label: '활성 멤버', value: members?.filter(m => m.status === 'ACTIVE').length || 0, icon: User },
         ].map((stat, i) => (
           <div
             key={i}
