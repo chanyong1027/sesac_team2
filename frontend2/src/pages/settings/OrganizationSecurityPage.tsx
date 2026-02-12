@@ -5,6 +5,7 @@ import { organizationApi } from '@/api/organization.api';
 import { workspaceApi } from '@/api/workspace.api';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
+import { useAuthStore } from '@/features/auth/store';
 import type { OrganizationApiKeySummaryResponse, OrganizationMemberResponse } from '@/types/api.types';
 import { AlertCircle, Check, Copy, Download, Key, Plus, RefreshCw, Search, Shield, UserPlus } from 'lucide-react';
 
@@ -231,9 +232,12 @@ export function OrganizationSecurityPage() {
   const orgId = orgIdParam ? Number(orgIdParam) : currentOrgId ?? null;
   const queryClient = useQueryClient();
 
+  const { user } = useAuthStore();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'OWNER' | 'ADMIN' | 'MEMBER'>('ALL');
+  const [memberToRemove, setMemberToRemove] = useState<OrganizationMemberResponse | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const { data: members, isLoading: isMembersLoading, isError: isMembersError } = useQuery({
     queryKey: ['org-members', orgId],
@@ -259,8 +263,23 @@ export function OrganizationSecurityPage() {
     mutationFn: ({ memberId }: { memberId: number }) => organizationApi.removeMember(orgId!, memberId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['org-members', orgId] });
+      setMemberToRemove(null);
+      setRemoveError(null);
+    },
+    onError: (error: unknown) => {
+      let message = '멤버 퇴출에 실패했습니다.';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { message?: string } } };
+        message = axiosError.response?.data?.message || message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+      setRemoveError(message);
     },
   });
+
+  const currentMember = members?.find(m => m.userId === user?.id);
+  const canManageMembers = currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
 
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
   const [creatingKey, setCreatingKey] = useState(false);
@@ -457,19 +476,29 @@ export function OrganizationSecurityPage() {
                       {formatRelativeKorean(m.joinedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        type="button"
-                        disabled={removeMemberMutation.isPending}
-                        onClick={() => {
-                          if (confirm(`멤버를 퇴출할까요? (${m.email})`)) {
-                            removeMemberMutation.mutate({ memberId: m.memberId });
-                          }
-                        }}
-                        className="text-gray-400 hover:text-rose-200 transition-colors opacity-0 group-hover:opacity-100"
-                        title="퇴출"
-                      >
-                        ✕
-                      </button>
+                      {canManageMembers && m.role !== 'OWNER' && (() => {
+                        const isSelf = m.userId === user?.id;
+                        return (
+                          <button
+                            type="button"
+                            disabled={isSelf}
+                            onClick={() => {
+                              if (!isSelf) {
+                                setRemoveError(null);
+                                setMemberToRemove(m);
+                              }
+                            }}
+                            className={`transition-colors opacity-0 group-hover:opacity-100 ${
+                              isSelf
+                                ? 'text-gray-600 cursor-not-allowed'
+                                : 'text-gray-400 hover:text-rose-200'
+                            }`}
+                            title={isSelf ? '본인은 퇴출할 수 없습니다' : '퇴출'}
+                          >
+                            ✕
+                          </button>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))
@@ -530,6 +559,47 @@ export function OrganizationSecurityPage() {
 
       {/* Modals */}
       <InviteMemberModal orgId={orgId} isOpen={inviteOpen} onClose={() => setInviteOpen(false)} />
+
+      {memberToRemove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => { setMemberToRemove(null); setRemoveError(null); }}
+            aria-label="Close modal overlay"
+          />
+          <div className="relative w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl p-6">
+            <h3 className="text-lg font-semibold text-white mb-2">멤버 퇴출</h3>
+            <p className="text-sm text-gray-400 mb-6">
+              {memberToRemove.name}님을 조직에서 퇴출하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            {removeError && (
+              <div className="flex items-center gap-2 p-3 mb-4 text-sm text-rose-200 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{removeError}</span>
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setMemberToRemove(null); setRemoveError(null); }}
+                disabled={removeMemberMutation.isPending}
+                className="flex-1 h-10 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium disabled:opacity-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => removeMemberMutation.mutate({ memberId: memberToRemove.memberId })}
+                disabled={removeMemberMutation.isPending}
+                className="flex-1 h-10 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50"
+              >
+                {removeMemberMutation.isPending ? '처리 중...' : '퇴출'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(newKeyValue || rotatedKeyValue) ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
