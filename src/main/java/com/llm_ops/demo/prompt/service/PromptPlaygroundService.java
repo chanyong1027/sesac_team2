@@ -344,7 +344,7 @@ public class PromptPlaygroundService {
         String rendered = template;
         for (Map.Entry<String, ?> entry : variables.entrySet()) {
             String key = entry.getKey();
-            String value = String.valueOf(entry.getValue());
+            String value = entry.getValue() == null ? "" : String.valueOf(entry.getValue());
             rendered = rendered.replace("{{" + key + "}}", value);
             rendered = rendered.replace("{" + key + "}", value);
         }

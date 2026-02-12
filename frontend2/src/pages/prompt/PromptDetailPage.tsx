@@ -544,7 +544,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
     });
 
     const availableProviders = Array.from(
-        new Set((credentials || []).map((cred) => normalizeProviderKey(cred.provider)))
+        new Set((credentials || [])
+            .filter((cred) => cred.status === 'ACTIVE')
+            .map((cred) => normalizeProviderKey(cred.provider)))
     ).filter((provider) => providerLabel[provider]);
 
     const filteredPresets = presets.filter((preset) => availableProviders.includes(preset.data.provider));
@@ -1746,7 +1748,9 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         return n.toUpperCase();
     };
     const availableProviders = Array.from(
-        new Set((credentials || []).map((c) => normalizeProviderKey(c.provider)))
+        new Set((credentials || [])
+            .filter((c) => c.status === 'ACTIVE')
+            .map((c) => normalizeProviderKey(c.provider)))
     ).filter((p) => providerLabel[p]);
 
     const providerModels = useMemo(() => {
@@ -1798,7 +1802,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         }).catch((err) => {
             const msg = axios.isAxiosError(err)
                 ? err.response?.data?.message || err.message
-                : (err as Error).message;
+                : (err instanceof Error ? err.message : 'Unknown error');
             setVersionLoadError(msg);
         });
     }, [promptId]);
@@ -1829,7 +1833,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         },
         onSuccess: (data) => { setResult(data); },
         onError: (err) => {
-            const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err as Error).message;
+            const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err instanceof Error ? err.message : 'Unknown error');
             setRunError(msg);
             setResult(null);
         },
@@ -1857,7 +1861,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
             setReleaseAfterSave(false);
         },
         onError: (err) => {
-            const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err as Error).message;
+            const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err instanceof Error ? err.message : 'Unknown error');
             setSaveError(msg);
         },
     });
@@ -2175,7 +2179,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                     type="button"
                                     onClick={async () => {
                                         try {
-                                            await navigator.clipboard.writeText(result.answer);
+                                            await navigator.clipboard.writeText(result.answer ?? '');
                                             setOutputCopied(true);
                                             setTimeout(() => setOutputCopied(false), 2000);
                                         } catch { /* ignore */ }
@@ -2195,7 +2199,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                             )}
                             {result ? (
                                 <pre className="text-sm text-gray-200 whitespace-pre-wrap font-sans leading-relaxed">
-                                    {result.answer}
+                                    {result.answer ?? '(응답 없음)'}
                                 </pre>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-600 gap-3">
