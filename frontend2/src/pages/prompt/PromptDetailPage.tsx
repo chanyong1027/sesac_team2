@@ -311,7 +311,7 @@ function OverviewTab({
                             />
                             <button
                                 type="button"
-                                onClick={() => navigator.clipboard.writeText(prompt.promptKey)}
+                                onClick={async () => { try { await navigator.clipboard.writeText(prompt.promptKey); } catch { /* ignore */ } }}
                                 className="absolute right-3 top-3 text-gray-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
                                 aria-label="copy prompt key"
                             >
@@ -1831,6 +1831,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         onError: (err) => {
             const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err as Error).message;
             setRunError(msg);
+            setResult(null);
         },
     });
 
@@ -2172,10 +2173,12 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                             {result && (
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(result.answer);
-                                        setOutputCopied(true);
-                                        setTimeout(() => setOutputCopied(false), 2000);
+                                    onClick={async () => {
+                                        try {
+                                            await navigator.clipboard.writeText(result.answer);
+                                            setOutputCopied(true);
+                                            setTimeout(() => setOutputCopied(false), 2000);
+                                        } catch { /* ignore */ }
                                     }}
                                     className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
                                 >
