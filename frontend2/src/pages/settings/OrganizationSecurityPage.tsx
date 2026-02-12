@@ -41,8 +41,8 @@ function RoleBadge({ role }: { role: string }) {
 
 function StatusDot({ status }: { status: string }) {
   const color =
-    status === 'ACTIVATE' ? 'bg-green-500' : status === 'PENDING' ? 'bg-yellow-500' : 'bg-gray-500';
-  const label = status === 'ACTIVATE' ? 'Active' : status === 'PENDING' ? 'Pending' : 'Inactive';
+    status === 'ACTIVE' ? 'bg-green-500' : status === 'DELETED' ? 'bg-red-500' : 'bg-gray-500';
+  const label = status === 'ACTIVE' ? 'Active' : status === 'DELETED' ? 'Deleted' : status;
   return (
     <span className="flex items-center gap-2">
       <span className={`size-2 rounded-full ${color}`} />
@@ -119,9 +119,9 @@ function InviteMemberModal({
                     onChange={(e) => setSelectedWorkspaceId(e.target.value ? Number(e.target.value) : null)}
                     className="w-full h-10 px-3 rounded-lg bg-[color:rgba(255,255,255,0.04)] border border-[color:rgba(255,255,255,0.10)] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)]"
                   >
-                    <option value="">선택하세요</option>
+                    <option value="" className="bg-[#1a1a2e] text-gray-300">선택하세요</option>
                     {available.map((ws) => (
-                      <option key={ws.id} value={ws.id}>
+                      <option key={ws.id} value={ws.id} className="bg-[#1a1a2e] text-white">
                         {ws.displayName}
                       </option>
                     ))}
@@ -390,10 +390,10 @@ export function OrganizationSecurityPage() {
               onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
               className="h-10 pl-3 pr-8 rounded-lg bg-[color:rgba(0,0,0,0.18)] border border-[color:rgba(255,255,255,0.10)] text-sm text-gray-200 focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)] cursor-pointer"
             >
-              <option value="ALL">모든 역할</option>
-              <option value="OWNER">소유자</option>
-              <option value="ADMIN">관리자</option>
-              <option value="MEMBER">멤버</option>
+              <option value="ALL" className="bg-[#1a1a2e] text-gray-300">모든 역할</option>
+              <option value="OWNER" className="bg-[#1a1a2e] text-white">소유자</option>
+              <option value="ADMIN" className="bg-[#1a1a2e] text-white">관리자</option>
+              <option value="MEMBER" className="bg-[#1a1a2e] text-white">멤버</option>
             </select>
           </div>
         </div>
