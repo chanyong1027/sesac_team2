@@ -38,6 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -285,6 +286,7 @@ public class PromptPlaygroundService {
         }
     }
 
+    @Transactional
     public PlaygroundSaveVersionResponse saveAsVersion(Long promptId, Long userId, PlaygroundSaveVersionRequest request) {
         PromptVersionCreateRequest versionRequest = new PromptVersionCreateRequest(
                 request.title(),
@@ -332,6 +334,10 @@ public class PromptPlaygroundService {
     }
 
     private String renderPrompt(String template, Map<String, ?> variables) {
+        if (template == null) {
+            return "";
+        }
+
         if (variables == null || variables.isEmpty()) {
             return template;
         }
