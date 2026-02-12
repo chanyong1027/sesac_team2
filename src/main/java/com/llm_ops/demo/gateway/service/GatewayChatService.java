@@ -55,10 +55,11 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
-    private static final String RAG_CONTEXT_TEMPLATE = """
+    private static final String RAG_CONTEXT_PREFIX = """
             다음은 질문과 관련된 참고 문서입니다:
 
-            %s
+            """;
+    private static final String RAG_CONTEXT_SUFFIX = """
 
             위 문서를 참고하여 다음 질문에 답변해주세요:
 
@@ -228,7 +229,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
-                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context()) + prompt;
+                        prompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + prompt;
                     }
                 }
             }

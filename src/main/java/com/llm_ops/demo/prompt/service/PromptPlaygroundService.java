@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,10 +46,11 @@ public class PromptPlaygroundService {
 
     private static final String PLAYGROUND_REQUEST_PATH = "/api/v1/prompts/playground/run";
     private static final String PLAYGROUND_HTTP_METHOD = "POST";
-    private static final String RAG_CONTEXT_TEMPLATE = """
+    private static final String RAG_CONTEXT_PREFIX = """
             다음은 질문과 관련된 참고 문서입니다:
 
-            %s
+            """;
+    private static final String RAG_CONTEXT_SUFFIX = """
 
             위 문서를 참고하여 다음 질문에 답변해주세요:
 
@@ -73,7 +74,7 @@ public class PromptPlaygroundService {
             WorkspaceMemberRepository workspaceMemberRepository,
             ProviderCredentialService providerCredentialService,
             LlmCallService llmCallService,
-            @Autowired(required = false) RagSearchService ragSearchService,
+            @Nullable RagSearchService ragSearchService,
             RagContextBuilder ragContextBuilder,
             WorkspaceRagSettingsService workspaceRagSettingsService,
             RequestLogWriter requestLogWriter,
@@ -167,7 +168,7 @@ public class PromptPlaygroundService {
                     ragContextChars = result.contextChars();
                     ragContextTruncated = result.truncated();
                     ragContextHash = sha256HexOrNull(result.context());
-                    finalPrompt = String.format(RAG_CONTEXT_TEMPLATE, result.context()) + finalPrompt;
+                    finalPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + finalPrompt;
                 }
             }
 
