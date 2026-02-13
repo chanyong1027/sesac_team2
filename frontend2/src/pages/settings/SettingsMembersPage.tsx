@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
 import { workspaceApi } from '@/api/workspace.api';
-import type { OrganizationMemberResponse } from '@/types/api.types';
+import type { OrganizationMemberResponse, OrganizationRole } from '@/types/api.types';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 import { useAuthStore } from '@/features/auth/store';
@@ -308,6 +308,18 @@ export function SettingsMembersPage() {
     },
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ memberId, role }: { memberId: number; role: OrganizationRole }) => {
+      if (!currentOrgId) throw new Error("No organization selected");
+      return organizationApi.updateMemberRole(currentOrgId, memberId, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organization-members'] });
+    },
+  });
+
+  const isOwner = currentMember?.role === 'OWNER';
+
   if (!currentOrgId) return <div>조직을 선택해주세요.</div>;
 
   return (
@@ -390,7 +402,24 @@ export function SettingsMembersPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <RoleBadge role={member.role} />
+                  {isOwner && member.role !== 'OWNER' && member.userId !== user?.id ? (
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        updateRoleMutation.mutate({
+                          memberId: member.memberId,
+                          role: e.target.value as OrganizationRole,
+                        })
+                      }
+                      disabled={updateRoleMutation.isPending}
+                      className="px-2 py-1 text-xs font-medium rounded-full border border-gray-300 bg-white text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="ADMIN">ADMIN</option>
+                      <option value="MEMBER">MEMBER</option>
+                    </select>
+                  ) : (
+                    <RoleBadge role={member.role} />
+                  )}
                 </div>
 
                 <div className="col-span-2">

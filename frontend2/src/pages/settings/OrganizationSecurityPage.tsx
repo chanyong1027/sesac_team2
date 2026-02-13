@@ -6,7 +6,7 @@ import { workspaceApi } from '@/api/workspace.api';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useAuthStore } from '@/features/auth/store';
-import type { OrganizationApiKeySummaryResponse, OrganizationMemberResponse } from '@/types/api.types';
+import type { OrganizationApiKeySummaryResponse, OrganizationMemberResponse, OrganizationRole } from '@/types/api.types';
 import { AlertCircle, Check, Copy, Download, Key, Plus, RefreshCw, Search, Shield, UserPlus } from 'lucide-react';
 
 function formatRelativeKorean(iso: string) {
@@ -278,8 +278,17 @@ export function OrganizationSecurityPage() {
     },
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ memberId, role }: { memberId: number; role: OrganizationRole }) =>
+      organizationApi.updateMemberRole(orgId!, memberId, { role }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['org-members', orgId] });
+    },
+  });
+
   const currentMember = members?.find(m => m.userId === user?.id);
   const canManageMembers = currentMember?.role === 'OWNER' || currentMember?.role === 'ADMIN';
+  const isOwner = currentMember?.role === 'OWNER';
 
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
   const [creatingKey, setCreatingKey] = useState(false);
@@ -467,7 +476,24 @@ export function OrganizationSecurityPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <RoleBadge role={m.role} />
+                      {isOwner && m.role !== 'OWNER' && m.userId !== user?.id ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) =>
+                            updateRoleMutation.mutate({
+                              memberId: m.memberId,
+                              role: e.target.value as OrganizationRole,
+                            })
+                          }
+                          disabled={updateRoleMutation.isPending}
+                          className="px-2 py-1 text-xs font-medium rounded-full border border-[color:rgba(255,255,255,0.15)] bg-[color:rgba(255,255,255,0.06)] text-gray-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)]"
+                        >
+                          <option value="ADMIN" className="bg-[#1a1a2e] text-white">관리자</option>
+                          <option value="MEMBER" className="bg-[#1a1a2e] text-white">멤버</option>
+                        </select>
+                      ) : (
+                        <RoleBadge role={m.role} />
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusDot status={m.status} />
