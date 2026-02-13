@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '@/api/organization.api';
 import { workspaceApi } from '@/api/workspace.api';
-import type { OrganizationMemberResponse } from '@/types/api.types';
+import type { OrganizationMemberResponse, OrganizationRole } from '@/types/api.types';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 import { useAuthStore } from '@/features/auth/store';
@@ -15,9 +15,8 @@ const roleColors: Record<string, { bg: string; text: string; border: string }> =
 };
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  ACTIVATE: { bg: '#D1FAE5', text: '#065F46' },
-  INACTIVE: { bg: '#FEE2E2', text: '#991B1B' },
-  PENDING: { bg: '#FEF3C7', text: '#92400E' },
+  ACTIVE: { bg: '#D1FAE5', text: '#065F46' },
+  DELETED: { bg: '#FEE2E2', text: '#991B1B' },
 };
 
 function RoleBadge({ role }: { role: string }) {
@@ -37,7 +36,7 @@ function RoleBadge({ role }: { role: string }) {
 }
 
 function StatusDot({ status }: { status: string }) {
-  const colors = statusColors[status] || statusColors.INACTIVE;
+  const colors = statusColors[status] || { bg: '#F3F4F6', text: '#6B7280' };
   return (
     <span className="flex items-center gap-1.5">
       <span
@@ -214,6 +213,7 @@ function ConfirmModal({
   message,
   confirmText = '확인',
   isLoading = false,
+  error,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -222,6 +222,7 @@ function ConfirmModal({
   message: string;
   confirmText?: string;
   isLoading?: boolean;
+  error?: string | null;
 }) {
   if (!isOpen) return null;
 
@@ -236,6 +237,12 @@ function ConfirmModal({
           {title}
         </h3>
         <p className="text-sm text-gray-500 mb-6">{message}</p>
+        {error && (
+          <div className="flex items-center gap-2 p-3 mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
         <div className="flex gap-3">
           <button
             onClick={onClose}
@@ -260,6 +267,7 @@ function ConfirmModal({
 export function SettingsMembersPage() {
   const queryClient = useQueryClient();
   const [memberToRemove, setMemberToRemove] = useState<OrganizationMemberResponse | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const { currentOrgId } = useOrganizationStore();
   const { user } = useAuthStore();
@@ -286,8 +294,31 @@ export function SettingsMembersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['organization-members'] });
       setMemberToRemove(null);
+      setRemoveError(null);
+    },
+    onError: (error: unknown) => {
+      let message = '멤버 퇴출에 실패했습니다.';
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: { message?: string } } };
+        message = axiosError.response?.data?.message || message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+      setRemoveError(message);
     },
   });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ memberId, role }: { memberId: number; role: OrganizationRole }) => {
+      if (!currentOrgId) throw new Error("No organization selected");
+      return organizationApi.updateMemberRole(currentOrgId, memberId, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['organization-members'] });
+    },
+  });
+
+  const isOwner = currentMember?.role === 'OWNER';
 
   if (!currentOrgId) return <div>조직을 선택해주세요.</div>;
 
@@ -317,7 +348,7 @@ export function SettingsMembersPage() {
         {[
           { label: '전체 멤버', value: members?.length || 0, icon: User },
           { label: '관리자', value: members?.filter(m => m.role === 'ADMIN' || m.role === 'OWNER').length || 0, icon: Shield },
-          { label: '활성 멤버', value: members?.filter(m => m.status === 'ACTIVATE').length || 0, icon: User },
+          { label: '활성 멤버', value: members?.filter(m => m.status === 'ACTIVE').length || 0, icon: User },
         ].map((stat, i) => (
           <div
             key={i}
@@ -371,7 +402,24 @@ export function SettingsMembersPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <RoleBadge role={member.role} />
+                  {isOwner && member.role !== 'OWNER' && member.userId !== user?.id ? (
+                    <select
+                      value={member.role}
+                      onChange={(e) =>
+                        updateRoleMutation.mutate({
+                          memberId: member.memberId,
+                          role: e.target.value as OrganizationRole,
+                        })
+                      }
+                      disabled={updateRoleMutation.isPending}
+                      className="px-2 py-1 text-xs font-medium rounded-full border border-gray-300 bg-white text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="ADMIN">ADMIN</option>
+                      <option value="MEMBER">MEMBER</option>
+                    </select>
+                  ) : (
+                    <RoleBadge role={member.role} />
+                  )}
                 </div>
 
                 <div className="col-span-2">
@@ -390,14 +438,29 @@ export function SettingsMembersPage() {
 
                 <div className="col-span-1 flex justify-end">
                   {canManageMembers && member.role !== 'OWNER' && (
-                    <button
-                      onClick={() => setMemberToRemove(member)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                      title="퇴출"
-                    >
-                      <User size={16} className="rotate-45" />
-                      <span className="sr-only">퇴출</span>
-                    </button>
+                    (() => {
+                      const isSelf = member.userId === user?.id;
+                      return (
+                        <button
+                          onClick={() => {
+                            if (!isSelf) {
+                              setRemoveError(null);
+                              setMemberToRemove(member);
+                            }
+                          }}
+                          disabled={isSelf}
+                          className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${
+                            isSelf
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                          }`}
+                          title={isSelf ? '본인은 퇴출할 수 없습니다' : '퇴출'}
+                        >
+                          <User size={16} className="rotate-45" />
+                          <span className="sr-only">퇴출</span>
+                        </button>
+                      );
+                    })()
                   )}
                 </div>
               </div>
@@ -424,7 +487,10 @@ export function SettingsMembersPage() {
 
       <ConfirmModal
         isOpen={!!memberToRemove}
-        onClose={() => setMemberToRemove(null)}
+        onClose={() => {
+          setMemberToRemove(null);
+          setRemoveError(null);
+        }}
         onConfirm={() => {
           if (memberToRemove) {
             removeMutation.mutate(memberToRemove.memberId);
@@ -434,6 +500,7 @@ export function SettingsMembersPage() {
         message={`${memberToRemove?.name}님을 조직에서 퇴출하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
         confirmText="퇴출"
         isLoading={removeMutation.isPending}
+        error={removeError}
       />
 
       <InviteMemberModal

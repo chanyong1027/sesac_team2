@@ -4,6 +4,8 @@ import type {
   OrganizationCreateResponse,
   OrganizationMemberResponse,
   OrganizationMemberRemoveResponse,
+  OrganizationMemberRoleUpdateRequest,
+  OrganizationMemberRoleUpdateResponse,
   ProviderCredentialCreateRequest,
   ProviderCredentialCreateResponse,
   ProviderCredentialSummaryResponse,
@@ -27,6 +29,13 @@ export const organizationApi = {
   getMembers: (orgId: number) =>
     api.get<OrganizationMemberResponse[]>(
       `/organizations/${orgId}/members`
+    ),
+
+  // 멤버 역할 변경 - PATCH /api/v1/organizations/{orgId}/members/{memberId}
+  updateMemberRole: (orgId: number, memberId: number, data: OrganizationMemberRoleUpdateRequest) =>
+    api.patch<OrganizationMemberRoleUpdateResponse>(
+      `/organizations/${orgId}/members/${memberId}`,
+      data
     ),
 
   // 멤버 퇴출 - 현재 백엔드: DELETE /api/v1/organizations/{orgId}/members/{memberId}

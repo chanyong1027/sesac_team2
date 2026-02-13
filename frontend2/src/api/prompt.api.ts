@@ -13,7 +13,11 @@ import type {
     PromptReleaseResponse,
     PromptReleaseRequest,
     PromptReleaseHistoryResponse,
-    PromptRollbackRequest
+    PromptRollbackRequest,
+    PlaygroundRunRequest,
+    PlaygroundRunResponse,
+    PlaygroundSaveVersionRequest,
+    PlaygroundSaveVersionResponse,
 } from '@/types/api.types';
 
 export const promptApi = {
@@ -70,4 +74,13 @@ export const promptApi = {
 
     rollbackPrompt: (promptId: number, data: PromptRollbackRequest) =>
         api.post<PromptReleaseResponse>(`/prompts/${promptId}/rollback`, data),
+
+    // =================================================================
+    // Prompt Playground
+    // =================================================================
+    playgroundRun: (promptId: number, data: PlaygroundRunRequest) =>
+        api.post<PlaygroundRunResponse>(`/prompts/${promptId}/playground/run`, data),
+
+    playgroundSave: (promptId: number, data: PlaygroundSaveVersionRequest) =>
+        api.post<PlaygroundSaveVersionResponse>(`/prompts/${promptId}/playground/save`, data),
 };
