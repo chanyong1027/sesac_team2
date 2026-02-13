@@ -139,7 +139,7 @@ public class PromptVersionService {
     }
 
     private boolean containsQuestionPlaceholder(String template) {
-        return template.contains("{{question}}") || template.contains("{question}");
+        return template.contains("{{question}}");
     }
 
     private void validateSecondaryModel(PromptVersionCreateRequest request) {

@@ -347,7 +347,6 @@ public class PromptPlaygroundService {
             String key = entry.getKey();
             String value = entry.getValue() == null ? "" : String.valueOf(entry.getValue());
             rendered = rendered.replace("{{" + key + "}}", value);
-            rendered = rendered.replace("{" + key + "}", value);
         }
         return rendered;
     }
