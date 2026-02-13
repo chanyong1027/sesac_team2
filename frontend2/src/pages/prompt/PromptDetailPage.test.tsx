@@ -84,6 +84,7 @@ beforeEach(() => {
       secondaryModel: null,
       systemPrompt: 'system',
       userTemplate: '질문: {{question}}',
+      ragEnabled: false,
       modelConfig: {},
       createdBy: 1,
       createdAt: '2026-02-01T00:00:00Z',

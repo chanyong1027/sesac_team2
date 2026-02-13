@@ -38,7 +38,8 @@ public class RequestLogWriter {
                                 request.requestPath(),
                                 request.httpMethod(),
                                 request.promptKey(),
-                                request.ragEnabled());
+                                request.ragEnabled(),
+                                request.requestSource());
                 requestLogRepository.save(requestLog);
                 return requestId;
         }
@@ -182,7 +183,8 @@ public class RequestLogWriter {
                         String requestPath,
                         String httpMethod,
                         String promptKey,
-                        boolean ragEnabled) {
+                        boolean ragEnabled,
+                        String requestSource) {
         }
 
         public record SuccessUpdate(

@@ -198,7 +198,8 @@ class RequestLogQueryServiceTest {
                 "/v1/chat",
                 "POST",
                 "test-prompt",
-                false);
+                false,
+                "GATEWAY");
         if (status == RequestLogStatus.SUCCESS) {
             log.markSuccess(java.time.LocalDateTime.now(), 200, 100);
         } else if (status == RequestLogStatus.FAIL) {

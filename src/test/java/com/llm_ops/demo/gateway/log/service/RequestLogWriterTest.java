@@ -44,7 +44,8 @@ class RequestLogWriterTest {
                                 "/v1/chat/completions",
                                 "POST",
                                 "prompt-key",
-                                false));
+                                false,
+                                "GATEWAY"));
 
                 requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                                 200,
@@ -104,7 +105,8 @@ class RequestLogWriterTest {
                                 "/v1/chat/completions",
                                 "POST",
                                 "prompt-key",
-                                false));
+                                false,
+                                "GATEWAY"));
 
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                                 502,
