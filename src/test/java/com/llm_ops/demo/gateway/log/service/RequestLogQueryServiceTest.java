@@ -198,11 +198,13 @@ class RequestLogQueryServiceTest {
                 "/v1/chat",
                 "POST",
                 "test-prompt",
-                false);
+                false,
+                null,
+                "GATEWAY");
         if (status == RequestLogStatus.SUCCESS) {
-            log.markSuccess(java.time.LocalDateTime.now(), 200, 100);
+            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, null);
         } else if (status == RequestLogStatus.FAIL) {
-            log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR");
+            log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR", null);
         }
         return log;
     }

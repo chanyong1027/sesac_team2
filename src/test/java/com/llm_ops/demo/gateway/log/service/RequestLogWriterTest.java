@@ -44,7 +44,9 @@ class RequestLogWriterTest {
                                 "/v1/chat/completions",
                                 "POST",
                                 "prompt-key",
-                                false));
+                                false,
+                                "{\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}",
+                                "GATEWAY"));
 
                 requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                                 200,
@@ -66,7 +68,9 @@ class RequestLogWriterTest {
                                 true,
                                 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                                 5,
-                                0.7));
+                                0.7,
+                                "Hello! I'm an AI assistant.",
+                                null));
 
                 // 비동기 처리 완료 대기
                 Thread.sleep(1000);
@@ -90,6 +94,10 @@ class RequestLogWriterTest {
                                 .isEqualTo("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
                 assertThat(saved.getRagTopK()).isEqualTo(5);
                 assertThat(saved.getRagSimilarityThreshold()).isEqualTo(0.7);
+                assertThat(saved.getRequestPayload())
+                                .isEqualTo("{\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}");
+                assertThat(saved.getResponsePayload()).isEqualTo("Hello! I'm an AI assistant.");
+                assertThat(saved.getRequestSource()).isEqualTo("GATEWAY");
         }
 
         @Test
@@ -104,7 +112,9 @@ class RequestLogWriterTest {
                                 "/v1/chat/completions",
                                 "POST",
                                 "prompt-key",
-                                false));
+                                false,
+                                "{\"messages\":[{\"role\":\"user\",\"content\":\"fail test\"}]}",
+                                "GATEWAY"));
 
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                                 502,
@@ -129,7 +139,9 @@ class RequestLogWriterTest {
                                 false,
                                 null,
                                 3,
-                                0.5));
+                                0.5,
+                                "Error: bad gateway",
+                                null));
 
                 // 비동기 처리 완료 대기
                 Thread.sleep(1000);
@@ -149,6 +161,6 @@ class RequestLogWriterTest {
                 assertThat(saved.getRagContextChars()).isEqualTo(0);
                 assertThat(saved.getRagContextTruncated()).isFalse();
                 assertThat(saved.getRagContextHash()).isNull();
+                assertThat(saved.getResponsePayload()).isEqualTo("Error: bad gateway");
         }
 }
-
