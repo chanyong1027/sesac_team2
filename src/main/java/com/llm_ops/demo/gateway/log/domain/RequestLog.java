@@ -1,13 +1,17 @@
 package com.llm_ops.demo.gateway.log.domain;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -135,6 +139,20 @@ public class RequestLog {
     @Column(name = "rag_context_hash", length = 64)
     private String ragContextHash;
 
+    // === 신규 필드: Payload & Source ===
+
+    @Column(name = "request_payload", columnDefinition = "TEXT")
+    private String requestPayload;
+
+    @Column(name = "response_payload", columnDefinition = "TEXT")
+    private String responsePayload;
+
+    @Column(name = "request_source", nullable = false, length = 16)
+    private String requestSource;
+
+    @OneToMany(mappedBy = "requestLog", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RetrievedDocument> retrievedDocuments = new ArrayList<>();
+
     public static RequestLog loggingStart(
             UUID requestId,
             String traceId,
@@ -145,7 +163,9 @@ public class RequestLog {
             String requestPath,
             String httpMethod,
             String promptKey,
-            boolean ragEnabled) {
+            boolean ragEnabled,
+            String requestPayload,
+            String requestSource) {
         Objects.requireNonNull(traceId, "traceId는 필수입니다");
         Objects.requireNonNull(organizationId, "organizationId는 필수입니다");
         Objects.requireNonNull(workspaceId, "workspaceId는 필수입니다");
@@ -164,12 +184,15 @@ public class RequestLog {
         requestLog.httpMethod = httpMethod;
         requestLog.promptKey = promptKey;
         requestLog.ragEnabled = ragEnabled;
+        requestLog.requestPayload = requestPayload;
+        requestLog.requestSource = requestSource != null ? requestSource : "GATEWAY";
         requestLog.status = RequestLogStatus.IN_PROGRESS;
         requestLog.currency = "USD";
         return requestLog;
     }
 
-    public void markSuccess(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs) {
+    public void markSuccess(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs,
+            String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
             return;
         }
@@ -177,10 +200,11 @@ public class RequestLog {
         this.finishedAt = finishedAt;
         this.httpStatus = httpStatus;
         this.latencyMs = latencyMs;
+        this.responsePayload = responsePayload;
     }
 
     public void markFail(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode,
-            String errorMessage, String failReason) {
+            String errorMessage, String failReason, String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
             return;
         }
@@ -191,10 +215,11 @@ public class RequestLog {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.failReason = failReason;
+        this.responsePayload = responsePayload;
     }
 
     public void markBlocked(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode,
-            String errorMessage, String failReason) {
+            String errorMessage, String failReason, String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL
                 || this.status == RequestLogStatus.BLOCKED) {
             return;
@@ -206,7 +231,15 @@ public class RequestLog {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.failReason = failReason;
+        this.responsePayload = responsePayload;
     }
+
+    public void addRetrievedDocuments(List<RetrievedDocument> documents) {
+        if (documents != null) {
+            this.retrievedDocuments.addAll(documents);
+        }
+    }
+
     public void fillPromptInfo(Long promptId, Long promptVersionId) {
         // start 시점에는 prompt_id/version_id를 모르는 경우가 있어, 성공/실패 업데이트 시 채웁니다.
         // 이미 값이 존재하면(예: 추후 확장으로 start에서 세팅) 덮어쓰지 않습니다.
