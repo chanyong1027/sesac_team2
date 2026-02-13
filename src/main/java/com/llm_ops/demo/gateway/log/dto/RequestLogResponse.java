@@ -3,6 +3,7 @@ package com.llm_ops.demo.gateway.log.dto;
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,8 +30,19 @@ public record RequestLogResponse(
         String errorMessage,
         String failReason,
         LocalDateTime createdAt,
-        LocalDateTime finishedAt) {
+        LocalDateTime finishedAt,
+        String requestPayload,
+        String responsePayload,
+        String requestSource,
+        List<RetrievedDocumentResponse> retrievedDocuments) {
+
     public static RequestLogResponse from(RequestLog log) {
+        List<RetrievedDocumentResponse> docs = log.getRetrievedDocuments() != null
+                ? log.getRetrievedDocuments().stream()
+                        .map(RetrievedDocumentResponse::from)
+                        .toList()
+                : List.of();
+
         return new RequestLogResponse(
                 log.getRequestId(),
                 log.getTraceId(),
@@ -52,6 +64,10 @@ public record RequestLogResponse(
                 log.getErrorMessage(),
                 log.getFailReason(),
                 log.getCreatedAt(),
-                log.getFinishedAt());
+                log.getFinishedAt(),
+                log.getRequestPayload(),
+                log.getResponsePayload(),
+                log.getRequestSource(),
+                docs);
     }
 }
