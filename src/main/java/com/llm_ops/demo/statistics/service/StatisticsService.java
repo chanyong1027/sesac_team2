@@ -1,15 +1,19 @@
 package com.llm_ops.demo.statistics.service;
 
+import com.llm_ops.demo.gateway.log.dto.projection.ErrorDistributionProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.ModelUsageProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.OverviewStatsProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.PromptUsageProjection;
+import com.llm_ops.demo.gateway.log.dto.projection.RagQualityProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.TimeseriesDataProjection;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
+import com.llm_ops.demo.statistics.dto.ErrorDistributionResponse;
 import com.llm_ops.demo.statistics.dto.ModelUsageResponse;
 import com.llm_ops.demo.statistics.dto.ModelUsageResponse.ModelUsageItem;
 import com.llm_ops.demo.statistics.dto.OverviewResponse;
 import com.llm_ops.demo.statistics.dto.PromptUsageResponse;
 import com.llm_ops.demo.statistics.dto.PromptUsageResponse.PromptUsageItem;
+import com.llm_ops.demo.statistics.dto.RagQualityResponse;
 import com.llm_ops.demo.statistics.dto.TimeseriesResponse;
 import com.llm_ops.demo.statistics.dto.TimeseriesResponse.TimeseriesDataPoint;
 import java.math.BigDecimal;
@@ -190,6 +194,44 @@ public class StatisticsService {
                                 .toList();
 
                 return new PromptUsageResponse(items);
+        }
+
+        /**
+         * 에러 분포 통계 조회 (status + errorCode + failReason 3축)
+         */
+        @Transactional(readOnly = true)
+        public ErrorDistributionResponse getErrorDistribution(
+                        Long organizationId,
+                        Long workspaceId,
+                        LocalDateTime from,
+                        LocalDateTime to) {
+
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+
+                List<ErrorDistributionProjection> projections = requestLogRepository.getErrorDistribution(
+                                organizationId, workspaceId, currentFrom, currentTo);
+
+                return ErrorDistributionResponse.from(projections);
+        }
+
+        /**
+         * RAG 품질 통계 조회 (hitRate, avgSimilarity, truncation 등)
+         */
+        @Transactional(readOnly = true)
+        public RagQualityResponse getRagQuality(
+                        Long organizationId,
+                        Long workspaceId,
+                        LocalDateTime from,
+                        LocalDateTime to) {
+
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+
+                RagQualityProjection projection = requestLogRepository.getRagQuality(
+                                organizationId, workspaceId, currentFrom, currentTo);
+
+                return RagQualityResponse.from(projection);
         }
 
         /**
