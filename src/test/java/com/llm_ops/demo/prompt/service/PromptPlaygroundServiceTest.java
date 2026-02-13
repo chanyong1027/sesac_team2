@@ -35,6 +35,7 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +50,6 @@ import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class PromptPlaygroundServiceTest {
@@ -83,8 +83,9 @@ class PromptPlaygroundServiceTest {
     }
 
     @Test
-    @DisplayName("플레이그라운드 실행 성공")
-    void run_Success() {
+    @DisplayName("정상 요청이 주어졌을 때 실행하면 LLM 응답을 반환한다")
+    void 정상_요청이_주어졌을_때_실행하면_LLM_응답을_반환한다() {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
 
@@ -116,8 +117,10 @@ class PromptPlaygroundServiceTest {
                 false, null,
                 Map.of("question", "안녕하세요?"), null);
 
+        // when
         PlaygroundRunResponse response = service.run(promptId, userId, request);
 
+        // then
         assertThat(response.answer()).isEqualTo("테스트 응답입니다.");
         assertThat(response.usedModel()).isEqualTo("gpt-4o-2024-05-13");
         assertThat(response.usage().inputTokens()).isEqualTo(100);
@@ -130,8 +133,9 @@ class PromptPlaygroundServiceTest {
     }
 
     @Test
-    @DisplayName("프롬프트가 없으면 NOT_FOUND")
-    void run_PromptNotFound() {
+    @DisplayName("존재하지 않는 프롬프트ID가 주어졌을 때 실행하면 NOT_FOUND 예외가 발생한다")
+    void 존재하지_않는_프롬프트ID가_주어졌을_때_실행하면_NOT_FOUND_예외가_발생한다() {
+        // given
         Long promptId = 999L;
         Long userId = 1L;
 
@@ -142,6 +146,7 @@ class PromptPlaygroundServiceTest {
                 ProviderType.OPENAI, "gpt-4o", null, "{{question}}",
                 false, null, Map.of("question", "test"), null);
 
+        // when & then
         assertThatThrownBy(() -> service.run(promptId, userId, request))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
@@ -149,8 +154,9 @@ class PromptPlaygroundServiceTest {
     }
 
     @Test
-    @DisplayName("워크스페이스 멤버가 아니면 FORBIDDEN")
-    void run_NotMember() {
+    @DisplayName("워크스페이스 멤버가 아닌 사용자가 주어졌을 때 실행하면 FORBIDDEN 예외가 발생한다")
+    void 워크스페이스_멤버가_아닌_사용자가_주어졌을_때_실행하면_FORBIDDEN_예외가_발생한다() {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
 
@@ -163,6 +169,7 @@ class PromptPlaygroundServiceTest {
                 ProviderType.OPENAI, "gpt-4o", null, "{{question}}",
                 false, null, Map.of("question", "test"), null);
 
+        // when & then
         assertThatThrownBy(() -> service.run(promptId, userId, request))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
@@ -170,8 +177,9 @@ class PromptPlaygroundServiceTest {
     }
 
     @Test
-    @DisplayName("버전 저장 성공 (배포 없음)")
-    void saveAsVersion_WithoutRelease() {
+    @DisplayName("배포없이 저장 요청이 주어졌을 때 저장하면 버전만 생성하고 배포하지 않는다")
+    void 배포없이_저장_요청이_주어졌을_때_저장하면_버전만_생성하고_배포하지_않는다() {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
 
@@ -185,16 +193,19 @@ class PromptPlaygroundServiceTest {
                 null, null, "system", "{{question}}",
                 false, null, null, false);
 
+        // when
         PlaygroundSaveVersionResponse response = service.saveAsVersion(promptId, userId, request);
 
+        // then
         assertThat(response.version().id()).isEqualTo(10L);
         assertThat(response.released()).isFalse();
         verify(promptReleaseService, never()).release(any(), any(), any());
     }
 
     @Test
-    @DisplayName("버전 저장 + 즉시 배포 성공")
-    void saveAsVersion_WithRelease() {
+    @DisplayName("즉시배포 저장 요청이 주어졌을 때 저장하면 버전 생성 후 배포도 수행한다")
+    void 즉시배포_저장_요청이_주어졌을_때_저장하면_버전_생성_후_배포도_수행한다() {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
 
@@ -210,8 +221,10 @@ class PromptPlaygroundServiceTest {
                 null, null, "system", "{{question}}",
                 false, null, null, true);
 
+        // when
         PlaygroundSaveVersionResponse response = service.saveAsVersion(promptId, userId, request);
 
+        // then
         assertThat(response.version().id()).isEqualTo(10L);
         assertThat(response.released()).isTrue();
         verify(promptReleaseService).release(eq(promptId), eq(userId), any(PromptReleaseRequest.class));
