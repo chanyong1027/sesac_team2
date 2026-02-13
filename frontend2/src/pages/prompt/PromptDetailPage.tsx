@@ -1788,6 +1788,33 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         }
     }, [providerModels, model]);
 
+    const secondaryProviderModels = useMemo(() => {
+        if (!modelAllowlist || !secondaryProvider) return [];
+        return modelAllowlist[secondaryProvider as ProviderType] ?? [];
+    }, [modelAllowlist, secondaryProvider]);
+
+    useEffect(() => {
+        if (!secondaryProvider) return;
+        if (!availableProviders.includes(secondaryProvider)) {
+            setSecondaryProvider('');
+            setSecondaryModel('');
+        }
+    }, [availableProviders, secondaryProvider]);
+
+    useEffect(() => {
+        if (!secondaryProvider) {
+            if (secondaryModel) setSecondaryModel('');
+            return;
+        }
+        if (!secondaryProviderModels.length) {
+            if (secondaryModel) setSecondaryModel('');
+            return;
+        }
+        if (!secondaryProviderModels.includes(secondaryModel)) {
+            setSecondaryModel(secondaryProviderModels[0]);
+        }
+    }, [secondaryProvider, secondaryModel, secondaryProviderModels]);
+
     // Load version into playground
     const loadVersion = useCallback((versionId: number) => {
         setVersionLoadError(null);
