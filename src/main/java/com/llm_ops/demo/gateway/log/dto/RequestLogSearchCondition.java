@@ -15,8 +15,10 @@ public record RequestLogSearchCondition(
         String usedModel,
         Boolean ragEnabled,
         String promptKey,
-        String traceId) {
+        String traceId,
+        String errorCode,
+        String requestSource) {
     public static RequestLogSearchCondition empty() {
-        return new RequestLogSearchCondition(null, null, null, null, null, null, null, null, null);
+        return new RequestLogSearchCondition(null, null, null, null, null, null, null, null, null, null, null);
     }
 }
