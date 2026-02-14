@@ -31,4 +31,3 @@ export const logsApi = {
     return res.data.data;
   },
 };
-
