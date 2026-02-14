@@ -6,6 +6,7 @@ import com.llm_ops.demo.statistics.dto.ModelUsageResponse;
 import com.llm_ops.demo.statistics.dto.OverviewResponse;
 import com.llm_ops.demo.statistics.dto.PromptUsageResponse;
 import com.llm_ops.demo.statistics.dto.RagQualityResponse;
+import com.llm_ops.demo.statistics.dto.RagQualityTimeseriesResponse;
 import com.llm_ops.demo.statistics.dto.TimeseriesResponse;
 import com.llm_ops.demo.statistics.service.StatisticsService;
 import java.time.LocalDateTime;
@@ -187,6 +188,32 @@ public class StatisticsController {
         organizationService.getDetail(orgId, userId);
 
         RagQualityResponse response = statisticsService.getRagQuality(orgId, workspaceId, from, to);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * RAG 품질 시계열 조회
+     * GET /api/v1/organizations/{orgId}/stats/rag-quality/timeseries
+     *
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
+     * @param workspaceId 워크스페이스 필터 (optional)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
+     * @return 날짜별 RAG 품질 지표 (hitRate, similarity, truncation 등)
+     */
+    @GetMapping("/rag-quality/timeseries")
+    public ResponseEntity<RagQualityTimeseriesResponse> getRagQualityTimeseries(
+            @PathVariable Long orgId,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) Long workspaceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        // 조직 권한 검증
+        organizationService.getDetail(orgId, userId);
+
+        RagQualityTimeseriesResponse response = statisticsService.getRagQualityTimeseries(orgId, workspaceId, from, to);
         return ResponseEntity.ok(response);
     }
 }

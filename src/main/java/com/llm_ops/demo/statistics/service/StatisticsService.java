@@ -5,6 +5,7 @@ import com.llm_ops.demo.gateway.log.dto.projection.ModelUsageProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.OverviewStatsProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.PromptUsageProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.RagQualityProjection;
+import com.llm_ops.demo.gateway.log.dto.projection.RagQualityTimeseriesProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.TimeseriesDataProjection;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.statistics.dto.ErrorDistributionResponse;
@@ -14,6 +15,7 @@ import com.llm_ops.demo.statistics.dto.OverviewResponse;
 import com.llm_ops.demo.statistics.dto.PromptUsageResponse;
 import com.llm_ops.demo.statistics.dto.PromptUsageResponse.PromptUsageItem;
 import com.llm_ops.demo.statistics.dto.RagQualityResponse;
+import com.llm_ops.demo.statistics.dto.RagQualityTimeseriesResponse;
 import com.llm_ops.demo.statistics.dto.TimeseriesResponse;
 import com.llm_ops.demo.statistics.dto.TimeseriesResponse.TimeseriesDataPoint;
 import java.math.BigDecimal;
@@ -286,6 +288,25 @@ public class StatisticsService {
                                 .multiply(BigDecimal.valueOf(100));
 
                 return change.doubleValue();
+        }
+
+        /**
+         * RAG 품질 시계열 조회
+         */
+        @Transactional(readOnly = true)
+        public RagQualityTimeseriesResponse getRagQualityTimeseries(
+                        Long organizationId,
+                        Long workspaceId,
+                        LocalDateTime from,
+                        LocalDateTime to) {
+
+                LocalDateTime currentFrom = from != null ? from : LocalDateTime.now().minusDays(30).with(LocalTime.MIN);
+                LocalDateTime currentTo = to != null ? to : LocalDateTime.now().with(LocalTime.MAX);
+
+                List<RagQualityTimeseriesProjection> projections = requestLogRepository.getRagQualityTimeseries(
+                                organizationId, workspaceId, currentFrom, currentTo);
+
+                return RagQualityTimeseriesResponse.from(projections);
         }
 
         private record PeriodRange(LocalDateTime from, LocalDateTime to) {
