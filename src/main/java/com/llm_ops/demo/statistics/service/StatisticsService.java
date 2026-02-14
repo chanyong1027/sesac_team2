@@ -121,6 +121,7 @@ public class StatisticsService {
                                 .map(p -> new TimeseriesDataPoint(
                                                 p.getDate(),
                                                 p.getRequests(),
+                                                p.getErrorCount(),
                                                 p.getTokens(),
                                                 p.getCost()))
                                 .toList();
@@ -160,7 +161,8 @@ public class StatisticsService {
                                                         p.getRequests(),
                                                         p.getTokens(),
                                                         p.getCost(),
-                                                        percentage);
+                                                        percentage,
+                                                        p.getAvgLatencyMs());
                                 })
                                 .toList();
 
