@@ -10,7 +10,7 @@ export interface ApiResponse<T> {
 // ========================================
 // Logs
 // ========================================
-export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED';
+export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED' | 'TIMEOUT';
 
 export interface RequestLogResponse {
   requestId: string;
@@ -29,11 +29,19 @@ export interface RequestLogResponse {
   ragEnabled: boolean;
   ragLatencyMs: number | null;
   ragChunksCount: number | null;
+  ragTopK?: number;
+  ragSimilarityThreshold?: number;
+  requestPath?: string;
   errorCode: string | null;
   errorMessage: string | null;
   failReason: string | null;
   createdAt: string;
   finishedAt: string | null;
+  requestPayload: string | null;
+  responsePayload: string | null;
+  requestSource: string | null;
+  retrievedDocuments?: any[]; // Detailed type can be added if needed
+  cost?: number; // UI required field
 }
 
 export interface RequestLogListResponse {

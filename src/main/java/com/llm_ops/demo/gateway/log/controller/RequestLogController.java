@@ -63,12 +63,15 @@ public class RequestLogController {
             @RequestParam(required = false) Boolean ragEnabled,
             @RequestParam(required = false) String promptKey,
             @RequestParam(required = false) String traceId,
+            @RequestParam(required = false) String errorCode,
+            @RequestParam(required = false) String requestSource,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
 
         RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                from, to, status, failover, provider, usedModel, ragEnabled, promptKey, traceId);
+                from, to, status, failover, provider, usedModel, ragEnabled, promptKey, traceId,
+                errorCode, requestSource);
 
         RequestLogListResponse response = requestLogQueryService.search(workspaceId, condition, pageable);
         return ResponseEntity.ok(ApiResponse.success(response));
