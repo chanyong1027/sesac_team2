@@ -29,6 +29,9 @@ export interface RequestLogResponse {
   ragEnabled: boolean;
   ragLatencyMs: number | null;
   ragChunksCount: number | null;
+  ragTopK?: number;
+  ragSimilarityThreshold?: number;
+  requestPath?: string;
   errorCode: string | null;
   errorMessage: string | null;
   failReason: string | null;

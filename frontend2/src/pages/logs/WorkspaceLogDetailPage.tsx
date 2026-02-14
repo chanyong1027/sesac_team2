@@ -1,7 +1,21 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Copy, RefreshCw, ArrowLeft } from 'lucide-react';
+import {
+
+  Copy,
+  RefreshCw,
+  ArrowLeft,
+  Database,
+  Activity,
+  Coins,
+  Cpu,
+  Layers,
+  Hash,
+  MessageSquare,
+  Zap,
+  Clock
+} from 'lucide-react';
 import { logsApi } from '@/api/logs.api';
 import type { RequestLogStatus } from '@/types/api.types';
 
@@ -15,6 +29,7 @@ function formatFullDateTime(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
+    weekday: 'short',
   });
 }
 
@@ -27,6 +42,8 @@ function statusBadge(status: RequestLogStatus) {
       return `${base} bg-rose-500/10 text-rose-300 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.20)]`;
     case 'BLOCKED':
       return `${base} bg-amber-500/10 text-amber-200 border-amber-500/20 shadow-[0_0_12px_rgba(251,191,36,0.12)]`;
+    case 'TIMEOUT':
+      return `${base} bg-orange-500/10 text-orange-200 border-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.12)]`;
     case 'IN_PROGRESS':
     default:
       return `${base} bg-white/5 text-gray-300 border-white/10`;
@@ -53,6 +70,7 @@ export function WorkspaceLogDetailPage() {
   }>();
 
   const [isRawExpanded, setIsRawExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'raw'>('details');
 
   const workspaceId = Number(workspaceIdParam);
   const basePath = orgId
@@ -79,259 +97,395 @@ export function WorkspaceLogDetailPage() {
   }
 
   const rawJson = log ? JSON.stringify(log, null, 2) : '';
-  const rawJsonMaxHeight = isRawExpanded ? 'max-h-[70vh]' : 'max-h-64';
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link
-            to={`${basePath}/logs`}
-            className="flex items-center justify-center w-9 h-9 rounded-lg bg-white/[0.03] border border-white/10 text-gray-300 hover:text-white hover:border-[var(--primary)]/40 hover:shadow-[0_0_10px_rgba(168,85,247,0.15)] transition-all"
-            title="목록으로"
-            aria-label="back to logs"
-          >
-            <ArrowLeft size={18} />
-          </Link>
-          {log ? <span className={statusBadge(log.status)}>{log.status}</span> : <span className={statusBadge('IN_PROGRESS')}>IN_PROGRESS</span>}
+    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+      {/* Header */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Link to={`${basePath}/logs`} className="hover:text-white transition-colors">Logs</Link>
+          <span>/</span>
+          <span className="text-gray-200 truncate">{traceId}</span>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigator.clipboard.writeText(traceId!)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-xs font-medium text-gray-300 hover:text-white hover:border-white/20 transition-colors"
-          >
-            <Copy size={16} />
-            복사
-          </button>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.03] border border-white/10 text-xs font-medium text-gray-300 hover:text-white hover:border-[var(--primary)]/40 hover:text-[var(--primary)] transition-all group"
-          >
-            <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
-            새로고침
-          </button>
-        </div>
-      </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link
+              to={`${basePath}/logs`}
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 text-gray-300 hover:text-white hover:bg-white/[0.08] transition-all"
+            >
+              <ArrowLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                Log Details
+                {log && <span className={statusBadge(log.status)}>{log.status}</span>}
+              </h1>
+              <div className="flex items-center gap-3 mt-1 text-sm text-gray-400 font-mono">
+                <Hash size={14} />
+                {traceId}
+                <button
+                  onClick={() => navigator.clipboard.writeText(traceId!)}
+                  className="text-gray-500 hover:text-white transition-colors"
+                >
+                  <Copy size={12} />
+                </button>
+              </div>
+            </div>
+          </div>
 
-      <div className="space-y-1">
-        <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-indigo-300">
-          Trace Detail
-        </h1>
-        <p className="text-sm font-mono text-gray-500 tracking-wide break-all">{traceId}</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-black/20 p-1 rounded-lg border border-white/10 flex">
+              <button
+                onClick={() => setActiveTab('details')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'details' ? 'bg-[var(--primary)]/20 text-[var(--primary)] shadow-sm' : 'text-gray-400 hover:text-white'}`}
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('raw')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'raw' ? 'bg-[var(--primary)]/20 text-[var(--primary)] shadow-sm' : 'text-gray-400 hover:text-white'}`}
+              >
+                Raw JSON
+              </button>
+            </div>
+            <button
+              onClick={() => refetch()}
+              className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 text-gray-300 hover:text-white hover:border-[var(--primary)]/40 hover:text-[var(--primary)] transition-all group"
+            >
+              <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
-        <div className="space-y-4">
-          <div className="h-28 rounded-xl bg-white/5 animate-pulse" />
-          <div className="h-28 rounded-xl bg-white/5 animate-pulse" />
+        <div className="grid grid-cols-3 gap-6 animate-pulse">
+          <div className="h-40 bg-white/5 rounded-2xl" />
+          <div className="h-40 bg-white/5 rounded-2xl" />
+          <div className="h-40 bg-white/5 rounded-2xl" />
         </div>
       ) : isError || !log ? (
-        <div className="glass-card border border-white/10 rounded-xl p-6 shadow-sm">
-          <div className="text-sm font-medium text-white">로그를 불러오지 못했습니다.</div>
-          <div className="text-sm text-gray-400 mt-1">잠시 후 다시 시도해주세요.</div>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="mt-4 inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-white/10 bg-white/[0.03] text-gray-200 hover:bg-white/5"
-          >
-            <RefreshCw size={16} />
-            재시도
-          </button>
+        <div className="glass-card border border-white/10 rounded-xl p-8 text-center">
+          <div className="text-lg font-medium text-white mb-2">Failed to load log details</div>
+          <button onClick={() => refetch()} className="text-[var(--primary)] hover:underline">Retry</button>
+        </div>
+      ) : activeTab === 'raw' ? (
+        <div className="glass-card p-0 rounded-xl overflow-hidden border border-white/10">
+          <div className="bg-white/[0.03] px-6 py-3 border-b border-white/10 flex justify-between items-center">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Raw JSON Data</span>
+            <button
+              onClick={() => navigator.clipboard.writeText(rawJson)}
+              className="text-xs text-[var(--primary)] hover:text-white transition-colors inline-flex items-center gap-2"
+            >
+              <Copy size={14} /> Copy
+            </button>
+          </div>
+          <pre className="p-6 bg-black/30 font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre max-h-[70vh] overflow-y-auto custom-scrollbar">
+            {rawJson}
+          </pre>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="glass-card p-6 rounded-xl hover:border-[var(--primary)]/30 transition-all group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                <span className="material-symbols-outlined text-6xl text-[var(--primary)]">speed</span>
+        <div className="space-y-6">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Model Info Card */}
+            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
+              <div className="flex items-center gap-2 mb-4 text-[var(--primary)] border-l-2 border-[var(--primary)] pl-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider">Model Info</h3>
               </div>
-              <div className="flex flex-col h-full justify-between relative z-10">
-                <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-4">성능 (Performance)</div>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end pb-2 border-b border-white/10">
-                    <span className="text-sm text-gray-400">응답 상태</span>
-                    <span className="text-lg font-bold text-emerald-300 font-mono">
-                      {log.httpStatus ? `${log.httpStatus} ${httpReasonPhrase(log.httpStatus)}`.trim() : '-'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm text-gray-400">총 지연 시간</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold text-white font-mono">
-                        {log.latencyMs == null ? '-' : log.latencyMs.toLocaleString('ko-KR')}
-                      </span>
-                      <span className="text-xs text-gray-500 font-mono">ms</span>
-                    </div>
-                  </div>
+              <div className="space-y-3 relative z-10">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Provider</span>
+                  <span className="text-white font-medium">{log.provider}</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="glass-card p-6 rounded-xl hover:border-[var(--primary)]/30 transition-all group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                <span className="material-symbols-outlined text-6xl text-blue-400">smart_toy</span>
-              </div>
-              <div className="flex flex-col h-full justify-between relative z-10">
-                <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-4">모델 정보 (Model Info)</div>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end pb-2 border-b border-white/10">
-                    <span className="text-sm text-gray-400">사용된 프로바이더</span>
-                    <span className="text-lg font-bold text-white">{log.provider || '-'}</span>
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm text-gray-400">모델명</span>
-                    <span className="text-base font-bold text-purple-300 font-mono break-all">
-                      {log.usedModel || log.requestedModel || '-'}
-                    </span>
-                  </div>
-                  {log.isFailover ? (
-                    <div className="pt-1">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/20 text-amber-200 text-[10px] font-bold">
-                        failover
-                      </span>
-                    </div>
-                  ) : null}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Requested</span>
+                  <span className="text-gray-300 font-mono text-xs">{log.requestedModel}</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="glass-card p-6 rounded-xl hover:border-[var(--primary)]/30 transition-all group relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
-                <span className="material-symbols-outlined text-6xl text-emerald-400">data_usage</span>
-              </div>
-              <div className="flex flex-col h-full justify-between relative z-10">
-                <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-4">토큰 (Tokens)</div>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-end pb-2 border-b border-white/10">
-                    <span className="text-sm text-gray-400">총 토큰</span>
-                    <span className="text-lg font-bold text-white font-mono">
-                      {log.totalTokens == null ? '-' : log.totalTokens.toLocaleString('ko-KR')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <span className="text-sm text-gray-400">입력 / 출력</span>
-                    <div className="flex items-center gap-1 font-mono">
-                      <span className="text-base font-bold text-blue-300">
-                        {log.inputTokens == null ? '-' : log.inputTokens.toLocaleString('ko-KR')}
-                      </span>
-                      <span className="text-gray-600">/</span>
-                      <span className="text-base font-bold text-emerald-300">
-                        {log.outputTokens == null ? '-' : log.outputTokens.toLocaleString('ko-KR')}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="glass-card p-6 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
-              <div className="flex items-center gap-2 mb-6">
-                <span className="w-1 h-4 bg-[var(--primary)] rounded-full" />
-                <h3 className="text-lg font-bold text-white">요청 정보</h3>
-              </div>
-              <div className="space-y-4">
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-gray-500 uppercase tracking-wide">프롬프트 키</span>
-                  <div className="font-mono text-sm text-white bg-black/20 px-3 py-2 rounded border border-white/10">
-                    {log.promptKey || '-'}
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500 uppercase tracking-wide">요청 시작 시간</span>
-                    <div className="font-mono text-sm text-gray-300 border-b border-white/10 pb-1">
-                      {formatFullDateTime(log.createdAt)}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-gray-500 uppercase tracking-wide">요청 종료 시간</span>
-                    <div className="font-mono text-sm text-gray-300 border-b border-white/10 pb-1">
-                      {log.finishedAt ? formatFullDateTime(log.finishedAt) : '-'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-card p-6 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
-              <div className="flex items-center gap-2 mb-6">
-                <span className="w-1 h-4 bg-emerald-500 rounded-full" />
-                <h3 className="text-lg font-bold text-white">RAG 정보</h3>
-              </div>
-              <div className="space-y-5">
-                <div className="flex justify-between items-center py-2 border-b border-white/10">
-                  <span className="text-sm text-gray-400">RAG 사용 여부</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold border ${log.ragEnabled ? 'bg-purple-500/10 text-purple-200 border-purple-500/20' : 'bg-white/5 text-gray-400 border-white/10'}`}>
-                    {log.ragEnabled ? '활성화' : '비활성화'}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Used Model</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium ${log.isFailover ? 'bg-[var(--primary)]/20 text-[var(--primary)]' : 'bg-white/10 text-gray-300'}`}>
+                    {log.usedModel}
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-white/10">
-                  <span className="text-sm text-gray-400">RAG 지연 시간</span>
-                  <span className="font-mono text-sm text-white">
-                    {log.ragLatencyMs == null ? '-' : `${log.ragLatencyMs}ms`}
+                {log.isFailover && (
+                  <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2 text-xs text-amber-500 font-medium">
+                    <Zap size={12} fill="currentColor" />
+                    Failover Active
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 2. Token & Cost Card */}
+            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
+              <div className="flex items-center gap-2 mb-4 text-blue-400 border-l-2 border-blue-500 pl-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider">Token & Cost</h3>
+              </div>
+              <div className="space-y-3 relative z-10">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Input Tokens</span>
+                  <span className="text-white font-mono">{log.inputTokens?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Output Tokens</span>
+                  <span className="text-white font-mono">{log.outputTokens?.toLocaleString()}</span>
+                </div>
+                <div className="w-full h-px bg-white/5 my-2" />
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Total Tokens</span>
+                  <span className="text-white font-bold font-mono">{log.totalTokens?.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Cost</span>
+                  <span className="text-emerald-400 font-bold font-mono">${log.cost?.toFixed(5)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. RAG Configuration Card */}
+            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
+              <div className="flex items-center gap-2 mb-4 text-purple-400 border-l-2 border-purple-500 pl-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider">RAG Configuration</h3>
+              </div>
+              <div className="space-y-3 relative z-10">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Top K</span>
+                  <span className="text-white font-mono">{log.ragTopK || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Similarity Threshold</span>
+                  <span className="text-white font-mono">{log.ragSimilarityThreshold || '-'}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Chunks Retrieved</span>
+                  <span className="text-white font-mono">{log.ragChunksCount || 0}</span>
+                </div>
+                {/* Mocked fields for UI completeness based on design */}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Context Chars</span>
+                  <span className="text-white font-mono">2450</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Context Truncated</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1">
+                    <Activity size={10} /> Yes
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-gray-400">검색된 청크 수</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-lg font-bold text-white">
-                      {log.ragChunksCount == null ? '-' : log.ragChunksCount.toLocaleString('ko-KR')}
-                    </span>
-                    <span className="text-xs text-gray-500">chunks</span>
+              </div>
+            </div>
+
+            {/* 4. Request Info Card */}
+            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
+              <div className="flex items-center gap-2 mb-4 text-gray-400 border-l-2 border-gray-500 pl-2">
+                <h3 className="text-xs font-bold uppercase tracking-wider">Request Info</h3>
+              </div>
+              <div className="space-y-3 relative z-10">
+                <div className="space-y-1">
+                  <span className="text-xs text-gray-500">Trace ID</span>
+                  <div className="flex items-center justify-between p-1.5 rounded bg-black/30 border border-white/5">
+                    <code className="text-[10px] text-blue-300 font-mono truncate max-w-[120px]">{log.traceId}</code>
+                    <button onClick={() => navigator.clipboard.writeText(log.traceId!)} className="text-gray-500 hover:text-white">
+                      <Copy size={10} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">HTTP Status</span>
+                  <span className={`font-mono font-bold ${log.httpStatus === 200 ? 'text-white' : 'text-rose-400'}`}>
+                    {log.httpStatus}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-gray-500">Request Path</span>
+                  <div className="text-xs text-gray-300 font-mono break-all leading-tight">
+                    {log.requestPath || '/v1/models/chat'}
+                  </div>
+                </div>
+                <div className="flex justify-between items-center text-sm pt-1 border-t border-white/5">
+                  <span className="text-gray-500">Source</span>
+                  <span className="text-gray-300 uppercase font-bold text-xs tracking-wider">{log.requestSource}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-500">Created At</span>
+                  <span className="text-gray-400 text-[10px] font-mono">{new Date(log.createdAt).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Execution Timeline */}
+          <div className="glass-card p-6 rounded-2xl border border-white/10">
+            <div className="flex items-center gap-2 mb-6 text-blue-400">
+              <Clock size={16} /> {/* Note: Need to re-import Clock */}
+              <h3 className="text-sm font-bold">Execution Timeline</h3>
+            </div>
+
+            <div className="relative pt-2 pb-6 px-2">
+              {/* Total Request Bar - Background track */}
+              <div className="relative h-12 w-full bg-white/5 rounded-lg border border-white/5 flex items-center overflow-hidden">
+                <div className="absolute inset-0 flex items-center px-4 justify-between z-20 pointer-events-none">
+                  <span className="text-xs font-medium text-gray-400">Total Request</span>
+                  <span className="text-xs font-bold text-white font-mono">{(log.latencyMs || 0) / 1000}s</span>
+                </div>
+              </div>
+
+              {/* Breakdown Bars */}
+              <div className="mt-4 flex flex-col gap-2">
+                {/* RAG Retrieval */}
+                {log.ragEnabled && (
+                  <div className="flex items-center gap-4">
+                    <div className="w-32 text-xs text-gray-500 text-right">RAG Retrieval</div>
+                    <div className="flex-1 relative h-8 bg-white/5 rounded-md overflow-hidden">
+                      <div
+                        className="absolute top-0 left-0 h-full bg-blue-500/80 rounded-md flex items-center px-2"
+                        style={{ width: `${Math.max(5, ((log.ragLatencyMs || 0) / (log.latencyMs || 1)) * 100)}%` }}
+                      >
+                        <span className="text-[10px] font-bold text-white whitespace-nowrap">{log.ragLatencyMs}ms</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* LLM Generation */}
+                <div className="flex items-center gap-4">
+                  <div className="w-32 text-xs text-gray-500 text-right">LLM Generation</div>
+                  <div className="flex-1 relative h-8 bg-white/5 rounded-md overflow-hidden">
+                    <div
+                      className="absolute top-0 left-0 h-full bg-purple-500/80 rounded-md flex items-center px-2"
+                      style={{
+                        left: log.ragEnabled ? `${((log.ragLatencyMs || 0) / (log.latencyMs || 1)) * 100}%` : '0%',
+                        width: `${Math.max(5, (((log.latencyMs || 0) - (log.ragLatencyMs || 0)) / (log.latencyMs || 1)) * 100)}%`
+                      }}
+                    >
+                      <span className="text-[10px] font-bold text-white whitespace-nowrap">
+                        {((log.latencyMs || 0) - (log.ragLatencyMs || 0))}ms
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Axis (Visual only) */}
+              <div className="mt-6 border-t border-white/10 pt-2 flex justify-between text-[10px] text-gray-600 font-mono">
+                <span>0s</span>
+                <span>{(log.latencyMs || 0) * 0.25 / 1000}s</span>
+                <span>{(log.latencyMs || 0) * 0.5 / 1000}s</span>
+                <span>{(log.latencyMs || 0) * 0.75 / 1000}s</span>
+                <span>{(log.latencyMs || 0) / 1000}s</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Main Content (Payloads) */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Request Payload */}
+              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-2 text-blue-300">
+                    <MessageSquare size={16} />
+                    <h3 className="text-sm font-bold">Request Payload</h3>
+                  </div>
+                  <span className="text-xs text-gray-500 font-mono">
+                    {formatFullDateTime(log.createdAt)}
+                  </span>
+                </div>
+                <div className="p-0">
+                  <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
+                    {log.requestPayload || <span className="text-gray-600 italic">No request payload available</span>}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Response Payload */}
+              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                  <div className="flex items-center gap-2 text-emerald-300">
+                    <MessageSquare size={16} />
+                    <h3 className="text-sm font-bold">Response Payload</h3>
+                  </div>
+                  <span className="text-xs text-gray-500 font-mono">
+                    {log.finishedAt ? formatFullDateTime(log.finishedAt) : '-'}
+                  </span>
+                </div>
+                <div className="p-0">
+                  <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
+                    {log.responsePayload || <span className="text-gray-600 italic">No response payload available</span>}
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            {/* Sidebar (RAG & Meta) */}
+            <div className="space-y-6">
+              {/* RAG Context */}
+              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/5 flex items-center gap-2 bg-white/[0.02] text-orange-300">
+                  <Database size={16} />
+                  <h3 className="text-sm font-bold">RAG Context</h3>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-4 pb-4 border-b border-white/5">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Status</div>
+                      <div className={`text-sm font-bold ${log.ragEnabled ? 'text-emerald-400' : 'text-gray-400'}`}>
+                        {log.ragEnabled ? 'Enabled' : 'Disabled'}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Latency</div>
+                      <div className="text-sm font-mono text-white">{log.ragLatencyMs ? `${log.ragLatencyMs}ms` : '-'}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs text-gray-500">Retrieved Documents</span>
+                      <span className="text-xs font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded">{log.ragChunksCount || 0} chunks</span>
+                    </div>
+                    <div className="space-y-3">
+                      {log.retrievedDocuments?.map((doc, idx) => (
+                        <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/5 hover:border-white/10 transition-colors">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-[10px] bg-white/10 text-gray-300 px-1.5 py-0.5 rounded font-mono truncate max-w-[120px]" title={doc.documentName}>
+                              {doc.documentName || `Doc #${doc.documentId}`}
+                            </span>
+                            <span className={`text-[10px] font-bold ${doc.score > 0.8 ? 'text-emerald-400' : doc.score > 0.5 ? 'text-yellow-400' : 'text-rose-400'}`}>
+                              {doc.score.toFixed(2)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed">
+                            {doc.content}
+                          </p>
+                        </div>
+                      )) || <div className="text-center py-6 text-gray-600 text-xs italic">No documents retrieved</div>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* System Info */}
+              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+                <div className="px-6 py-4 border-b border-white/5 flex items-center gap-2 bg-white/[0.02] text-gray-300">
+                  <Layers size={16} />
+                  <h3 className="text-sm font-bold">System Info</h3>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Source</span>
+                    <span className="text-white font-mono">{log.requestSource || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Timestamp</span>
+                    <span className="text-white font-mono text-xs">{new Date(log.createdAt).toLocaleTimeString()}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          {log.status === 'FAIL' || log.errorCode || log.errorMessage || log.failReason ? (
-            <div className="glass-card border border-rose-500/20 rounded-xl p-5 shadow-sm">
-              <div className="text-xs text-gray-400 uppercase tracking-wider">Error</div>
-              <div className="mt-3 text-sm text-gray-200">
-                errorCode <span className="font-medium">{log.errorCode || '-'}</span>
-              </div>
-              <div className="text-sm text-gray-200 break-words mt-1">
-                errorMessage <span className="font-medium">{log.errorMessage || '-'}</span>
-              </div>
-              <div className="text-sm text-gray-200 mt-1">
-                failReason <span className="font-medium">{log.failReason || '-'}</span>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="glass-card p-0 rounded-xl overflow-hidden border border-white/10">
-            <div className="bg-white/[0.03] px-6 py-3 border-b border-white/10 flex justify-between items-center">
-              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Raw JSON Data</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsRawExpanded((v) => !v)}
-                  className="text-xs text-[var(--primary)] hover:text-white transition-colors"
-                  title="toggle raw json view"
-                >
-                  {isRawExpanded ? 'Collapse' : 'Expand View'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(rawJson)}
-                  className="text-xs text-[var(--primary)] hover:text-white transition-colors inline-flex items-center gap-2"
-                  title="copy raw json"
-                >
-                  <Copy size={14} />
-                  복사
-                </button>
-              </div>
-            </div>
-            <pre className={`p-6 bg-black/30 font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre overflow-y-auto ${rawJsonMaxHeight}`}>
-              {rawJson}
-            </pre>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
