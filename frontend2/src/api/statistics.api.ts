@@ -19,6 +19,7 @@ export interface OverviewResponse {
 export interface TimeseriesDataPoint {
     date: string;
     requests: number;
+    errorCount: number;
     tokens: number;
     cost: number;
 }
@@ -34,6 +35,7 @@ export interface ModelUsage {
     tokens: number;
     cost: number;
     percentage: number;
+    avgLatencyMs: number;
 }
 
 export interface ModelUsageResponse {
@@ -72,4 +74,52 @@ export const statisticsApi = {
 
     getByPrompt: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
         api.get<PromptUsageResponse>(`/organizations/${orgId}/stats/by-prompt`, { params }),
+
+    getErrorDistribution: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
+        api.get<ErrorDistributionResponse>(`/organizations/${orgId}/stats/errors`, { params }),
+
+    getRagQuality: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
+        api.get<RagQualityResponse>(`/organizations/${orgId}/stats/rag-quality`, { params }),
+
+    getRagQualityTimeseries: (orgId: number, params: StatisticsQueryParams) =>
+        api.get<RagQualityTimeseriesResponse>(`/organizations/${orgId}/stats/rag-quality/timeseries`, { params }),
 };
+
+export interface ErrorDistributionItem {
+    status: string;
+    errorCode: string | null;
+    failReason: string | null;
+    count: number;
+}
+
+export interface ErrorDistributionResponse {
+    items: ErrorDistributionItem[];
+    totalErrors: number;
+}
+
+export interface RagQualityResponse {
+    ragTotalCount: number;
+    ragHitCount: number;
+    hitRate: number;
+    avgSimilarityThreshold: number;
+    truncatedCount: number;
+    truncationRate: number;
+    totalChunks: number;
+    avgRagLatencyMs: number;
+}
+
+export interface RagQualityDataPoint {
+    date: string;
+    ragTotalCount: number;
+    ragHitCount: number;
+    hitRate: number;
+    avgSimilarityThreshold: number;
+    truncatedCount: number;
+    truncationRate: number;
+    totalChunks: number;
+    avgRagLatencyMs: number;
+}
+
+export interface RagQualityTimeseriesResponse {
+    data: RagQualityDataPoint[];
+}
