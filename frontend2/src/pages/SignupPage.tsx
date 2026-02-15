@@ -253,8 +253,12 @@ export function SignupPage() {
         password: data.password,
         name: data.name,
       }),
-    onSuccess: () => {
-      navigate('/login');
+    onSuccess: (response, variables) => {
+      const createdName = response.data?.data?.name ?? variables.name;
+      navigate('/login', {
+        replace: true,
+        state: { signupSuccess: true, signupName: createdName },
+      });
     },
   });
 
