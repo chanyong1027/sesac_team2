@@ -107,6 +107,20 @@ public class ModelPricing {
     }
 
     /**
+     * 가격표에 등록된(지원되는) 모델인지 여부
+     *
+     * NOTE: 알 수 없는 모델을 0원으로 표시하면 운영/UX에서 오해가 생기므로,
+     * 호출자에서 "비용 미정"으로 처리할 수 있도록 별도 플래그를 제공합니다.
+     */
+    public static boolean isKnownModel(String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            return false;
+        }
+        String normalized = normalizeModelName(modelName);
+        return PRICING_TABLE.containsKey(normalized);
+    }
+
+    /**
      * 모델명 정규화
      * 예: "gpt-4o-2024-05-13" -> "gpt-4o"
      */

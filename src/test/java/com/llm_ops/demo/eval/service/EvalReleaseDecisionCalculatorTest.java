@@ -24,7 +24,8 @@ class EvalReleaseDecisionCalculatorTest {
                 98.0,
                 92.0,
                 0.0,
-                -1.5
+                -1.5,
+                true
         );
 
         // then
@@ -47,13 +48,37 @@ class EvalReleaseDecisionCalculatorTest {
                 99.0,
                 93.0,
                 0.0,
-                1.0
+                1.0,
+                true
         );
 
         // then
         assertThat(decision.releaseDecision()).isEqualTo(EvalReleaseDecision.SAFE_TO_DEPLOY);
         assertThat(decision.reasons()).contains("COMPARE_IMPROVEMENT_MINOR");
         assertThat(decision.riskLevel()).isEqualTo("MEDIUM");
+    }
+
+    @Test
+    @DisplayName("Compare 모드에서 운영 비교 데이터가 불완전하면 HOLD로 판정한다")
+    void Compare_모드에서_운영_비교_데이터가_불완전하면_hold로_판정한다() {
+        // given
+        EvalReleaseCriteria criteria = EvalReleaseCriteria.createDefault(1L);
+
+        // when
+        EvalReleaseDecision decision = calculator.calculate(
+                EvalMode.COMPARE_ACTIVE,
+                criteria,
+                99.0,
+                93.0,
+                0.0,
+                1.0,
+                false
+        );
+
+        // then
+        assertThat(decision.releaseDecision()).isEqualTo(EvalReleaseDecision.HOLD);
+        assertThat(decision.reasons()).contains("COMPARE_BASELINE_INCOMPLETE");
+        assertThat(decision.riskLevel()).isEqualTo("HIGH");
     }
 
     @Test
@@ -69,7 +94,8 @@ class EvalReleaseDecisionCalculatorTest {
                 75.0,
                 90.0,
                 0.0,
-                null
+                null,
+                true
         );
 
         // then

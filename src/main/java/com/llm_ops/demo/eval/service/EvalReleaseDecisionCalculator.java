@@ -15,7 +15,8 @@ public class EvalReleaseDecisionCalculator {
             double passRate,
             double avgOverallScore,
             double errorRate,
-            Double avgScoreDelta
+            Double avgScoreDelta,
+            boolean compareBaselineComplete
     ) {
         List<String> blockingReasons = new ArrayList<>();
         List<String> warningReasons = new ArrayList<>();
@@ -28,6 +29,10 @@ public class EvalReleaseDecisionCalculator {
         }
         if (errorRate > safeValue(criteria.getMaxErrorRate())) {
             blockingReasons.add("ERROR_RATE_ABOVE_THRESHOLD");
+        }
+
+        if (mode == EvalMode.COMPARE_ACTIVE && !compareBaselineComplete) {
+            blockingReasons.add("COMPARE_BASELINE_INCOMPLETE");
         }
 
         if (mode == EvalMode.COMPARE_ACTIVE && avgScoreDelta != null) {
@@ -58,6 +63,7 @@ public class EvalReleaseDecisionCalculator {
     private static String resolveRiskLevel(List<String> blockingReasons, List<String> warningReasons) {
         if (!blockingReasons.isEmpty()) {
             if (blockingReasons.contains("COMPARE_REGRESSION_DETECTED")
+                    || blockingReasons.contains("COMPARE_BASELINE_INCOMPLETE")
                     || blockingReasons.contains("ERROR_RATE_ABOVE_THRESHOLD")) {
                 return "HIGH";
             }
