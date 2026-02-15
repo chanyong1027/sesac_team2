@@ -90,6 +90,7 @@ export function OrganizationDashboardPage() {
             enabled: !!ws?.id,
             retry: false,
             staleTime: 1000 * 30, // 30s
+            refetchOnWindowFocus: false,
         })),
     });
 
@@ -148,7 +149,10 @@ export function OrganizationDashboardPage() {
                             overview={workspaceOverviews[idx]?.data ?? null}
                             orgTotalCost={orgTotalCost}
                             documents={workspaceDocuments[idx]?.data ?? null}
-                            docsLoading={workspaceDocuments[idx]?.isLoading ?? false}
+                            docsLoading={Boolean(
+                                workspaceDocuments[idx]?.isLoading
+                                && workspaceDocuments[idx]?.data == null
+                            )}
                         />
                     ))}
 
@@ -344,7 +348,7 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
         };
     }
 
-    const statuses = new Set(docs.map(d => d.status));
+    const statuses = new Set(docs.map((d) => String(d.status).toUpperCase()));
     if (statuses.has('FAILED')) {
         return {
             label: 'Warning',
@@ -354,7 +358,8 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
     }
 
     // Any "in flight" status -> processing.
-    const inFlight = ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'DELETING'].some(s => statuses.has(s));
+    const inFlight = ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'PROCESSING', 'DELETING']
+        .some((s) => statuses.has(s));
     if (inFlight) {
         return {
             label: 'Processing',

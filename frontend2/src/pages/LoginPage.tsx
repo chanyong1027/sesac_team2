@@ -136,6 +136,12 @@ export function LoginPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
+  const state = (location.state ?? null) as null | {
+    from?: { pathname?: string };
+    signupSuccess?: boolean;
+    signupName?: string;
+  };
+
   // 이미 로그인된 사용자는 대시보드로 리다이렉트
   useEffect(() => {
     if (isAuthenticated) {
@@ -180,8 +186,7 @@ export function LoginPage() {
         }
       }
 
-      const from =
-        (location.state as { from?: Location })?.from?.pathname || '/dashboard';
+      const from = state?.from?.pathname || '/dashboard';
       navigate(from);
     },
   });
@@ -223,6 +228,15 @@ export function LoginPage() {
               <span className="text-cyan-400">Ops</span>
             </span>
           </Link>
+
+          {state?.signupSuccess ? (
+            <div className="mt-8 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
+              <p className="text-sm text-emerald-200">
+                {state?.signupName ? `${state.signupName}님, ` : ''}
+                회원가입이 완료되었습니다. 로그인 해주세요.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         {/* Form section - vertically centered */}

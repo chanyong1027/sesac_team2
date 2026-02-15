@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -18,8 +18,13 @@ import type {
     ProviderType
 } from '@/types/api.types';
 
+const PromptEvaluateTab = lazy(async () => {
+    const mod = await import('./components/PromptEvaluateTab');
+    return { default: mod.PromptEvaluateTab };
+});
+
 // 탭 정의
-type TabType = 'overview' | 'versions' | 'release' | 'playground';
+type TabType = 'overview' | 'versions' | 'release' | 'playground' | 'evaluate';
 
 export function PromptDetailPage() {
     const { orgId, workspaceId: workspaceIdStr, promptId: promptIdStr } = useParams<{ orgId: string; workspaceId: string; promptId: string }>();
@@ -123,6 +128,12 @@ export function PromptDetailPage() {
                         label="Playground"
                         kind="playground"
                     />
+                    <TabButton
+                        active={activeTab === 'evaluate'}
+                        onClick={() => setActiveTab('evaluate')}
+                        iconName="analytics"
+                        label="Evaluate"
+                    />
                 </nav>
             </div>
 
@@ -141,6 +152,11 @@ export function PromptDetailPage() {
                 {activeTab === 'versions' && <VersionsTab promptId={promptId} />}
                 {activeTab === 'release' && <ReleaseTab promptId={promptId} />}
                 {activeTab === 'playground' && <PlaygroundTab />}
+                {activeTab === 'evaluate' ? (
+                    <Suspense fallback={<div className="p-8 text-gray-500">로딩 중...</div>}>
+                        <PromptEvaluateTab workspaceId={workspaceId} promptId={promptId} />
+                    </Suspense>
+                ) : null}
             </div>
         </div>
     );
@@ -166,6 +182,7 @@ function TabButton({
         >
             <span
                 className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300')} transition-colors`}
+                aria-hidden="true"
             >
                 {iconName}
             </span>

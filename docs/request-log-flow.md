@@ -1,151 +1,107 @@
 # Request Log Flow (Gateway)
 
-아래 내용은 **현재 코드 기준**으로 `request_logs`가 **어떤 시점에 어떤 필드로 채워지는지**를
-요청 흐름 순서대로 정리한 문서입니다.
+현재 코드는 `request_logs` 스키마를 유지하면서, 실패 원인을 표준 코드로 기록합니다.
 
-## 1) 흐름 요약
+## 1) 핵심 요약
 
-1. 고객 요청 도착
-2. 인증 및 초기 파라미터 계산
-3. RequestLog **start (INSERT)**
-4. 프롬프트 렌더링 / RAG 처리
-5. 프로바이더 결정 및 LLM 호출
-6. RequestLog **success/fail (UPDATE)**
-7. 응답 반환
+1. 시작 시 `start()`로 `IN_PROGRESS` 동기 INSERT
+2. 처리 성공 시 `markSuccess()` 비동기 UPDATE
+3. 실패/차단 시 `markFail()/markBlocked()` 비동기 UPDATE
+4. 실패 표준화 규칙:
+5. `error_code`: 표준 Gateway 코드 (예: `GW-UP-RATE_LIMIT`)
+6. `fail_reason`: 상세 원인 (예: `HTTP_503`, `SOCKET_TIMEOUT`, `MODEL_404`)
+7. `error_message`: 사용자 안내 문구
 
----
+## 2) 필드별 저장 시점
 
-## 2) 필드별 저장 시점 (흐름 기준)
+### A. 시작 INSERT (`RequestLogWriter.start`)
 
-### A. 요청 시작 시 INSERT (`RequestLogWriter.start`)
+채움:
+1. `request_id`, `trace_id`
+2. `organization_id`, `workspace_id`, `api_key_id`, `api_key_prefix`
+3. `request_path`, `http_method`, `prompt_key`, `rag_enabled`
+4. `status = IN_PROGRESS`, `currency = USD`, `created_at`
 
-저장 위치:
-- `GatewayChatService.chat()` → `requestLogWriter.start(...)`
-- `RequestLogWriter.start()` → `RequestLog.start()`
+### B. 성공 UPDATE (`RequestLogWriter.markSuccess`)
 
-채워지는 필드:
-- `request_id` (UUID 생성)
-- `trace_id`
-- `organization_id`
-- `workspace_id`
-- `api_key_id`
-- `api_key_prefix`
-- `request_path`
-- `http_method`
-- `prompt_key`
-- `rag_enabled`
-- `status = IN_PROGRESS`
-- `currency = USD`
-- `created_at` (DB 자동)
+채움:
+1. `status = SUCCESS`, `http_status = 200`, `finished_at`, `latency_ms`
+2. `provider`, `requested_model`, `used_model`, `is_failover`
+3. `input_tokens`, `output_tokens`, `total_tokens`
+4. `estimated_cost`, `pricing_version`
+5. RAG 메트릭(`rag_*`)
 
-### B. 처리 중 계산 (DB 저장 전)
+### C. 실패 UPDATE (`RequestLogWriter.markFail`)
 
-계산 위치:
-- `GatewayChatService.chat()`
+채움:
+1. `status = FAIL`, `http_status`, `finished_at`, `latency_ms`
+2. `error_code` (표준 코드)
+3. `fail_reason` (상세 원인)
+4. `error_message` (사용자 안내 문구)
+5. 가능한 경우 `provider/requested_model/used_model/is_failover`
+6. 가능한 경우 토큰/비용/RAG 메트릭
 
-계산되는 값:
-- `latency_ms` (요청 시작~끝)
-- `rag_latency_ms`
-- `rag_chunks_count`
-- `rag_context_chars`
-- `rag_context_truncated`
-- `rag_context_hash`
+### D. 차단 UPDATE (`RequestLogWriter.markBlocked`)
 
-### C. 성공 시 UPDATE (`RequestLogWriter.markSuccess`)
+채움:
+1. `status = BLOCKED`
+2. `error_code` / `fail_reason` / `error_message`
+3. 기타 실패와 동일한 메타 필드
 
-저장 위치:
-- `GatewayChatService.chat()` → `requestLogWriter.markSuccess(...)`
-- `RequestLogWriter.markSuccess()` →
-  `fillModelUsage()` + `fillRagMetrics()` + `markSuccess()`
+## 3) Failover/Retry 반영 방식
 
-채워지는 필드:
-- `status = SUCCESS`
-- `finished_at`
-- `http_status` (200)
-- `latency_ms`
-- `provider`
-- `requested_model`
-- `used_model`
-- `is_failover`
-- `input_tokens`
-- `output_tokens`
-- `total_tokens`
-- `rag_latency_ms`
-- `rag_chunks_count`
-- `rag_context_chars`
-- `rag_context_truncated`
-- `rag_context_hash`
+1. 즉시 failover:
+2. `GW-UP-RATE_LIMIT`, `GW-UP-MODEL_NOT_FOUND`
+3. 1회 retry 후 failover:
+4. `GW-UP-TIMEOUT`, `GW-UP-UNAVAILABLE`
+5. fail-fast:
+6. `GW-REQ-*`, `GW-GW-POLICY_BLOCKED`
+7. 모든 경로 실패:
+8. `error_code = GW-GW-ALL_PROVIDERS_FAILED`
 
-### D. 실패 시 UPDATE (`RequestLogWriter.markFail`)
+## 3-1) 전역 시간예산 초과 기록 예시
 
-저장 위치:
-- `GatewayChatService.chat()` → `requestLogWriter.markFail(...)`
-- `RequestLogWriter.markFail()` →
-  `fillModelUsage()` + `fillRagMetrics()` + `markFail()`
+1. 상황: primary 실패 후 failover 가능한 코드였지만 남은 시간이 최소 failover 예산보다 작은 경우
+2. 저장:
+3. `error_code = GW-UP-TIMEOUT`
+4. `fail_reason = REQUEST_DEADLINE_EXCEEDED`
+5. `error_message = 요청 전체 처리 시간 한도를 초과했습니다.`
 
-채워지는 필드:
-- `status = FAIL`
-- `finished_at`
-- `http_status`
-- `latency_ms`
-- `error_code`
-- `error_message`
-- `fail_reason`
-- (가능 시) `provider`, `requested_model`, `used_model`, `is_failover`
-- (가능 시) `input_tokens`, `output_tokens`, `total_tokens`
-- `rag_latency_ms`
-- `rag_chunks_count`
-- `rag_context_chars`
-- `rag_context_truncated`
-- `rag_context_hash`
-
----
-
-## 3) 현재 코드상 미사용/미채움 필드
-
-- `prompt_id`, `prompt_version_id`
-- `rag_top_k`, `rag_similarity_threshold`
-- `estimated_cost`, `pricing_version`
-- `input_tokens`, `output_tokens` (대부분 null로 남음)
-
----
-
-## 4) 시퀀스 다이어그램 (Mermaid)
+## 4) 시퀀스
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Client as Client
     participant GW as GatewayChatService
-    participant Auth as OrganizationApiKeyAuthService
     participant Log as RequestLogWriter
-    participant RAG as RagSearchService
-    participant Provider as LLM Provider
+    participant LLM as Provider
 
     Client->>GW: POST /v1/chat/completions
-    GW->>Auth: resolveAuthResult(apiKey)
-    Auth-->>GW: organizationId, apiKeyId, apiKeyPrefix
+    GW->>Log: start(...) (INSERT)
 
-    GW->>Log: start(...)
-    Log-->>GW: request_id (INSERT)
-
-    alt rag_enabled == true
-        GW->>RAG: search(workspaceId, prompt)
-        RAG-->>GW: chunks + metrics
+    GW->>LLM: primary call
+    alt primary success
+        LLM-->>GW: response
+    else primary fail
+        GW->>LLM: retry once (timeout/5xx only)
+        alt retry success
+            LLM-->>GW: response
+        else retry fail
+            GW->>LLM: secondary failover call
+            alt secondary success
+                LLM-->>GW: response
+            else secondary fail
+                GW-->>GW: code=GW-GW-ALL_PROVIDERS_FAILED
+            end
+        end
     end
 
-    GW->>Provider: call LLM (OpenAI/Anthropic/Gemini)
-    Provider-->>GW: response + usage
-
-    GW->>Log: markSuccess(...) (UPDATE)
-    Log-->>GW: ok
-
-    GW-->>Client: GatewayChatResponse
-
-    alt exception 발생
-        GW->>Log: markFail(...) (UPDATE)
-        Log-->>GW: ok
+    alt success
+        GW->>Log: markSuccess(...) (UPDATE)
+        GW-->>Client: GatewayChatResponse
+    else fail/blocked
+        GW->>Log: markFail/markBlocked(...) (UPDATE)
         GW-->>Client: error response
     end
 ```
-
