@@ -33,9 +33,28 @@ class EvalRuleCheckerServiceTest {
     }
 
     @Test
-    @DisplayName("must_include 룰을 위반하면 실패 항목에 기록된다")
+    @DisplayName("max_chars 룰을 위반하면 실패 항목에 기록된다")
     @SuppressWarnings("unchecked")
-    void must_include_룰_위반시_실패항목에_기록된다() {
+    void max_chars_룰_위반시_실패항목에_기록된다() {
+        // given
+        String output = "환불은 접수 후 처리됩니다.";
+        Map<String, Object> constraints = Map.of(
+                "max_chars", 5
+        );
+
+        // when
+        Map<String, Object> result = service.check(output, constraints, null, RubricTemplateCode.GENERAL_TEXT);
+
+        // then
+        assertThat(result.get("pass")).isEqualTo(false);
+        assertThat(result.get("max_chars")).isEqualTo("FAIL");
+        assertThat((List<String>) result.get("failedChecks")).contains("max_chars");
+    }
+
+    @Test
+    @DisplayName("must_include 룰이 만족되지 않으면 실패 항목에 기록된다")
+    @SuppressWarnings("unchecked")
+    void must_include_룰이_만족되지_않으면_실패_항목에_기록된다() {
         // given
         String output = "환불은 접수 후 처리됩니다.";
         Map<String, Object> constraints = Map.of(
@@ -49,5 +68,42 @@ class EvalRuleCheckerServiceTest {
         assertThat(result.get("pass")).isEqualTo(false);
         assertThat(result.get("must_include")).isEqualTo("FAIL");
         assertThat((List<String>) result.get("failedChecks")).contains("must_include");
+    }
+
+    @Test
+    @DisplayName("must_not_include 룰을 위반하면 실패 항목에 기록된다")
+    @SuppressWarnings("unchecked")
+    void must_not_include_룰을_위반하면_실패_항목에_기록된다() {
+        // given
+        String output = "환불은 확실히 처리됩니다.";
+        Map<String, Object> constraints = Map.of(
+                "must_not_include", List.of("확실히")
+        );
+
+        // when
+        Map<String, Object> result = service.check(output, constraints, null, RubricTemplateCode.GENERAL_TEXT);
+
+        // then
+        assertThat(result.get("pass")).isEqualTo(false);
+        assertThat(result.get("must_not_include")).isEqualTo("FAIL");
+        assertThat((List<String>) result.get("failedChecks")).contains("must_not_include");
+    }
+
+    @Test
+    @DisplayName("키워드 정규화(BASIC)를 사용하면 공백/구두점 차이를 허용한다")
+    void 키워드_정규화_BASIC를_사용하면_공백_구두점_차이를_허용한다() {
+        // given
+        String output = "사전신청은 온라인으로 진행됩니다. Refund-policy!!";
+        Map<String, Object> constraints = Map.of(
+                "keyword_normalization", "BASIC",
+                "must_include", List.of("사전 신청", "refund policy")
+        );
+
+        // when
+        Map<String, Object> result = service.check(output, constraints, null, RubricTemplateCode.GENERAL_TEXT);
+
+        // then
+        assertThat(result.get("pass")).isEqualTo(true);
+        assertThat(result.get("must_include")).isEqualTo("PASS");
     }
 }

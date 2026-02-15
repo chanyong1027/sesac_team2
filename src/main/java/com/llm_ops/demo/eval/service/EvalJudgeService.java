@@ -143,17 +143,29 @@ public class EvalJudgeService {
             Map<String, Object> ruleChecks,
             String baselineOutput
     ) {
+        boolean isCustomRubric = "CUSTOM".equalsIgnoreCase(rubric.templateCode());
+        Map<String, String> criteriaDefinitions = isCustomRubric
+                ? extractCriteriaDefinitions(rubric.description(), rubric.weights())
+                : Map.of();
+        List<String> missingCriteriaDefinitions = isCustomRubric
+                ? listMissingCriteriaDefinitionKeys(rubric.weights(), criteriaDefinitions)
+                : List.of();
+
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("rubric", Map.of(
-                "template", rubric.templateCode(),
-                "description", rubric.description(),
-                "weights", rubric.weights(),
-                "gates", rubric.gates()
-        ));
+        Map<String, Object> rubricPayload = new LinkedHashMap<>();
+        rubricPayload.put("template", rubric.templateCode());
+        rubricPayload.put("description", rubric.description());
+        rubricPayload.put("weights", rubric.weights());
+        rubricPayload.put("gates", rubric.gates());
+        if (isCustomRubric) {
+            rubricPayload.put("criteriaDefinitions", criteriaDefinitions);
+            rubricPayload.put("missingCriteriaDefinitions", missingCriteriaDefinitions);
+        }
+        payload.put("rubric", rubricPayload);
         payload.put("input", input);
         payload.put("context", context);
-        payload.put("expected", expected);
-        payload.put("constraints", constraints);
+        payload.put("expected", sanitizeForJudge(expected));
+        payload.put("constraints", sanitizeForJudge(constraints));
         payload.put("candidateOutput", candidateOutput);
         payload.put("ruleChecks", ruleChecks);
         payload.put("baselineOutput", baselineOutput);
@@ -164,6 +176,15 @@ public class EvalJudgeService {
         } catch (Exception e) {
             payloadJson = "{}";
         }
+
+        String customRubricInstructions = isCustomRubric
+                ? """
+                - CUSTOM 루브릭은 rubric.weights의 키 이름만으로는 의미가 모호할 수 있다.
+                  rubric.criteriaDefinitions(또는 rubric.description의 `key: 의미` 라인)을 기준으로 각 항목 점수를 산정하라.
+                  missingCriteriaDefinitions가 비어있지 않다면 labels에 "RUBRIC_CRITERION_DEFINITION_MISSING" 를 포함하고 evidence에 누락 키를 나열하라.
+
+                """
+                : "";
 
         return """
                 너는 프롬프트 평가 심사자다.
@@ -177,12 +198,100 @@ public class EvalJudgeService {
                   "scores": {"<criterion>": 1~5 숫자},
                   "labels": ["문제라벨"],
                   "evidence": ["근거"],
-                  "suggestions": ["개선 제안"]
+                  "suggestions": ["개선 제안"],
+                  "mustCoverChecks": [{"item":"핵심포인트","covered":true,"note":"한줄근거"}]
                 }
 
+                해석 규칙:
+                - scores는 rubric.weights에 있는 모든 criterion 키를 반드시 포함해야 한다(각 1~5점).
+                - expected.must_cover 가 있으면, 각 항목이 candidateOutput에 "의미적으로" 포함/해결되었는지 판단하라(동의어/다른 표현 허용).
+                  하나라도 누락되면 pass=false 로 두고 labels에 "MISSING_MUST_COVER" 를 포함하라.
+                  mustCoverChecks에 항목별 covered=true/false를 채우고, 누락 항목은 evidence에 명시하라.
+                - ruleChecks는 하드 룰(형식/길이/키워드/JSON 등) 결과이므로, ruleChecks.pass=false 인 경우 pass는 false여야 한다.
+                - 하드룰(must_include/must_not_include 등)은 ruleChecks에서 이미 판정된다. 너는 candidateOutput을 다시 문자열로 재검증하지 말고 ruleChecks만 따르라.
+
+                %s
                 입력:
                 %s
-                """.formatted(payloadJson);
+                """.formatted(customRubricInstructions, payloadJson);
+    }
+
+    private static Map<String, Object> sanitizeForJudge(Map<String, Object> value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        Map<String, Object> copy = new LinkedHashMap<>(value);
+        copy.remove("must_include");
+        copy.remove("must_not_include");
+        copy.remove("keyword_normalization");
+        copy.remove("keyword_normalize");
+        copy.remove("forbidden_words");
+        return copy;
+    }
+
+    private static Map<String, String> extractCriteriaDefinitions(String description, Map<String, Double> weights) {
+        if (description == null || description.isBlank() || weights == null || weights.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, String> canonicalKeyByLower = new LinkedHashMap<>();
+        for (String key : weights.keySet()) {
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            canonicalKeyByLower.put(key.trim().toLowerCase(), key);
+        }
+
+        Map<String, String> definitions = new LinkedHashMap<>();
+        for (String rawLine : description.split("\\R")) {
+            if (rawLine == null) {
+                continue;
+            }
+            String line = rawLine.trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+
+            // Allow simple bullets: "- key: meaning"
+            line = line.replaceFirst("^[\\s\\-*]+", "");
+            int colonIndex = line.indexOf(':');
+            if (colonIndex <= 0) {
+                continue;
+            }
+
+            String candidateKey = line.substring(0, colonIndex).trim();
+            String meaning = line.substring(colonIndex + 1).trim();
+            if (candidateKey.isEmpty() || meaning.isEmpty()) {
+                continue;
+            }
+
+            String canonicalKey = canonicalKeyByLower.get(candidateKey.toLowerCase());
+            if (canonicalKey == null) {
+                continue;
+            }
+            definitions.putIfAbsent(canonicalKey, meaning);
+        }
+
+        return definitions;
+    }
+
+    private static List<String> listMissingCriteriaDefinitionKeys(
+            Map<String, Double> weights,
+            Map<String, String> criteriaDefinitions
+    ) {
+        if (weights == null || weights.isEmpty()) {
+            return List.of();
+        }
+        List<String> missing = new ArrayList<>();
+        for (String key : weights.keySet()) {
+            if (key == null) {
+                continue;
+            }
+            if (criteriaDefinitions == null || !criteriaDefinitions.containsKey(key)) {
+                missing.add(key);
+            }
+        }
+        return missing;
     }
 
     private Map<String, Object> parseJudgeOutput(String text) {

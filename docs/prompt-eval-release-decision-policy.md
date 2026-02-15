@@ -27,6 +27,7 @@
 - `errorRate > maxErrorRate`
 
 ### 4.2 Compare 모드 추가 조건
+- baseline(현재 운영 버전) 비교 데이터가 일부라도 누락되면 HOLD (비교 신뢰도 부족)
 - `avgScoreDelta < 0` 이면 HOLD (회귀)
 - `avgScoreDelta >= 0` 이고 `avgScoreDelta < minImprovementNoticeDelta` 이면 HOLD 아님, 경고(reason)만 추가
 
@@ -48,6 +49,7 @@
 - `PASS_RATE_BELOW_THRESHOLD`
 - `AVG_SCORE_BELOW_THRESHOLD`
 - `ERROR_RATE_ABOVE_THRESHOLD`
+- `COMPARE_BASELINE_INCOMPLETE`
 - `COMPARE_REGRESSION_DETECTED`
 - `COMPARE_IMPROVEMENT_MINOR` (경고)
 
