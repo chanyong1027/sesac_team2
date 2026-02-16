@@ -27,6 +27,7 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
+import com.llm_ops.demo.global.error.GatewayException;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +41,6 @@ import java.util.Map;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.springframework.beans.factory.annotation.Autowired;
 import jakarta.persistence.EntityManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -183,17 +183,21 @@ class GatewayChatServiceTest {
                 );
 
                 // when
-                assertThatThrownBy(() -> gatewayChatService.chat(response.apiKey(), request))
-                                .isInstanceOf(com.llm_ops.demo.global.error.BusinessException.class);
+                Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(
+                        () -> gatewayChatService.chat(response.apiKey(), request)
+                );
 
                 // then
+                assertThat(thrown).isInstanceOf(GatewayException.class);
+                assertThat(((GatewayException) thrown).getCode()).isEqualTo("GW-REQ-FORBIDDEN");
+
                 List<RequestLog> logs = requestLogRepository.findAll();
                 assertThat(logs).hasSize(1);
                 RequestLog requestLog = logs.get(0);
                 assertThat(requestLog.getStatus()).isEqualTo(RequestLogStatus.FAIL);
                 assertThat(requestLog.getHttpStatus()).isEqualTo(403);
-                assertThat(requestLog.getErrorCode()).isEqualTo("FORBIDDEN");
-                assertThat(requestLog.getFailReason()).isEqualTo("BUSINESS_EXCEPTION");
+                assertThat(requestLog.getErrorCode()).isEqualTo("GW-REQ-FORBIDDEN");
+                assertThat(requestLog.getFailReason()).isEqualTo("FORBIDDEN");
                 assertThat(requestLog.getFinishedAt()).isNotNull();
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
