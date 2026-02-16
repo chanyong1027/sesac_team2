@@ -1,7 +1,9 @@
 package com.llm_ops.demo.eval.service;
 
 import com.google.genai.Client;
+import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
+import com.llm_ops.demo.eval.config.EvalProperties;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.gateway.service.GatewayChatOptionsCreateService;
 import com.llm_ops.demo.global.error.BusinessException;
@@ -11,6 +13,13 @@ import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -29,14 +38,28 @@ import org.springframework.stereotype.Service;
 public class EvalModelRunnerService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final int PROVIDER_CALL_MAX_THREADS = 16;
+    private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
+    private static final ExecutorService PROVIDER_CALL_EXECUTOR = Executors.newFixedThreadPool(
+            PROVIDER_CALL_MAX_THREADS,
+            runnable -> {
+                Thread thread = new Thread(runnable);
+                thread.setName("eval-provider-call-" + PROVIDER_CALL_THREAD_SEQUENCE.getAndIncrement());
+                thread.setDaemon(true);
+                return thread;
+            }
+    );
 
+    private final EvalProperties evalProperties;
     private final ProviderCredentialService providerCredentialService;
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
 
     public EvalModelRunnerService(
+            EvalProperties evalProperties,
             ProviderCredentialService providerCredentialService,
             GatewayChatOptionsCreateService gatewayChatOptionsCreateService
     ) {
+        this.evalProperties = evalProperties;
         this.providerCredentialService = providerCredentialService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
     }
@@ -63,7 +86,7 @@ public class EvalModelRunnerService {
         ChatResponse response = switch (provider) {
             case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
             case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-            case GEMINI -> callGemini(resolved.apiKey(), model, prompt);
+            case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
         };
 
         String output = response.getResult() != null && response.getResult().getOutput() != null
@@ -125,7 +148,10 @@ public class EvalModelRunnerService {
         }
         applyNumericOptionBestEffort(options, "setTemperature", temperature);
         configureOpenAiMaxTokens(options, maxOutputTokens);
-        return chatModel.call(new Prompt(new UserMessage(prompt), options));
+        return callWithTimeout(
+                ProviderType.OPENAI,
+                () -> chatModel.call(new Prompt(new UserMessage(prompt), options))
+        );
     }
 
     private ChatResponse callAnthropic(
@@ -142,32 +168,52 @@ public class EvalModelRunnerService {
         }
         applyNumericOptionBestEffort(options, "setTemperature", temperature);
         applyIntegerOptionBestEffort(options, maxOutputTokens);
-        return chatModel.call(new Prompt(new UserMessage(prompt), options));
+        return callWithTimeout(
+                ProviderType.ANTHROPIC,
+                () -> chatModel.call(new Prompt(new UserMessage(prompt), options))
+        );
     }
 
-    private ChatResponse callGemini(String apiKey, String modelOverride, String prompt) {
+    private ChatResponse callGemini(
+            String apiKey,
+            String modelOverride,
+            String prompt,
+            Double temperature,
+            Integer maxOutputTokens
+    ) {
         String model = (modelOverride == null || modelOverride.isBlank()) ? DEFAULT_GEMINI_MODEL : modelOverride;
-        try (Client client = Client.builder().apiKey(apiKey).build()) {
-            GenerateContentResponse response = client.models.generateContent(model, prompt, null);
-            String output = response != null ? response.text() : "";
-            String resolvedModel = response != null ? response.modelVersion().orElse(model) : model;
-
-            ChatResponseMetadata.Builder metadataBuilder = ChatResponseMetadata.builder().withModel(resolvedModel);
-            if (response != null) {
-                response.responseId().ifPresent(metadataBuilder::withId);
-                response.usageMetadata().ifPresent(usage -> {
-                    Long promptTokens = usage.promptTokenCount().map(Integer::longValue).orElse(null);
-                    Long completionTokens = usage.candidatesTokenCount().map(Integer::longValue).orElse(null);
-                    Long totalTokens = usage.totalTokenCount().map(Integer::longValue).orElse(null);
-                    metadataBuilder.withUsage(new DefaultUsage(promptTokens, completionTokens, totalTokens));
-                });
+        return callWithTimeout(ProviderType.GEMINI, () -> {
+            GenerateContentConfig.Builder configBuilder = GenerateContentConfig.builder();
+            if (temperature != null) {
+                configBuilder.temperature(temperature.floatValue());
             }
+            if (maxOutputTokens != null && maxOutputTokens > 0) {
+                configBuilder.maxOutputTokens(maxOutputTokens);
+            }
+            GenerateContentConfig config = configBuilder.build();
 
-            return new ChatResponse(
-                    java.util.List.of(new Generation(new AssistantMessage(output))),
-                    metadataBuilder.build()
-            );
-        }
+            try (Client client = Client.builder().apiKey(apiKey).build()) {
+                GenerateContentResponse response = client.models.generateContent(model, prompt, config);
+                String output = response != null ? response.text() : "";
+                String resolvedModel = response != null ? response.modelVersion().orElse(model) : model;
+
+                ChatResponseMetadata.Builder metadataBuilder = ChatResponseMetadata.builder().withModel(resolvedModel);
+                if (response != null) {
+                    response.responseId().ifPresent(metadataBuilder::withId);
+                    response.usageMetadata().ifPresent(usage -> {
+                        Long promptTokens = usage.promptTokenCount().map(Integer::longValue).orElse(null);
+                        Long completionTokens = usage.candidatesTokenCount().map(Integer::longValue).orElse(null);
+                        Long totalTokens = usage.totalTokenCount().map(Integer::longValue).orElse(null);
+                        metadataBuilder.withUsage(new DefaultUsage(promptTokens, completionTokens, totalTokens));
+                    });
+                }
+
+                return new ChatResponse(
+                        java.util.List.of(new Generation(new AssistantMessage(output))),
+                        metadataBuilder.build()
+                );
+            }
+        });
     }
 
     private static void applyIntegerOptionBestEffort(Object options, Integer maxOutputTokens) {
@@ -228,8 +274,43 @@ public class EvalModelRunnerService {
         if (options == null || value == null) {
             return;
         }
-        tryInvoke(options, setterName, value);
+        if (tryInvoke(options, setterName, value)) {
+            return;
+        }
         tryInvoke(options, setterName, value.floatValue());
+    }
+
+    private ChatResponse callWithTimeout(
+            ProviderType providerType,
+            java.util.concurrent.Callable<ChatResponse> providerCall
+    ) {
+        long timeoutMs = Math.max(1_000L, evalProperties.getRunner().getRequestTimeoutMs());
+        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(providerCall);
+        try {
+            return future.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException timeoutException) {
+            future.cancel(true);
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR,
+                    providerType.name() + " 평가 모델 호출 시간이 초과되었습니다."
+            );
+        } catch (InterruptedException interruptedException) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR,
+                    providerType.name() + " 평가 모델 호출이 중단되었습니다."
+            );
+        } catch (ExecutionException executionException) {
+            Throwable cause = executionException.getCause();
+            if (cause instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        }
     }
 
     private static boolean tryInvoke(Object target, String methodName, Object value) {
