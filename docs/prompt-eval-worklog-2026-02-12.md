@@ -28,7 +28,7 @@
   - `summary.topIssues`, `summary.plainSummary` 추가
 
 ### 2.1 백엔드 (Eval 코어)
-- 평가 도메인/저장소/마이그레이션 추가 (`V20__prompt_eval_core.sql` 기반)
+- 평가 도메인/저장소/마이그레이션 추가 (`V23__prompt_eval_core.sql` 기반)
 - Eval API 구현
   - Dataset 생성/조회
   - TestCase bulk upload
