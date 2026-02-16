@@ -1818,6 +1818,8 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
     // Load version into playground
     const loadVersion = useCallback((versionId: number) => {
         setVersionLoadError(null);
+        setResult(null);
+        setRunError(null);
         promptApi.getVersion(promptId, versionId).then((res) => {
             const v = res.data;
             setProvider(v.provider);

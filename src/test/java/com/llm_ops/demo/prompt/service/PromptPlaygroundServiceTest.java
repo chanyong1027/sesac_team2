@@ -109,7 +109,7 @@ class PromptPlaygroundServiceTest {
         ChatResponse chatResponse = new ChatResponse(
                 List.of(new Generation(new AssistantMessage("테스트 응답입니다."))),
                 metadata);
-        given(llmCallService.callProvider(eq(resolvedKey), eq("gpt-4o"), any(), any())).willReturn(chatResponse);
+        given(llmCallService.callProvider(eq(resolvedKey), eq("gpt-4o"), any(), any(), any())).willReturn(chatResponse);
 
         PlaygroundRunRequest request = new PlaygroundRunRequest(
                 ProviderType.OPENAI, "gpt-4o",

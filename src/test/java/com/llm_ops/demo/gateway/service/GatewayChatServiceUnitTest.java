@@ -286,7 +286,7 @@ class GatewayChatServiceUnitTest {
                     .withUsage(new DefaultUsage(null, null, 10L))
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
-            when(llmCallService.callProvider(any(), anyString(), anyString(), any())).thenReturn(chatResponse);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any())).thenReturn(chatResponse);
 
             GatewayChatRequest request = new GatewayChatRequest(
                     workspaceId,

@@ -155,13 +155,9 @@ public class GatewayChatService {
             promptId = resolution.promptId();
             promptVersionId = resolution.promptVersionId();
 
-            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
+            String userPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
                     request.variables());
-            String renderedSystemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
-
-            String prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
-                    ? renderedUserPrompt
-                    : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
+            String systemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
 
             ProviderType providerType = activeVersion.getProvider();
             String requestedModel = activeVersion.getModel();
@@ -208,7 +204,7 @@ public class GatewayChatService {
                     long ragStartedAtNanos = System.nanoTime();
                     RagSearchResponse ragResponse = ragSearchService.search(
                             request.workspaceId(),
-                            resolveRagQuery(renderedUserPrompt, request.variables()),
+                            resolveRagQuery(userPrompt, request.variables()),
                             new RagSearchOptions(
                                     ragSettings.topK(),
                                     ragSettings.similarityThreshold(),
@@ -229,7 +225,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
-                        prompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + prompt;
+                        userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
             }
@@ -266,7 +262,7 @@ public class GatewayChatService {
                             }
                             String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                             usedRequestedModel = secondaryModelEffective;
-                            response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, prompt, ModelConfigOverride.ofMaxTokens(secondaryMaxTokens));
+                            response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, systemPrompt, userPrompt, ModelConfigOverride.ofMaxTokens(secondaryMaxTokens));
                         } else {
                             budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
                             throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
@@ -277,7 +273,7 @@ public class GatewayChatService {
                     }
                 }
 
-                response = llmCallService.callProvider(primaryKey, requestedModelEffective, prompt, ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride));
+                response = llmCallService.callProvider(primaryKey, requestedModelEffective, systemPrompt, userPrompt, ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride));
             } catch (Exception primaryException) {
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
                     throw primaryException;
@@ -314,7 +310,7 @@ public class GatewayChatService {
                 }
                 String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                 usedRequestedModel = secondaryModelEffective;
-                response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, prompt, ModelConfigOverride.ofMaxTokens(secondaryMaxTokens));
+                response = llmCallService.callProvider(secondaryKey, secondaryModelEffective, systemPrompt, userPrompt, ModelConfigOverride.ofMaxTokens(secondaryMaxTokens));
             }
 
             String answer = response.getResult().getOutput().getText();
