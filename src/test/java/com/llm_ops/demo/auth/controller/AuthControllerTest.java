@@ -1,5 +1,6 @@
 package com.llm_ops.demo.auth.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -160,6 +161,51 @@ class AuthControllerTest {
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
                                         .andExpect(status().isBadRequest());
+                }
+        }
+
+        @Nested
+        @DisplayName("이메일 중복 확인 테스트")
+        class CheckEmailTest {
+
+                @Test
+                @DisplayName("미등록 이메일이면 사용 가능(true)을 반환한다")
+                void 미등록_이메일이면_사용_가능을_반환한다() throws Exception {
+                        // given
+                        String email = "new-user@example.com";
+
+                        // when & then
+                        mockMvc.perform(get("/api/v1/auth/check-email")
+                                        .param("email", email))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"))
+                                        .andExpect(jsonPath("$.data.available").value(true))
+                                        .andExpect(jsonPath("$.data.message").value("사용 가능한 이메일입니다."));
+                }
+
+                @Test
+                @DisplayName("등록된 이메일이면 사용 불가(false)를 반환한다")
+                void 등록된_이메일이면_사용_불가를_반환한다() throws Exception {
+                        // given
+                        SignUpRequest request = new SignUpRequest(
+                                        "duplicate@example.com",
+                                        "Test1234!",
+                                        "testuser");
+
+                        mockMvc.perform(post("/api/v1/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isCreated());
+
+                        // when & then
+                        mockMvc.perform(get("/api/v1/auth/check-email")
+                                        .param("email", "duplicate@example.com"))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"))
+                                        .andExpect(jsonPath("$.data.available").value(false))
+                                        .andExpect(jsonPath("$.data.message").value("이미 사용 중인 이메일입니다."));
                 }
         }
 

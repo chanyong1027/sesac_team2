@@ -2,6 +2,7 @@ import axios from 'axios';
 import api from './axios';
 import type {
   ApiResponse,
+  EmailAvailabilityResponse,
   UserSignupRequest,
   UserSignupResponse,
   UserLoginRequest,
@@ -20,6 +21,10 @@ const authAxios = axios.create({
 });
 
 export const authApi = {
+  // 이메일 중복 체크 - GET /api/v1/auth/check-email
+  checkEmailAvailability: (email: string) =>
+    api.get<ApiResponse<EmailAvailabilityResponse>>('/auth/check-email', { params: { email } }),
+
   // 회원가입 - POST /api/v1/auth/signup
   signup: (data: UserSignupRequest) =>
     api.post<ApiResponse<UserSignupResponse>>('/auth/signup', data),

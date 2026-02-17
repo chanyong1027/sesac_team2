@@ -116,6 +116,11 @@ export interface UserSignupResponse {
   name: string;
 }
 
+export interface EmailAvailabilityResponse {
+  available: boolean;
+  message: string;
+}
+
 export interface UserLoginRequest {
   email: string;
   password: string;
