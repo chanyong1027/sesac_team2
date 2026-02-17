@@ -48,8 +48,9 @@ class PromptPlaygroundControllerTest {
     private PromptPlaygroundService promptPlaygroundService;
 
     @Test
-    @DisplayName("플레이그라운드 실행 API 성공")
-    void run_Success() throws Exception {
+    @DisplayName("정상 요청이 주어졌을 때 플레이그라운드 실행하면 200과 응답을 반환한다")
+    void 정상_요청이_주어졌을_때_플레이그라운드_실행하면_200과_응답을_반환한다() throws Exception {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
         PlaygroundRunRequest request = new PlaygroundRunRequest(
@@ -73,6 +74,7 @@ class PromptPlaygroundControllerTest {
         given(promptPlaygroundService.run(eq(promptId), eq(userId), any(PlaygroundRunRequest.class)))
                 .willReturn(response);
 
+        // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/playground/run", promptId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -87,8 +89,9 @@ class PromptPlaygroundControllerTest {
     }
 
     @Test
-    @DisplayName("Provider 누락 시 검증 실패")
-    void run_NullProvider_ValidationFails() throws Exception {
+    @DisplayName("Provider가 누락되었을 때 실행하면 400을 반환한다")
+    void Provider가_누락되었을_때_실행하면_400을_반환한다() throws Exception {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
         PlaygroundRunRequest request = new PlaygroundRunRequest(
@@ -101,6 +104,7 @@ class PromptPlaygroundControllerTest {
                 Map.of("question", "테스트"),
                 null);
 
+        // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/playground/run", promptId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,8 +114,9 @@ class PromptPlaygroundControllerTest {
     }
 
     @Test
-    @DisplayName("모델명 누락 시 검증 실패")
-    void run_BlankModel_ValidationFails() throws Exception {
+    @DisplayName("모델명이 빈값일 때 실행하면 400을 반환한다")
+    void 모델명이_빈값일_때_실행하면_400을_반환한다() throws Exception {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
         PlaygroundRunRequest request = new PlaygroundRunRequest(
@@ -124,6 +129,7 @@ class PromptPlaygroundControllerTest {
                 Map.of("question", "테스트"),
                 null);
 
+        // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/playground/run", promptId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,8 +139,9 @@ class PromptPlaygroundControllerTest {
     }
 
     @Test
-    @DisplayName("userTemplate 누락 시 검증 실패")
-    void run_BlankUserTemplate_ValidationFails() throws Exception {
+    @DisplayName("userTemplate이 빈값일 때 실행하면 400을 반환한다")
+    void userTemplate이_빈값일_때_실행하면_400을_반환한다() throws Exception {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
         PlaygroundRunRequest request = new PlaygroundRunRequest(
@@ -147,6 +154,7 @@ class PromptPlaygroundControllerTest {
                 Map.of("question", "테스트"),
                 null);
 
+        // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/playground/run", promptId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -156,8 +164,9 @@ class PromptPlaygroundControllerTest {
     }
 
     @Test
-    @DisplayName("플레이그라운드 저장 API 성공 (배포 없음)")
-    void save_Success_WithoutRelease() throws Exception {
+    @DisplayName("배포없이 저장 요청이 주어졌을 때 저장하면 201과 released=false를 반환한다")
+    void 배포없이_저장_요청이_주어졌을_때_저장하면_201과_released_false를_반환한다() throws Exception {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
         PlaygroundSaveVersionRequest request = new PlaygroundSaveVersionRequest(
@@ -180,6 +189,7 @@ class PromptPlaygroundControllerTest {
         given(promptPlaygroundService.saveAsVersion(eq(promptId), eq(userId), any(PlaygroundSaveVersionRequest.class)))
                 .willReturn(response);
 
+        // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/playground/save", promptId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -192,8 +202,9 @@ class PromptPlaygroundControllerTest {
     }
 
     @Test
-    @DisplayName("플레이그라운드 저장 + 즉시 배포 API 성공")
-    void save_Success_WithRelease() throws Exception {
+    @DisplayName("즉시배포 저장 요청이 주어졌을 때 저장하면 201과 released=true를 반환한다")
+    void 즉시배포_저장_요청이_주어졌을_때_저장하면_201과_released_true를_반환한다() throws Exception {
+        // given
         Long promptId = 1L;
         Long userId = 1L;
         PlaygroundSaveVersionRequest request = new PlaygroundSaveVersionRequest(
@@ -216,6 +227,7 @@ class PromptPlaygroundControllerTest {
         given(promptPlaygroundService.saveAsVersion(eq(promptId), eq(userId), any(PlaygroundSaveVersionRequest.class)))
                 .willReturn(response);
 
+        // when & then
         mockMvc.perform(post("/api/v1/prompts/{promptId}/playground/save", promptId)
                         .header("X-User-Id", userId)
                         .contentType(MediaType.APPLICATION_JSON)

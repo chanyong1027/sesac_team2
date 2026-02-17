@@ -129,12 +129,8 @@ public class PromptPlaygroundService {
         Double ragSimilarityThreshold = null;
 
         try {
-            String renderedUserPrompt = renderPrompt(request.userTemplate(), request.variables());
-            String renderedSystemPrompt = renderOptionalTemplate(request.systemPrompt(), request.variables());
-
-            String finalPrompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
-                    ? renderedUserPrompt
-                    : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
+            String userPrompt = renderPrompt(request.userTemplate(), request.variables());
+            String systemPrompt = renderOptionalTemplate(request.systemPrompt(), request.variables());
 
             if (ragEnabled && ragSearchService != null) {
                 ragChunksCount = 0;
@@ -149,7 +145,7 @@ public class PromptPlaygroundService {
                 long ragStartedAtNanos = System.nanoTime();
                 RagSearchResponse ragResponse = ragSearchService.search(
                         workspaceId,
-                        resolveRagQuery(renderedUserPrompt, request.variables()),
+                        resolveRagQuery(userPrompt, request.variables()),
                         new RagSearchOptions(
                                 ragSettings.topK(),
                                 ragSettings.similarityThreshold(),
@@ -168,7 +164,7 @@ public class PromptPlaygroundService {
                     ragContextChars = result.contextChars();
                     ragContextTruncated = result.truncated();
                     ragContextHash = sha256HexOrNull(result.context());
-                    finalPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + finalPrompt;
+                    userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                 }
             }
 
@@ -178,7 +174,7 @@ public class PromptPlaygroundService {
             ModelConfigOverride configOverride = ModelConfigOverride.from(request.modelConfig());
 
             ChatResponse response = llmCallService.callProvider(
-                    resolvedKey, request.model(), finalPrompt, configOverride);
+                    resolvedKey, request.model(), systemPrompt, userPrompt, configOverride);
 
             String answer = "";
             if (response.getResult() != null && response.getResult().getOutput() != null) {
@@ -347,7 +343,6 @@ public class PromptPlaygroundService {
             String key = entry.getKey();
             String value = entry.getValue() == null ? "" : String.valueOf(entry.getValue());
             rendered = rendered.replace("{{" + key + "}}", value);
-            rendered = rendered.replace("{" + key + "}", value);
         }
         return rendered;
     }

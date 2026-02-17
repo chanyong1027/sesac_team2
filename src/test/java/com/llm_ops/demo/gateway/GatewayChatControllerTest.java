@@ -159,7 +159,8 @@ class GatewayChatControllerTest {
                                                   "promptKey": "hello"
                                                 }
                                                 """))
-                                .andExpect(status().isUnauthorized());
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.code").value("GW-REQ-UNAUTHORIZED"));
         }
 
         @Test

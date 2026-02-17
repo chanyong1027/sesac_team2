@@ -1694,6 +1694,8 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
     // --- State ---
     const [provider, setProvider] = useState<ProviderType>('OPENAI');
     const [model, setModel] = useState('');
+    const [secondaryProvider, setSecondaryProvider] = useState<ProviderType | ''>('');
+    const [secondaryModel, setSecondaryModel] = useState('');
     const [systemPrompt, setSystemPrompt] = useState('');
     const [userTemplate, setUserTemplate] = useState('');
     const [temperature, setTemperature] = useState(0.7);
@@ -1710,6 +1712,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
     const [saveError, setSaveError] = useState<string | null>(null);
     const [outputCopied, setOutputCopied] = useState(false);
     const [selectedVersionId, setSelectedVersionId] = useState<string>('');
+    const [loadedVersionId, setLoadedVersionId] = useState<number | null>(null);
     const [versionLoadError, setVersionLoadError] = useState<string | null>(null);
 
     // --- Queries ---
@@ -1785,13 +1788,44 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         }
     }, [providerModels, model]);
 
+    const secondaryProviderModels = useMemo(() => {
+        if (!modelAllowlist || !secondaryProvider) return [];
+        return modelAllowlist[secondaryProvider as ProviderType] ?? [];
+    }, [modelAllowlist, secondaryProvider]);
+
+    useEffect(() => {
+        if (!secondaryProvider) return;
+        if (!availableProviders.includes(secondaryProvider)) {
+            setSecondaryProvider('');
+            setSecondaryModel('');
+        }
+    }, [availableProviders, secondaryProvider]);
+
+    useEffect(() => {
+        if (!secondaryProvider) {
+            if (secondaryModel) setSecondaryModel('');
+            return;
+        }
+        if (!secondaryProviderModels.length) {
+            if (secondaryModel) setSecondaryModel('');
+            return;
+        }
+        if (!secondaryProviderModels.includes(secondaryModel)) {
+            setSecondaryModel(secondaryProviderModels[0]);
+        }
+    }, [secondaryProvider, secondaryModel, secondaryProviderModels]);
+
     // Load version into playground
     const loadVersion = useCallback((versionId: number) => {
         setVersionLoadError(null);
+        setResult(null);
+        setRunError(null);
         promptApi.getVersion(promptId, versionId).then((res) => {
             const v = res.data;
             setProvider(v.provider);
             setModel(v.model);
+            setSecondaryProvider(v.secondaryProvider ?? '');
+            setSecondaryModel(v.secondaryModel ?? '');
             setSystemPrompt(v.systemPrompt || '');
             setUserTemplate(v.userTemplate || '');
             setRagEnabled(v.ragEnabled ?? false);
@@ -1799,6 +1833,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
             setMaxTokens(v.modelConfig?.maxTokens ?? 2048);
             setTopP(v.modelConfig?.topP ?? 1.0);
             setFrequencyPenalty(v.modelConfig?.frequencyPenalty ?? 0.0);
+            setLoadedVersionId(versionId);
         }).catch((err) => {
             const msg = axios.isAxiosError(err)
                 ? err.response?.data?.message || err.message
@@ -1828,6 +1863,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                 ragEnabled,
                 modelConfig: buildModelConfig(),
                 variables: varsMap,
+                baseVersionId: loadedVersionId ?? undefined,
             });
             return response.data;
         },
@@ -1846,6 +1882,8 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                 title: saveTitle.trim() || undefined,
                 provider,
                 model,
+                secondaryProvider: secondaryProvider || undefined,
+                secondaryModel: secondaryProvider ? secondaryModel || undefined : undefined,
                 systemPrompt: systemPrompt || undefined,
                 userTemplate,
                 ragEnabled,

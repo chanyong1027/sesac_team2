@@ -1,14 +1,19 @@
 package com.llm_ops.demo.gateway.service;
 
 import com.google.genai.Client;
+import com.google.genai.types.Content;
 import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
+import com.google.genai.types.Part;
+import com.google.genai.types.ThinkingConfig;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
@@ -20,6 +25,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -77,17 +83,27 @@ public class LlmCallService {
     public ChatResponse callProvider(
             ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt,
+            String systemPrompt,
+            String userPrompt,
             ModelConfigOverride configOverride) {
         String providerApiKey = resolved.apiKey();
         return switch (resolved.providerType()) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel, configOverride);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel, configOverride);
-            case GEMINI -> callGemini(prompt, providerApiKey, requestedModel, configOverride);
+            case OPENAI -> callOpenAi(systemPrompt, userPrompt, providerApiKey, requestedModel, configOverride);
+            case ANTHROPIC -> callAnthropic(systemPrompt, userPrompt, providerApiKey, requestedModel, configOverride);
+            case GEMINI -> callGemini(systemPrompt, userPrompt, providerApiKey, requestedModel, configOverride);
         };
     }
 
-    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride, ModelConfigOverride config) {
+    private List<Message> buildMessages(String systemPrompt, String userPrompt) {
+        List<Message> messages = new ArrayList<>();
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            messages.add(new SystemMessage(systemPrompt));
+        }
+        messages.add(new UserMessage(userPrompt));
+        return messages;
+    }
+
+    private ChatResponse callOpenAi(String systemPrompt, String userPrompt, String apiKey, String modelOverride, ModelConfigOverride config) {
         ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
         if (chatModel == null) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
@@ -97,54 +113,58 @@ public class LlmCallService {
             chatOptions.setModel(modelOverride);
         }
         applyModelConfig(chatOptions, config);
-        return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
+        return chatModel.call(new Prompt(buildMessages(systemPrompt, userPrompt), chatOptions));
     }
 
-    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride, ModelConfigOverride config) {
+    private ChatResponse callAnthropic(String systemPrompt, String userPrompt, String apiKey, String modelOverride, ModelConfigOverride config) {
         AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
         var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
         if (modelOverride != null && !modelOverride.isBlank()) {
             chatOptions.setModel(modelOverride);
         }
         applyModelConfig(chatOptions, config);
-        return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
+        return anthropicChatModel.call(new Prompt(buildMessages(systemPrompt, userPrompt), chatOptions));
     }
 
-    private ChatResponse callGemini(String prompt, String apiKey, String modelOverride, ModelConfigOverride config) {
+    private ChatResponse callGemini(String systemPrompt, String userPrompt, String apiKey, String modelOverride, ModelConfigOverride config) {
         Client client = Client.builder().apiKey(apiKey).build();
         String model = modelOverride;
         if (model == null || model.isBlank()) {
             model = DEFAULT_GEMINI_MODEL;
         }
 
-        GenerateContentConfig geminiConfig = null;
+        var geminiBuilder = GenerateContentConfig.builder()
+                .thinkingConfig(ThinkingConfig.builder().thinkingBudget(0).build());
+        boolean hasConfig = true;
+        if (systemPrompt != null && !systemPrompt.isBlank()) {
+            geminiBuilder.systemInstruction(Content.builder()
+                    .parts(Part.builder().text(systemPrompt).build())
+                    .build());
+            hasConfig = true;
+        }
         if (config != null) {
-            var builder = GenerateContentConfig.builder();
-            boolean hasConfig = false;
             if (config.temperature() != null) {
-                builder.temperature(config.temperature().floatValue());
+                geminiBuilder.temperature(config.temperature().floatValue());
                 hasConfig = true;
             }
             if (config.maxTokens() != null) {
-                builder.maxOutputTokens(config.maxTokens());
+                geminiBuilder.maxOutputTokens(config.maxTokens());
                 hasConfig = true;
             }
             if (config.topP() != null) {
-                builder.topP(config.topP().floatValue());
+                geminiBuilder.topP(config.topP().floatValue());
                 hasConfig = true;
             }
             if (config.frequencyPenalty() != null) {
-                builder.frequencyPenalty(config.frequencyPenalty().floatValue());
+                geminiBuilder.frequencyPenalty(config.frequencyPenalty().floatValue());
                 hasConfig = true;
             }
-            if (hasConfig) {
-                geminiConfig = builder.build();
-            }
         }
+        GenerateContentConfig geminiConfig = hasConfig ? geminiBuilder.build() : null;
 
         GenerateContentResponse response = client.models.generateContent(
                 model,
-                prompt,
+                userPrompt,
                 geminiConfig);
         if (response == null) {
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
