@@ -1,8 +1,5 @@
 package com.llm_ops.demo.gateway.service;
 
-import com.google.genai.Client;
-import com.google.genai.types.GenerateContentResponse;
-import com.google.genai.types.HttpOptions;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetDecisionAction;
@@ -11,6 +8,7 @@ import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
+import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
@@ -34,19 +32,7 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
-import org.springframework.ai.anthropic.AnthropicChatModel;
-import org.springframework.ai.anthropic.api.AnthropicApi;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.metadata.ChatResponseMetadata;
-import org.springframework.ai.chat.metadata.DefaultUsage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -54,7 +40,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -74,8 +59,6 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
-    private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-    private static final int DEFAULT_GEMINI_TIMEOUT_MS = 15_000;
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
     private static final int PROVIDER_CALL_MAX_THREADS = 16;
     private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
@@ -89,20 +72,20 @@ public class GatewayChatService {
             }
     );
     private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
-    private static final String RAG_CONTEXT_TEMPLATE = """
+    private static final String RAG_CONTEXT_PREFIX = """
             다음은 질문과 관련된 참고 문서입니다:
 
-            %s
+            """;
+    private static final String RAG_CONTEXT_SUFFIX = """
 
             위 문서를 참고하여 다음 질문에 답변해주세요:
 
             """;
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
-    private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final GatewayReliabilityProperties gatewayReliabilityProperties;
     private final ProviderCredentialService providerCredentialService;
-    private final ObjectProvider<ChatModel> openAiChatModelProvider;
+    private final LlmCallService llmCallService;
     private final RagSearchService ragSearchService;
     private final RagContextBuilder ragContextBuilder;
     private final WorkspaceRepository workspaceRepository;
@@ -115,11 +98,10 @@ public class GatewayChatService {
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
-            GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
             GatewayReliabilityProperties gatewayReliabilityProperties,
             ProviderCredentialService providerCredentialService,
-            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
-            @Autowired(required = false) RagSearchService ragSearchService,
+            LlmCallService llmCallService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) RagSearchService ragSearchService,
             RagContextBuilder ragContextBuilder,
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
@@ -129,10 +111,9 @@ public class GatewayChatService {
             BudgetGuardrailService budgetGuardrailService,
             BudgetUsageService budgetUsageService) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
-        this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.gatewayReliabilityProperties = gatewayReliabilityProperties;
         this.providerCredentialService = providerCredentialService;
-        this.openAiChatModelProvider = openAiChatModelProvider;
+        this.llmCallService = llmCallService;
         this.ragSearchService = ragSearchService;
         this.ragContextBuilder = ragContextBuilder;
         this.workspaceRepository = workspaceRepository;
@@ -169,7 +150,8 @@ public class GatewayChatService {
                 GATEWAY_CHAT_COMPLETIONS_PATH,
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
-                request.isRagEnabled()));
+                request.isRagEnabled(),
+                "GATEWAY"));
 
         Integer ragLatencyMs = null;
         Integer ragChunksCount = null;
@@ -196,13 +178,9 @@ public class GatewayChatService {
             promptId = resolution.promptId();
             promptVersionId = resolution.promptVersionId();
 
-            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
+            String userPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
                     request.variables());
-            String renderedSystemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
-
-            String prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
-                    ? renderedUserPrompt
-                    : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
+            String systemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
 
             ProviderType providerType = activeVersion.getProvider();
             String requestedModel = activeVersion.getModel();
@@ -249,7 +227,7 @@ public class GatewayChatService {
                     long ragStartedAtNanos = System.nanoTime();
                     RagSearchResponse ragResponse = ragSearchService.search(
                             request.workspaceId(),
-                            resolveRagQuery(renderedUserPrompt, request.variables()),
+                            resolveRagQuery(userPrompt, request.variables()),
                             new RagSearchOptions(
                                     ragSettings.topK(),
                                     ragSettings.similarityThreshold(),
@@ -270,7 +248,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
-                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context()) + prompt;
+                        userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
             }
@@ -322,7 +300,8 @@ public class GatewayChatService {
                 ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
                         secondaryKey,
                         secondaryModelEffective,
-                        prompt,
+                        systemPrompt,
+                        userPrompt,
                         secondaryMaxTokens,
                         deadlineNanos,
                         false
@@ -336,7 +315,8 @@ public class GatewayChatService {
                 ProviderCallOutcome primaryOutcome = callProviderWithPolicy(
                         primaryKey,
                         requestedModelEffective,
-                        prompt,
+                        systemPrompt,
+                        userPrompt,
                         maxOutputTokensOverride,
                         deadlineNanos,
                         hasSecondaryModel(secondaryProvider, secondaryModel)
@@ -386,7 +366,8 @@ public class GatewayChatService {
                     ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
                             secondaryKey,
                             secondaryModelEffective,
-                            prompt,
+                            systemPrompt,
+                            userPrompt,
                             secondaryMaxTokens,
                             deadlineNanos,
                             false
@@ -681,67 +662,30 @@ public class GatewayChatService {
             String key = entry.getKey();
             String value = entry.getValue();
             String doubleBrace = "{{" + key + "}}";
-            String singleBrace = "{" + key + "}";
             rendered = rendered.replace(doubleBrace, value);
-            rendered = rendered.replace(singleBrace, value);
         }
         return rendered;
     }
 
-    private static void applyMaxOutputTokensBestEffort(Object chatOptions, Integer maxOutputTokens) {
-        if (chatOptions == null || maxOutputTokens == null || maxOutputTokens <= 0) {
-            return;
-        }
-        // Spring AI 옵션 타입별 API 차이를 흡수하기 위해 reflection으로 best-effort 적용합니다.
-        // (모델/라이브러리 버전 변경 시에도 컴파일 의존성을 최소화)
-        tryInvokeSetter(chatOptions, "setMaxTokens", maxOutputTokens);
-        tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxOutputTokens);
-        tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxOutputTokens);
-    }
+    // ── Provider 호출 체인 ──────────────────────────────────────────────────
 
-    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
-        try {
-            var m = target.getClass().getMethod(methodName, Integer.class);
-            m.invoke(target, value);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // fallthrough
-        } catch (Exception ignored) {
-            return;
-        }
-        try {
-            var m = target.getClass().getMethod(methodName, int.class);
-            m.invoke(target, value.intValue());
-        } catch (Exception ignored) {
-        }
-    }
-
-    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
-        ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
-        if (chatModel == null) {
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
-        }
-        var chatOptions = gatewayChatOptionsCreateService.openAiOptions(apiKey);
-        if (modelOverride != null && !modelOverride.isBlank()) {
-            chatOptions.setModel(modelOverride);
-        }
-        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
-        return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
-    }
-
+    /**
+     * LlmCallService에 위임하여 실제 LLM 프로바이더를 호출합니다.
+     */
     private ChatResponse callProvider(
             ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt,
-            Integer maxOutputTokensOverride,
-            long attemptTimeoutMs
+            String systemPrompt,
+            String userPrompt,
+            Integer maxOutputTokensOverride
     ) {
-        String providerApiKey = resolved.apiKey();
-        return switch (resolved.providerType()) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
-            case GEMINI -> callGemini(prompt, providerApiKey, requestedModel, attemptTimeoutMs);
-        };
+        return llmCallService.callProvider(
+                resolved,
+                requestedModel,
+                systemPrompt,
+                userPrompt,
+                ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride)
+        );
     }
 
     private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
@@ -755,7 +699,8 @@ public class GatewayChatService {
     private ProviderCallOutcome callProviderWithPolicy(
             ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt,
+            String systemPrompt,
+            String userPrompt,
             Integer maxOutputTokensOverride,
             long deadlineNanos,
             boolean reserveFailoverBudget
@@ -767,7 +712,8 @@ public class GatewayChatService {
             ChatResponse first = callProviderWithDeadline(
                     resolved,
                     requestedModel,
-                    prompt,
+                    systemPrompt,
+                    userPrompt,
                     maxOutputTokensOverride,
                     deadlineNanos,
                     failoverReserveMs
@@ -795,7 +741,8 @@ public class GatewayChatService {
                 ChatResponse second = callProviderWithDeadline(
                         resolved,
                         requestedModel,
-                        prompt,
+                        systemPrompt,
+                        userPrompt,
                         maxOutputTokensOverride,
                         deadlineNanos,
                         failoverReserveMs
@@ -821,7 +768,8 @@ public class GatewayChatService {
     private ChatResponse callProviderWithDeadline(
             ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt,
+            String systemPrompt,
+            String userPrompt,
             Integer maxOutputTokensOverride,
             long deadlineNanos,
             long reservedBudgetAfterCallMs
@@ -834,7 +782,7 @@ public class GatewayChatService {
 
         long attemptTimeoutMs = Math.max(1L, usableBudgetMs);
         Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(() ->
-                callProvider(resolved, requestedModel, prompt, maxOutputTokensOverride, attemptTimeoutMs));
+                callProvider(resolved, requestedModel, systemPrompt, userPrompt, maxOutputTokensOverride));
 
         try {
             return future.get(attemptTimeoutMs, TimeUnit.MILLISECONDS);
@@ -853,6 +801,8 @@ public class GatewayChatService {
             throw new RuntimeException(cause);
         }
     }
+
+    // ── 실패 분류 / 에러 처리 ────────────────────────────────────────────────
 
     private GatewayFailureClassifier.GatewayFailure classifyBusinessFailure(BusinessException exception, String budgetFailReason) {
         String overrideReason = exception.getErrorCode() == ErrorCode.BUDGET_EXCEEDED
@@ -945,68 +895,6 @@ public class GatewayChatService {
         boolean success() {
             return response != null;
         }
-    }
-
-    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
-        AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
-        var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
-        if (modelOverride != null && !modelOverride.isBlank()) {
-            chatOptions.setModel(modelOverride);
-        }
-        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
-        return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
-    }
-
-    private ChatResponse callGemini(String prompt, String apiKey, String modelOverride, long attemptTimeoutMs) {
-        String model = modelOverride;
-        if (model == null || model.isBlank()) {
-            model = DEFAULT_GEMINI_MODEL;
-        }
-        int geminiTimeoutMs = clampToPositiveInt(Math.min((long) DEFAULT_GEMINI_TIMEOUT_MS, attemptTimeoutMs));
-        try (Client client = Client.builder()
-                .apiKey(apiKey)
-                .httpOptions(HttpOptions.builder().timeout(geminiTimeoutMs).build())
-                .build()) {
-            GenerateContentResponse response = client.models.generateContent(
-                    model,
-                    prompt,
-                    null);
-            if (response == null) {
-                ChatResponseMetadata metadata = ChatResponseMetadata.builder()
-                        .withModel(model)
-                        .build();
-                return new ChatResponse(
-                        List.of(new Generation(new AssistantMessage(""))),
-                        metadata);
-            }
-
-            String answer = response.text();
-            String resolvedModel = response.modelVersion().orElse(model);
-
-            ChatResponseMetadata.Builder metadataBuilder = ChatResponseMetadata.builder()
-                    .withModel(resolvedModel);
-
-            response.responseId().ifPresent(metadataBuilder::withId);
-
-            response.usageMetadata().ifPresent(usage -> {
-                Long promptTokens = usage.promptTokenCount().map(Integer::longValue).orElse(null);
-                Long completionTokens = usage.candidatesTokenCount().map(Integer::longValue).orElse(null);
-                Long totalTokens = usage.totalTokenCount().map(Integer::longValue).orElse(null);
-                metadataBuilder.withUsage(new DefaultUsage(promptTokens, completionTokens, totalTokens));
-            });
-
-            ChatResponseMetadata metadata = metadataBuilder.build();
-            return new ChatResponse(
-                    List.of(new Generation(new AssistantMessage(answer))),
-                    metadata);
-        }
-    }
-
-    private static int clampToPositiveInt(long value) {
-        if (value <= 0) {
-            return 1;
-        }
-        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
     }
 
     private static final class RequestDeadlineExhaustedException extends RuntimeException {

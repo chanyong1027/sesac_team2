@@ -436,6 +436,7 @@ export interface PromptVersionDetailResponse {
   secondaryModel: string | null;
   systemPrompt: string;
   userTemplate: string;
+  ragEnabled: boolean;
   contextUrl?: string;
   modelConfig: Record<string, any>;
   createdBy: number;
@@ -534,4 +535,53 @@ export interface WorkspaceRagSettingsUpdateRequest {
   rerankTopN: number;
   chunkSize: number;
   chunkOverlapTokens: number;
+}
+
+// ========================================
+// Prompt Playground
+// ========================================
+export interface PlaygroundRunRequest {
+  provider: ProviderType;
+  model: string;
+  systemPrompt?: string;
+  userTemplate: string;
+  ragEnabled?: boolean;
+  modelConfig?: Record<string, any>;
+  variables: Record<string, string>;
+  baseVersionId?: number;
+}
+
+export interface PlaygroundUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  estimatedCost: number | null;
+}
+
+export interface PlaygroundRunResponse {
+  traceId: string;
+  answer: string;
+  usedModel: string;
+  usage: PlaygroundUsage;
+  latencyMs: number;
+  executedAt: string;
+}
+
+export interface PlaygroundSaveVersionRequest {
+  title?: string;
+  provider: ProviderType;
+  model: string;
+  secondaryProvider?: ProviderType;
+  secondaryModel?: string;
+  systemPrompt?: string;
+  userTemplate: string;
+  ragEnabled?: boolean;
+  contextUrl?: string;
+  modelConfig?: Record<string, any>;
+  releaseAfterSave: boolean;
+}
+
+export interface PlaygroundSaveVersionResponse {
+  version: PromptVersionCreateResponse;
+  released: boolean;
 }

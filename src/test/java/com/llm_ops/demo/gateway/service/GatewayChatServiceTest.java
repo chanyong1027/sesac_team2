@@ -133,6 +133,7 @@ class GatewayChatServiceTest {
                 providerCredentialService.register(
                                 organizationId,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
+                activateCredential(organizationId, ProviderType.OPENAI);
 
                 GatewayChatRequest request = new GatewayChatRequest(
                                 workspaceId,
@@ -201,6 +202,13 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getFinishedAt()).isNotNull();
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
+        }
+
+        private void activateCredential(Long orgId, ProviderType providerType) {
+                var credential = providerCredentialRepository
+                        .findByOrganizationIdAndProvider(orgId, providerType).orElseThrow();
+                credential.markActive();
+                providerCredentialRepository.save(credential);
         }
 
         private String createReleasedPrompt(String key, String userTemplate) {

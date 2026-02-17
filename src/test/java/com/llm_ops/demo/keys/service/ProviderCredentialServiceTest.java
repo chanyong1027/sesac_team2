@@ -32,6 +32,13 @@ class ProviderCredentialServiceTest {
         providerCredentialRepository.deleteAll();
     }
 
+    private void activateCredential(Long organizationId, ProviderType providerType) {
+        var credential = providerCredentialRepository
+                .findByOrganizationIdAndProvider(organizationId, providerType).orElseThrow();
+        credential.markActive();
+        providerCredentialRepository.save(credential);
+    }
+
     @Test
     @DisplayName("조직+프로바이더로 저장된 키를 복호화하여 조회한다")
     void 저장된_키를_복호화하여_조회한다() {
@@ -42,6 +49,7 @@ class ProviderCredentialServiceTest {
         providerCredentialService.register(
                 organizationId,
                 new ProviderCredentialCreateRequest("openai", apiKey));
+        activateCredential(organizationId, ProviderType.OPENAI);
 
         // when
         String decryptedApiKey = providerCredentialService.getDecryptedApiKey(
