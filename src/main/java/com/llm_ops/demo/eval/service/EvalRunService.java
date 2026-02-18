@@ -361,13 +361,20 @@ public class EvalRunService {
         return savedRun;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<EvalRun> pickQueuedRuns(int batchSize) {
         int safeBatchSize = Math.max(batchSize, 1);
-        return evalRunRepository.findByStatusOrderByCreatedAtAsc(
+        List<EvalRun> queuedRuns = evalRunRepository.findQueuedRunsForUpdate(
                 EvalRunStatus.QUEUED.name(),
                 PageRequest.of(0, safeBatchSize)
         );
+
+        if (queuedRuns.isEmpty()) {
+            return queuedRuns;
+        }
+
+        queuedRuns.forEach(EvalRun::markRunning);
+        return evalRunRepository.saveAll(queuedRuns);
     }
 
     private PromptVersion resolveBaselineVersionForEstimate(Prompt prompt, PromptVersion candidateVersion, EvalMode mode) {
