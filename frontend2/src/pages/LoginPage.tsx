@@ -3,10 +3,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Link, useLocation, type Location as RouterLocation } from 'react-router-dom';
+import axios, { type AxiosError } from 'axios';
 import { authApi } from '@/api/auth.api';
 import { workspaceApi } from '@/api/workspace.api';
 import { useAuthStore } from '@/features/auth/store';
+import type { ErrorResponse, WorkspaceInviteAcceptResponse, WorkspaceInvitePreviewResponse } from '@/types/api.types';
 
 const loginSchema = z.object({
   email: z.string().email('유효한 이메일을 입력하세요'),
@@ -14,6 +16,52 @@ const loginSchema = z.object({
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+
+interface ParsedApiError {
+  code: string | null;
+  status: number | null;
+  message: string;
+}
+
+const DEFAULT_INVITATION_ERROR_MESSAGE = '초대 처리 중 오류가 발생했습니다.';
+
+function unwrapData<T>(payload: unknown): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
+
+function parseApiError(error: unknown): ParsedApiError {
+  if (!axios.isAxiosError(error)) {
+    return {
+      code: null,
+      status: null,
+      message: DEFAULT_INVITATION_ERROR_MESSAGE,
+    };
+  }
+
+  const axiosError = error as AxiosError<ErrorResponse>;
+  return {
+    code: axiosError.response?.data?.code ?? null,
+    status: axiosError.response?.status ?? null,
+    message: axiosError.response?.data?.message ?? axiosError.message ?? DEFAULT_INVITATION_ERROR_MESSAGE,
+  };
+}
+
+function resolveWorkspacePath(organizationId: number | null | undefined, workspaceId: number | null | undefined): string {
+  const resolvedWorkspaceId = Number(workspaceId);
+  if (!Number.isFinite(resolvedWorkspaceId) || resolvedWorkspaceId <= 0) {
+    return '/dashboard';
+  }
+
+  const resolvedOrganizationId = Number(organizationId);
+  if (Number.isFinite(resolvedOrganizationId) && resolvedOrganizationId > 0) {
+    return `/orgs/${resolvedOrganizationId}/workspaces/${resolvedWorkspaceId}`;
+  }
+
+  return `/workspaces/${resolvedWorkspaceId}`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AURORA BACKGROUND COMPONENT
@@ -163,25 +211,50 @@ export function LoginPage() {
 
       const pendingToken = sessionStorage.getItem('pendingInvitation');
       if (pendingToken) {
-        sessionStorage.removeItem('pendingInvitation');
         try {
           const acceptResponse = await workspaceApi.acceptInvitation({
             token: pendingToken,
           });
-          const { workspaceId, organizationId } = acceptResponse.data;
-          if (organizationId) {
-            navigate(`/orgs/${organizationId}/workspaces/${workspaceId}`);
-          } else {
-            navigate(`/workspaces/${workspaceId}`);
-          }
+          const acceptPayload = unwrapData<WorkspaceInviteAcceptResponse>(acceptResponse.data);
+          sessionStorage.removeItem('pendingInvitation');
+          navigate(resolveWorkspacePath(acceptPayload.organizationId, acceptPayload.workspaceId));
           return;
         } catch (error) {
-          console.error('초대 수락 실패:', error);
+          const parsedError = parseApiError(error);
+
+          if (parsedError.code === 'C409' && parsedError.message.includes('이미 워크스페이스 멤버')) {
+            try {
+              const previewResponse = await workspaceApi.previewInvitation(pendingToken);
+              const previewPayload = unwrapData<WorkspaceInvitePreviewResponse>(previewResponse.data);
+              navigate(resolveWorkspacePath(previewPayload.organizationId, previewPayload.workspaceId));
+              return;
+            } catch {
+              navigate(`/invitations/accept?token=${encodeURIComponent(pendingToken)}`);
+              return;
+            }
+          }
+
+          const isInvalidInvitation =
+            parsedError.code === 'C404'
+            || (parsedError.code === 'C400' && parsedError.message.includes('만료된 초대 링크'));
+
+          if (isInvalidInvitation) {
+            navigate(`/invitations/accept?token=${encodeURIComponent(pendingToken)}`);
+            return;
+          }
+
+          if (parsedError.code === 'C401' || parsedError.status === 401) {
+            navigate('/login');
+            return;
+          }
+
+          navigate('/dashboard');
+          return;
         }
       }
 
       const from =
-        (location.state as { from?: Location })?.from?.pathname || '/dashboard';
+        (location.state as { from?: RouterLocation })?.from?.pathname || '/dashboard';
       navigate(from);
     },
   });

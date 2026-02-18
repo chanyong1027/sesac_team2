@@ -1,97 +1,313 @@
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import axios, { AxiosError } from 'axios';
 import { workspaceApi } from '@/api/workspace.api';
 import { useAuthStore } from '@/features/auth/store';
+import type { WorkspaceInviteAcceptResponse, WorkspaceInvitePreviewResponse, ErrorResponse } from '@/types/api.types';
+
+type InvitationPageState =
+  | 'loading-preview'
+  | 'preview-ready'
+  | 'accepting'
+  | 'success-redirect'
+  | 'error-invalid'
+  | 'error-expired'
+  | 'error-conflict-already-member'
+  | 'error-conflict-other-org';
+
+interface ParsedError {
+  status: number | null;
+  code: string | null;
+  message: string;
+}
+
+const DEFAULT_ERROR_MESSAGE = '초대 링크 처리 중 오류가 발생했습니다.';
 
 export function InvitationAcceptPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [navigationError, setNavigationError] = useState<string | null>(null);
-  const token = searchParams.get('token');
-
-  const acceptMutation = useMutation({
-    mutationFn: () => workspaceApi.acceptInvitation({ token: token! }),
-    onSuccess: (response) => {
-      const payload = (response.data as any).data ?? response.data;
-      const { workspaceId, organizationId } = payload;
-      const resolvedWorkspaceId = Number(workspaceId);
-      if (!Number.isFinite(resolvedWorkspaceId)) {
-        console.warn('Invitation accept: missing workspaceId', payload);
-        setNavigationError('워크스페이스 정보를 찾을 수 없습니다.');
-        return;
-      }
-      if (organizationId) {
-        navigate(`/orgs/${organizationId}/workspaces/${resolvedWorkspaceId}`);
-      } else {
-        navigate(`/workspaces/${resolvedWorkspaceId}`);
-      }
-    },
-  });
+  const token = useMemo(() => searchParams.get('token')?.trim() ?? '', [searchParams]);
+  const [pageState, setPageState] = useState<InvitationPageState>('loading-preview');
+  const [preview, setPreview] = useState<WorkspaceInvitePreviewResponse | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>(DEFAULT_ERROR_MESSAGE);
 
   useEffect(() => {
-    if (!token) {
+    const loadPreview = async () => {
+      if (!token) {
+        setErrorMessage('유효하지 않은 초대 링크입니다.');
+        setPageState('error-invalid');
+        return;
+      }
+
+      setPageState('loading-preview');
+      try {
+        const response = await workspaceApi.previewInvitation(token);
+        setPreview(unwrapData<WorkspaceInvitePreviewResponse>(response.data));
+        setPageState('preview-ready');
+      } catch (error) {
+        const parsed = parseError(error);
+        setErrorMessage(parsed.message);
+        setPageState(mapPreviewErrorToState(parsed));
+      }
+    };
+
+    loadPreview();
+  }, [token]);
+
+  const moveToWorkspace = (organizationId: number | null, workspaceId: number | null) => {
+    const resolvedWorkspaceId = Number(workspaceId);
+    if (!Number.isFinite(resolvedWorkspaceId) || resolvedWorkspaceId <= 0) {
       navigate('/dashboard');
       return;
     }
 
-    if (!isAuthenticated) {
-      // 🔑 초대 토큰을 sessionStorage에 저장 후 로그인으로 이동
-      // LoginPage에서 로그인 성공 시 이 토큰으로 자동 수락 처리
-      sessionStorage.setItem('pendingInvitation', token);
-      navigate('/login');
+    if (organizationId && Number.isFinite(Number(organizationId))) {
+      navigate(`/orgs/${organizationId}/workspaces/${resolvedWorkspaceId}`);
       return;
     }
 
-    // 로그인 상태면 바로 수락 시도
-    acceptMutation.mutate();
-  }, [token, isAuthenticated]);
+    navigate(`/workspaces/${resolvedWorkspaceId}`);
+  };
 
-  if (acceptMutation.isPending) {
+  const handleAccept = async () => {
+    if (!token) {
+      setErrorMessage('유효하지 않은 초대 링크입니다.');
+      setPageState('error-invalid');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      sessionStorage.setItem('pendingInvitation', token);
+      setPageState('preview-ready');
+      return;
+    }
+
+    setPageState('accepting');
+    try {
+      const response = await workspaceApi.acceptInvitation({ token });
+      const payload = unwrapData<WorkspaceInviteAcceptResponse>(response.data);
+      setPageState('success-redirect');
+      moveToWorkspace(payload.organizationId ?? preview?.organizationId ?? null, payload.workspaceId ?? preview?.workspaceId ?? null);
+    } catch (error) {
+      const parsed = parseError(error);
+      setErrorMessage(parsed.message);
+      setPageState(mapAcceptErrorToState(parsed));
+    }
+  };
+
+  const handleLogin = () => {
+    if (token) {
+      sessionStorage.setItem('pendingInvitation', token);
+    }
+    navigate('/login');
+  };
+
+  const handleSignup = () => {
+    if (token) {
+      sessionStorage.setItem('pendingInvitation', token);
+    }
+    navigate('/signup');
+  };
+
+  if (pageState === 'loading-preview' || pageState === 'accepting' || pageState === 'success-redirect') {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-white text-lg">초대를 수락하는 중...</p>
-        </div>
-      </div>
+      <CenterPanel
+        title={pageState === 'accepting' ? '초대를 수락하는 중...' : '초대 정보를 확인하는 중...'}
+        description={pageState === 'accepting' ? '잠시만 기다려주세요.' : '팀 정보를 불러오고 있습니다.'}
+        loading
+      />
     );
   }
 
-  if (navigationError) {
+  if (pageState === 'preview-ready' && preview) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-lg mb-4">{navigationError}</p>
-          <p className="text-gray-400">다시 시도하거나 대시보드로 이동해주세요.</p>
+      <CenterPanel
+        title={`${preview.organizationName}에서 초대했습니다`}
+        description="초대 정보를 확인하고 팀에 참여하세요."
+      >
+        <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4 text-left text-sm text-gray-200">
+          <InfoRow label="조직" value={preview.organizationName} />
+          <InfoRow label="워크스페이스" value={preview.workspaceName} />
+          <InfoRow label="역할" value={preview.role} />
+          <InfoRow label="초대한 사람" value={preview.inviterName} />
+          <InfoRow label="만료 시각" value={formatDateTime(preview.expiresAt)} />
+        </div>
+
+        {isAuthenticated ? (
           <button
-            onClick={() => navigate('/dashboard')}
-            className="mt-6 px-6 py-3 bg-blue-500 text-white rounded-lg"
+            onClick={handleAccept}
+            className="mt-6 w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600"
           >
-            대시보드로 이동
+            팀 참여하기
           </button>
-        </div>
-      </div>
+        ) : (
+          <div className="mt-6 flex gap-3">
+            <button
+              onClick={handleLogin}
+              className="flex-1 rounded-lg bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600"
+            >
+              로그인하고 참여
+            </button>
+            <button
+              onClick={handleSignup}
+              className="flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-medium text-white hover:bg-white/10"
+            >
+              회원가입
+            </button>
+          </div>
+        )}
+      </CenterPanel>
     );
   }
 
-  if (acceptMutation.isError) {
+  if (pageState === 'error-conflict-already-member') {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-lg mb-4">초대 수락에 실패했습니다.</p>
-          <p className="text-gray-400">링크가 만료되었거나 유효하지 않습니다.</p>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="mt-6 px-6 py-3 bg-blue-500 text-white rounded-lg"
-          >
-            대시보드로 이동
-          </button>
-        </div>
-      </div>
+      <CenterPanel
+        title="이미 참여 중인 팀입니다"
+        description={errorMessage}
+      >
+        <button
+          onClick={() => moveToWorkspace(preview?.organizationId ?? null, preview?.workspaceId ?? null)}
+          className="mt-6 w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600"
+        >
+          워크스페이스로 이동
+        </button>
+      </CenterPanel>
     );
   }
 
-  return null;
+  if (pageState === 'error-conflict-other-org') {
+    return (
+      <CenterPanel
+        title="다른 조직에 이미 소속되어 있습니다"
+        description={errorMessage}
+      >
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="mt-6 w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600"
+        >
+          대시보드로 이동
+        </button>
+      </CenterPanel>
+    );
+  }
+
+  if (pageState === 'error-expired') {
+    return (
+      <CenterPanel
+        title="초대 링크가 만료되었습니다"
+        description={`${errorMessage} 초대한 사용자에게 재초대를 요청해주세요.`}
+      >
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="mt-6 w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600"
+        >
+          대시보드로 이동
+        </button>
+      </CenterPanel>
+    );
+  }
+
+  return (
+    <CenterPanel
+      title="유효하지 않은 초대 링크입니다"
+      description={errorMessage}
+    >
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="mt-6 w-full rounded-lg bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600"
+      >
+        대시보드로 이동
+      </button>
+    </CenterPanel>
+  );
+}
+
+function CenterPanel({
+  title,
+  description,
+  loading = false,
+  children,
+}: {
+  title: string;
+  description: string;
+  loading?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-lg rounded-xl border border-white/10 bg-white/5 p-6 text-center">
+        {loading ? (
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500" />
+        ) : null}
+        <h1 className="text-xl font-semibold text-white">{title}</h1>
+        <p className="mt-2 text-sm text-gray-400">{description}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-gray-400">{label}</span>
+      <span className="text-right text-white">{value}</span>
+    </div>
+  );
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
+}
+
+function unwrapData<T>(payload: unknown): T {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return (payload as { data: T }).data;
+  }
+  return payload as T;
+}
+
+function parseError(error: unknown): ParsedError {
+  if (!axios.isAxiosError(error)) {
+    return { status: null, code: null, message: DEFAULT_ERROR_MESSAGE };
+  }
+
+  const axiosError = error as AxiosError<ErrorResponse>;
+  const message = axiosError.response?.data?.message ?? axiosError.message ?? DEFAULT_ERROR_MESSAGE;
+  const code = axiosError.response?.data?.code ?? null;
+  const status = axiosError.response?.status ?? null;
+
+  return { status, code, message };
+}
+
+function mapPreviewErrorToState(error: ParsedError): InvitationPageState {
+  if (error.code === 'C400' && error.message.includes('만료된 초대 링크')) {
+    return 'error-expired';
+  }
+  return 'error-invalid';
+}
+
+function mapAcceptErrorToState(error: ParsedError): InvitationPageState {
+  if (error.code === 'C409' && error.message.includes('이미 워크스페이스 멤버')) {
+    return 'error-conflict-already-member';
+  }
+  if (error.code === 'C409' && error.message.includes('이미 다른 조직에 속해')) {
+    return 'error-conflict-other-org';
+  }
+  if (error.code === 'C400' && error.message.includes('만료된 초대 링크')) {
+    return 'error-expired';
+  }
+  if (error.code === 'C404') {
+    return 'error-invalid';
+  }
+  if (error.code === 'C401' || error.status === 401) {
+    return 'error-invalid';
+  }
+  return 'error-invalid';
 }

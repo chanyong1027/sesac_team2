@@ -93,12 +93,7 @@ export interface ErrorResponse {
   code: string;
   message: string;
   timestamp: string;
-  fieldErrors: FieldError[] | null;
-}
-
-export interface FieldError {
-  field: string;
-  message: string;
+  fieldErrors: Record<string, string> | null;
 }
 
 // ========================================
@@ -257,6 +252,20 @@ export interface WorkspaceInviteCreateResponse {
   invitationUrl: string;
   token: string;
   expiredAt: string;
+}
+
+export type InvitationPreviewStatus = 'VALID' | 'EXPIRED' | 'WORKSPACE_INACTIVE';
+
+export interface WorkspaceInvitePreviewResponse {
+  organizationId: number;
+  organizationName: string;
+  workspaceId: number;
+  workspaceName: string;
+  role: string;
+  inviterName: string;
+  expiresAt: string;
+  status: InvitationPreviewStatus;
+  invitationMessage: string | null;
 }
 
 export interface WorkspaceInviteAcceptRequest {
