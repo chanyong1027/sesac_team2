@@ -106,4 +106,21 @@ class EvalRuleCheckerServiceTest {
         assertThat(result.get("pass")).isEqualTo(true);
         assertThat(result.get("must_include")).isEqualTo("PASS");
     }
+
+    @Test
+    @DisplayName("required_keys가 있으면 json_only가 아니어도 schema를 검사한다")
+    void required_keys가_있으면_json_only가_아니어도_schema를_검사한다() {
+        // given
+        String output = "{\"answer\":\"ok\",\"category\":\"refund\"}";
+        Map<String, Object> constraints = Map.of(
+                "required_keys", List.of("answer", "category")
+        );
+
+        // when
+        Map<String, Object> result = service.check(output, constraints, null, RubricTemplateCode.GENERAL_TEXT);
+
+        // then
+        assertThat(result.get("pass")).isEqualTo(true);
+        assertThat(result.get("schema")).isEqualTo("PASS");
+    }
 }

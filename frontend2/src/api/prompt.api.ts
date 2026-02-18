@@ -29,7 +29,11 @@ import type {
     EvalRunResponse,
     EvalCancelResponse,
     EvalCaseResultListResponse,
-    EvalCaseResultResponse
+    EvalCaseResultResponse,
+    PlaygroundRunRequest,
+    PlaygroundRunResponse,
+    PlaygroundSaveVersionRequest,
+    PlaygroundSaveVersionResponse,
 } from '@/types/api.types';
 
 export const promptApi = {
@@ -149,4 +153,12 @@ export const promptApi = {
 
     updateEvalReleaseCriteria: (workspaceId: number, data: EvalReleaseCriteriaUpdateRequest) =>
         api.put<EvalReleaseCriteriaResponse>(`/workspaces/${workspaceId}/eval/release-criteria`, data),
+
+    // Prompt Playground
+    // =================================================================
+    playgroundRun: (promptId: number, data: PlaygroundRunRequest) =>
+        api.post<PlaygroundRunResponse>(`/prompts/${promptId}/playground/run`, data),
+
+    playgroundSave: (promptId: number, data: PlaygroundSaveVersionRequest) =>
+        api.post<PlaygroundSaveVersionResponse>(`/prompts/${promptId}/playground/save`, data),
 };

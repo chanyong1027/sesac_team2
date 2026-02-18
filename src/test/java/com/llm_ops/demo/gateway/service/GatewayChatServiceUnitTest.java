@@ -2,7 +2,6 @@ package com.llm_ops.demo.gateway.service;
 
 import com.google.genai.errors.ApiException;
 import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
-import com.llm_ops.demo.gateway.config.GatewayModelProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
@@ -38,16 +37,12 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -78,22 +73,10 @@ class GatewayChatServiceUnitTest {
     private OrganizationApiKeyAuthService organizationApiKeyAuthService;
 
     @Mock
-    private GatewayChatProviderResolveService gatewayChatProviderResolveService;
-
-    @Mock
-    private GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
-
-    @Mock
     private ProviderCredentialService providerCredentialService;
 
     @Mock
-    private GatewayModelProperties gatewayModelProperties;
-
-    @Mock
-    private ObjectProvider<ChatModel> openAiChatModelProvider;
-
-    @Mock
-    private ChatModel chatModel;
+    private LlmCallService llmCallService;
 
     @Mock
     private RagSearchService ragSearchService;
@@ -226,13 +209,13 @@ class GatewayChatServiceUnitTest {
         // given
         String promptKey = "question: {{question}}";
         Map<String, String> variables = new HashMap<>();
-        variables.put("question", "What's the weather? It's 25°C & sunny!");
+        variables.put("question", "What's the weather? It's 25\u00b0C & sunny!");
 
         // when
         String result = invokeRenderPrompt(promptKey, variables);
 
         // then
-        assertThat(result).isEqualTo("question: What's the weather? It's 25°C & sunny!");
+        assertThat(result).isEqualTo("question: What's the weather? It's 25\u00b0C & sunny!");
     }
 
     @Nested
@@ -310,15 +293,13 @@ class GatewayChatServiceUnitTest {
             when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                     .withModel("gpt-4o-mini")
                     .withUsage(new DefaultUsage(null, null, 10L))
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
-            when(chatModel.call(any(Prompt.class))).thenReturn(chatResponse);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any())).thenReturn(chatResponse);
 
             GatewayChatRequest request = new GatewayChatRequest(
                     workspaceId,
@@ -435,8 +416,6 @@ class GatewayChatServiceUnitTest {
             when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             HttpClientErrorException tooManyRequests = HttpClientErrorException.create(
                     HttpStatusCode.valueOf(429),
@@ -451,7 +430,9 @@ class GatewayChatServiceUnitTest {
                     .withUsage(new DefaultUsage(null, null, 10L))
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
-            when(chatModel.call(any(Prompt.class))).thenThrow(tooManyRequests).thenReturn(chatResponse);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenThrow(tooManyRequests)
+                    .thenReturn(chatResponse);
 
             GatewayChatRequest request = new GatewayChatRequest(
                     workspaceId,
@@ -466,7 +447,7 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.isFailover()).isTrue();
-            verify(chatModel, times(2)).call(any(Prompt.class));
+            verify(llmCallService, times(2)).callProvider(any(), anyString(), any(), anyString(), any());
         }
 
         @Test
@@ -514,8 +495,6 @@ class GatewayChatServiceUnitTest {
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             HttpServerErrorException upstream503 = HttpServerErrorException.create(
                     HttpStatusCode.valueOf(503),
@@ -530,7 +509,7 @@ class GatewayChatServiceUnitTest {
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
 
-            when(chatModel.call(any(Prompt.class)))
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
                     .thenThrow(upstream503)
                     .thenThrow(upstream503)
                     .thenReturn(chatResponse);
@@ -543,7 +522,7 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.isFailover()).isTrue();
-            verify(chatModel, times(3)).call(any(Prompt.class));
+            verify(llmCallService, times(3)).callProvider(any(), anyString(), any(), anyString(), any());
         }
 
         @Test
@@ -596,8 +575,6 @@ class GatewayChatServiceUnitTest {
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             HttpServerErrorException upstream503 = HttpServerErrorException.create(
                     HttpStatusCode.valueOf(503),
@@ -612,7 +589,7 @@ class GatewayChatServiceUnitTest {
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
 
-            when(chatModel.call(any(Prompt.class)))
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
                     .thenThrow(upstream503)
                     .thenReturn(chatResponse);
 
@@ -624,7 +601,7 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.isFailover()).isTrue();
-            verify(chatModel, times(2)).call(any(Prompt.class));
+            verify(llmCallService, times(2)).callProvider(any(), anyString(), any(), anyString(), any());
         }
 
         @Test
@@ -677,8 +654,6 @@ class GatewayChatServiceUnitTest {
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                     .withModel("gpt-4o-mini")
@@ -686,7 +661,7 @@ class GatewayChatServiceUnitTest {
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
 
-            when(chatModel.call(any(Prompt.class)))
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
                     .thenAnswer(invocation -> {
                         Thread.sleep(700L);
                         return chatResponse;
@@ -701,7 +676,7 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.isFailover()).isTrue();
-            verify(chatModel, times(2)).call(any(Prompt.class));
+            verify(llmCallService, times(2)).callProvider(any(), anyString(), any(), anyString(), any());
         }
 
         @Test
@@ -812,8 +787,6 @@ class GatewayChatServiceUnitTest {
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             HttpClientErrorException tooManyRequests = HttpClientErrorException.create(
                     HttpStatusCode.valueOf(429),
@@ -822,7 +795,9 @@ class GatewayChatServiceUnitTest {
                     new byte[0],
                     StandardCharsets.UTF_8
             );
-            when(chatModel.call(any(Prompt.class))).thenThrow(tooManyRequests).thenThrow(tooManyRequests);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenThrow(tooManyRequests)
+                    .thenThrow(tooManyRequests);
 
             GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
 

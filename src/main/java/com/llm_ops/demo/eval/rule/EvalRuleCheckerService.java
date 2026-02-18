@@ -123,6 +123,15 @@ public class EvalRuleCheckerService {
             requiredKeys = readStringList(safeExpected.get("required_keys"));
         }
         if (!requiredKeys.isEmpty()) {
+            if (parsedJson == null && output != null && !output.isBlank()) {
+                try {
+                    // required_keys가 있으면 format=json_only가 아니어도 JSON 스키마를 점검한다.
+                    parsedJson = objectMapper.readValue(output, new TypeReference<>() {});
+                } catch (Exception ignored) {
+                    // JSON 파싱 실패 시 schema 체크는 FAIL 처리된다.
+                }
+            }
+
             boolean schemaPass = parsedJson != null;
             if (schemaPass) {
                 for (String key : requiredKeys) {

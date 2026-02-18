@@ -133,7 +133,7 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
     const [advancedJsonOpenByRow, setAdvancedJsonOpenByRow] = useState<Record<string, boolean>>({});
     const [isMovingToRun, setIsMovingToRun] = useState(false);
     const [testcaseInput, setTestcaseInput] = useState('');
-    const [replaceExisting, setReplaceExisting] = useState(true);
+    const [replaceExisting, setReplaceExisting] = useState(false);
 
     const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
     const [mode, setMode] = useState<EvalMode>('CANDIDATE_ONLY');

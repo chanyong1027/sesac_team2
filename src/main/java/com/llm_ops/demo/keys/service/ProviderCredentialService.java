@@ -4,6 +4,7 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.global.util.ProviderKeyEncryptor;
 import com.llm_ops.demo.keys.domain.ProviderCredential;
+import com.llm_ops.demo.keys.domain.ProviderCredentialStatus;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateRequest;
 import com.llm_ops.demo.keys.dto.ProviderCredentialCreateResponse;
@@ -17,6 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ProviderCredentialService {
@@ -31,9 +33,6 @@ public class ProviderCredentialService {
             ProviderCredentialCreateRequest request
     ) {
         ProviderType providerType = ProviderType.from(request.provider());
-
-        // TODO: enforce OWNER-only access once auth is implemented.
-        // TODO: validate organization existence once organization domain is available.
 
         validateDuplicate(organizationId, providerType);
 
@@ -51,8 +50,6 @@ public class ProviderCredentialService {
 
     @Transactional(readOnly = true)
     public List<ProviderCredentialSummaryResponse> getProviderCredentials(Long organizationId) {
-        // TODO: enforce MEMBER+ access once auth is implemented.
-        // TODO: validate organization existence once organization domain is available.
         return providerCredentialRepository.findAllByOrganizationId(organizationId).stream()
                 .map(ProviderCredentialSummaryResponse::from)
                 .toList();
@@ -63,22 +60,25 @@ public class ProviderCredentialService {
         ProviderCredential credential = providerCredentialRepository
                 .findByOrganizationIdAndProvider(organizationId, providerType)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+        requireActiveCredential(credential);
         return providerKeyEncryptor.decrypt(credential.getKeyCiphertext());
     }
 
     @Transactional(readOnly = true)
     public Long resolveCredentialId(Long organizationId, ProviderType providerType) {
         ProviderCredential credential = providerCredentialRepository
-            .findByOrganizationIdAndProvider(organizationId, providerType)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+                .findByOrganizationIdAndProvider(organizationId, providerType)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+        requireActiveCredential(credential);
         return credential.getId();
     }
 
     @Transactional(readOnly = true)
     public ResolvedProviderApiKey resolveApiKey(Long organizationId, ProviderType providerType) {
         ProviderCredential credential = providerCredentialRepository
-            .findByOrganizationIdAndProvider(organizationId, providerType)
-            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+                .findByOrganizationIdAndProvider(organizationId, providerType)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "등록된 provider key가 없습니다."));
+        requireActiveCredential(credential);
         String apiKey = providerKeyEncryptor.decrypt(credential.getKeyCiphertext());
         return new ResolvedProviderApiKey(credential.getId(), providerType, apiKey);
     }
@@ -145,9 +145,17 @@ public class ProviderCredentialService {
             task.run();
         }
     }
+
     private void validateDuplicate(Long organizationId, ProviderType providerType) {
         if (providerCredentialRepository.existsByOrganizationIdAndProvider(organizationId, providerType)) {
-            throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider 입니다.");
+            throw new BusinessException(ErrorCode.CONFLICT, "이미 등록된 provider입니다.");
+        }
+    }
+
+    private void requireActiveCredential(ProviderCredential credential) {
+        if (credential.getStatus() != ProviderCredentialStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "해당 provider key가 활성 상태가 아닙니다. (현재: " + credential.getStatus() + ")");
         }
     }
 }

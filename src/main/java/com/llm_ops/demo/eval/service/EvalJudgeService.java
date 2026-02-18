@@ -337,9 +337,28 @@ public class EvalJudgeService {
         }
 
         int depth = 0;
+        boolean inString = false;
+        boolean escaping = false;
         for (int i = start; i < candidate.length(); i++) {
             char ch = candidate.charAt(i);
-            if (ch == '{') {
+            if (inString) {
+                if (escaping) {
+                    escaping = false;
+                    continue;
+                }
+                if (ch == '\\') {
+                    escaping = true;
+                    continue;
+                }
+                if (ch == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (ch == '"') {
+                inString = true;
+            } else if (ch == '{') {
                 depth++;
             } else if (ch == '}') {
                 depth--;

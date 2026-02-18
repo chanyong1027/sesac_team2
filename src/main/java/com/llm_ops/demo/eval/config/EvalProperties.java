@@ -14,6 +14,7 @@ public class EvalProperties {
 
     private Judge judge = new Judge();
     private Worker worker = new Worker();
+    private Runner runner = new Runner();
 
     @Getter
     @Setter
@@ -30,5 +31,11 @@ public class EvalProperties {
     public static class Worker {
         private long pollIntervalMs = 3000L;
         private int batchSize = 3;
+    }
+
+    @Getter
+    @Setter
+    public static class Runner {
+        private long requestTimeoutMs = 20000L;
     }
 }

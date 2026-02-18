@@ -137,3 +137,5 @@ eval:
   worker:
     poll-interval-ms: 3000
     batch-size: 3
+  runner:
+    request-timeout-ms: 20000

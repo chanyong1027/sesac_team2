@@ -9,6 +9,6 @@ public record EvalBulkUploadRequest(
         Boolean replaceExisting
 ) {
     public boolean isReplaceExisting() {
-        return replaceExisting == null || replaceExisting;
+        return Boolean.TRUE.equals(replaceExisting);
     }
 }

@@ -135,6 +135,9 @@ public class RequestLog {
     @Column(name = "rag_context_hash", length = 64)
     private String ragContextHash;
 
+    @Column(name = "request_source", nullable = false, length = 16)
+    private String requestSource;
+
     public static RequestLog loggingStart(
             UUID requestId,
             String traceId,
@@ -145,7 +148,8 @@ public class RequestLog {
             String requestPath,
             String httpMethod,
             String promptKey,
-            boolean ragEnabled) {
+            boolean ragEnabled,
+            String requestSource) {
         Objects.requireNonNull(traceId, "traceId는 필수입니다");
         Objects.requireNonNull(organizationId, "organizationId는 필수입니다");
         Objects.requireNonNull(workspaceId, "workspaceId는 필수입니다");
@@ -164,6 +168,7 @@ public class RequestLog {
         requestLog.httpMethod = httpMethod;
         requestLog.promptKey = promptKey;
         requestLog.ragEnabled = ragEnabled;
+        requestLog.requestSource = requestSource != null ? requestSource : "GATEWAY";
         requestLog.status = RequestLogStatus.IN_PROGRESS;
         requestLog.currency = "USD";
         return requestLog;

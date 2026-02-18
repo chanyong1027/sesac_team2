@@ -102,7 +102,7 @@ public class EvalRunService {
                 EvalTriggerType.MANUAL,
                 request.rubricTemplateCode(),
                 request.rubricOverrides(),
-                (int) totalCases,
+                Math.toIntExact(totalCases),
                 scope.user().getId()
         );
         return EvalRunResponse.from(run);
@@ -258,7 +258,9 @@ public class EvalRunService {
         EvalAccessService.PromptScope scope = evalAccessService.requirePromptScope(workspaceId, promptId, userId);
         EvalRun run = evalAccessService.requireRun(scope.prompt(), runId);
 
-        PageRequest pageRequest = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        PageRequest pageRequest = PageRequest.of(safePage, safeSize);
         Page<EvalCaseResultResponse> responsePage = evalCaseResultRepository
                 .findByEvalRunIdOrderByIdAsc(run.getId(), pageRequest)
                 .map(EvalCaseResultResponse::from);
@@ -333,7 +335,7 @@ public class EvalRunService {
                 EvalTriggerType.AUTO_VERSION_CREATE,
                 defaults.rubricTemplateCode(),
                 defaults.getRubricOverridesJson(),
-                (int) totalCases,
+                Math.toIntExact(totalCases),
                 createdBy
         );
     }
@@ -377,13 +379,20 @@ public class EvalRunService {
         return savedRun;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<EvalRun> pickQueuedRuns(int batchSize) {
         int safeBatchSize = Math.max(batchSize, 1);
-        return evalRunRepository.findTop10ByStatusOrderByCreatedAtAsc(EvalRunStatus.QUEUED.name())
-                .stream()
-                .limit(safeBatchSize)
-                .toList();
+        List<EvalRun> queuedRuns = evalRunRepository.findQueuedRunsForUpdate(
+                EvalRunStatus.QUEUED.name(),
+                PageRequest.of(0, safeBatchSize)
+        );
+
+        if (queuedRuns.isEmpty()) {
+            return queuedRuns;
+        }
+
+        queuedRuns.forEach(EvalRun::markRunning);
+        return evalRunRepository.saveAll(queuedRuns);
     }
 
     private PromptVersion resolveBaselineVersionForEstimate(Prompt prompt, PromptVersion candidateVersion, EvalMode mode) {
