@@ -22,8 +22,11 @@ const authAxios = axios.create({
 
 export const authApi = {
   // 이메일 중복 체크 - GET /api/v1/auth/check-email
-  checkEmailAvailability: (email: string) =>
-    api.get<ApiResponse<EmailAvailabilityResponse>>('/auth/check-email', { params: { email } }),
+  checkEmailAvailability: (email: string, options?: { signal?: AbortSignal }) =>
+    api.get<ApiResponse<EmailAvailabilityResponse>>('/auth/check-email', {
+      params: { email },
+      signal: options?.signal,
+    }),
 
   // 회원가입 - POST /api/v1/auth/signup
   signup: (data: UserSignupRequest) =>

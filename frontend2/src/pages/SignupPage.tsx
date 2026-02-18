@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,9 +9,11 @@ import axios from 'axios';
 import { authApi } from '@/api/auth.api';
 import { useAuthStore } from '@/features/auth/store';
 
+const signupEmailSchema = z.string().email('유효한 이메일을 입력하세요');
+
 const signupSchema = z
   .object({
-    email: z.string().email('유효한 이메일을 입력하세요'),
+    email: signupEmailSchema,
     password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다'),
     confirmPassword: z.string(),
     name: z.string().min(2, '이름을 입력하세요'),
@@ -24,8 +26,6 @@ const signupSchema = z
 type SignupFormData = z.infer<typeof signupSchema>;
 type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'duplicate' | 'error';
 type ToastTone = 'success' | 'error' | 'info';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function resolveApiError(error: unknown): {
   message: string;
@@ -330,6 +330,9 @@ export function SignupPage() {
   const [signupErrorMessage, setSignupErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<ToastTone>('info');
+  const toastTimerRef = useRef<number | null>(null);
+  const navTimerRef = useRef<number | null>(null);
+  const emailCheckAbortRef = useRef<AbortController | null>(null);
 
   // 이미 로그인된 사용자는 대시보드로 리다이렉트
   useEffect(() => {
@@ -353,11 +356,27 @@ export function SignupPage() {
     emailCheckStatus === 'available' &&
     lastCheckedEmail === normalizedWatchedEmail;
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      if (navTimerRef.current !== null) {
+        window.clearTimeout(navTimerRef.current);
+      }
+      emailCheckAbortRef.current?.abort();
+    };
+  }, []);
+
   const showToast = (message: string, tone: ToastTone) => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToastTone(tone);
     setToastMessage(message);
-    window.setTimeout(() => {
+    toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 2500);
   };
 
@@ -367,6 +386,8 @@ export function SignupPage() {
     setSignupErrorMessage(null);
 
     if (normalizedEmail !== lastCheckedEmail) {
+      emailCheckAbortRef.current?.abort();
+      emailCheckAbortRef.current = null;
       setEmailCheckStatus('idle');
       setEmailCheckMessage(null);
       setLastCheckedEmail(null);
@@ -379,7 +400,9 @@ export function SignupPage() {
   const handleEmailBlur = async (value: string) => {
     const normalizedEmail = value.trim();
 
-    if (!normalizedEmail || !EMAIL_REGEX.test(normalizedEmail)) {
+    if (!normalizedEmail || !signupEmailSchema.safeParse(normalizedEmail).success) {
+      emailCheckAbortRef.current?.abort();
+      emailCheckAbortRef.current = null;
       setEmailCheckStatus('idle');
       setEmailCheckMessage(null);
       setLastCheckedEmail(null);
@@ -392,10 +415,20 @@ export function SignupPage() {
 
     setEmailCheckStatus('checking');
     setEmailCheckMessage('이메일 중복 확인 중입니다...');
+    emailCheckAbortRef.current?.abort();
+
+    const controller = new AbortController();
+    emailCheckAbortRef.current = controller;
 
     try {
-      const response = await authApi.checkEmailAvailability(normalizedEmail);
+      const response = await authApi.checkEmailAvailability(normalizedEmail, {
+        signal: controller.signal,
+      });
       const availability = response.data.data;
+
+      if (emailCheckAbortRef.current !== controller) {
+        return;
+      }
 
       setLastCheckedEmail(normalizedEmail);
       setEmailCheckStatus(availability.available ? 'available' : 'duplicate');
@@ -410,10 +443,19 @@ export function SignupPage() {
         });
       }
     } catch (error) {
+      if ((axios.isAxiosError(error) && error.code === 'ERR_CANCELED')
+        || (error instanceof DOMException && error.name === 'AbortError')) {
+        return;
+      }
+
       const resolved = resolveApiError(error);
       setEmailCheckStatus('error');
       setEmailCheckMessage(resolved.message);
       setLastCheckedEmail(null);
+    } finally {
+      if (emailCheckAbortRef.current === controller) {
+        emailCheckAbortRef.current = null;
+      }
     }
   };
 
@@ -427,7 +469,11 @@ export function SignupPage() {
     onSuccess: () => {
       setSignupErrorMessage(null);
       showToast('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.', 'success');
-      window.setTimeout(() => {
+      if (navTimerRef.current !== null) {
+        window.clearTimeout(navTimerRef.current);
+      }
+      navTimerRef.current = window.setTimeout(() => {
+        navTimerRef.current = null;
         navigate('/login');
       }, 900);
     },
@@ -477,6 +523,9 @@ export function SignupPage() {
                 : 'border-cyan-400/40 bg-cyan-500/10 text-cyan-200'
           }`}
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          role={toastTone === 'error' ? 'alert' : 'status'}
+          aria-live={toastTone === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
         >
           <p className="text-[12px]">{toastMessage}</p>
         </div>
