@@ -193,6 +193,19 @@ export interface OrganizationMemberRemoveResponse {
   removedAt: string;
 }
 
+export type OrganizationRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+export interface OrganizationMemberRoleUpdateRequest {
+  role: OrganizationRole;
+}
+
+export interface OrganizationMemberRoleUpdateResponse {
+  memberId: number;
+  previousRole: OrganizationRole;
+  newRole: OrganizationRole;
+  updatedAt: string;
+}
+
 // ========================================
 // Workspace
 // ========================================
