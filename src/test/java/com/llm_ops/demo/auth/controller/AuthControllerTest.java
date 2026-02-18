@@ -1,13 +1,16 @@
 package com.llm_ops.demo.auth.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.auth.service.EmailCheckRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,9 +39,13 @@ class AuthControllerTest {
         @Autowired
         private UserRepository userRepository;
 
+        @Autowired
+        private EmailCheckRateLimiter emailCheckRateLimiter;
+
         @BeforeEach
         void setUp() {
                 userRepository.deleteAll();
+                emailCheckRateLimiter.clear();
         }
 
         // ==================== 회원가입 테스트 ====================
@@ -228,8 +235,14 @@ class AuthControllerTest {
                                         .param("email", "overflow@example.com"))
                                         .andDo(print())
                                         .andExpect(status().isTooManyRequests())
-                                        .andExpect(jsonPath("$.code").value("C429"))
-                                        .andExpect(jsonPath("$.message").value("이메일 확인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                                        .andExpect(jsonPath("$.code").value("C4291"))
+                                        .andExpect(jsonPath("$.message").value("이메일 확인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."))
+                                        .andExpect(header().exists("Retry-After"))
+                                        .andExpect(result -> {
+                                                String retryAfter = result.getResponse().getHeader("Retry-After");
+                                                assertThat(retryAfter).isNotBlank();
+                                                assertThat(Long.parseLong(retryAfter)).isGreaterThan(0L);
+                                        });
                 }
         }
 

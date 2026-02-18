@@ -19,15 +19,34 @@ public class EmailCheckRateLimiter {
         this.windowMillis = Math.max(1L, windowSeconds) * 1000L;
     }
 
-    public boolean tryAcquire(String key) {
+    public RateLimitDecision tryAcquire(String key) {
         long now = System.currentTimeMillis();
-        CounterWindow updated = counters.compute(key, (k, current) -> {
+        CounterWindow updated = counters.compute(normalizeKey(key), (k, current) -> {
             if (current == null || now - current.windowStartMillis >= windowMillis) {
                 return new CounterWindow(now, 1);
             }
             return new CounterWindow(current.windowStartMillis, current.count + 1);
         });
-        return updated != null && updated.count <= maxRequests;
+        if (updated == null || updated.count <= maxRequests) {
+            return new RateLimitDecision(true, 0L);
+        }
+        long remainingMillis = windowMillis - (now - updated.windowStartMillis);
+        long retryAfterSeconds = Math.max(1L, (remainingMillis + 999L) / 1000L);
+        return new RateLimitDecision(false, retryAfterSeconds);
+    }
+
+    public void clear() {
+        counters.clear();
+    }
+
+    private String normalizeKey(String key) {
+        if (key == null || key.isBlank()) {
+            return "unknown";
+        }
+        return key.trim();
+    }
+
+    public record RateLimitDecision(boolean allowed, long retryAfterSeconds) {
     }
 
     private record CounterWindow(long windowStartMillis, int count) {

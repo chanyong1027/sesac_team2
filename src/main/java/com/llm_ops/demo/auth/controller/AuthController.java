@@ -1,9 +1,6 @@
 package com.llm_ops.demo.auth.controller;
 
-import com.llm_ops.demo.global.error.BusinessException;
-import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.auth.service.AuthService;
-import com.llm_ops.demo.auth.service.EmailCheckRateLimiter;
 import com.llm_ops.demo.auth.dto.request.LoginRequest;
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.dto.request.TokenRefreshRequest;
@@ -12,7 +9,6 @@ import com.llm_ops.demo.auth.dto.response.LoginResponse;
 import com.llm_ops.demo.auth.dto.response.SignUpResponse;
 import com.llm_ops.demo.auth.dto.response.TokenRefreshResponse;
 import com.llm_ops.demo.auth.dto.response.ApiResponse;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -35,20 +31,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
-    private final EmailCheckRateLimiter emailCheckRateLimiter;
 
     @GetMapping("/check-email")
     public ResponseEntity<ApiResponse<EmailAvailabilityResponse>> checkEmailAvailability(
-            HttpServletRequest request,
             @RequestParam
             @NotBlank
             @Size(max = 50)
             @Email
             String email) {
-        String clientIp = resolveClientIp(request);
-        if (!emailCheckRateLimiter.tryAcquire(clientIp)) {
-            throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "이메일 확인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
-        }
         EmailAvailabilityResponse response = authService.checkEmailAvailability(email);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -80,14 +70,5 @@ public class AuthController {
             @Valid @RequestBody TokenRefreshRequest request) {
         TokenRefreshResponse response = authService.refreshToken(request);
         return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-        String remoteAddr = request.getRemoteAddr();
-        return remoteAddr != null ? remoteAddr : "unknown";
     }
 }
