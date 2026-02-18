@@ -52,6 +52,50 @@ export interface RequestLogListResponse {
   totalPages: number;
 }
 
+// ========================================
+// Budget Guardrail
+// ========================================
+export type BudgetScopeType = 'WORKSPACE' | 'PROVIDER_CREDENTIAL';
+export type BudgetSoftAction = 'DEGRADE';
+
+export interface BudgetPolicyResponse {
+  scopeType: BudgetScopeType;
+  scopeId: number;
+  monthLimitUsd: number | null;
+  softLimitUsd: number | null;
+  softAction: BudgetSoftAction;
+  degradeProviderModelMap: Record<string, string>;
+  degradeMaxOutputTokens: number | null;
+  degradeDisableRag: boolean | null;
+  enabled: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface BudgetPolicyUpdateRequest {
+  monthLimitUsd?: number | null;
+  softLimitUsd?: number | null;
+  softAction?: BudgetSoftAction;
+  degradeProviderModelMap?: Record<string, string>;
+  degradeMaxOutputTokens?: number | null;
+  degradeDisableRag?: boolean | null;
+  enabled?: boolean;
+}
+
+export interface BudgetUsageResponse {
+  scopeType: BudgetScopeType;
+  scopeId: number;
+  month: string; // YYYY-MM (UTC)
+  usedUsd: number;
+  hardLimitUsd: number | null;
+  softLimitUsd: number | null;
+  remainingHardUsd: number | null;
+  remainingSoftUsd: number | null;
+  requestCount: number;
+  totalTokens: number;
+  lastUpdatedAt: string | null;
+}
+
 // 에러 응답
 export interface ErrorResponse {
   code: string;
@@ -155,6 +199,19 @@ export interface OrganizationMemberResponse {
 export interface OrganizationMemberRemoveResponse {
   memberId: number;
   removedAt: string;
+}
+
+export type OrganizationRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+export interface OrganizationMemberRoleUpdateRequest {
+  role: OrganizationRole;
+}
+
+export interface OrganizationMemberRoleUpdateResponse {
+  memberId: number;
+  previousRole: OrganizationRole;
+  newRole: OrganizationRole;
+  updatedAt: string;
 }
 
 // ========================================
@@ -400,6 +457,7 @@ export interface PromptVersionDetailResponse {
   secondaryModel: string | null;
   systemPrompt: string;
   userTemplate: string;
+  ragEnabled: boolean;
   contextUrl?: string;
   modelConfig: Record<string, any>;
   createdBy: number;
@@ -498,4 +556,53 @@ export interface WorkspaceRagSettingsUpdateRequest {
   rerankTopN: number;
   chunkSize: number;
   chunkOverlapTokens: number;
+}
+
+// ========================================
+// Prompt Playground
+// ========================================
+export interface PlaygroundRunRequest {
+  provider: ProviderType;
+  model: string;
+  systemPrompt?: string;
+  userTemplate: string;
+  ragEnabled?: boolean;
+  modelConfig?: Record<string, any>;
+  variables: Record<string, string>;
+  baseVersionId?: number;
+}
+
+export interface PlaygroundUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  estimatedCost: number | null;
+}
+
+export interface PlaygroundRunResponse {
+  traceId: string;
+  answer: string;
+  usedModel: string;
+  usage: PlaygroundUsage;
+  latencyMs: number;
+  executedAt: string;
+}
+
+export interface PlaygroundSaveVersionRequest {
+  title?: string;
+  provider: ProviderType;
+  model: string;
+  secondaryProvider?: ProviderType;
+  secondaryModel?: string;
+  systemPrompt?: string;
+  userTemplate: string;
+  ragEnabled?: boolean;
+  contextUrl?: string;
+  modelConfig?: Record<string, any>;
+  releaseAfterSave: boolean;
+}
+
+export interface PlaygroundSaveVersionResponse {
+  version: PromptVersionCreateResponse;
+  released: boolean;
 }
