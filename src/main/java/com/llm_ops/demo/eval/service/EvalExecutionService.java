@@ -91,6 +91,7 @@ public class EvalExecutionService {
             );
 
             PromptVersion baselineVersion = resolveBaselineVersion(run);
+            boolean compareBaselineAvailable = run.mode() != EvalMode.COMPARE_ACTIVE || baselineVersion != null;
             List<EvalCaseResult> caseResults = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(run.getId());
 
             for (EvalCaseResult caseResult : caseResults) {
@@ -104,7 +105,7 @@ public class EvalExecutionService {
                 processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
             }
 
-            finishRun(run.getId(), costAccumulator);
+            finishRun(run.getId(), costAccumulator, compareBaselineAvailable);
         } catch (Exception e) {
             log.error("Eval run failed. runId={}", runId, e);
             failRun(runId, costAccumulator, e.getMessage());
@@ -359,7 +360,7 @@ public class EvalExecutionService {
                 .orElse(true);
     }
 
-    private void finishRun(Long runId, CostAccumulator costAccumulator) {
+    private void finishRun(Long runId, CostAccumulator costAccumulator, boolean compareBaselineAvailable) {
         EvalRun run = evalRunRepository.findById(runId).orElse(null);
         if (run == null || run.status() == EvalRunStatus.CANCELLED) {
             return;
@@ -395,8 +396,8 @@ public class EvalExecutionService {
                     .filter(result -> hasCompareSummary(result.getJudgeOutputJson()))
                     .count();
             compareMissingOkCases = Math.max(0L, okResults.size() - compareAvailableOkCases);
-            // If any candidate OK case is missing baseline comparison, block release decision.
-            compareBaselineComplete = okResults.isEmpty() || compareMissingOkCases == 0L;
+            // baseline 자체를 찾지 못했거나, OK 케이스 중 비교 누락이 있으면 비교 불완전으로 처리한다.
+            compareBaselineComplete = compareBaselineAvailable && (okResults.isEmpty() || compareMissingOkCases == 0L);
         }
 
         EvalReleaseCriteria criteria = evalReleaseCriteriaService.resolveOrDefault(run.getWorkspaceId());
@@ -428,6 +429,7 @@ public class EvalExecutionService {
             summary.put("avgScoreDelta", round(avgScoreDelta));
         }
         if (run.mode() == EvalMode.COMPARE_ACTIVE) {
+            summary.put("compareBaselineAvailable", compareBaselineAvailable);
             summary.put("compareBaselineComplete", compareBaselineComplete);
             summary.put("compareOkCases", compareAvailableOkCases);
             summary.put("compareMissingOkCases", compareMissingOkCases);
