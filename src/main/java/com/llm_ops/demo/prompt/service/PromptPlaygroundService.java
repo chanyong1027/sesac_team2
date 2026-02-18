@@ -118,6 +118,7 @@ public class PromptPlaygroundService {
                 PLAYGROUND_HTTP_METHOD,
                 prompt.getPromptKey(),
                 ragEnabled,
+                request.toString(),
                 "PLAYGROUND"));
 
         Integer ragLatencyMs = null;
@@ -236,7 +237,9 @@ public class PromptPlaygroundService {
                     ragContextTruncated,
                     ragContextHash,
                     ragTopK,
-                    ragSimilarityThreshold));
+                    ragSimilarityThreshold,
+                    answer,
+                    null));
 
             return new PlaygroundRunResponse(
                     traceId,
@@ -261,7 +264,9 @@ public class PromptPlaygroundService {
                     e.getMessage(),
                     "BUSINESS_EXCEPTION",
                     ragLatencyMs, ragChunksCount, ragContextChars,
-                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold));
+                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
+                    e.getMessage(),
+                    null));
             throw e;
         } catch (Exception e) {
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
@@ -278,7 +283,9 @@ public class PromptPlaygroundService {
                     "Unhandled exception",
                     "UNHANDLED_EXCEPTION",
                     ragLatencyMs, ragChunksCount, ragContextChars,
-                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold));
+                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
+                    e.getMessage(),
+                    null));
             throw e;
         }
     }

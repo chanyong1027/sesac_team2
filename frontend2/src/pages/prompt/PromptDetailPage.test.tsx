@@ -136,7 +136,7 @@ describe('PromptDetailPage VersionsTab', () => {
   it('updates model options when provider changes', async () => {
     renderPage();
 
-    const versionsTab = await screen.findByRole('button', { name: '버전 (Versions)' });
+    const versionsTab = await screen.findByRole('button', { name: /버전 \(Versions\)/ });
     fireEvent.click(versionsTab);
 
     const openButton = await screen.findByText('+ 새 버전 생성');
@@ -158,7 +158,7 @@ describe('PromptDetailPage VersionsTab', () => {
 
     renderPage();
 
-    const versionsTab = await screen.findByRole('button', { name: '버전 (Versions)' });
+    const versionsTab = await screen.findByRole('button', { name: /버전 \(Versions\)/ });
     fireEvent.click(versionsTab);
 
     const openButton = await screen.findByText('+ 새 버전 생성');
