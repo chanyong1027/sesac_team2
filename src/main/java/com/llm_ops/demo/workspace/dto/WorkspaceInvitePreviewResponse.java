@@ -17,9 +17,7 @@ public record WorkspaceInvitePreviewResponse(
     String invitationMessage
 ) {
     public enum InvitationPreviewStatus {
-        VALID,
-        EXPIRED,
-        WORKSPACE_INACTIVE
+        VALID
     }
 
     public static WorkspaceInvitePreviewResponse fromValid(WorkspaceInvitationLink invitation) {

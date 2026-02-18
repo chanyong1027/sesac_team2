@@ -254,7 +254,7 @@ export interface WorkspaceInviteCreateResponse {
   expiredAt: string;
 }
 
-export type InvitationPreviewStatus = 'VALID' | 'EXPIRED' | 'WORKSPACE_INACTIVE';
+export type InvitationPreviewStatus = 'VALID';
 
 export interface WorkspaceInvitePreviewResponse {
   organizationId: number;

@@ -22,6 +22,10 @@ interface ParsedError {
 }
 
 const DEFAULT_ERROR_MESSAGE = '초대 링크 처리 중 오류가 발생했습니다.';
+// TODO: 백엔드가 초대 관련 서브코드(예: INVITATION_EXPIRED)를 제공하면 메시지 매칭을 제거한다.
+const INVITATION_ERROR_EXPIRED = '만료된 초대 링크';
+const INVITATION_ERROR_ALREADY_MEMBER = '이미 워크스페이스 멤버';
+const INVITATION_ERROR_OTHER_ORG = '이미 다른 조직에 속해';
 
 export function InvitationAcceptPage() {
   const [searchParams] = useSearchParams();
@@ -287,20 +291,20 @@ function parseError(error: unknown): ParsedError {
 }
 
 function mapPreviewErrorToState(error: ParsedError): InvitationPageState {
-  if (error.code === 'C400' && error.message.includes('만료된 초대 링크')) {
+  if (error.code === 'C400' && error.message.includes(INVITATION_ERROR_EXPIRED)) {
     return 'error-expired';
   }
   return 'error-invalid';
 }
 
 function mapAcceptErrorToState(error: ParsedError): InvitationPageState {
-  if (error.code === 'C409' && error.message.includes('이미 워크스페이스 멤버')) {
+  if (error.code === 'C409' && error.message.includes(INVITATION_ERROR_ALREADY_MEMBER)) {
     return 'error-conflict-already-member';
   }
-  if (error.code === 'C409' && error.message.includes('이미 다른 조직에 속해')) {
+  if (error.code === 'C409' && error.message.includes(INVITATION_ERROR_OTHER_ORG)) {
     return 'error-conflict-other-org';
   }
-  if (error.code === 'C400' && error.message.includes('만료된 초대 링크')) {
+  if (error.code === 'C400' && error.message.includes(INVITATION_ERROR_EXPIRED)) {
     return 'error-expired';
   }
   if (error.code === 'C404') {

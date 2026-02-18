@@ -24,6 +24,8 @@ interface ParsedApiError {
 }
 
 const DEFAULT_INVITATION_ERROR_MESSAGE = '초대 처리 중 오류가 발생했습니다.';
+const INVITATION_ERROR_ALREADY_MEMBER = '이미 워크스페이스 멤버';
+const INVITATION_ERROR_EXPIRED = '만료된 초대 링크';
 
 function unwrapData<T>(payload: unknown): T {
   if (payload && typeof payload === 'object' && 'data' in payload) {
@@ -47,6 +49,14 @@ function parseApiError(error: unknown): ParsedApiError {
     status: axiosError.response?.status ?? null,
     message: axiosError.response?.data?.message ?? axiosError.message ?? DEFAULT_INVITATION_ERROR_MESSAGE,
   };
+}
+
+function isAlreadyMemberInvitationError(error: ParsedApiError): boolean {
+  return error.code === 'C409' && error.message.includes(INVITATION_ERROR_ALREADY_MEMBER);
+}
+
+function isExpiredInvitationError(error: ParsedApiError): boolean {
+  return error.code === 'C400' && error.message.includes(INVITATION_ERROR_EXPIRED);
 }
 
 function resolveWorkspacePath(organizationId: number | null | undefined, workspaceId: number | null | undefined): string {
@@ -184,13 +194,6 @@ export function LoginPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  // 이미 로그인된 사용자는 대시보드로 리다이렉트
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
-
   const {
     register,
     handleSubmit,
@@ -222,13 +225,15 @@ export function LoginPage() {
         } catch (error) {
           const parsedError = parseApiError(error);
 
-          if (parsedError.code === 'C409' && parsedError.message.includes('이미 워크스페이스 멤버')) {
+          if (isAlreadyMemberInvitationError(parsedError)) {
             try {
               const previewResponse = await workspaceApi.previewInvitation(pendingToken);
               const previewPayload = unwrapData<WorkspaceInvitePreviewResponse>(previewResponse.data);
+              sessionStorage.removeItem('pendingInvitation');
               navigate(resolveWorkspacePath(previewPayload.organizationId, previewPayload.workspaceId));
               return;
             } catch {
+              sessionStorage.removeItem('pendingInvitation');
               navigate(`/invitations/accept?token=${encodeURIComponent(pendingToken)}`);
               return;
             }
@@ -236,7 +241,7 @@ export function LoginPage() {
 
           const isInvalidInvitation =
             parsedError.code === 'C404'
-            || (parsedError.code === 'C400' && parsedError.message.includes('만료된 초대 링크'));
+            || isExpiredInvitationError(parsedError);
 
           if (isInvalidInvitation) {
             navigate(`/invitations/accept?token=${encodeURIComponent(pendingToken)}`);
@@ -258,6 +263,14 @@ export function LoginPage() {
       navigate(from);
     },
   });
+
+  // 이미 로그인된 사용자는 대시보드로 리다이렉트
+  // 로그인 성공 직후 초대 처리 중일 때는 mutation이 pending 상태여서 자동 리다이렉트를 막는다.
+  useEffect(() => {
+    if (isAuthenticated && !loginMutation.isPending) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, loginMutation.isPending, navigate]);
 
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data);

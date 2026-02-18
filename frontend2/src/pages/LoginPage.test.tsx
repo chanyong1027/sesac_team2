@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { LoginPage } from './LoginPage';
 import { authApi } from '@/api/auth.api';
 import { workspaceApi } from '@/api/workspace.api';
+import { createAxiosApiError } from '@/test/axiosTestHelpers';
 import type {
   ApiResponse,
-  ErrorResponse,
   UserLoginResponse,
   UserMeResponse,
   WorkspaceInviteAcceptResponse,
@@ -54,26 +54,6 @@ const createApiResponse = <T,>(data: T): ApiResponse<T> => ({
   message: 'ok',
   data,
 });
-
-const createAxiosApiError = (status: number, code: string, message: string): AxiosError<ErrorResponse> => ({
-  name: 'AxiosError',
-  message,
-  isAxiosError: true,
-  toJSON: () => ({}),
-  config: { headers: {} } as InternalAxiosRequestConfig,
-  response: {
-    status,
-    statusText: 'Error',
-    headers: {},
-    config: { headers: {} } as InternalAxiosRequestConfig,
-    data: {
-      code,
-      message,
-      timestamp: '2026-02-18T00:00:00',
-      fieldErrors: null,
-    },
-  },
-} as AxiosError<ErrorResponse>);
 
 function CurrentLocation() {
   const location = useLocation();
@@ -188,7 +168,7 @@ describe('LoginPage pending invitation flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/orgs/5/workspaces/15');
     });
-    expect(sessionStorage.getItem('pendingInvitation')).toBe('invite-token');
+    expect(sessionStorage.getItem('pendingInvitation')).toBeNull();
   });
 
   it('이미 멤버 충돌 후 프리뷰도 실패하면 초대 페이지로 복귀한다', async () => {
@@ -206,7 +186,7 @@ describe('LoginPage pending invitation flow', () => {
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/invitations/accept?token=invite-token');
     });
-    expect(sessionStorage.getItem('pendingInvitation')).toBe('invite-token');
+    expect(sessionStorage.getItem('pendingInvitation')).toBeNull();
   });
 
   it('만료/잘못된 링크면 초대 페이지로 복귀한다', async () => {

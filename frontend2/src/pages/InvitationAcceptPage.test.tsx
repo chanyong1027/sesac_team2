@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { InvitationAcceptPage } from './InvitationAcceptPage';
 import { workspaceApi } from '@/api/workspace.api';
-import type { ErrorResponse, WorkspaceInviteAcceptResponse, WorkspaceInvitePreviewResponse } from '@/types/api.types';
+import { createAxiosApiError } from '@/test/axiosTestHelpers';
+import type { WorkspaceInviteAcceptResponse, WorkspaceInvitePreviewResponse } from '@/types/api.types';
 
 const authState = {
   isAuthenticated: false,
@@ -30,26 +31,6 @@ const mockAxiosResponse = <T,>(data: T): AxiosResponse<T> => ({
   headers: {},
   config: { headers: {} } as InternalAxiosRequestConfig,
 });
-
-const createAxiosApiError = (status: number, code: string, message: string): AxiosError<ErrorResponse> => ({
-  name: 'AxiosError',
-  message,
-  isAxiosError: true,
-  toJSON: () => ({}),
-  config: { headers: {} } as InternalAxiosRequestConfig,
-  response: {
-    status,
-    statusText: 'Error',
-    headers: {},
-    config: { headers: {} } as InternalAxiosRequestConfig,
-    data: {
-      code,
-      message,
-      timestamp: '2026-02-18T00:00:00',
-      fieldErrors: null,
-    },
-  },
-} as AxiosError<ErrorResponse>);
 
 function CurrentLocation() {
   const location = useLocation();
