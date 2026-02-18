@@ -119,12 +119,20 @@ class ChatCompletionE2ETest {
                 organizationId,
                 new ProviderCredentialCreateRequest("openai", "provider-key")
         );
+        activateCredential(organizationId, ProviderType.OPENAI);
     }
 
     @AfterEach
     void tearDown() {
         organizationApiKeyRepository.deleteAll();
         providerCredentialRepository.deleteAll();
+    }
+
+    private void activateCredential(Long organizationId, ProviderType providerType) {
+        var credential = providerCredentialRepository
+                .findByOrganizationIdAndProvider(organizationId, providerType).orElseThrow();
+        credential.markActive();
+        providerCredentialRepository.save(credential);
     }
 
     @Test

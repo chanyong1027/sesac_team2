@@ -1,11 +1,14 @@
 package com.llm_ops.demo.gateway.service;
 
-import com.llm_ops.demo.gateway.config.GatewayModelProperties;
+import com.google.genai.errors.ApiException;
+import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
+import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetGuardrailService;
 import com.llm_ops.demo.budget.service.BudgetUsageService;
+import com.llm_ops.demo.global.error.GatewayException;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
@@ -34,14 +37,15 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.DefaultUsage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
@@ -54,6 +58,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 /**
@@ -68,22 +73,10 @@ class GatewayChatServiceUnitTest {
     private OrganizationApiKeyAuthService organizationApiKeyAuthService;
 
     @Mock
-    private GatewayChatProviderResolveService gatewayChatProviderResolveService;
-
-    @Mock
-    private GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
-
-    @Mock
     private ProviderCredentialService providerCredentialService;
 
     @Mock
-    private GatewayModelProperties gatewayModelProperties;
-
-    @Mock
-    private ObjectProvider<ChatModel> openAiChatModelProvider;
-
-    @Mock
-    private ChatModel chatModel;
+    private LlmCallService llmCallService;
 
     @Mock
     private RagSearchService ragSearchService;
@@ -111,6 +104,9 @@ class GatewayChatServiceUnitTest {
 
     @Spy
     private RagContextBuilder ragContextBuilder = new RagContextBuilder(new RagContextProperties());
+
+    @Spy
+    private GatewayReliabilityProperties gatewayReliabilityProperties = new GatewayReliabilityProperties();
 
     @InjectMocks
     private GatewayChatService gatewayChatService;
@@ -213,13 +209,13 @@ class GatewayChatServiceUnitTest {
         // given
         String promptKey = "question: {{question}}";
         Map<String, String> variables = new HashMap<>();
-        variables.put("question", "What's the weather? It's 25°C & sunny!");
+        variables.put("question", "What's the weather? It's 25\u00b0C & sunny!");
 
         // when
         String result = invokeRenderPrompt(promptKey, variables);
 
         // then
-        assertThat(result).isEqualTo("question: What's the weather? It's 25°C & sunny!");
+        assertThat(result).isEqualTo("question: What's the weather? It's 25\u00b0C & sunny!");
     }
 
     @Nested
@@ -297,15 +293,13 @@ class GatewayChatServiceUnitTest {
             when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
             when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
             when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
-            when(openAiChatModelProvider.getIfAvailable()).thenReturn(chatModel);
-            when(gatewayChatOptionsCreateService.openAiOptions(anyString())).thenReturn(OpenAiChatOptions.builder().build());
 
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
                     .withModel("gpt-4o-mini")
                     .withUsage(new DefaultUsage(null, null, 10L))
                     .build();
             ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
-            when(chatModel.call(any(Prompt.class))).thenReturn(chatResponse);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any())).thenReturn(chatResponse);
 
             GatewayChatRequest request = new GatewayChatRequest(
                     workspaceId,
@@ -343,6 +337,490 @@ class GatewayChatServiceUnitTest {
             return (String) method.invoke(null, value);
         }
 
+    }
+
+    @Nested
+    @DisplayName("Failover 조건 테스트")
+    class FailoverConditionTest {
+
+        @Test
+        @DisplayName("HTTP 429(Too Many Requests)은 secondary failover 대상이다")
+        void http_429_예외이면_failover_대상이다() throws Exception {
+            // given
+            HttpClientErrorException tooManyRequests = HttpClientErrorException.create(
+                    HttpStatusCode.valueOf(429),
+                    "Too Many Requests",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+            );
+
+            // when
+            boolean retryable = invokeIsRetryableException(tooManyRequests);
+
+            // then
+            assertThat(retryable).isTrue();
+        }
+
+        @Test
+        @DisplayName("Gemini ApiException 429/RESOURCE_EXHAUSTED는 secondary failover 대상이다")
+        void gemini_resource_exhausted_예외이면_failover_대상이다() throws Exception {
+            // given
+            ApiException quotaExceeded = new ApiException(429, "RESOURCE_EXHAUSTED", "quota exceeded");
+
+            // when
+            boolean retryable = invokeIsRetryableException(quotaExceeded);
+
+            // then
+            assertThat(retryable).isTrue();
+        }
+
+        @Test
+        @DisplayName("Primary가 429로 실패하면 secondary로 재시도하여 성공한다")
+        void primary가_429로_실패하면_secondary로_failover한다() {
+            // given
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getSecondaryModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"));
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+
+            HttpClientErrorException tooManyRequests = HttpClientErrorException.create(
+                    HttpStatusCode.valueOf(429),
+                    "Too Many Requests",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+            );
+
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                    .withModel("gpt-4o-mini")
+                    .withUsage(new DefaultUsage(null, null, 10L))
+                    .build();
+            ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenThrow(tooManyRequests)
+                    .thenReturn(chatResponse);
+
+            GatewayChatRequest request = new GatewayChatRequest(
+                    workspaceId,
+                    "hello",
+                    Map.of(),
+                    false
+            );
+
+            // when
+            GatewayChatResponse response = gatewayChatService.chat(apiKey, request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.isFailover()).isTrue();
+            verify(llmCallService, times(2)).callProvider(any(), anyString(), any(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("Primary가 503이면 1회 재시도 후 secondary로 전환한다")
+        void primary가_503이면_1회_재시도_후_secondary로_failover한다() {
+            // given
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getSecondaryModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(
+                            new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"),
+                            new ProviderCredentialService.ResolvedProviderApiKey(11L, ProviderType.OPENAI, "provider-key-2")
+                    );
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
+
+            HttpServerErrorException upstream503 = HttpServerErrorException.create(
+                    HttpStatusCode.valueOf(503),
+                    "Service Unavailable",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+            );
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                    .withModel("gpt-4o-mini")
+                    .withUsage(new DefaultUsage(null, null, 10L))
+                    .build();
+            ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenThrow(upstream503)
+                    .thenThrow(upstream503)
+                    .thenReturn(chatResponse);
+
+            GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+            // when
+            GatewayChatResponse response = gatewayChatService.chat(apiKey, request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.isFailover()).isTrue();
+            verify(llmCallService, times(3)).callProvider(any(), anyString(), any(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("Primary가 503이어도 남은 시간이 부족하면 retry를 생략하고 secondary로 전환한다")
+        void primary가_503이어도_남은시간_부족하면_retry를_생략하고_secondary로_failover한다() {
+            // given
+            gatewayReliabilityProperties.setRequestTimeoutMs(1_000);
+            gatewayReliabilityProperties.setMinRetryBudgetMs(1_200);
+            gatewayReliabilityProperties.setMinFailoverBudgetMs(100);
+            gatewayReliabilityProperties.setRetryBackoffMs(0);
+
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getSecondaryModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(
+                            new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"),
+                            new ProviderCredentialService.ResolvedProviderApiKey(11L, ProviderType.OPENAI, "provider-key-2")
+                    );
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
+
+            HttpServerErrorException upstream503 = HttpServerErrorException.create(
+                    HttpStatusCode.valueOf(503),
+                    "Service Unavailable",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+            );
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                    .withModel("gpt-4o-mini")
+                    .withUsage(new DefaultUsage(null, null, 10L))
+                    .build();
+            ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenThrow(upstream503)
+                    .thenReturn(chatResponse);
+
+            GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+            // when
+            GatewayChatResponse response = gatewayChatService.chat(apiKey, request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.isFailover()).isTrue();
+            verify(llmCallService, times(2)).callProvider(any(), anyString(), any(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("Primary 시도 시간이 길어 time-budget timeout이면 secondary로 전환한다")
+        void primary_시도시간이_길어_timeout이면_secondary로_failover한다() {
+            // given
+            gatewayReliabilityProperties.setRequestTimeoutMs(500);
+            gatewayReliabilityProperties.setMinRetryBudgetMs(1_200);
+            gatewayReliabilityProperties.setMinFailoverBudgetMs(50);
+            gatewayReliabilityProperties.setRetryBackoffMs(0);
+
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getSecondaryModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(
+                            new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"),
+                            new ProviderCredentialService.ResolvedProviderApiKey(11L, ProviderType.OPENAI, "provider-key-2")
+                    );
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
+
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                    .withModel("gpt-4o-mini")
+                    .withUsage(new DefaultUsage(null, null, 10L))
+                    .build();
+            ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenAnswer(invocation -> {
+                        Thread.sleep(700L);
+                        return chatResponse;
+                    })
+                    .thenReturn(chatResponse);
+
+            GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+            // when
+            GatewayChatResponse response = gatewayChatService.chat(apiKey, request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.isFailover()).isTrue();
+            verify(llmCallService, times(2)).callProvider(any(), anyString(), any(), anyString(), any());
+        }
+
+        @Test
+        @DisplayName("남은 시간이 failover 최소 예산보다 작으면 GW-UP-TIMEOUT으로 종료한다")
+        void 남은시간이_failover_최소예산보다_작으면_timeout으로_종료한다() {
+            // given
+            gatewayReliabilityProperties.setRequestTimeoutMs(400);
+            gatewayReliabilityProperties.setMinRetryBudgetMs(1_200);
+            gatewayReliabilityProperties.setMinFailoverBudgetMs(500);
+            gatewayReliabilityProperties.setRetryBackoffMs(0);
+
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getSecondaryModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"));
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+
+            GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+            // when
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> gatewayChatService.chat(apiKey, request));
+
+            // then
+            assertThat(thrown).isInstanceOf(GatewayException.class);
+            assertThat(((GatewayException) thrown).getCode()).isEqualTo("GW-UP-TIMEOUT");
+
+            ArgumentCaptor<RequestLogWriter.FailUpdate> captor = ArgumentCaptor.forClass(RequestLogWriter.FailUpdate.class);
+            verify(requestLogWriter).markFail(eq(requestId), captor.capture());
+            RequestLogWriter.FailUpdate update = captor.getValue();
+            assertThat(update.errorCode()).isEqualTo("GW-UP-TIMEOUT");
+            assertThat(update.failReason()).isEqualTo("REQUEST_DEADLINE_EXCEEDED");
+        }
+
+        @Test
+        @DisplayName("Primary/Secondary 모두 실패하면 GW-GW-ALL_PROVIDERS_FAILED로 기록된다")
+        void primary_secondary가_모두_실패하면_예외가_발생한다() {
+            // given
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getSecondaryModel()).thenReturn("gpt-4o-mini");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(
+                            new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"),
+                            new ProviderCredentialService.ResolvedProviderApiKey(11L, ProviderType.OPENAI, "provider-key-2")
+                    );
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
+
+            HttpClientErrorException tooManyRequests = HttpClientErrorException.create(
+                    HttpStatusCode.valueOf(429),
+                    "Too Many Requests",
+                    HttpHeaders.EMPTY,
+                    new byte[0],
+                    StandardCharsets.UTF_8
+            );
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenThrow(tooManyRequests)
+                    .thenThrow(tooManyRequests);
+
+            GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+            // when
+            Throwable thrown = org.assertj.core.api.Assertions.catchThrowable(() -> gatewayChatService.chat(apiKey, request));
+
+            // then
+            assertThat(thrown)
+                    .isInstanceOf(GatewayException.class);
+            assertThat(((GatewayException) thrown).getCode()).isEqualTo("GW-GW-ALL_PROVIDERS_FAILED");
+
+            ArgumentCaptor<RequestLogWriter.FailUpdate> captor = ArgumentCaptor.forClass(RequestLogWriter.FailUpdate.class);
+            verify(requestLogWriter).markFail(eq(requestId), captor.capture());
+            RequestLogWriter.FailUpdate update = captor.getValue();
+            assertThat(update.errorCode()).isEqualTo("GW-GW-ALL_PROVIDERS_FAILED");
+            assertThat(update.failReason()).contains("ALL_FAILED");
+        }
+
+        private boolean invokeIsRetryableException(Exception exception) throws Exception {
+            Method method = GatewayChatService.class.getDeclaredMethod("isRetryableException", Exception.class);
+            method.setAccessible(true);
+            return (boolean) method.invoke(gatewayChatService, exception);
+        }
     }
 
     @Test
