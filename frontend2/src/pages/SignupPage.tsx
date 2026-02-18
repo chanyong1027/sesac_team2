@@ -398,6 +398,7 @@ export function SignupPage() {
   };
 
   const handleEmailBlur = async (value: string) => {
+    setCurrentEmail(value);
     const normalizedEmail = value.trim();
 
     if (!normalizedEmail || !signupEmailSchema.safeParse(normalizedEmail).success) {

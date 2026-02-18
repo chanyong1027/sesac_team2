@@ -207,6 +207,30 @@ class AuthControllerTest {
                                         .andExpect(jsonPath("$.data.available").value(false))
                                         .andExpect(jsonPath("$.data.message").value("이미 사용 중인 이메일입니다."));
                 }
+
+                @Test
+                @DisplayName("동일 IP에서 연속 요청이 한도를 넘으면 429를 반환한다")
+                void 동일_ip에서_연속_요청이_한도를_넘으면_429를_반환한다() throws Exception {
+                        // given
+                        String ip = "198.51.100.10";
+
+                        // when
+                        for (int i = 0; i < 20; i++) {
+                                mockMvc.perform(get("/api/v1/auth/check-email")
+                                                .header("X-Forwarded-For", ip)
+                                                .param("email", "new-user-" + i + "@example.com"))
+                                                .andExpect(status().isOk());
+                        }
+
+                        // then
+                        mockMvc.perform(get("/api/v1/auth/check-email")
+                                        .header("X-Forwarded-For", ip)
+                                        .param("email", "overflow@example.com"))
+                                        .andDo(print())
+                                        .andExpect(status().isTooManyRequests())
+                                        .andExpect(jsonPath("$.code").value("C429"))
+                                        .andExpect(jsonPath("$.message").value("이메일 확인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."));
+                }
         }
 
         // ==================== 로그인 테스트 ====================
