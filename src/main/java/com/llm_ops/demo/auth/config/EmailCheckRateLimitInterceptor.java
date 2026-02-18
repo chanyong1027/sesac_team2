@@ -6,10 +6,12 @@ import com.llm_ops.demo.global.error.RateLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 @Component
+@ConditionalOnBean(EmailCheckRateLimiter.class)
 @RequiredArgsConstructor
 public class EmailCheckRateLimitInterceptor implements HandlerInterceptor {
 
