@@ -43,8 +43,6 @@ public class ProviderCredentialVerificationService {
     private boolean isAuthFailure(BusinessException exception) {
         ErrorCode code = exception.getErrorCode();
         return code == ErrorCode.UNAUTHENTICATED
-                || code == ErrorCode.FORBIDDEN
-                || code == ErrorCode.INVALID_INPUT_VALUE
-                || code == ErrorCode.NOT_FOUND;
+                || code == ErrorCode.FORBIDDEN;
     }
 }

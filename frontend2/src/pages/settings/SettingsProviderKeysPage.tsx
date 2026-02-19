@@ -179,7 +179,7 @@ function ProviderCard({
       const res = await budgetApi.getProviderUsage(orgId, providerSlug);
       return res.data;
     },
-    enabled: supportsBudget && !!credential && !isEnterpriseOnly,
+    enabled: supportsBudget && isConnected && !isEnterpriseOnly,
     retry: false,
   });
 
@@ -189,7 +189,7 @@ function ProviderCard({
       const res = await budgetApi.getProviderPolicy(orgId, providerSlug);
       return res.data;
     },
-    enabled: supportsBudget && !!credential && !isEnterpriseOnly,
+    enabled: supportsBudget && isConnected && !isEnterpriseOnly,
     retry: false,
   });
 
@@ -580,15 +580,17 @@ export function SettingsProviderKeysPage() {
    const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
    const [budgetProvider, setBudgetProvider] = useState<ProviderKey | null>(null);
    const [toastMessage, setToastMessage] = useState<string | null>(null);
+   const [toastType, setToastType] = useState<'success' | 'error'>('success');
    const toastTimerRef = useRef<number | null>(null);
    const { currentOrgId } = useOrganizationStore();
    const queryClient = useQueryClient();
 
-  const showToast = (message: string) => {
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
     }
     setToastMessage(message);
+    setToastType(type);
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
@@ -617,8 +619,12 @@ export function SettingsProviderKeysPage() {
       return payload?.data ?? [];
     },
     enabled: !!currentOrgId,
-    refetchInterval: (data) =>
-      Array.isArray(data) && data.some((cred) => cred.status === 'VERIFYING') ? 5000 : false,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return Array.isArray(data) && data.some((cred: ProviderCredentialSummaryResponse) => cred.status === 'VERIFYING')
+        ? 5000
+        : false;
+    },
   });
 
   const reverifyMutation = useMutation({
@@ -631,7 +637,7 @@ export function SettingsProviderKeysPage() {
       showToast('재검증이 시작되었습니다.');
     },
     onError: (error) => {
-      showToast(resolveCredentialError(error, '재검증 요청에 실패했습니다.'));
+      showToast(resolveCredentialError(error, '재검증 요청에 실패했습니다.'), 'error');
     },
   });
 
@@ -669,7 +675,7 @@ export function SettingsProviderKeysPage() {
       setBudgetProvider(null);
     },
     onError: () => {
-      showToast('예산 설정 저장에 실패했습니다.');
+      showToast('예산 설정 저장에 실패했습니다.', 'error');
     },
   });
 
@@ -695,7 +701,14 @@ export function SettingsProviderKeysPage() {
       />
 
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-4 py-3 text-sm font-medium text-emerald-200 shadow-lg backdrop-blur-xl">
+        <div
+          className={[
+            'fixed top-6 right-6 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-xl border',
+            toastType === 'error'
+              ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+              : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
+          ].join(' ')}
+        >
           {toastMessage}
         </div>
       )}
@@ -774,7 +787,7 @@ export function SettingsProviderKeysPage() {
       <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span>{Object.keys(credentialMap).length}개 연결됨</span>
+          <span>{(credentials || []).filter(c => c.status === 'ACTIVE').length}개 연결됨</span>
         </div>
       </div>
 

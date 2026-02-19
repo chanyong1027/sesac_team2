@@ -29,7 +29,8 @@ public class ProviderCredentialVerificationTimeoutService {
             return;
         }
         for (ProviderCredential credential : stale) {
-            providerCredentialRepository.delete(credential);
+            credential.markInvalid();
         }
+        providerCredentialRepository.saveAll(stale);
     }
 }
