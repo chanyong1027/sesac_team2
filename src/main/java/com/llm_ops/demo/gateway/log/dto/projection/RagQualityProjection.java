@@ -17,4 +17,6 @@ public interface RagQualityProjection {
     Long getTotalChunks();
 
     BigDecimal getAvgRagLatencyMs();
+
+    BigDecimal getAvgRetrievedScore();
 }

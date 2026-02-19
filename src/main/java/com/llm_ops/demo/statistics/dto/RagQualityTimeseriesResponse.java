@@ -18,6 +18,7 @@ public record RagQualityTimeseriesResponse(
             long ragHitCount,
             BigDecimal hitRate,
             BigDecimal avgSimilarityThreshold,
+            BigDecimal avgRetrievedScore,
             long truncatedCount,
             BigDecimal truncationRate,
             long totalChunks,
@@ -47,6 +48,9 @@ public record RagQualityTimeseriesResponse(
                             hitRate,
                             p.getAvgSimilarityThreshold() != null
                                     ? p.getAvgSimilarityThreshold().setScale(4, RoundingMode.HALF_UP)
+                                    : BigDecimal.ZERO,
+                            p.getAvgRetrievedScore() != null
+                                    ? p.getAvgRetrievedScore().setScale(4, RoundingMode.HALF_UP)
                                     : BigDecimal.ZERO,
                             truncated,
                             truncationRate,

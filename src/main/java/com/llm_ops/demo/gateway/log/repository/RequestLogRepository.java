@@ -185,18 +185,39 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
      * RAG 품질 집계
      */
     @Query(value = """
+            WITH base AS (
+                SELECT
+                    COUNT(CASE WHEN rl.rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
+                    COUNT(*) AS ragTotalCount,
+                    AVG(rl.rag_similarity_threshold) AS avgSimilarityThreshold,
+                    SUM(CASE WHEN rl.rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
+                    COALESCE(SUM(rl.rag_chunks_count), 0) AS totalChunks,
+                    AVG(rl.rag_latency_ms) AS avgRagLatencyMs
+                FROM request_logs rl
+                WHERE rl.organization_id = :organizationId
+                  AND (:workspaceId IS NULL OR rl.workspace_id = :workspaceId)
+                  AND rl.rag_enabled = true
+                  AND rl.created_at BETWEEN :from AND :to
+            ),
+            score AS (
+                SELECT AVG(rd.score) AS avgRetrievedScore
+                FROM retrieved_documents rd
+                JOIN request_logs rl ON rl.request_id = rd.request_id
+                WHERE rl.organization_id = :organizationId
+                  AND (:workspaceId IS NULL OR rl.workspace_id = :workspaceId)
+                  AND rl.rag_enabled = true
+                  AND rl.created_at BETWEEN :from AND :to
+            )
             SELECT
-                COUNT(CASE WHEN rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
-                COUNT(*) AS ragTotalCount,
-                AVG(rag_similarity_threshold) AS avgSimilarityThreshold,
-                SUM(CASE WHEN rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
-                COALESCE(SUM(rag_chunks_count), 0) AS totalChunks,
-                AVG(rag_latency_ms) AS avgRagLatencyMs
-            FROM request_logs
-            WHERE organization_id = :organizationId
-              AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
-              AND rag_enabled = true
-              AND created_at BETWEEN :from AND :to
+                base.ragHitCount,
+                base.ragTotalCount,
+                base.avgSimilarityThreshold,
+                base.truncatedCount,
+                base.totalChunks,
+                base.avgRagLatencyMs,
+                score.avgRetrievedScore
+            FROM base
+            CROSS JOIN score
             """, nativeQuery = true)
     RagQualityProjection getRagQuality(
             @Param("organizationId") Long organizationId,
@@ -208,21 +229,46 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
      * RAG 품질 시계열 집계 (일별)
      */
     @Query(value = """
+            WITH base AS (
+                SELECT
+                    CAST(rl.created_at AS date) AS date,
+                    COUNT(*) AS ragTotalCount,
+                    COUNT(CASE WHEN rl.rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
+                    AVG(rl.rag_similarity_threshold) AS avgSimilarityThreshold,
+                    SUM(CASE WHEN rl.rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
+                    COALESCE(SUM(rl.rag_chunks_count), 0) AS totalChunks,
+                    AVG(rl.rag_latency_ms) AS avgRagLatencyMs
+                FROM request_logs rl
+                WHERE rl.organization_id = :organizationId
+                  AND (:workspaceId IS NULL OR rl.workspace_id = :workspaceId)
+                  AND rl.rag_enabled = true
+                  AND rl.created_at BETWEEN :from AND :to
+                GROUP BY CAST(rl.created_at AS date)
+            ),
+            score AS (
+                SELECT
+                    CAST(rl.created_at AS date) AS date,
+                    AVG(rd.score) AS avgRetrievedScore
+                FROM request_logs rl
+                JOIN retrieved_documents rd ON rl.request_id = rd.request_id
+                WHERE rl.organization_id = :organizationId
+                  AND (:workspaceId IS NULL OR rl.workspace_id = :workspaceId)
+                  AND rl.rag_enabled = true
+                  AND rl.created_at BETWEEN :from AND :to
+                GROUP BY CAST(rl.created_at AS date)
+            )
             SELECT
-                CAST(created_at AS date) AS date,
-                COUNT(*) AS ragTotalCount,
-                COUNT(CASE WHEN rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
-                AVG(rag_similarity_threshold) AS avgSimilarityThreshold,
-                SUM(CASE WHEN rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
-                COALESCE(SUM(rag_chunks_count), 0) AS totalChunks,
-                AVG(rag_latency_ms) AS avgRagLatencyMs
-            FROM request_logs
-            WHERE organization_id = :organizationId
-              AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
-              AND rag_enabled = true
-              AND created_at BETWEEN :from AND :to
-            GROUP BY CAST(created_at AS date)
-            ORDER BY date
+                base.date AS date,
+                base.ragTotalCount AS ragTotalCount,
+                base.ragHitCount AS ragHitCount,
+                base.avgSimilarityThreshold AS avgSimilarityThreshold,
+                base.truncatedCount AS truncatedCount,
+                base.totalChunks AS totalChunks,
+                base.avgRagLatencyMs AS avgRagLatencyMs,
+                score.avgRetrievedScore AS avgRetrievedScore
+            FROM base
+            LEFT JOIN score ON score.date = base.date
+            ORDER BY base.date
             """, nativeQuery = true)
     List<RagQualityTimeseriesProjection> getRagQualityTimeseries(
             @Param("organizationId") Long organizationId,

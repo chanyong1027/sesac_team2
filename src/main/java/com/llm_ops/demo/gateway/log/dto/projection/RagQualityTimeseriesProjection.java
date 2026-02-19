@@ -20,4 +20,6 @@ public interface RagQualityTimeseriesProjection {
     Long getTotalChunks();
 
     BigDecimal getAvgRagLatencyMs();
+
+    BigDecimal getAvgRetrievedScore();
 }

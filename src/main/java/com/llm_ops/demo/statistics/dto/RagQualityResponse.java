@@ -12,6 +12,7 @@ public record RagQualityResponse(
         long ragHitCount,
         BigDecimal hitRate,
         BigDecimal avgSimilarityThreshold,
+        BigDecimal avgRetrievedScore,
         long truncatedCount,
         BigDecimal truncationRate,
         long totalChunks,
@@ -37,6 +38,9 @@ public record RagQualityResponse(
                 hitRate,
                 projection.getAvgSimilarityThreshold() != null
                         ? projection.getAvgSimilarityThreshold().setScale(4, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO,
+                projection.getAvgRetrievedScore() != null
+                        ? projection.getAvgRetrievedScore().setScale(4, RoundingMode.HALF_UP)
                         : BigDecimal.ZERO,
                 truncated,
                 truncationRate,
