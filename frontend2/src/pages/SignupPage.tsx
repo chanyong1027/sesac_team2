@@ -27,13 +27,16 @@ type SignupFormData = z.infer<typeof signupSchema>;
 type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'duplicate' | 'error';
 type ToastTone = 'success' | 'error' | 'info';
 
-function resolveApiError(error: unknown): {
+function resolveApiError(
+  error: unknown,
+  fallbackMessage = '회원가입에 실패했습니다. 다시 시도해주세요.',
+): {
   message: string;
   fieldErrors: Record<string, string>;
 } {
   if (!axios.isAxiosError(error)) {
     return {
-      message: '회원가입에 실패했습니다. 다시 시도해주세요.',
+      message: fallbackMessage,
       fieldErrors: {},
     };
   }
@@ -70,7 +73,7 @@ function resolveApiError(error: unknown): {
   }
 
   return {
-    message: payload?.message ?? '회원가입에 실패했습니다. 다시 시도해주세요.',
+    message: payload?.message ?? fallbackMessage,
     fieldErrors,
   };
 }
@@ -307,6 +310,8 @@ function FormInput({
         <p
           className={`mt-2 text-[12px] ${helperTextClassName}`}
           style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          aria-live="polite"
+          aria-atomic="true"
         >
           {helperText}
         </p>
@@ -449,7 +454,7 @@ export function SignupPage() {
         return;
       }
 
-      const resolved = resolveApiError(error);
+      const resolved = resolveApiError(error, '이메일 중복 확인 중 오류가 발생했습니다. 다시 시도해주세요.');
       setEmailCheckStatus('error');
       setEmailCheckMessage(resolved.message);
       setLastCheckedEmail(null);

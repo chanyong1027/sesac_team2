@@ -30,10 +30,6 @@ public class EmailCheckRateLimitInterceptor implements HandlerInterceptor {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
         String remoteAddr = request.getRemoteAddr();
         return remoteAddr != null ? remoteAddr : "unknown";
     }

@@ -1,15 +1,19 @@
 package com.llm_ops.demo.auth.service;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class EmailCheckRateLimiter {
 
+    private static final int CLEANUP_INTERVAL = 128;
+
     private final int maxRequests;
     private final long windowMillis;
     private final ConcurrentHashMap<String, CounterWindow> counters = new ConcurrentHashMap<>();
+    private final AtomicInteger requestCounter = new AtomicInteger();
 
     public EmailCheckRateLimiter(
             @Value("${auth.email-check.rate-limit.max-requests:20}") int maxRequests,
@@ -21,6 +25,8 @@ public class EmailCheckRateLimiter {
 
     public RateLimitDecision tryAcquire(String key) {
         long now = System.currentTimeMillis();
+        evictExpiredIfNeeded(now);
+
         CounterWindow updated = counters.compute(normalizeKey(key), (k, current) -> {
             if (current == null || now - current.windowStartMillis >= windowMillis) {
                 return new CounterWindow(now, 1);
@@ -37,6 +43,15 @@ public class EmailCheckRateLimiter {
 
     public void clear() {
         counters.clear();
+    }
+
+    private void evictExpiredIfNeeded(long now) {
+        int currentCount = requestCounter.incrementAndGet();
+        if (currentCount % CLEANUP_INTERVAL != 0) {
+            return;
+        }
+
+        counters.entrySet().removeIf(entry -> now - entry.getValue().windowStartMillis >= windowMillis);
     }
 
     private String normalizeKey(String key) {
