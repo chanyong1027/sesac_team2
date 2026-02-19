@@ -8,14 +8,14 @@ import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { OrganizationDashboardPage } from '@/pages/dashboard/OrganizationDashboardPage';
-	import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
-	import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
-	import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
-	import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
-	import { DocumentListPage } from '@/pages/document/DocumentListPage';
-	import { WorkspaceLogsPage } from '@/pages/logs/WorkspaceLogsPage';
-	import { WorkspaceLogDetailPage } from '@/pages/logs/WorkspaceLogDetailPage';
-	import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
+import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
+import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
+import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
+import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
+import { DocumentListPage } from '@/pages/document/DocumentListPage';
+import { WorkspaceLogsPage } from '@/pages/logs/WorkspaceLogsPage';
+import { WorkspaceLogDetailPage } from '@/pages/logs/WorkspaceLogDetailPage';
+import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
 import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
 import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
 import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
@@ -28,6 +28,7 @@ import { OnboardingPage } from '@/pages/OnboardingPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import { WorkspaceGuard } from '@/components/common/WorkspaceGuard';
 import { AccessDenied } from '@/components/common/AccessDenied';
+import { GuidePage } from '@/pages/GuidePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -127,6 +128,9 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/invitations/accept" element={<InvitationAcceptPage />} />
+          <Route path="/guide" element={<GuidePage />} />
+          <Route path="/guide/category/:categoryId" element={<GuidePage />} />
+          <Route path="/guide/article/:articleId" element={<GuidePage />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
@@ -136,12 +140,12 @@ function App() {
             <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
               <Route path="dashboard" element={<OrganizationDashboardPage />} />
               <Route path="workspaces/:workspaceId" element={<WorkspaceGuard><WorkspaceDashboardPage /></WorkspaceGuard>} />
-	              <Route path="workspaces/:workspaceId/prompts" element={<WorkspaceGuard><PromptEntryPage /></WorkspaceGuard>} />
-	              <Route path="workspaces/:workspaceId/prompts/new" element={<WorkspaceGuard><PromptCreatePage /></WorkspaceGuard>} />
-	              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<WorkspaceGuard><PromptDetailPage /></WorkspaceGuard>} />
-	              <Route path="workspaces/:workspaceId/documents" element={<WorkspaceGuard><DocumentListPage /></WorkspaceGuard>} />
-	              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceGuard><WorkspaceLogsPage /></WorkspaceGuard>} />
-	              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceGuard><WorkspaceLogDetailPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/prompts" element={<WorkspaceGuard><PromptEntryPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/prompts/new" element={<WorkspaceGuard><PromptCreatePage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<WorkspaceGuard><PromptDetailPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/documents" element={<WorkspaceGuard><DocumentListPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceGuard><WorkspaceLogsPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceGuard><WorkspaceLogDetailPage /></WorkspaceGuard>} />
 
               {/* Settings Routes (Integrated) */}
               <Route path="settings/security" element={<OrganizationSecurityPage />} />

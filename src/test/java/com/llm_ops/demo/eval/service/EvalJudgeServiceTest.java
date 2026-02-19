@@ -1,6 +1,7 @@
 package com.llm_ops.demo.eval.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -177,6 +178,40 @@ class EvalJudgeServiceTest {
         assertThat(result.pass()).isFalse();
         assertThat(result.judgeOutput()).doesNotContainKey("judgeAttempts");
         verify(runner, times(1)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
+    }
+
+    @Test
+    @DisplayName("Judge 프롬프트 직렬화에 실패하면 예외를 던진다")
+    void Judge_프롬프트_직렬화에_실패하면_예외를_던진다() throws Exception {
+        // given
+        EvalProperties properties = new EvalProperties();
+        EvalModelRunnerService runner = mock(EvalModelRunnerService.class);
+        ObjectMapper failingObjectMapper = mock(ObjectMapper.class);
+        when(failingObjectMapper.writeValueAsString(any())).thenThrow(new RuntimeException("serialize fail"));
+
+        EvalJudgeService service = new EvalJudgeService(properties, runner, failingObjectMapper);
+        ResolvedRubricConfig rubric = new ResolvedRubricConfig(
+                "CUSTOM",
+                "test",
+                Map.of("quality", 1.0),
+                Map.of("minOverallScore", 70.0)
+        );
+
+        // when // then
+        assertThatThrownBy(() -> service.judge(
+                1L,
+                rubric,
+                "input",
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                "candidate output",
+                Map.of("pass", true),
+                null
+        ))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Judge prompt payload serialization failed");
+        verify(runner, times(0)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
     }
 
     private EvalModelRunnerService.ModelExecution modelExecution(String output) {

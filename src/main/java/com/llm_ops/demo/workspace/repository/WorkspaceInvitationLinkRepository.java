@@ -45,4 +45,13 @@ public interface WorkspaceInvitationLinkRepository extends JpaRepository<Workspa
     Optional<WorkspaceInvitationLink> findByTokenWithWorkspaceAndOrganization(
         @Param("token") String token
     );
+
+    @Query("SELECT wil FROM WorkspaceInvitationLink wil " +
+           "JOIN FETCH wil.workspace w " +
+           "JOIN FETCH w.organization " +
+           "JOIN FETCH wil.createdBy " +
+           "WHERE wil.token = :token")
+    Optional<WorkspaceInvitationLink> findByTokenWithWorkspaceOrganizationAndCreator(
+        @Param("token") String token
+    );
 }

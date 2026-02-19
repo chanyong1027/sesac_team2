@@ -17,6 +17,8 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -24,6 +26,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @Service
 public class PromptVersionService {
+
+    private static final Logger log = LoggerFactory.getLogger(PromptVersionService.class);
 
     private final PromptVersionRepository promptVersionRepository;
     private final PromptRepository promptRepository;
@@ -61,7 +65,19 @@ public class PromptVersionService {
         int nextVersionNo = calculateNextVersionNo(prompt);
         PromptVersion version = buildVersion(prompt, nextVersionNo, request, user);
         PromptVersion saved = promptVersionRepository.save(version);
-        runAfterCommit(() -> evalRunService.enqueueAutoRunIfEnabled(prompt.getId(), saved.getId(), user.getId()));
+        runAfterCommit(() -> {
+            try {
+                evalRunService.enqueueAutoRunIfEnabled(prompt.getId(), saved.getId(), user.getId());
+            } catch (Exception e) {
+                log.warn(
+                        "자동 평가 큐 등록 실패 promptId={}, versionId={}, userId={}",
+                        prompt.getId(),
+                        saved.getId(),
+                        user.getId(),
+                        e
+                );
+            }
+        });
 
         return PromptVersionCreateResponse.from(saved);
     }

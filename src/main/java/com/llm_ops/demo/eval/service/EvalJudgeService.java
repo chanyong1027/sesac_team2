@@ -9,10 +9,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 public class EvalJudgeService {
+
+    private static final Logger log = LoggerFactory.getLogger(EvalJudgeService.class);
 
     private final EvalProperties evalProperties;
     private final EvalModelRunnerService evalModelRunnerService;
@@ -174,7 +178,8 @@ public class EvalJudgeService {
         try {
             payloadJson = objectMapper.writeValueAsString(payload);
         } catch (Exception e) {
-            payloadJson = "{}";
+            log.error("Judge prompt payload 직렬화 실패", e);
+            throw new IllegalStateException("Judge prompt payload serialization failed", e);
         }
 
         String customRubricInstructions = isCustomRubric

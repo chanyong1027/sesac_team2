@@ -123,4 +123,24 @@ class EvalRuleCheckerServiceTest {
         assertThat(result.get("pass")).isEqualTo(true);
         assertThat(result.get("schema")).isEqualTo("PASS");
     }
+
+    @Test
+    @DisplayName("출력이 null이어도 max_chars와 max_lines는 0 기준으로 통과한다")
+    @SuppressWarnings("unchecked")
+    void 출력이_null이어도_max_chars와_max_lines는_0_기준으로_통과한다() {
+        // given
+        Map<String, Object> constraints = Map.of(
+                "max_chars", 10,
+                "max_lines", 2
+        );
+
+        // when
+        Map<String, Object> result = service.check(null, constraints, null, RubricTemplateCode.GENERAL_TEXT);
+
+        // then
+        assertThat(result.get("pass")).isEqualTo(true);
+        assertThat(result.get("max_chars")).isEqualTo("PASS");
+        assertThat(result.get("max_lines")).isEqualTo("PASS");
+        assertThat((List<String>) result.get("failedChecks")).isEmpty();
+    }
 }

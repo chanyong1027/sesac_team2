@@ -44,7 +44,8 @@ public class EvalRuleCheckerService {
         String normalizedOutputNoSpaces = keywordNormalization == KeywordNormalization.BASIC ? removeSpaces(normalizedOutput) : normalizedOutput;
 
         if (maxChars > 0) {
-            boolean pass = output != null && output.length() <= maxChars;
+            int charCount = output == null ? 0 : output.length();
+            boolean pass = charCount <= maxChars;
             result.put("max_chars", pass ? "PASS" : "FAIL");
             if (!pass) {
                 failures.add("max_chars");

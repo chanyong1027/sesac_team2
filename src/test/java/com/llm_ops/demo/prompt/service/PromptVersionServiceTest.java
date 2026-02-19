@@ -97,6 +97,42 @@ class PromptVersionServiceTest {
     }
 
     @Test
+    @DisplayName("자동 평가 큐 등록이 실패해도 프롬프트 버전 생성은 성공한다")
+    void 자동_평가_큐_등록이_실패해도_프롬프트_버전_생성은_성공한다() throws Exception {
+        // given
+        Long promptId = 1L;
+        Long userId = 1L;
+        PromptVersionCreateRequest request = createRequest();
+
+        User user = createMockUser(userId);
+        Workspace workspace = createMockWorkspace(1L, user);
+        Prompt prompt = createMockPrompt(promptId, workspace);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(promptRepository.findByIdAndStatus(promptId, PromptStatus.ACTIVE))
+                .willReturn(Optional.of(prompt));
+        given(workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user))
+                .willReturn(true);
+        given(promptVersionRepository.findMaxVersionNo(prompt)).willReturn(0);
+        given(promptVersionRepository.save(any(PromptVersion.class))).willAnswer(invocation -> {
+            PromptVersion version = invocation.getArgument(0);
+            setId(version, 1L);
+            return version;
+        });
+        doThrow(new RuntimeException("queue enqueue failed"))
+                .when(evalRunService)
+                .enqueueAutoRunIfEnabled(promptId, 1L, userId);
+
+        // when
+        PromptVersionCreateResponse response = promptVersionService.create(promptId, userId, request);
+
+        // then
+        assertThat(response.id()).isEqualTo(1L);
+        verify(promptVersionRepository).save(any(PromptVersion.class));
+        verify(evalRunService).enqueueAutoRunIfEnabled(promptId, 1L, userId);
+    }
+
+    @Test
     @DisplayName("허용되지 않은 모델이면 예외가 발생한다")
     void create_InvalidModel_ThrowsException() throws Exception {
         // given

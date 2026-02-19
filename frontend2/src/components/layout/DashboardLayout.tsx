@@ -368,13 +368,13 @@ function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
           <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-[var(--background)] shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
         </button>
         <div className="h-6 w-px bg-white/10 hidden sm:block" />
-        <button
-          type="button"
+        <Link
+          to="/guide"
           className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors text-xs font-medium backdrop-blur-md"
         >
           <HelpCircle size={18} />
           <span className="hidden sm:inline">가이드</span>
-        </button>
+        </Link>
       </div>
     </header>
   );
