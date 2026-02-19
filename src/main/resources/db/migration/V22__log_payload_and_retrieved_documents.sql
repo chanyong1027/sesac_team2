@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS retrieved_documents (
 
 COMMENT ON TABLE retrieved_documents IS 'RAG 검색 결과 문서 (1요청 N문서)';
 COMMENT ON COLUMN retrieved_documents.score IS '벡터 유사도 점수';
-COMMENT ON COLUMN retrieved_documents.ranking IS '검색 순위 (1부터 시작)';
+COMMENT ON COLUMN retrieved_documents.ranking IS '검색 순위 (1부터 시작, 0은 순위 없음)';
 
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_retrieved_documents_request_id
