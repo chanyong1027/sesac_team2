@@ -37,12 +37,30 @@ public record RequestLogResponse(
         List<RetrievedDocumentResponse> retrievedDocuments) {
 
     public static RequestLogResponse from(RequestLog log) {
+        return fromDetail(log);
+    }
+
+    /**
+     * 상세 조회 응답 변환
+     */
+    public static RequestLogResponse fromDetail(RequestLog log) {
         List<RetrievedDocumentResponse> docs = log.getRetrievedDocuments() != null
                 ? log.getRetrievedDocuments().stream()
                         .map(RetrievedDocumentResponse::from)
                         .toList()
                 : List.of();
 
+        return from(log, docs);
+    }
+
+    /**
+     * 목록 조회 응답 변환 (N+1 방지를 위해 retrievedDocuments는 비워서 응답)
+     */
+    public static RequestLogResponse fromSummary(RequestLog log) {
+        return from(log, List.of());
+    }
+
+    private static RequestLogResponse from(RequestLog log, List<RetrievedDocumentResponse> docs) {
         return new RequestLogResponse(
                 log.getRequestId(),
                 log.getTraceId(),
