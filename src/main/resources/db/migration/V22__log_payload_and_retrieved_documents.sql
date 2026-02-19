@@ -9,6 +9,8 @@
 -- 1) request_logs: payload 컬럼 추가
 ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS request_payload TEXT;
 ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS response_payload TEXT;
+ALTER TABLE request_logs ALTER COLUMN request_payload SET STORAGE EXTENDED;
+ALTER TABLE request_logs ALTER COLUMN response_payload SET STORAGE EXTENDED;
 
 COMMENT ON COLUMN request_logs.request_payload IS '사용자 요청 전체 (JSON)';
 COMMENT ON COLUMN request_logs.response_payload IS 'AI 응답 전체';
@@ -21,12 +23,16 @@ CREATE TABLE IF NOT EXISTS retrieved_documents (
     score DOUBLE PRECISION,
     content TEXT,
     duration_ms INTEGER,
-    ranking INTEGER NOT NULL DEFAULT 0
+    ranking INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+ALTER TABLE retrieved_documents ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now();
+ALTER TABLE retrieved_documents ALTER COLUMN content SET STORAGE EXTENDED;
 
 COMMENT ON TABLE retrieved_documents IS 'RAG 검색 결과 문서 (1요청 N문서)';
 COMMENT ON COLUMN retrieved_documents.score IS '벡터 유사도 점수';
 COMMENT ON COLUMN retrieved_documents.ranking IS '검색 순위 (1부터 시작, 0은 순위 없음)';
+COMMENT ON COLUMN retrieved_documents.created_at IS '검색 문서 레코드 생성 시각';
 
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_retrieved_documents_request_id
