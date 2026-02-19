@@ -180,6 +180,9 @@ public class RequestLogWriter {
                                         update.errorMessage(),
                                         update.failReason(),
                                         update.responsePayload());
+
+                        // RetrievedDocument 저장
+                        saveRetrievedDocuments(requestLog, update.retrievedDocuments());
                 } catch (Exception e) {
                         log.error("로그 차단 기록 실패: requestId={}", requestId, e);
                 }
@@ -298,7 +301,8 @@ public class RequestLogWriter {
                         String ragContextHash,
                         Integer ragTopK,
                         Double ragSimilarityThreshold,
-                        String responsePayload) {
+                        String responsePayload,
+                        List<RetrievedDocumentInfo> retrievedDocuments) {
         }
 
         /**
