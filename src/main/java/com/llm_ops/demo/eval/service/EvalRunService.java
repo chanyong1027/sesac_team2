@@ -88,6 +88,11 @@ public class EvalRunService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "활성화된 testCase가 없습니다.");
         }
 
+        if (request.mode() == EvalMode.COMPARE_ACTIVE) {
+            // Validate baseline exists and is different from candidate.
+            resolveBaselineVersionForEstimate(scope.prompt(), promptVersion, request.mode());
+        }
+
         EvalRun run = enqueueRun(
                 scope.prompt(),
                 promptVersion,
@@ -183,12 +188,16 @@ public class EvalRunService {
 
         double estimatedDurationSecMin = round2((estimatedCallsMin * 1.5d));
         double estimatedDurationSecMax = round2((estimatedCallsMax * 2.8d));
-        String estimatedCostTier = resolveEstimatedCostTier(estimatedCostMin, estimatedCostMax);
+        boolean pricingKnown = ModelPricing.isKnownModel(candidateVersion.getModel())
+                && ModelPricing.isKnownModel(evalProperties.getJudge().getModel())
+                && (baselineVersion == null || ModelPricing.isKnownModel(baselineVersion.getModel()));
+        String estimatedCostTier = resolveEstimatedCostTier(estimatedCostMin, estimatedCostMax, pricingKnown);
 
         Map<String, Object> assumptions = new LinkedHashMap<>();
         assumptions.put("candidateModel", candidateVersion.getModel());
         assumptions.put("baselineModel", baselineVersion != null ? baselineVersion.getModel() : null);
         assumptions.put("judgeModel", evalProperties.getJudge().getModel());
+        assumptions.put("pricingKnown", pricingKnown);
         assumptions.put("judgeAttemptsMin", judgeAttemptsMin);
         assumptions.put("judgeAttemptsMax", judgeAttemptsMax);
         assumptions.put("candidateMaxOutputTokens", candidateMaxOutputTokens);
@@ -305,6 +314,15 @@ public class EvalRunService {
         if (totalCases <= 0) {
             log.info("Skip auto eval run. no enabled test cases. promptId={}, datasetId={}", promptId, dataset.getId());
             return;
+        }
+
+        if (defaults.defaultMode() == EvalMode.COMPARE_ACTIVE) {
+            try {
+                resolveBaselineVersionForEstimate(prompt, promptVersion, defaults.defaultMode());
+            } catch (BusinessException e) {
+                log.info("Skip auto eval compare run. promptId={}, reason={}", promptId, e.getMessage());
+                return;
+            }
         }
 
         Long createdBy = actorUserId != null ? actorUserId : promptVersion.getCreatedBy().getId();
@@ -513,7 +531,10 @@ public class EvalRunService {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 
-    private String resolveEstimatedCostTier(BigDecimal minCost, BigDecimal maxCost) {
+    private String resolveEstimatedCostTier(BigDecimal minCost, BigDecimal maxCost, boolean pricingKnown) {
+        if (!pricingKnown) {
+            return "UNKNOWN";
+        }
         BigDecimal max = maxCost != null ? maxCost : (minCost != null ? minCost : BigDecimal.ZERO);
         if (max.compareTo(new BigDecimal("0.20")) >= 0) {
             return "HIGH";

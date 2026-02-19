@@ -8,14 +8,14 @@ import { LandingPage } from '@/pages/LandingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
 import { OrganizationDashboardPage } from '@/pages/dashboard/OrganizationDashboardPage';
-	import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
-	import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
-	import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
-	import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
-	import { DocumentListPage } from '@/pages/document/DocumentListPage';
-	import { WorkspaceLogsPage } from '@/pages/logs/WorkspaceLogsPage';
-	import { WorkspaceLogDetailPage } from '@/pages/logs/WorkspaceLogDetailPage';
-	import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
+import { WorkspaceDashboardPage } from '@/pages/dashboard/WorkspaceDashboardPage';
+import { PromptEntryPage } from '@/pages/prompt/PromptEntryPage';
+import { PromptCreatePage } from '@/pages/prompt/PromptCreatePage';
+import { PromptDetailPage } from '@/pages/prompt/PromptDetailPage';
+import { DocumentListPage } from '@/pages/document/DocumentListPage';
+import { WorkspaceLogsPage } from '@/pages/logs/WorkspaceLogsPage';
+import { WorkspaceLogDetailPage } from '@/pages/logs/WorkspaceLogDetailPage';
+import { AuthInitializer } from '@/features/auth/components/AuthInitializer';
 import { InvitationAcceptPage } from '@/pages/InvitationAcceptPage';
 import { SettingsMembersPage } from '@/pages/settings/SettingsMembersPage';
 import { SettingsApiKeysPage } from '@/pages/settings/SettingsApiKeysPage';
@@ -26,6 +26,8 @@ import { useOrganizationStore } from '@/features/organization/store/organization
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 import { OnboardingPage } from '@/pages/OnboardingPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
+import { WorkspaceGuard } from '@/components/common/WorkspaceGuard';
+import { AccessDenied } from '@/components/common/AccessDenied';
 import { GuidePage } from '@/pages/GuidePage';
 
 const queryClient = new QueryClient({
@@ -40,14 +42,36 @@ const queryClient = new QueryClient({
 const OrgScopedDashboardLayout = () => {
   const { orgId } = useParams<{ orgId: string }>();
   const { currentOrgId, setCurrentOrgId } = useOrganizationStore();
+  const { data: workspaces, isLoading } = useWorkspaces();
+
+  const parsedOrgId = Number(orgId);
+  const isValidOrgId = Number.isInteger(parsedOrgId) && parsedOrgId > 0;
+  const isAccessibleOrg = !!workspaces && workspaces.length > 0 && isValidOrgId
+    && workspaces.some((ws) => ws.organizationId === parsedOrgId);
 
   useEffect(() => {
-    if (!orgId) return;
-    const parsedOrgId = Number(orgId);
-    if (!Number.isNaN(parsedOrgId) && parsedOrgId !== currentOrgId) {
+    if (!isAccessibleOrg) return;
+    if (parsedOrgId !== currentOrgId) {
       setCurrentOrgId(parsedOrgId);
     }
-  }, [orgId, currentOrgId, setCurrentOrgId]);
+  }, [isAccessibleOrg, parsedOrgId, currentOrgId, setCurrentOrgId]);
+
+  if (isLoading) {
+    return <div className="p-6 text-gray-500">조직 권한을 확인하는 중...</div>;
+  }
+
+  if (!workspaces || workspaces.length === 0) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  if (!isAccessibleOrg) {
+    return (
+      <AccessDenied
+        title="접근 권한이 없습니다"
+        description="해당 조직에 접근할 수 없습니다. URL을 직접 변경한 경우, 접근 가능한 조직으로 이동하세요."
+      />
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -115,13 +139,13 @@ function App() {
             <Route path="/workspaces/:workspaceId/*" element={<LegacyWorkspaceRedirect />} />
             <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
               <Route path="dashboard" element={<OrganizationDashboardPage />} />
-              <Route path="workspaces/:workspaceId" element={<WorkspaceDashboardPage />} />
-	              <Route path="workspaces/:workspaceId/prompts" element={<PromptEntryPage />} />
-	              <Route path="workspaces/:workspaceId/prompts/new" element={<PromptCreatePage />} />
-	              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<PromptDetailPage />} />
-	              <Route path="workspaces/:workspaceId/documents" element={<DocumentListPage />} />
-	              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceLogsPage />} />
-	              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceLogDetailPage />} />
+              <Route path="workspaces/:workspaceId" element={<WorkspaceGuard><WorkspaceDashboardPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/prompts" element={<WorkspaceGuard><PromptEntryPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/prompts/new" element={<WorkspaceGuard><PromptCreatePage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<WorkspaceGuard><PromptDetailPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/documents" element={<WorkspaceGuard><DocumentListPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceGuard><WorkspaceLogsPage /></WorkspaceGuard>} />
+              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceGuard><WorkspaceLogDetailPage /></WorkspaceGuard>} />
 
               {/* Settings Routes (Integrated) */}
               <Route path="settings/security" element={<OrganizationSecurityPage />} />

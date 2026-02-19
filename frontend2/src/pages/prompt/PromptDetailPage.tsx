@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -10,7 +10,6 @@ import {
     Copy,
     Save
 } from 'lucide-react';
-import { PromptEvaluateTab } from './components/PromptEvaluateTab';
 import type {
     PromptDetailResponse,
     PromptReleaseHistoryResponse,
@@ -19,6 +18,11 @@ import type {
     ProviderType,
     PlaygroundRunResponse,
 } from '@/types/api.types';
+
+const PromptEvaluateTab = lazy(async () => {
+    const mod = await import('./components/PromptEvaluateTab');
+    return { default: mod.PromptEvaluateTab };
+});
 
 // 탭 정의
 type TabType = 'overview' | 'versions' | 'release' | 'playground' | 'evaluate';
@@ -149,7 +153,11 @@ export function PromptDetailPage() {
                 {activeTab === 'versions' && <VersionsTab promptId={promptId} />}
                 {activeTab === 'release' && <ReleaseTab promptId={promptId} />}
                 {activeTab === 'playground' && <PlaygroundTab promptId={promptId} />}
-                {activeTab === 'evaluate' && <PromptEvaluateTab workspaceId={workspaceId} promptId={promptId} />}
+                {activeTab === 'evaluate' ? (
+                    <Suspense fallback={<div className="p-8 text-gray-500">로딩 중...</div>}>
+                        <PromptEvaluateTab workspaceId={workspaceId} promptId={promptId} />
+                    </Suspense>
+                ) : null}
             </div>
         </div>
     );
@@ -175,6 +183,7 @@ function TabButton({
         >
             <span
                 className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300')} transition-colors`}
+                aria-hidden="true"
             >
                 {iconName}
             </span>

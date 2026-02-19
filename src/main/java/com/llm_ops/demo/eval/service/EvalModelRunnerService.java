@@ -113,10 +113,13 @@ public class EvalModelRunnerService {
 
         BigDecimal estimatedCost = null;
         String pricingModel = usedModel != null ? usedModel : model;
-        if (inputTokens != null && outputTokens != null) {
-            estimatedCost = ModelPricing.calculateCost(pricingModel, toInt(inputTokens), toInt(outputTokens));
-        } else if (totalTokens != null) {
-            estimatedCost = ModelPricing.calculateCostFromTotalTokens(pricingModel, toInt(totalTokens));
+        boolean pricingKnown = ModelPricing.isKnownModel(pricingModel);
+        if (pricingKnown) {
+            if (inputTokens != null && outputTokens != null) {
+                estimatedCost = ModelPricing.calculateCost(pricingModel, toInt(inputTokens), toInt(outputTokens));
+            } else if (totalTokens != null) {
+                estimatedCost = ModelPricing.calculateCostFromTotalTokens(pricingModel, toInt(totalTokens));
+            }
         }
 
         long latencyMs = Math.max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L);
@@ -124,6 +127,7 @@ public class EvalModelRunnerService {
         meta.put("provider", provider.name());
         meta.put("requestedModel", model);
         meta.put("usedModel", usedModel);
+        meta.put("pricingKnown", pricingKnown);
         meta.put("latencyMs", latencyMs);
         meta.put("inputTokens", inputTokens);
         meta.put("outputTokens", outputTokens);

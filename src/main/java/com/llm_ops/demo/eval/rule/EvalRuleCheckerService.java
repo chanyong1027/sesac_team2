@@ -3,16 +3,20 @@ package com.llm_ops.demo.eval.rule;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.eval.domain.RubricTemplateCode;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
 public class EvalRuleCheckerService {
 
     private final ObjectMapper objectMapper;
+    private static final Pattern BASIC_NORMALIZE_PATTERN = Pattern.compile("[^\\p{L}\\p{N}\\s]");
 
     public EvalRuleCheckerService(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -33,6 +37,11 @@ public class EvalRuleCheckerService {
 
         int maxChars = readInt(safeConstraints.get("max_chars"));
         int maxLines = readInt(safeConstraints.get("max_lines"));
+
+        KeywordNormalization keywordNormalization = resolveKeywordNormalization(safeConstraints, safeExpected);
+        String safeOutput = output != null ? output : "";
+        String normalizedOutput = keywordNormalization == KeywordNormalization.BASIC ? normalizeBasic(safeOutput) : safeOutput;
+        String normalizedOutputNoSpaces = keywordNormalization == KeywordNormalization.BASIC ? removeSpaces(normalizedOutput) : normalizedOutput;
 
         if (maxChars > 0) {
             int charCount = output == null ? 0 : output.length();
@@ -59,7 +68,11 @@ public class EvalRuleCheckerService {
         if (!mustInclude.isEmpty()) {
             boolean pass = true;
             for (String token : mustInclude) {
-                if (output == null || !output.contains(token)) {
+                String trimmed = token != null ? token.trim() : "";
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if (!containsToken(safeOutput, normalizedOutput, normalizedOutputNoSpaces, trimmed, keywordNormalization)) {
                     pass = false;
                     break;
                 }
@@ -77,7 +90,11 @@ public class EvalRuleCheckerService {
         if (!mustNotInclude.isEmpty()) {
             boolean pass = true;
             for (String token : mustNotInclude) {
-                if (output != null && output.contains(token)) {
+                String trimmed = token != null ? token.trim() : "";
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if (containsToken(safeOutput, normalizedOutput, normalizedOutputNoSpaces, trimmed, keywordNormalization)) {
                     pass = false;
                     break;
                 }
@@ -136,6 +153,83 @@ public class EvalRuleCheckerService {
         return result;
     }
 
+    private static KeywordNormalization resolveKeywordNormalization(
+            Map<String, Object> constraints,
+            Map<String, Object> expected
+    ) {
+        Object value = constraints != null ? constraints.get("keyword_normalization") : null;
+        if (value == null && constraints != null) {
+            value = constraints.get("keyword_normalize");
+        }
+        if (value == null && expected != null) {
+            value = expected.get("keyword_normalization");
+        }
+        if (value == null && expected != null) {
+            value = expected.get("keyword_normalize");
+        }
+
+        if (value instanceof Boolean bool) {
+            return bool ? KeywordNormalization.BASIC : KeywordNormalization.NONE;
+        }
+
+        if (value == null) {
+            return KeywordNormalization.NONE;
+        }
+
+        String text = String.valueOf(value).trim();
+        if (text.isBlank()) {
+            return KeywordNormalization.NONE;
+        }
+        if ("BASIC".equalsIgnoreCase(text) || "TRUE".equalsIgnoreCase(text)) {
+            return KeywordNormalization.BASIC;
+        }
+        return KeywordNormalization.NONE;
+    }
+
+    private static boolean containsToken(
+            String rawOutput,
+            String normalizedOutput,
+            String normalizedOutputNoSpaces,
+            String token,
+            KeywordNormalization keywordNormalization
+    ) {
+        if (token == null || token.isBlank()) {
+            return true;
+        }
+        if (keywordNormalization == KeywordNormalization.NONE) {
+            return rawOutput != null && rawOutput.contains(token);
+        }
+
+        String normalizedToken = normalizeBasic(token);
+        if (normalizedOutput.contains(normalizedToken)) {
+            return true;
+        }
+
+        if (normalizedToken.contains(" ")) {
+            String tokenNoSpaces = removeSpaces(normalizedToken);
+            return normalizedOutputNoSpaces.contains(tokenNoSpaces);
+        }
+        return false;
+    }
+
+    private static String normalizeBasic(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(text, Normalizer.Form.NFKC)
+                .toLowerCase(Locale.ROOT);
+        normalized = BASIC_NORMALIZE_PATTERN.matcher(normalized).replaceAll(" ");
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+        return normalized;
+    }
+
+    private static String removeSpaces(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        return text.replace(" ", "");
+    }
+
     private static int readInt(Object value) {
         if (value == null) {
             return 0;
@@ -152,5 +246,10 @@ public class EvalRuleCheckerService {
             return list.stream().map(String::valueOf).toList();
         }
         return List.of();
+    }
+
+    private enum KeywordNormalization {
+        NONE,
+        BASIC
     }
 }
