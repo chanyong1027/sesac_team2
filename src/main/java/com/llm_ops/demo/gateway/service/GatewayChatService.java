@@ -35,6 +35,7 @@ import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -90,7 +91,7 @@ public class GatewayChatService {
             GatewayReliabilityProperties gatewayReliabilityProperties,
             ProviderCredentialService providerCredentialService,
             LlmCallService llmCallService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) RagSearchService ragSearchService,
+            @Nullable RagSearchService ragSearchService,
             RagContextBuilder ragContextBuilder,
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
