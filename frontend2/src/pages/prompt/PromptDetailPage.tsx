@@ -10,6 +10,7 @@ import {
     Copy,
     Save
 } from 'lucide-react';
+import { PromptEvaluateTab } from './components/PromptEvaluateTab';
 import type {
     PromptDetailResponse,
     PromptReleaseHistoryResponse,
@@ -20,7 +21,7 @@ import type {
 } from '@/types/api.types';
 
 // 탭 정의
-type TabType = 'overview' | 'versions' | 'release' | 'playground';
+type TabType = 'overview' | 'versions' | 'release' | 'playground' | 'evaluate';
 
 export function PromptDetailPage() {
     const { orgId, workspaceId: workspaceIdStr, promptId: promptIdStr } = useParams<{ orgId: string; workspaceId: string; promptId: string }>();
@@ -124,6 +125,12 @@ export function PromptDetailPage() {
                         label="Playground"
                         kind="playground"
                     />
+                    <TabButton
+                        active={activeTab === 'evaluate'}
+                        onClick={() => setActiveTab('evaluate')}
+                        iconName="analytics"
+                        label="Evaluate"
+                    />
                 </nav>
             </div>
 
@@ -142,6 +149,7 @@ export function PromptDetailPage() {
                 {activeTab === 'versions' && <VersionsTab promptId={promptId} />}
                 {activeTab === 'release' && <ReleaseTab promptId={promptId} />}
                 {activeTab === 'playground' && <PlaygroundTab promptId={promptId} />}
+                {activeTab === 'evaluate' && <PromptEvaluateTab workspaceId={workspaceId} promptId={promptId} />}
             </div>
         </div>
     );

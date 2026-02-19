@@ -63,7 +63,8 @@ function formatTokens(tokens: number | null) {
 }
 
 function isIndexingStatus(s: string) {
-    return ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'DELETING'].includes(s);
+    return ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'PROCESSING', 'DELETING']
+        .includes(String(s).toUpperCase());
 }
 
 export function WorkspaceDashboardPage() {
@@ -322,7 +323,13 @@ export function WorkspaceDashboardPage() {
                                     <span className="material-symbols-outlined text-xl">description</span>
                                 </div>
                                 <span className="px-2 py-1 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/5">
-                                    {(documents ?? []).some(d => isIndexingStatus(d.status)) ? 'Indexing..' : 'Ready'}
+                                    {documents == null
+                                        ? 'Checking..'
+                                        : documents.length === 0
+                                            ? 'No Docs'
+                                            : (documents ?? []).some(d => isIndexingStatus(d.status))
+                                                ? 'Indexing..'
+                                                : 'Ready'}
                                 </span>
                             </div>
                             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">RAG 문서</h3>

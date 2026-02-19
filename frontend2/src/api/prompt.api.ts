@@ -14,6 +14,22 @@ import type {
     PromptReleaseRequest,
     PromptReleaseHistoryResponse,
     PromptRollbackRequest,
+    EvalDatasetCreateRequest,
+    EvalDatasetResponse,
+    EvalBulkUploadRequest,
+    EvalBulkUploadResponse,
+    EvalTestCaseResponse,
+    PromptEvalDefaultResponse,
+    PromptEvalDefaultUpsertRequest,
+    EvalRunCreateRequest,
+    EvalRunEstimateRequest,
+    EvalRunEstimateResponse,
+    EvalReleaseCriteriaResponse,
+    EvalReleaseCriteriaUpdateRequest,
+    EvalRunResponse,
+    EvalCancelResponse,
+    EvalCaseResultListResponse,
+    EvalCaseResultResponse,
     PlaygroundRunRequest,
     PlaygroundRunResponse,
     PlaygroundSaveVersionRequest,
@@ -76,6 +92,68 @@ export const promptApi = {
         api.post<PromptReleaseResponse>(`/prompts/${promptId}/rollback`, data),
 
     // =================================================================
+    // Prompt Eval
+    // =================================================================
+    getEvalDatasets: (workspaceId: number, promptId: number) =>
+        api.get<EvalDatasetResponse[]>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/datasets`),
+
+    createEvalDataset: (workspaceId: number, promptId: number, data: EvalDatasetCreateRequest) =>
+        api.post<EvalDatasetResponse>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/datasets`, data),
+
+    getEvalDatasetCases: (workspaceId: number, promptId: number, datasetId: number) =>
+        api.get<EvalTestCaseResponse[]>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/datasets/${datasetId}/testcases`),
+
+    bulkUploadEvalDatasetCases: (
+        workspaceId: number,
+        promptId: number,
+        datasetId: number,
+        data: EvalBulkUploadRequest
+    ) => api.post<EvalBulkUploadResponse>(
+        `/workspaces/${workspaceId}/prompts/${promptId}/eval/datasets/${datasetId}/testcases:bulk-upload`,
+        data
+    ),
+
+    getEvalDefaults: (workspaceId: number, promptId: number) =>
+        api.get<PromptEvalDefaultResponse | null>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults`),
+
+    upsertEvalDefaults: (
+        workspaceId: number,
+        promptId: number,
+        data: PromptEvalDefaultUpsertRequest
+    ) => api.put<PromptEvalDefaultResponse>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults`, data),
+
+    createEvalRun: (workspaceId: number, promptId: number, data: EvalRunCreateRequest) =>
+        api.post<EvalRunResponse>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/runs`, data),
+
+    estimateEvalRun: (workspaceId: number, promptId: number, data: EvalRunEstimateRequest) =>
+        api.post<EvalRunEstimateResponse>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/runs:estimate`, data),
+
+    getEvalRuns: (workspaceId: number, promptId: number) =>
+        api.get<EvalRunResponse[]>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/runs`),
+
+    getEvalRun: (workspaceId: number, promptId: number, runId: number) =>
+        api.get<EvalRunResponse>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}`),
+
+    cancelEvalRun: (workspaceId: number, promptId: number, runId: number) =>
+        api.post<EvalCancelResponse>(`/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}:cancel`),
+
+    getEvalRunCases: (workspaceId: number, promptId: number, runId: number, page = 0, size = 20) =>
+        api.get<EvalCaseResultListResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/cases`,
+            { params: { page, size } }
+        ),
+
+    getEvalRunCase: (workspaceId: number, promptId: number, runId: number, caseResultId: number) =>
+        api.get<EvalCaseResultResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/cases/${caseResultId}`
+        ),
+
+    getEvalReleaseCriteria: (workspaceId: number) =>
+        api.get<EvalReleaseCriteriaResponse>(`/workspaces/${workspaceId}/eval/release-criteria`),
+
+    updateEvalReleaseCriteria: (workspaceId: number, data: EvalReleaseCriteriaUpdateRequest) =>
+        api.put<EvalReleaseCriteriaResponse>(`/workspaces/${workspaceId}/eval/release-criteria`, data),
+
     // Prompt Playground
     // =================================================================
     playgroundRun: (promptId: number, data: PlaygroundRunRequest) =>
