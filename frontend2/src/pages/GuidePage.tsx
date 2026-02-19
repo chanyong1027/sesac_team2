@@ -8,7 +8,6 @@ import {
   BookOpen,
   ChevronRight,
   Database,
-  ExternalLink,
   Home,
   LayoutGrid,
   MessageSquare,
@@ -337,16 +336,29 @@ const flattenArticles = (): GuideArticleMeta[] =>
     })),
   );
 
+const renderInlineCodeSegments = (text: string) =>
+  text.split(/`([^`]+)`/g).map((part, index) =>
+    index % 2 === 1 ? (
+      <code key={`guide-code-${index}-${part}`} className="rounded bg-slate-100 px-1 font-mono text-[12px] text-slate-700">
+        {part}
+      </code>
+    ) : (
+      part
+    ),
+  );
+
 export function GuidePage() {
   const { categoryId, articleId } = useParams<{ categoryId?: string; articleId?: string }>();
   const [searchQuery, setSearchQuery] = useState('');
+  const isGuideHome = !categoryId && !articleId;
 
   const allArticles = useMemo(() => flattenArticles(), []);
   const activeArticle = allArticles.find((article) => article.id === articleId) ?? null;
-  const activeCategory =
-    GUIDE_CATEGORIES.find((category) => category.id === categoryId) ??
-    GUIDE_CATEGORIES.find((category) => category.id === activeArticle?.categoryId) ??
-    GUIDE_CATEGORIES[0];
+  const activeCategory = isGuideHome
+    ? null
+    : GUIDE_CATEGORIES.find((category) => category.id === categoryId) ??
+      GUIDE_CATEGORIES.find((category) => category.id === activeArticle?.categoryId) ??
+      GUIDE_CATEGORIES[0];
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredCategories = useMemo(() => {
@@ -393,6 +405,8 @@ export function GuidePage() {
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={16} />
               <input
+                type="search"
+                aria-label="가이드 검색"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="가이드 검색"
@@ -404,7 +418,7 @@ export function GuidePage() {
           <nav className="space-y-3">
             {filteredCategories.map((category) => {
               const Icon = category.icon;
-              const isActiveCategory = activeCategory.id === category.id;
+              const isActiveCategory = activeCategory?.id === category.id;
               return (
                 <div key={category.id} className="space-y-1">
                   <Link
@@ -452,10 +466,14 @@ export function GuidePage() {
               <Home size={13} />
               가이드 홈
             </Link>
-            <ChevronRight size={13} />
-            <Link to={`/guide/category/${activeCategory.id}`} className="hover:text-slate-700">
-              {activeCategory.title}
-            </Link>
+            {!isGuideHome && activeCategory ? (
+              <>
+                <ChevronRight size={13} />
+                <Link to={`/guide/category/${activeCategory.id}`} className="hover:text-slate-700">
+                  {activeCategory.title}
+                </Link>
+              </>
+            ) : null}
             {activeArticle ? (
               <>
                 <ChevronRight size={13} />
@@ -464,7 +482,33 @@ export function GuidePage() {
             ) : null}
           </div>
 
-          {activeArticle ? (
+          {isGuideHome ? (
+            <>
+              <header className="mb-6 border-b border-slate-200 pb-4">
+                <h1 className="text-4xl font-black tracking-tight text-slate-900">LuminaOps Guide</h1>
+                <p className="mt-3 text-sm text-slate-600">카테고리를 선택해 원하는 운영 가이드를 빠르게 확인하세요.</p>
+              </header>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {GUIDE_CATEGORIES.map((category) => {
+                  const Icon = category.icon;
+                  return (
+                    <Link
+                      key={category.id}
+                      to={`/guide/category/${category.id}`}
+                      className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-transform hover:-translate-y-0.5 hover:border-blue-200"
+                    >
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <Icon size={18} />
+                        <h2 className="text-lg font-bold text-slate-900">{category.title}</h2>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">{category.description}</p>
+                      <p className="mt-3 text-xs text-slate-400">{category.articles.length}개 가이드</p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          ) : activeArticle ? (
             <>
               <header className="mb-6 border-b border-slate-200 pb-4">
                 <h1 className="text-4xl font-black tracking-tight text-slate-900">{activeArticle.title}</h1>
@@ -481,7 +525,7 @@ export function GuidePage() {
                         <span className="mr-2 inline-flex size-5 items-center justify-center rounded-full bg-blue-600 text-[11px] font-bold text-white">
                           {index + 1}
                         </span>
-                        {step}
+                        {renderInlineCodeSegments(step)}
                       </li>
                     ))}
                   </ol>
@@ -523,7 +567,7 @@ export function GuidePage() {
                             <p className="font-medium">{link.label}</p>
                             {link.note ? <p className="text-xs text-slate-500">{link.note}</p> : null}
                           </div>
-                          <ExternalLink size={16} className="text-slate-400" />
+                          <ChevronRight size={16} className="text-slate-400" />
                         </Link>
                       ))}
                     </div>
@@ -557,12 +601,12 @@ export function GuidePage() {
           ) : (
             <>
               <header className="mb-6 border-b border-slate-200 pb-4">
-                <h1 className="text-4xl font-black tracking-tight text-slate-900">{activeCategory.title}</h1>
-                <p className="mt-3 text-sm text-slate-600">{activeCategory.description}</p>
+                <h1 className="text-4xl font-black tracking-tight text-slate-900">{activeCategory?.title}</h1>
+                <p className="mt-3 text-sm text-slate-600">{activeCategory?.description}</p>
               </header>
 
               <div className="grid gap-4 md:grid-cols-2">
-                {activeCategory.articles.map((article) => (
+                {activeCategory?.articles.map((article) => (
                   <Link
                     key={article.id}
                     to={`/guide/article/${article.id}`}
