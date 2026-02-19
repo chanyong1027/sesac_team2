@@ -41,6 +41,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -513,7 +514,7 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        e.getMessage(),
+                        toErrorResponsePayload(gatewayFailure),
                         retrievedDocumentInfos));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
@@ -540,7 +541,7 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        e.getMessage(),
+                        toErrorResponsePayload(gatewayFailure),
                         retrievedDocumentInfos));
             }
             throw toGatewayException(gatewayFailure, e);
@@ -577,7 +578,7 @@ public class GatewayChatService {
                     ragContextHash,
                     ragTopK,
                     ragSimilarityThreshold,
-                    e.getMessage(),
+                    toErrorResponsePayload(gatewayFailure),
                     retrievedDocumentInfos));
             throw toGatewayException(gatewayFailure, e);
         }
@@ -676,9 +677,31 @@ public class GatewayChatService {
             return null;
         }
         try {
-            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(request);
+            RequestPayloadForLog payload = new RequestPayloadForLog(
+                    request.workspaceId(),
+                    request.promptKey(),
+                    request.isRagEnabled(),
+                    request.variables() != null ? request.variables().size() : 0
+            );
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
         } catch (Exception ignored) {
-            return String.valueOf(request);
+            return null;
+        }
+    }
+
+    private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
+        if (gatewayFailure == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("errorCode", gatewayFailure.errorCode());
+            payload.put("message", gatewayFailure.errorMessage());
+            payload.put("httpStatus", gatewayFailure.httpStatus());
+            payload.put("failReason", gatewayFailure.failReason());
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return gatewayFailure.errorCode();
         }
     }
 
@@ -937,5 +960,13 @@ public class GatewayChatService {
         private ProviderAttemptTimeoutException(Throwable cause) {
             super(cause);
         }
+    }
+
+    private record RequestPayloadForLog(
+            Long workspaceId,
+            String promptKey,
+            boolean ragEnabled,
+            int variablesCount
+    ) {
     }
 }
