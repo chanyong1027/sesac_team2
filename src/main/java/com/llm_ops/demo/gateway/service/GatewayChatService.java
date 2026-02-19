@@ -1,5 +1,6 @@
 package com.llm_ops.demo.gateway.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetDecisionAction;
@@ -59,6 +60,7 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
+    private static final ObjectMapper REQUEST_PAYLOAD_MAPPER = new ObjectMapper();
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
     private static final int PROVIDER_CALL_MAX_THREADS = 16;
     private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
@@ -151,7 +153,7 @@ public class GatewayChatService {
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
                 request.isRagEnabled(),
-                request.toString(),
+                toRequestPayloadJson(request),
                 "GATEWAY"));
 
         Integer ragLatencyMs = null;
@@ -655,6 +657,17 @@ public class GatewayChatService {
             }
         }
         return renderedUserPrompt;
+    }
+
+    private static String toRequestPayloadJson(GatewayChatRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(request);
+        } catch (Exception ignored) {
+            return String.valueOf(request);
+        }
     }
 
     /**
