@@ -26,6 +26,7 @@ import { useOrganizationStore } from '@/features/organization/store/organization
 import { useWorkspaces } from '@/features/workspace/hooks/useWorkspaces';
 import { OnboardingPage } from '@/pages/OnboardingPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
+import { GuidePage } from '@/pages/GuidePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +104,9 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/invitations/accept" element={<InvitationAcceptPage />} />
+          <Route path="/guide" element={<GuidePage />} />
+          <Route path="/guide/category/:categoryId" element={<GuidePage />} />
+          <Route path="/guide/article/:articleId" element={<GuidePage />} />
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
