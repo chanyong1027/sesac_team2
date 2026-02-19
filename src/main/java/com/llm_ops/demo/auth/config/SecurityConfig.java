@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/signup",
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
+                                "/api/v1/auth/check-email",
                                 "/api/v1/invitations/preview"
                         ).permitAll()
                         // 게이트웨이 외부 호출(조직 API 키로 인증)

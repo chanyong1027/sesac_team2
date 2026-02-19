@@ -1,15 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
+import type { UseFormRegisterReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 import { authApi } from '@/api/auth.api';
 import { useAuthStore } from '@/features/auth/store';
 
+const signupEmailSchema = z.string().email('유효한 이메일을 입력하세요');
+
 const signupSchema = z
   .object({
-    email: z.string().email('유효한 이메일을 입력하세요'),
+    email: signupEmailSchema,
     password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다'),
     confirmPassword: z.string(),
     name: z.string().min(2, '이름을 입력하세요'),
@@ -20,6 +24,59 @@ const signupSchema = z
   });
 
 type SignupFormData = z.infer<typeof signupSchema>;
+type EmailCheckStatus = 'idle' | 'checking' | 'available' | 'duplicate' | 'error';
+type ToastTone = 'success' | 'error' | 'info';
+
+function resolveApiError(
+  error: unknown,
+  fallbackMessage = '회원가입에 실패했습니다. 다시 시도해주세요.',
+): {
+  message: string;
+  fieldErrors: Record<string, string>;
+} {
+  if (!axios.isAxiosError(error)) {
+    return {
+      message: fallbackMessage,
+      fieldErrors: {},
+    };
+  }
+
+  const payload = error.response?.data as
+    | {
+        message?: string;
+        fieldErrors?: unknown;
+      }
+    | undefined;
+
+  const fieldErrors: Record<string, string> = {};
+  const rawFieldErrors = payload?.fieldErrors;
+
+  if (Array.isArray(rawFieldErrors)) {
+    rawFieldErrors.forEach((item) => {
+      if (
+        item &&
+        typeof item === 'object' &&
+        'field' in item &&
+        'message' in item &&
+        typeof item.field === 'string' &&
+        typeof item.message === 'string'
+      ) {
+        fieldErrors[item.field] = item.message;
+      }
+    });
+  } else if (rawFieldErrors && typeof rawFieldErrors === 'object') {
+    Object.entries(rawFieldErrors as Record<string, unknown>).forEach(([key, value]) => {
+      if (typeof value === 'string') {
+        fieldErrors[key] = value;
+      }
+    });
+  }
+
+  return {
+    message: payload?.message ?? fallbackMessage,
+    fieldErrors,
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // AURORA BACKGROUND COMPONENT - Emerald variant for signup
@@ -172,14 +229,37 @@ interface FormInputProps {
   type: string;
   placeholder: string;
   error?: string;
+  helperText?: string;
+  helperTone?: 'default' | 'success' | 'error' | 'info';
   isFocused: boolean;
   onFocus: () => void;
   onBlur: () => void;
-  register: ReturnType<typeof useForm<SignupFormData>>['register'];
-  name: keyof SignupFormData;
+  onValueBlur?: (value: string) => void;
+  onValueChange?: (value: string) => void;
+  inputProps: UseFormRegisterReturn;
 }
 
-function FormInput({ label, type, placeholder, error, isFocused, onFocus, onBlur, register, name }: FormInputProps) {
+function FormInput({
+  label,
+  type,
+  placeholder,
+  error,
+  helperText,
+  helperTone = 'default',
+  isFocused,
+  onFocus,
+  onBlur,
+  onValueBlur,
+  onValueChange,
+  inputProps,
+}: FormInputProps) {
+  const helperTextClassName = {
+    default: 'text-white/50',
+    success: 'text-emerald-400',
+    error: 'text-red-400',
+    info: 'text-cyan-300',
+  }[helperTone];
+
   return (
     <div className="relative">
       <label
@@ -190,10 +270,18 @@ function FormInput({ label, type, placeholder, error, isFocused, onFocus, onBlur
       </label>
       <div className="relative">
         <input
-          {...register(name)}
+          {...inputProps}
           type={type}
           onFocus={onFocus}
-          onBlur={onBlur}
+          onBlur={(event) => {
+            inputProps.onBlur(event);
+            onBlur();
+            onValueBlur?.(event.target.value);
+          }}
+          onChange={(event) => {
+            inputProps.onChange(event);
+            onValueChange?.(event.target.value);
+          }}
           className="w-full px-0 py-3.5 bg-transparent border-0 border-b text-white placeholder-white/20 focus:outline-none transition-colors"
           style={{
             fontFamily: "'JetBrains Mono', monospace",
@@ -218,6 +306,16 @@ function FormInput({ label, type, placeholder, error, isFocused, onFocus, onBlur
           {error}
         </p>
       )}
+      {!error && helperText && (
+        <p
+          className={`mt-2 text-[12px] ${helperTextClassName}`}
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {helperText}
+        </p>
+      )}
     </div>
   );
 }
@@ -230,6 +328,16 @@ export function SignupPage() {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [currentEmail, setCurrentEmail] = useState('');
+  const [emailCheckStatus, setEmailCheckStatus] = useState<EmailCheckStatus>('idle');
+  const [emailCheckMessage, setEmailCheckMessage] = useState<string | null>(null);
+  const [lastCheckedEmail, setLastCheckedEmail] = useState<string | null>(null);
+  const [signupErrorMessage, setSignupErrorMessage] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<ToastTone>('info');
+  const toastTimerRef = useRef<number | null>(null);
+  const navTimerRef = useRef<number | null>(null);
+  const emailCheckAbortRef = useRef<AbortController | null>(null);
 
   // 이미 로그인된 사용자는 대시보드로 리다이렉트
   useEffect(() => {
@@ -241,28 +349,166 @@ export function SignupPage() {
   const {
     register,
     handleSubmit,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
   });
+  const normalizedWatchedEmail = currentEmail.trim();
+  const isEmailCheckPassed =
+    normalizedWatchedEmail.length > 0 &&
+    emailCheckStatus === 'available' &&
+    lastCheckedEmail === normalizedWatchedEmail;
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      if (navTimerRef.current !== null) {
+        window.clearTimeout(navTimerRef.current);
+      }
+      emailCheckAbortRef.current?.abort();
+    };
+  }, []);
+
+  const showToast = (message: string, tone: ToastTone) => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToastTone(tone);
+    setToastMessage(message);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 2500);
+  };
+
+  const handleEmailChange = (value: string) => {
+    setCurrentEmail(value);
+    const normalizedEmail = value.trim();
+    setSignupErrorMessage(null);
+
+    if (normalizedEmail !== lastCheckedEmail) {
+      emailCheckAbortRef.current?.abort();
+      emailCheckAbortRef.current = null;
+      setEmailCheckStatus('idle');
+      setEmailCheckMessage(null);
+      setLastCheckedEmail(null);
+      if (errors.email?.type === 'manual') {
+        clearErrors('email');
+      }
+    }
+  };
+
+  const handleEmailBlur = async (value: string) => {
+    setCurrentEmail(value);
+    const normalizedEmail = value.trim();
+
+    if (!normalizedEmail || !signupEmailSchema.safeParse(normalizedEmail).success) {
+      emailCheckAbortRef.current?.abort();
+      emailCheckAbortRef.current = null;
+      setEmailCheckStatus('idle');
+      setEmailCheckMessage(null);
+      setLastCheckedEmail(null);
+      return;
+    }
+
+    if (lastCheckedEmail === normalizedEmail && emailCheckStatus !== 'error') {
+      return;
+    }
+
+    setEmailCheckStatus('checking');
+    setEmailCheckMessage('이메일 중복 확인 중입니다...');
+    emailCheckAbortRef.current?.abort();
+
+    const controller = new AbortController();
+    emailCheckAbortRef.current = controller;
+
+    try {
+      const response = await authApi.checkEmailAvailability(normalizedEmail, {
+        signal: controller.signal,
+      });
+      const availability = response.data.data;
+
+      if (emailCheckAbortRef.current !== controller) {
+        return;
+      }
+
+      setLastCheckedEmail(normalizedEmail);
+      setEmailCheckStatus(availability.available ? 'available' : 'duplicate');
+      setEmailCheckMessage(availability.message);
+
+      if (availability.available) {
+        clearErrors('email');
+      } else {
+        setError('email', {
+          type: 'manual',
+          message: availability.message,
+        });
+      }
+    } catch (error) {
+      if ((axios.isAxiosError(error) && error.code === 'ERR_CANCELED')
+        || (error instanceof DOMException && error.name === 'AbortError')) {
+        return;
+      }
+
+      const resolved = resolveApiError(error, '이메일 중복 확인 중 오류가 발생했습니다. 다시 시도해주세요.');
+      setEmailCheckStatus('error');
+      setEmailCheckMessage(resolved.message);
+      setLastCheckedEmail(null);
+    } finally {
+      if (emailCheckAbortRef.current === controller) {
+        emailCheckAbortRef.current = null;
+      }
+    }
+  };
 
   const signupMutation = useMutation({
     mutationFn: (data: SignupFormData) =>
       authApi.signup({
-        email: data.email,
+        email: data.email.trim(),
         password: data.password,
         name: data.name,
       }),
-    onSuccess: (response, variables) => {
-      const createdName = response.data?.data?.name ?? variables.name;
-      navigate('/login', {
-        replace: true,
-        state: { signupSuccess: true, signupName: createdName },
+    onSuccess: () => {
+      setSignupErrorMessage(null);
+      showToast('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.', 'success');
+      if (navTimerRef.current !== null) {
+        window.clearTimeout(navTimerRef.current);
+      }
+      navTimerRef.current = window.setTimeout(() => {
+        navTimerRef.current = null;
+        navigate('/login');
+      }, 900);
+    },
+    onError: (error) => {
+      const resolved = resolveApiError(error);
+      setSignupErrorMessage(resolved.message);
+
+      Object.entries(resolved.fieldErrors).forEach(([field, message]) => {
+        if (field === 'email' || field === 'password' || field === 'name' || field === 'confirmPassword') {
+          setError(field, { type: 'manual', message });
+        }
       });
     },
   });
 
   const onSubmit = (data: SignupFormData) => {
+    setSignupErrorMessage(null);
+
+    if (!isEmailCheckPassed) {
+      const message =
+        emailCheckStatus === 'checking'
+          ? '이메일 중복 확인이 완료될 때까지 기다려주세요.'
+          : '이메일 중복 확인을 완료해주세요.';
+      setEmailCheckStatus('error');
+      setEmailCheckMessage(message);
+      setError('email', { type: 'manual', message });
+      return;
+    }
+
     signupMutation.mutate(data);
   };
 
@@ -272,6 +518,24 @@ export function SignupPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@300;400;500&family=JetBrains+Mono:wght@300;400;500&display=swap');
       `}</style>
+
+      {toastMessage && (
+        <div
+          className={`fixed top-6 right-6 z-50 px-5 py-3 border backdrop-blur-sm ${
+            toastTone === 'success'
+              ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+              : toastTone === 'error'
+                ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                : 'border-cyan-400/40 bg-cyan-500/10 text-cyan-200'
+          }`}
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          role={toastTone === 'error' ? 'alert' : 'status'}
+          aria-live={toastTone === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+        >
+          <p className="text-[12px]">{toastMessage}</p>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════════════════════════════════════ */}
       {/* LEFT SIDE - Aurora visual (reversed from login) */}
@@ -425,8 +689,7 @@ export function SignupPage() {
                 isFocused={focusedField === 'name'}
                 onFocus={() => setFocusedField('name')}
                 onBlur={() => setFocusedField(null)}
-                register={register}
-                name="name"
+                inputProps={register('name')}
               />
 
               <FormInput
@@ -434,11 +697,28 @@ export function SignupPage() {
                 type="email"
                 placeholder="email@company.com"
                 error={errors.email?.message}
+                helperText={
+                  errors.email?.message
+                    ? undefined
+                    : emailCheckMessage ?? '이메일 입력 후 포커스를 이동하면 중복 확인이 진행됩니다.'
+                }
+                helperTone={
+                  emailCheckStatus === 'available'
+                    ? 'success'
+                    : emailCheckStatus === 'duplicate' || emailCheckStatus === 'error'
+                      ? 'error'
+                      : emailCheckStatus === 'checking'
+                        ? 'info'
+                        : 'default'
+                }
                 isFocused={focusedField === 'email'}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
-                register={register}
-                name="email"
+                onValueBlur={(value) => {
+                  void handleEmailBlur(value);
+                }}
+                onValueChange={handleEmailChange}
+                inputProps={register('email')}
               />
 
               <FormInput
@@ -449,8 +729,7 @@ export function SignupPage() {
                 isFocused={focusedField === 'password'}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
-                register={register}
-                name="password"
+                inputProps={register('password')}
               />
 
               <FormInput
@@ -461,15 +740,14 @@ export function SignupPage() {
                 isFocused={focusedField === 'confirmPassword'}
                 onFocus={() => setFocusedField('confirmPassword')}
                 onBlur={() => setFocusedField(null)}
-                register={register}
-                name="confirmPassword"
+                inputProps={register('confirmPassword')}
               />
 
               {/* Submit button */}
               <div className="pt-4">
                 <button
                   type="submit"
-                  disabled={signupMutation.isPending}
+                  disabled={signupMutation.isPending || !isEmailCheckPassed}
                   className="group relative w-full py-5 overflow-hidden transition-all duration-300 disabled:opacity-50"
                   style={{
                     background: 'linear-gradient(135deg, oklch(0.65 0.18 160), oklch(0.55 0.15 180))',
@@ -502,13 +780,13 @@ export function SignupPage() {
               </div>
 
               {/* Error message */}
-              {signupMutation.isError && (
+              {signupErrorMessage && (
                 <div
                   className="p-4 border border-red-500/20 bg-red-500/5"
                   style={{ fontFamily: "'JetBrains Mono', monospace" }}
                 >
                   <p className="text-[12px] text-red-400">
-                    회원가입에 실패했습니다. 다시 시도해주세요.
+                    {signupErrorMessage}
                   </p>
                 </div>
               )}

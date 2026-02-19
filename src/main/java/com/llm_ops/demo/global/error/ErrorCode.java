@@ -13,6 +13,7 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C405", "지원하지 않는 HTTP 메서드입니다."),
     CONFLICT(HttpStatus.CONFLICT, "C409", "요청이 현재 상태와 충돌합니다."),
     BUDGET_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "C429", "예산 한도를 초과했습니다."),
+    EMAIL_CHECK_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "C4291", "이메일 확인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C500", "서버 오류가 발생했습니다.");
 
     private final HttpStatus status;

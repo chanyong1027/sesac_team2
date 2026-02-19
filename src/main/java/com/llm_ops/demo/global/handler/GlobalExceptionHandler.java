@@ -4,11 +4,13 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.global.error.ErrorResponse;
 import com.llm_ops.demo.global.error.GatewayException;
+import com.llm_ops.demo.global.error.RateLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.core.MethodParameter;
@@ -47,6 +49,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(e.getStatus())
                 .body(ErrorResponse.of(e.getCode(), message));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceededException(
+            RateLimitExceededException e,
+            HttpServletRequest request
+    ) {
+        if (isGatewayPath(request)) {
+            GatewayBusinessMapping mapping = mapGatewayBusiness(e);
+            return ResponseEntity
+                    .status(mapping.status())
+                    .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                    .body(ErrorResponse.of(
+                            mapping.code(),
+                            sanitizeMessage(mapping.message(), "게이트웨이 요청 처리 중 오류가 발생했습니다.")
+                    ));
+        }
+
+        ErrorCode errorCode = e.getErrorCode();
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getRetryAfterSeconds()))
+                .body(ErrorResponse.of(errorCode, sanitizeMessage(e.getMessage(), errorCode.getDefaultMessage())));
     }
 
     @ExceptionHandler(BusinessException.class)
@@ -198,7 +223,8 @@ public class GlobalExceptionHandler {
         return switch (errorCode) {
             case UNAUTHENTICATED -> new GatewayBusinessMapping("GW-REQ-UNAUTHORIZED", HttpStatus.UNAUTHORIZED, e.getMessage());
             case FORBIDDEN -> new GatewayBusinessMapping("GW-REQ-FORBIDDEN", HttpStatus.FORBIDDEN, e.getMessage());
-            case BUDGET_EXCEEDED -> new GatewayBusinessMapping("GW-REQ-QUOTA_EXCEEDED", HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
+            case BUDGET_EXCEEDED, EMAIL_CHECK_RATE_LIMITED ->
+                    new GatewayBusinessMapping("GW-REQ-QUOTA_EXCEEDED", HttpStatus.TOO_MANY_REQUESTS, e.getMessage());
             case INVALID_INPUT_VALUE, METHOD_NOT_ALLOWED, CONFLICT, NOT_FOUND ->
                     new GatewayBusinessMapping("GW-REQ-INVALID_REQUEST", HttpStatus.BAD_REQUEST, e.getMessage());
             default -> new GatewayBusinessMapping("GW-GW-POLICY_BLOCKED", errorCode.getStatus(), e.getMessage());
