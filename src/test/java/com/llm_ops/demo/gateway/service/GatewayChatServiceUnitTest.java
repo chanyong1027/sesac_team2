@@ -25,6 +25,7 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.FutureTask;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -60,6 +64,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 /**
  * GatewayChatService의 순수 단위 테스트입니다.
@@ -77,6 +82,9 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private LlmCallService llmCallService;
+
+    @Mock
+    private ExecutorService providerCallExecutor;
 
     @Mock
     private RagSearchService ragSearchService;
@@ -110,6 +118,20 @@ class GatewayChatServiceUnitTest {
 
     @InjectMocks
     private GatewayChatService gatewayChatService;
+
+    @BeforeEach
+    void setUpProviderExecutor() {
+        lenient().when(providerCallExecutor.submit(any(Callable.class)))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Callable<ChatResponse> callable = invocation.getArgument(0);
+                    FutureTask<ChatResponse> task = new FutureTask<>(callable);
+                    Thread thread = new Thread(task);
+                    thread.setDaemon(true);
+                    thread.start();
+                    return task;
+                });
+    }
 
     @Test
     @DisplayName("변수 치환 테스트: {{name}} 플레이스홀더가 값으로 치환된다")
