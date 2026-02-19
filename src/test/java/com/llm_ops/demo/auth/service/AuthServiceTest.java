@@ -106,6 +106,41 @@ class AuthServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("이메일 중복 확인 테스트")
+    class CheckEmailAvailabilityTest {
+
+        @Test
+        @DisplayName("미등록 이메일이면 사용 가능 응답을 반환한다")
+        void 미등록_이메일이면_사용_가능_응답을_반환한다() {
+            // given
+            String email = "available@example.com";
+            given(userRepository.existsByEmail(email)).willReturn(false);
+
+            // when
+            var response = authService.checkEmailAvailability(email);
+
+            // then
+            assertThat(response.available()).isTrue();
+            assertThat(response.message()).isEqualTo("사용 가능한 이메일입니다.");
+        }
+
+        @Test
+        @DisplayName("등록된 이메일이면 사용 불가 응답을 반환한다")
+        void 등록된_이메일이면_사용_불가_응답을_반환한다() {
+            // given
+            String email = "duplicate@example.com";
+            given(userRepository.existsByEmail(email)).willReturn(true);
+
+            // when
+            var response = authService.checkEmailAvailability(email);
+
+            // then
+            assertThat(response.available()).isFalse();
+            assertThat(response.message()).isEqualTo("이미 사용 중인 이메일입니다.");
+        }
+    }
+
     // ==================== 로그인 테스트 ====================
     @Nested
     @DisplayName("로그인 테스트")
