@@ -8,6 +8,7 @@ import type {
   WorkspaceDeleteResponse,
   WorkspaceInviteCreateRequest,
   WorkspaceInviteCreateResponse,
+  WorkspaceInvitePreviewResponse,
   WorkspaceInviteAcceptRequest,
   WorkspaceInviteAcceptResponse,
 } from '@/types/api.types';
@@ -49,5 +50,12 @@ export const workspaceApi = {
     api.post<WorkspaceInviteAcceptResponse>(
       '/invitations/accept',
       data
+    ),
+
+  // 초대 프리뷰 - 현재 백엔드: GET /api/v1/invitations/preview?token={token}
+  previewInvitation: (token: string) =>
+    api.get<WorkspaceInvitePreviewResponse>(
+      '/invitations/preview',
+      { params: { token } }
     ),
 };
