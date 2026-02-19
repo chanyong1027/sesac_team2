@@ -240,7 +240,7 @@ function ProviderCard({
         )}
       </div>
 
-       {isConnected && credential ? (
+       {credential ? (
          <div className="space-y-3">
            <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
              <p className="text-xs font-medium text-gray-500 mb-1">
@@ -249,48 +249,57 @@ function ProviderCard({
              <p className="font-mono text-sm text-gray-300">{formatKoreanDate(credential.createdAt)}</p>
            </div>
 
-           <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
-             <div className="flex items-center justify-between mb-2">
-               <p className="text-xs font-medium text-gray-500">이번 달 사용량</p>
-               <div className="flex items-center gap-2">
-                 {enabledBudget ? (
-                   <span
-                     className={[
-                       'px-2 py-0.5 rounded-full text-[10px] font-bold border',
-                       isHardExceeded
-                         ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
-                         : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
-                     ].join(' ')}
+           {isConnected && (
+             <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
+               <div className="flex items-center justify-between mb-2">
+                 <p className="text-xs font-medium text-gray-500">이번 달 사용량</p>
+                 <div className="flex items-center gap-2">
+                   {enabledBudget ? (
+                     <span
+                       className={[
+                         'px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                         isHardExceeded
+                           ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+                           : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
+                       ].join(' ')}
+                     >
+                       {isHardExceeded ? 'BLOCK' : 'ON'}
+                     </span>
+                   ) : (
+                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 border-white/10 text-gray-300">
+                       OFF
+                     </span>
+                   )}
+                   <button
+                     type="button"
+                     onClick={onConfigureBudget}
+                     disabled={!supportsBudget}
+                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
                    >
-                     {isHardExceeded ? 'BLOCK' : 'ON'}
-                   </span>
-                 ) : (
-                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 border-white/10 text-gray-300">
-                     OFF
-                   </span>
-                 )}
-                 <button
-                   type="button"
-                   onClick={onConfigureBudget}
-                   disabled={!supportsBudget}
-                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
-                 >
-                   예산 설정
-                 </button>
+                     예산 설정
+                   </button>
+                 </div>
                </div>
+               <div className="flex items-baseline justify-between">
+                 <p className="font-mono text-sm text-gray-300">{formatUsd(usedUsd)}</p>
+                 <p className="text-[11px] font-mono text-gray-500">
+                   {hardLimitUsd != null ? `${formatUsd(usedUsd)} / ${formatUsd(hardLimitUsd)}` : `${formatUsd(usedUsd)} / -`}
+                 </p>
+               </div>
+               {enabledBudget && isHardExceeded ? (
+                 <p className="mt-2 text-[11px] text-rose-200">
+                   Hard-limit을 초과했습니다. 이 Provider 키로 나가는 호출이 차단됩니다.
+                 </p>
+               ) : null}
              </div>
-             <div className="flex items-baseline justify-between">
-               <p className="font-mono text-sm text-gray-300">{formatUsd(usedUsd)}</p>
-               <p className="text-[11px] font-mono text-gray-500">
-                 {hardLimitUsd != null ? `${formatUsd(usedUsd)} / ${formatUsd(hardLimitUsd)}` : `${formatUsd(usedUsd)} / -`}
-               </p>
-             </div>
-             {enabledBudget && isHardExceeded ? (
-               <p className="mt-2 text-[11px] text-rose-200">
-                 Hard-limit을 초과했습니다. 이 Provider 키로 나가는 호출이 차단됩니다.
-               </p>
-             ) : null}
-           </div>
+           )}
+
+           {isInvalid && (
+             <p className="text-xs text-rose-300 flex items-center gap-1.5">
+               <span className="material-symbols-outlined text-sm">error</span>
+               API 키 인증에 실패했습니다. 키를 업데이트하거나 재검증해 주세요.
+             </p>
+           )}
 
            <div className="flex gap-2">
              <button

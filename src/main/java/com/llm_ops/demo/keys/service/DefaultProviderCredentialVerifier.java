@@ -149,6 +149,8 @@ public class DefaultProviderCredentialVerifier implements ProviderCredentialVeri
                 if (isAuthError(e)) {
                     throw e;
                 }
+            } catch (NonTransientAiException e) {
+                throw e;
             } catch (Exception ignored) {
                 // try next model
             }
@@ -183,6 +185,8 @@ public class DefaultProviderCredentialVerifier implements ProviderCredentialVeri
                 if (isAuthError(e)) {
                     throw e;
                 }
+            } catch (NonTransientAiException e) {
+                throw e;
             } catch (Exception ignored) {
                 // try next model
             }

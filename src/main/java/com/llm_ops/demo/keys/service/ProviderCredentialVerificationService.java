@@ -29,8 +29,7 @@ public class ProviderCredentialVerificationService {
             credential.markActive();
         } catch (BusinessException e) {
             if (isAuthFailure(e)) {
-                providerCredentialRepository.delete(credential);
-                return;
+                credential.markInvalid();
             } else {
                 credential.markVerifying();
             }
