@@ -1,6 +1,7 @@
 package com.llm_ops.demo.gateway.log.service;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import com.llm_ops.demo.gateway.log.domain.RetrievedDocument;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import java.time.Clock;
@@ -80,11 +81,14 @@ public class RequestLogWriter {
                                         update.ragTopK(),
                                         update.ragSimilarityThreshold());
 
+                        RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs(),
                                         update.responsePayload());
 
-                        // RetrievedDocument 저장
-                        saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                        // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
+                        if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.SUCCESS)) {
+                                saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                        }
                 } catch (Exception e) {
                         log.error("로그 성공 기록 실패: requestId={}", requestId, e);
                 }
@@ -123,6 +127,7 @@ public class RequestLogWriter {
                                         update.ragTopK(),
                                         update.ragSimilarityThreshold());
 
+                        RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markFail(
                                         LocalDateTime.now(clock),
                                         update.httpStatus(),
@@ -132,8 +137,10 @@ public class RequestLogWriter {
                                         update.failReason(),
                                         update.responsePayload());
 
-                        // RetrievedDocument 저장
-                        saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                        // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
+                        if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.FAIL)) {
+                                saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                        }
                 } catch (Exception e) {
                         log.error("로그 실패 기록 실패: requestId={}", requestId, e);
                 }
@@ -172,6 +179,7 @@ public class RequestLogWriter {
                                         update.ragTopK(),
                                         update.ragSimilarityThreshold());
 
+                        RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markBlocked(
                                         LocalDateTime.now(clock),
                                         update.httpStatus(),
@@ -181,8 +189,10 @@ public class RequestLogWriter {
                                         update.failReason(),
                                         update.responsePayload());
 
-                        // RetrievedDocument 저장
-                        saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                        // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
+                        if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.BLOCKED)) {
+                                saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                        }
                 } catch (Exception e) {
                         log.error("로그 차단 기록 실패: requestId={}", requestId, e);
                 }
@@ -205,6 +215,13 @@ public class RequestLogWriter {
                                                 info.ranking()))
                                 .toList();
                 requestLog.addRetrievedDocuments(entities);
+        }
+
+        private static boolean hasTransitionedTo(
+                        RequestLogStatus before,
+                        RequestLogStatus after,
+                        RequestLogStatus target) {
+                return before != target && after == target;
         }
 
         // ===== Inner Records =====
