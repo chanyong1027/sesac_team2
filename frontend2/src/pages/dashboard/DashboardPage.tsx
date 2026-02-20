@@ -58,7 +58,7 @@ export default function DashboardPage() {
         : [];
 
     // 1. Overview
-    const { data: overviewData, isLoading: isOverviewLoading, error: overviewError } = useQuery({
+    const { data: overviewData, error: overviewError } = useQuery({
         queryKey: ['stats-overview', organizationId, period, selectedWorkspaceId],
         queryFn: () => statisticsApi.getOverview(organizationId, {
             period,
@@ -68,7 +68,7 @@ export default function DashboardPage() {
     });
 
     // 2. Timeseries (Request Volume)
-    const { data: timeseriesData, isLoading: isTimeseriesLoading } = useQuery({
+    const { data: timeseriesData } = useQuery({
         queryKey: ['stats-timeseries', organizationId, period, selectedWorkspaceId],
         queryFn: () => statisticsApi.getTimeseries(organizationId, {
             period,
@@ -78,7 +78,7 @@ export default function DashboardPage() {
     });
 
     // 3. Model Usage
-    const { data: modelData, isLoading: isModelLoading } = useQuery({
+    const { data: modelData } = useQuery({
         queryKey: ['stats-model', organizationId, selectedWorkspaceId],
         queryFn: () => statisticsApi.getByModel(organizationId, {
             workspaceId: selectedWorkspaceId
@@ -87,7 +87,7 @@ export default function DashboardPage() {
     });
 
     // 4. Prompt Usage
-    const { data: promptData, isLoading: isPromptLoading } = useQuery({
+    const { data: promptData } = useQuery({
         queryKey: ['stats-prompt', organizationId, selectedWorkspaceId],
         queryFn: () => statisticsApi.getByPrompt(organizationId, {
             workspaceId: selectedWorkspaceId
@@ -96,7 +96,7 @@ export default function DashboardPage() {
     });
 
     // 5. Error Distribution
-    const { data: errorData, isLoading: isErrorLoading } = useQuery({
+    const { data: errorData } = useQuery({
         queryKey: ['stats-errors', organizationId, selectedWorkspaceId],
         queryFn: () => statisticsApi.getErrorDistribution(organizationId, {
             workspaceId: selectedWorkspaceId
@@ -105,7 +105,7 @@ export default function DashboardPage() {
     });
 
     // 6. RAG Quality
-    const { data: ragData, isLoading: isRagLoading } = useQuery({
+    const { data: ragData } = useQuery({
         queryKey: ['stats-rag', organizationId, selectedWorkspaceId],
         queryFn: () => statisticsApi.getRagQuality(organizationId, {
             workspaceId: selectedWorkspaceId
@@ -114,7 +114,7 @@ export default function DashboardPage() {
     });
 
     // 7. RAG Quality Timeseries
-    const { data: ragTimeseriesData, isLoading: isRagTimeseriesLoading } = useQuery({
+    const { data: ragTimeseriesData } = useQuery({
         queryKey: ['stats-rag-timeseries', organizationId, period, selectedWorkspaceId],
         queryFn: () => statisticsApi.getRagQualityTimeseries(organizationId, {
             period,

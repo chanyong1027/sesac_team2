@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { logsApi } from '@/api/logs.api';
 import type { RequestLogStatus } from '@/types/api.types';
+
+const PAGE_SIZE = 20;
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -58,12 +60,17 @@ export function WorkspaceLogsPage() {
   const [source, setSource] = useState<string>('ALL');
   const [ragEnabled, setRagEnabled] = useState<'ALL' | 'true' | 'false'>('ALL');
   const [isFailover, setIsFailover] = useState(false);
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, status, model, provider, source, ragEnabled, isFailover, workspaceId]);
 
   // Debounced params for query
   const queryParams = useMemo(() => {
-    const params: Record<string, any> = {
-      page: 0,
-      size: 20,
+    const params: Record<string, unknown> = {
+      page: page - 1,
+      size: PAGE_SIZE,
     };
 
     // Simple heuristic for search query: if it looks like a trace ID (long), use traceId, else promptKey
@@ -83,7 +90,7 @@ export function WorkspaceLogsPage() {
     if (isFailover) params.failover = true;
 
     return params;
-  }, [searchQuery, status, provider, model, source, ragEnabled, isFailover]);
+  }, [searchQuery, status, provider, model, source, ragEnabled, isFailover, page]);
 
   const { data: list, isLoading, refetch } = useQuery({
     queryKey: ['workspace-logs', workspaceId, queryParams],
@@ -92,6 +99,18 @@ export function WorkspaceLogsPage() {
   });
 
   const logs = list?.content ?? [];
+  const totalPages = list?.totalPages ?? 0;
+  const canGoPrev = page > 1;
+  const canGoNext = totalPages > 0 && page < totalPages;
+
+  const handlePrev = () => {
+    setPage((prev) => Math.max(1, prev - 1));
+  };
+
+  const handleNext = () => {
+    if (!canGoNext) return;
+    setPage((prev) => prev + 1);
+  };
 
   // Helper Functions
   const getStatusColor = (status: RequestLogStatus) => {
@@ -129,6 +148,33 @@ export function WorkspaceLogsPage() {
   const truncate = (str: string | null, length: number) => {
     if (!str) return '';
     return str.length > length ? str.substring(0, length) + '...' : str;
+  };
+
+  const getRequestPreview = (requestPayload: string | null) => {
+    if (!requestPayload) return 'No prompt';
+    try {
+      const parsed = JSON.parse(requestPayload);
+      if (parsed && typeof parsed === 'object' && 'messages' in parsed && Array.isArray(parsed.messages)) {
+        const firstMessage = parsed.messages[0];
+        if (firstMessage && typeof firstMessage === 'object' && 'content' in firstMessage) {
+          const content = firstMessage.content;
+          if (typeof content === 'string' && content.trim()) {
+            return content;
+          }
+        }
+      }
+      return requestPayload;
+    } catch {
+      return requestPayload;
+    }
+  };
+
+  const formatRequestSource = (requestSource: string | null | undefined) => {
+    if (!requestSource) return '-';
+    const normalized = requestSource.toUpperCase();
+    if (normalized === 'HTTP' || normalized === 'GATEWAY') return 'GW';
+    if (normalized === 'GRPC' || normalized === 'PLAYGROUND') return 'PG';
+    return requestSource;
   };
 
   return (
@@ -220,8 +266,8 @@ export function WorkspaceLogsPage() {
             className="bg-[#141522] text-gray-300 text-xs px-3 py-1.5 rounded-lg border border-white/10 focus:border-[var(--primary)] outline-none"
           >
             <option value="ALL">Source: All Sources</option>
-            <option value="HTTP">HTTP</option>
-            <option value="GRPC">GRPC</option>
+            <option value="GATEWAY">Gateway</option>
+            <option value="PLAYGROUND">Playground</option>
           </select>
 
           <div className="h-6 w-px bg-white/10 mx-1" />
@@ -313,7 +359,7 @@ export function WorkspaceLogsPage() {
                       <div className="flex items-center gap-2 max-w-md">
                         <FileText size={14} className="text-gray-500 shrink-0" />
                         <span className="text-sm text-gray-300 truncate font-mono">
-                          {truncate(log.requestPayload ? (JSON.parse(log.requestPayload)?.messages?.[0]?.content || 'No content') : 'No prompt', 60)}
+                          {truncate(getRequestPreview(log.requestPayload), 60)}
                         </span>
                       </div>
                       {log.errorMessage && (
@@ -346,8 +392,11 @@ export function WorkspaceLogsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-400 border border-white/5">
-                        {log.requestSource === 'HTTP' ? 'GW' : 'PG'}
+                      <span
+                        className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-gray-400 border border-white/5"
+                        title={log.requestSource || '-'}
+                      >
+                        {formatRequestSource(log.requestSource)}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right">
@@ -372,13 +421,15 @@ export function WorkspaceLogsPage() {
           </span>
           <div className="flex gap-2">
             <button
-              disabled={0 === 0}
+              disabled={!canGoPrev}
+              onClick={handlePrev}
               className="px-3 py-1 rounded-lg border border-white/10 text-xs text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Previous
             </button>
             <button
-              disabled={false}
+              disabled={!canGoNext}
+              onClick={handleNext}
               className="px-3 py-1 rounded-lg border border-white/10 text-xs text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
@@ -389,4 +440,3 @@ export function WorkspaceLogsPage() {
     </div>
   );
 }
-

@@ -12,6 +12,16 @@ export interface ApiResponse<T> {
 // ========================================
 export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED' | 'TIMEOUT';
 
+export interface RetrievedDocument {
+  id: number;
+  content: string;
+  score: number | null;
+  documentId?: number | null;
+  documentName?: string | null;
+  durationMs?: number | null;
+  ranking?: number | null;
+}
+
 export interface RequestLogResponse {
   requestId: string;
   traceId: string;
@@ -40,7 +50,7 @@ export interface RequestLogResponse {
   requestPayload: string | null;
   responsePayload: string | null;
   requestSource: string | null;
-  retrievedDocuments?: any[]; // Detailed type can be added if needed
+  retrievedDocuments?: RetrievedDocument[];
   cost?: number; // UI required field
 }
 

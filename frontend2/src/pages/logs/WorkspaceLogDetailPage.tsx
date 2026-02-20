@@ -8,8 +8,6 @@ import {
   ArrowLeft,
   Database,
   Activity,
-  Coins,
-  Cpu,
   Layers,
   Hash,
   MessageSquare,
@@ -50,18 +48,6 @@ function statusBadge(status: RequestLogStatus) {
   }
 }
 
-function httpReasonPhrase(status: number) {
-  if (status >= 200 && status < 300) return 'OK';
-  if (status === 400) return 'BAD_REQUEST';
-  if (status === 401) return 'UNAUTHORIZED';
-  if (status === 403) return 'FORBIDDEN';
-  if (status === 404) return 'NOT_FOUND';
-  if (status === 408) return 'TIMEOUT';
-  if (status === 429) return 'RATE_LIMIT';
-  if (status >= 500 && status < 600) return 'SERVER_ERROR';
-  return '';
-}
-
 export function WorkspaceLogDetailPage() {
   const { orgId, workspaceId: workspaceIdParam, traceId } = useParams<{
     orgId: string;
@@ -69,7 +55,6 @@ export function WorkspaceLogDetailPage() {
     traceId: string;
   }>();
 
-  const [isRawExpanded, setIsRawExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'raw'>('details');
 
   const workspaceId = Number(workspaceIdParam);
@@ -446,21 +431,33 @@ export function WorkspaceLogDetailPage() {
                       <span className="text-xs font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded">{log.ragChunksCount || 0} chunks</span>
                     </div>
                     <div className="space-y-3">
-                      {log.retrievedDocuments?.map((doc, idx) => (
-                        <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/5 hover:border-white/10 transition-colors">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="text-[10px] bg-white/10 text-gray-300 px-1.5 py-0.5 rounded font-mono truncate max-w-[120px]" title={doc.documentName}>
-                              {doc.documentName || `Doc #${doc.documentId}`}
-                            </span>
-                            <span className={`text-[10px] font-bold ${doc.score > 0.8 ? 'text-emerald-400' : doc.score > 0.5 ? 'text-yellow-400' : 'text-rose-400'}`}>
-                              {doc.score.toFixed(2)}
-                            </span>
+                      {log.retrievedDocuments?.map((doc, idx) => {
+                        const score = typeof doc.score === 'number' ? doc.score : null;
+                        const scoreClass = score === null
+                          ? 'text-gray-400'
+                          : score > 0.8
+                            ? 'text-emerald-400'
+                            : score > 0.5
+                              ? 'text-yellow-400'
+                              : 'text-rose-400';
+                        const scoreLabel = score === null ? 'N/A' : score.toFixed(2);
+
+                        return (
+                          <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/5 hover:border-white/10 transition-colors">
+                            <div className="flex justify-between items-start mb-2">
+                              <span className="text-[10px] bg-white/10 text-gray-300 px-1.5 py-0.5 rounded font-mono truncate max-w-[120px]" title={doc.documentName || undefined}>
+                                {doc.documentName || `Doc #${doc.documentId ?? 'N/A'}`}
+                              </span>
+                              <span className={`text-[10px] font-bold ${scoreClass}`}>
+                                {scoreLabel}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed">
+                              {doc.content}
+                            </p>
                           </div>
-                          <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed">
-                            {doc.content}
-                          </p>
-                        </div>
-                      )) || <div className="text-center py-6 text-gray-600 text-xs italic">No documents retrieved</div>}
+                        );
+                      }) || <div className="text-center py-6 text-gray-600 text-xs italic">No documents retrieved</div>}
                     </div>
                   </div>
                 </div>
