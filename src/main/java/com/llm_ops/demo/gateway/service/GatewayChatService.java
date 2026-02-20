@@ -174,7 +174,7 @@ public class GatewayChatService {
         GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
         Long promptVersionId = null;
-        List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
+        java.util.List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
 
         try {
@@ -506,7 +506,8 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        toErrorResponsePayload(gatewayFailure)));
+                        toErrorResponsePayload(gatewayFailure),
+                        retrievedDocumentInfos));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                         gatewayFailure.httpStatus(),
@@ -716,7 +717,6 @@ public class GatewayChatService {
         }
         return infos;
     }
-
     /**
      * 프롬프트 키(템플릿)와 변수 맵을 사용하여 최종 프롬프트 문자열을 생성(렌더링)합니다.
      */
