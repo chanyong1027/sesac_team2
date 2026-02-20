@@ -2734,15 +2734,16 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                                     </div>
                                     <p className="mt-1 text-[11px] text-gray-500">진행률 {runProgressPercent}%</p>
                                 </div>
-	                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-	                                    <KpiCard label="통과율" value={`${Number(selectedRun.summary?.passRate ?? 0).toFixed(2)}%`} tone="good" />
-	                                    <KpiCard label="평균 점수" value={formatOptionalNumber(toNullableNumber(selectedRun.summary?.avgOverallScore))} />
-	                                    <KpiCard label="통과" value={String(selectedRun.passedCases)} tone="good" />
-	                                    <KpiCard label="오류" value={String(selectedRun.errorCases)} tone={selectedRun.errorCases > 0 ? 'danger' : undefined} />
-	                                </div>
-                                <RunTrendCard runs={runs || []} />
-                            </>
-                        ) : null}
+		                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+		                                    <KpiCard label="통과율" value={`${Number(selectedRun.summary?.passRate ?? 0).toFixed(2)}%`} tone="good" />
+		                                    <KpiCard label="평균 점수" value={formatOptionalNumber(toNullableNumber(selectedRun.summary?.avgOverallScore))} />
+		                                    <KpiCard label="통과" value={String(selectedRun.passedCases)} tone="good" />
+		                                    <KpiCard label="오류" value={String(selectedRun.errorCases)} tone={selectedRun.errorCases > 0 ? 'danger' : undefined} />
+		                                </div>
+                                <PerformanceModePanel run={selectedRun} />
+	                                <RunTrendCard runs={runs || []} />
+	                            </>
+	                        ) : null}
 
 	                        {resultSectionTab === 'CASES' ? (
 	                            <RunCaseList
@@ -2771,72 +2772,90 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                     <div className="overflow-x-auto">
                         <table className="min-w-full text-sm">
 	                            <thead>
-	                                <tr className="text-left text-gray-400 border-b border-white/10">
-	                                    <th className="py-2 pr-3">Run 번호</th>
-	                                    <th className="py-2 pr-3">상태</th>
-	                                    <th className="py-2 pr-3">진행률</th>
-	                                    <th className="py-2 pr-3">통과율</th>
-	                                    <th className="py-2 pr-3">통과/실패/오류</th>
-	                                    <th className="py-2 pr-3">판정</th>
-	                                    <th className="py-2 pr-3">모드</th>
-	                                    <th className="py-2 pr-3">생성시각</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(runs || []).map((run) => (
-                                    <tr
-                                        key={run.id}
-                                        className={`border-b border-white/5 cursor-pointer ${selectedRunId === run.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
-                                        onClick={() => setSelectedRunId(run.id)}
-                                    >
-                                        <td className="py-2 pr-3 text-white">#{run.id}</td>
-                                        <td className="py-2 pr-3 text-gray-200">
-                                            <span className={`px-2 py-0.5 rounded-full text-[11px] ${runStatusBadgeClass(run.status)}`}>
-                                                {renderRunStatus(run.status)}
-                                            </span>
-                                        </td>
-                                        <td className="py-2 pr-3 text-gray-300">{run.processedCases}/{run.totalCases}</td>
-                                        <td className="py-2 pr-3 text-gray-300">{Number(run.summary?.passRate ?? 0).toFixed(1)}%</td>
-                                        <td className="py-2 pr-3 text-gray-300">{run.passedCases}/{run.failedCases}/{run.errorCases}</td>
-                                        <td className="py-2 pr-3 text-gray-300">{renderReleaseDecisionBadge(run.summary?.releaseDecision)}</td>
-                                        <td className="py-2 pr-3 text-gray-300">{renderModeLabel(run.mode)}</td>
-                                        <td className="py-2 pr-3 text-gray-400">{new Date(run.createdAt).toLocaleString('ko-KR')}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                ) : resultSectionTab === 'PERFORMANCE' ? (
-                    <details className="rounded-md border border-white/10 bg-black/20 p-2">
-                        <summary className="cursor-pointer text-[11px] text-gray-300">실행 히스토리 보기 (기술 상세)</summary>
-                        <div className="overflow-x-auto mt-2">
-                            <table className="min-w-full text-sm">
-	                                <thead>
-	                                    <tr className="text-left text-gray-400 border-b border-white/10">
-	                                        <th className="py-2 pr-3">Run 번호</th>
-	                                        <th className="py-2 pr-3">상태</th>
-	                                        <th className="py-2 pr-3">판정</th>
-	                                        <th className="py-2 pr-3">통과율</th>
-	                                        <th className="py-2 pr-3">생성시각</th>
-	                                    </tr>
-	                                </thead>
-                                <tbody>
-                                    {(runs || []).map((run) => (
+		                                <tr className="text-left text-gray-400 border-b border-white/10">
+		                                    <th className="py-2 pr-3">Run 번호</th>
+		                                    <th className="py-2 pr-3">상태</th>
+		                                    <th className="py-2 pr-3">진행률</th>
+		                                    <th className="py-2 pr-3">통과율</th>
+		                                    <th className="py-2 pr-3">통과/실패/오류</th>
+                                    <th className="py-2 pr-3">평균 토큰/케이스</th>
+                                    <th className="py-2 pr-3">평균 비용/케이스(USD)</th>
+                                    <th className="py-2 pr-3">p95 지연(ms)</th>
+		                                    <th className="py-2 pr-3">판정</th>
+		                                    <th className="py-2 pr-3">모드</th>
+		                                    <th className="py-2 pr-3">생성시각</th>
+		                                </tr>
+		                            </thead>
+		                            <tbody>
+                                {(runs || []).map((run) => {
+                                    const runPerformance = extractRunPerformance(run.summary);
+                                    const candidatePerformance = runPerformance?.candidate ?? null;
+                                    return (
                                         <tr
                                             key={run.id}
                                             className={`border-b border-white/5 cursor-pointer ${selectedRunId === run.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
                                             onClick={() => setSelectedRunId(run.id)}
                                         >
                                             <td className="py-2 pr-3 text-white">#{run.id}</td>
-                                            <td className="py-2 pr-3 text-gray-200">{renderRunStatus(run.status)}</td>
-                                            <td className="py-2 pr-3 text-gray-300">{renderReleaseDecisionBadge(run.summary?.releaseDecision)}</td>
+                                            <td className="py-2 pr-3 text-gray-200">
+                                                <span className={`px-2 py-0.5 rounded-full text-[11px] ${runStatusBadgeClass(run.status)}`}>
+                                                    {renderRunStatus(run.status)}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 pr-3 text-gray-300">{run.processedCases}/{run.totalCases}</td>
                                             <td className="py-2 pr-3 text-gray-300">{Number(run.summary?.passRate ?? 0).toFixed(1)}%</td>
+                                            <td className="py-2 pr-3 text-gray-300">{run.passedCases}/{run.failedCases}/{run.errorCases}</td>
+                                            <td className="py-2 pr-3 text-gray-300">{formatMetricValue(candidatePerformance?.avgTokensPerCase, 2)}</td>
+                                            <td className="py-2 pr-3 text-gray-300">{formatMetricValue(candidatePerformance?.avgCostUsdPerCase, 6)}</td>
+                                            <td className="py-2 pr-3 text-gray-300">{formatMetricValue(candidatePerformance?.p95LatencyMs, 2)}</td>
+                                            <td className="py-2 pr-3 text-gray-300">{renderReleaseDecisionBadge(run.summary?.releaseDecision)}</td>
+                                            <td className="py-2 pr-3 text-gray-300">{renderModeLabel(run.mode)}</td>
                                             <td className="py-2 pr-3 text-gray-400">{new Date(run.createdAt).toLocaleString('ko-KR')}</td>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    );
+                                })}
+		                            </tbody>
+		                        </table>
+		                    </div>
+                ) : resultSectionTab === 'PERFORMANCE' ? (
+                    <details className="rounded-md border border-white/10 bg-black/20 p-2">
+                        <summary className="cursor-pointer text-[11px] text-gray-300">실행 히스토리 보기 (기술 상세)</summary>
+                        <div className="overflow-x-auto mt-2">
+                            <table className="min-w-full text-sm">
+	                                <thead>
+		                                    <tr className="text-left text-gray-400 border-b border-white/10">
+		                                        <th className="py-2 pr-3">Run 번호</th>
+		                                        <th className="py-2 pr-3">상태</th>
+		                                        <th className="py-2 pr-3">판정</th>
+		                                        <th className="py-2 pr-3">통과율</th>
+                                        <th className="py-2 pr-3">평균 비용/케이스(USD)</th>
+                                        <th className="py-2 pr-3">p95 지연(ms)</th>
+		                                        <th className="py-2 pr-3">생성시각</th>
+		                                    </tr>
+		                                </thead>
+	                                <tbody>
+                                    {(runs || []).map((run) => {
+                                        const runPerformance = extractRunPerformance(run.summary);
+                                        const candidatePerformance = runPerformance?.candidate ?? null;
+                                        return (
+                                            <tr
+                                                key={run.id}
+                                                className={`border-b border-white/5 cursor-pointer ${selectedRunId === run.id ? 'bg-white/10' : 'hover:bg-white/5'}`}
+                                                onClick={() => setSelectedRunId(run.id)}
+                                            >
+                                                <td className="py-2 pr-3 text-white">#{run.id}</td>
+                                                <td className="py-2 pr-3 text-gray-200">{renderRunStatus(run.status)}</td>
+                                                <td className="py-2 pr-3 text-gray-300">{renderReleaseDecisionBadge(run.summary?.releaseDecision)}</td>
+                                                <td className="py-2 pr-3 text-gray-300">{Number(run.summary?.passRate ?? 0).toFixed(1)}%</td>
+                                                <td className="py-2 pr-3 text-gray-300">{formatMetricValue(candidatePerformance?.avgCostUsdPerCase, 6)}</td>
+                                                <td className="py-2 pr-3 text-gray-300">{formatMetricValue(candidatePerformance?.p95LatencyMs, 2)}</td>
+                                                <td className="py-2 pr-3 text-gray-400">{new Date(run.createdAt).toLocaleString('ko-KR')}</td>
+                                            </tr>
+                                        );
+                                    })}
+	                                </tbody>
+	                            </table>
+	                        </div>
                     </details>
                 ) : null}
 
@@ -3792,6 +3811,99 @@ function KpiCard({
     );
 }
 
+function PerformanceModePanel({ run }: { run: EvalRunResponse }) {
+    const performance = extractRunPerformance(run.summary);
+    if (!performance) {
+        return (
+            <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                <p className="text-xs text-gray-300">성능 지표 데이터가 아직 없습니다.</p>
+            </div>
+        );
+    }
+
+    const candidate = performance.candidate;
+    const baseline = performance.baseline;
+    const delta = performance.delta;
+    const isCompare = run.mode === 'COMPARE_ACTIVE';
+
+    if (!isCompare) {
+        return (
+            <div className="space-y-2">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <KpiCard label="평균 토큰/케이스" value={formatMetricValue(candidate.avgTokensPerCase, 2)} />
+                    <KpiCard label="평균 비용/케이스(USD)" value={formatMetricValue(candidate.avgCostUsdPerCase, 6)} />
+                    <KpiCard label="평균 지연(ms)" value={formatMetricValue(candidate.avgLatencyMs, 2)} />
+                    <KpiCard label="p95 지연(ms)" value={formatMetricValue(candidate.p95LatencyMs, 2)} />
+                </div>
+                <p className="text-[11px] text-gray-500">
+                    샘플 수: case {candidate.sampleSize} / tokens {candidate.tokenSampleSize} / cost {candidate.costSampleSize} / latency {candidate.latencySampleSize}
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <PerformanceCompareMetricCard
+                    label="평균 토큰/케이스"
+                    candidate={candidate.avgTokensPerCase}
+                    baseline={baseline?.avgTokensPerCase}
+                    delta={delta?.avgTokensPerCase ?? null}
+                />
+                <PerformanceCompareMetricCard
+                    label="평균 비용/케이스(USD)"
+                    candidate={candidate.avgCostUsdPerCase}
+                    baseline={baseline?.avgCostUsdPerCase}
+                    delta={delta?.avgCostUsdPerCase ?? null}
+                    valueScale={6}
+                />
+                <PerformanceCompareMetricCard
+                    label="평균 지연(ms)"
+                    candidate={candidate.avgLatencyMs}
+                    baseline={baseline?.avgLatencyMs}
+                    delta={delta?.avgLatencyMs ?? null}
+                />
+                <PerformanceCompareMetricCard
+                    label="p95 지연(ms)"
+                    candidate={candidate.p95LatencyMs}
+                    baseline={baseline?.p95LatencyMs}
+                    delta={delta?.p95LatencyMs ?? null}
+                />
+            </div>
+            <p className="text-[11px] text-gray-500">
+                샘플 수(이번/운영): case {candidate.sampleSize}/{baseline?.sampleSize ?? 0}, tokens {candidate.tokenSampleSize}/{baseline?.tokenSampleSize ?? 0}, cost {candidate.costSampleSize}/{baseline?.costSampleSize ?? 0}, latency {candidate.latencySampleSize}/{baseline?.latencySampleSize ?? 0}
+            </p>
+        </div>
+    );
+}
+
+function PerformanceCompareMetricCard({
+    label,
+    candidate,
+    baseline,
+    delta,
+    valueScale = 2,
+}: {
+    label: string;
+    candidate: number | null;
+    baseline: number | null | undefined;
+    delta: PerformanceMetricDeltaView | null;
+    valueScale?: number;
+}) {
+    const tone = inverseDeltaTone(delta?.value ?? null);
+    return (
+        <div className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 space-y-1">
+            <p className="text-[11px] text-gray-400">{label}</p>
+            <p className="text-[12px] text-gray-200">이번: {formatMetricValue(candidate, valueScale)}</p>
+            <p className="text-[12px] text-gray-300">운영: {formatMetricValue(baseline, valueScale)}</p>
+            <p className={`text-[11px] ${tone === 'danger' ? 'text-rose-200' : tone === 'good' ? 'text-emerald-200' : 'text-amber-200'}`}>
+                {formatDeltaText(delta, valueScale)}
+            </p>
+        </div>
+    );
+}
+
 function RuleSummaryCard({ title, checks }: { title: string; checks: Record<string, any> | null }) {
     const pass = toNullableBoolean(checks?.pass);
     const failedChecks = toStringArray(checks?.failedChecks);
@@ -3919,6 +4031,33 @@ type CompareSummaryView = {
     winner?: string | null;
 };
 
+type PerformanceMetricDeltaView = {
+    value: number | null;
+    pct: number | null;
+};
+
+type PerformanceSnapshotView = {
+    avgTokensPerCase: number | null;
+    avgCostUsdPerCase: number | null;
+    avgLatencyMs: number | null;
+    p95LatencyMs: number | null;
+    sampleSize: number;
+    tokenSampleSize: number;
+    costSampleSize: number;
+    latencySampleSize: number;
+};
+
+type RunPerformanceView = {
+    candidate: PerformanceSnapshotView;
+    baseline: PerformanceSnapshotView | null;
+    delta: {
+        avgTokensPerCase: PerformanceMetricDeltaView;
+        avgCostUsdPerCase: PerformanceMetricDeltaView;
+        avgLatencyMs: PerformanceMetricDeltaView;
+        p95LatencyMs: PerformanceMetricDeltaView;
+    } | null;
+};
+
 type RunDecisionView = {
     decision: string;
     decisionLabel: string;
@@ -4010,6 +4149,65 @@ function extractCompareSummary(judgeOutput: Record<string, any> | null | undefin
         baselinePass: toNullableBoolean(compare.baselinePass),
         scoreDelta: toNullableNumber(compare.scoreDelta),
         winner: compare.winner != null ? String(compare.winner) : null,
+    };
+}
+
+function extractRunPerformance(summary: Record<string, any> | null | undefined): RunPerformanceView | null {
+    if (!isObject(summary) || !isObject(summary.performance)) {
+        return null;
+    }
+
+    const performance = summary.performance as Record<string, any>;
+    const candidate = extractPerformanceSnapshot(performance.candidate);
+    if (!candidate) {
+        return null;
+    }
+
+    const baseline = extractPerformanceSnapshot(performance.baseline);
+    const delta = extractPerformanceDelta(performance.delta);
+
+    return {
+        candidate,
+        baseline,
+        delta,
+    };
+}
+
+function extractPerformanceSnapshot(raw: unknown): PerformanceSnapshotView | null {
+    if (!isObject(raw)) {
+        return null;
+    }
+    return {
+        avgTokensPerCase: toNullableNumber(raw.avgTokensPerCase),
+        avgCostUsdPerCase: toNullableNumber(raw.avgCostUsdPerCase),
+        avgLatencyMs: toNullableNumber(raw.avgLatencyMs),
+        p95LatencyMs: toNullableNumber(raw.p95LatencyMs),
+        sampleSize: toSafeInteger(raw.sampleSize),
+        tokenSampleSize: toSafeInteger(raw.tokenSampleSize),
+        costSampleSize: toSafeInteger(raw.costSampleSize),
+        latencySampleSize: toSafeInteger(raw.latencySampleSize),
+    };
+}
+
+function extractPerformanceDelta(raw: unknown): RunPerformanceView['delta'] {
+    if (!isObject(raw)) {
+        return null;
+    }
+    return {
+        avgTokensPerCase: extractPerformanceMetricDelta(raw.avgTokensPerCase),
+        avgCostUsdPerCase: extractPerformanceMetricDelta(raw.avgCostUsdPerCase),
+        avgLatencyMs: extractPerformanceMetricDelta(raw.avgLatencyMs),
+        p95LatencyMs: extractPerformanceMetricDelta(raw.p95LatencyMs),
+    };
+}
+
+function extractPerformanceMetricDelta(raw: unknown): PerformanceMetricDeltaView {
+    if (!isObject(raw)) {
+        return { value: null, pct: null };
+    }
+    return {
+        value: toNullableNumber(raw.value),
+        pct: toNullableNumber(raw.pct),
     };
 }
 
@@ -4121,6 +4319,38 @@ function compareDeltaBadgeClass(tone: 'good' | 'warn' | 'danger' | undefined): s
     return badgePillClass('neutral');
 }
 
+function formatMetricValue(value: number | null | undefined, scale = 2): string {
+    if (value == null || Number.isNaN(value)) {
+        return '-';
+    }
+    return Number(value).toFixed(scale);
+}
+
+function formatDeltaText(delta: PerformanceMetricDeltaView | null, scale = 2): string {
+    if (!delta || delta.value == null || Number.isNaN(delta.value)) {
+        return 'Δ -';
+    }
+    const valuePart = `${delta.value > 0 ? '+' : ''}${Number(delta.value).toFixed(scale)}`;
+    if (delta.pct == null || Number.isNaN(delta.pct)) {
+        return `Δ ${valuePart}`;
+    }
+    const pctPart = `${delta.pct > 0 ? '+' : ''}${Number(delta.pct).toFixed(2)}%`;
+    return `Δ ${valuePart} (${pctPart})`;
+}
+
+function inverseDeltaTone(value: number | null): 'good' | 'warn' | 'danger' | undefined {
+    if (value == null || Number.isNaN(value)) {
+        return undefined;
+    }
+    if (value > 0) {
+        return 'danger';
+    }
+    if (value < 0) {
+        return 'good';
+    }
+    return 'warn';
+}
+
 function formatOptionalNumber(value: number | null | undefined): string {
     if (value == null || Number.isNaN(value)) {
         return '-';
@@ -4166,6 +4396,14 @@ function toNullableNumber(value: any): number | null {
     }
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toSafeInteger(value: unknown): number {
+    const parsed = toNullableNumber(value);
+    if (parsed == null || parsed < 0) {
+        return 0;
+    }
+    return Math.round(parsed);
 }
 
 function toNullableBoolean(value: any): boolean | null {
