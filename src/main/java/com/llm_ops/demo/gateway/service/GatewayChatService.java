@@ -1,5 +1,6 @@
 package com.llm_ops.demo.gateway.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetDecisionAction;
@@ -42,6 +43,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -59,6 +61,7 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
+    private static final ObjectMapper LOG_PAYLOAD_MAPPER = new ObjectMapper();
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
     private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
     private static final String RAG_CONTEXT_PREFIX = """
@@ -143,7 +146,7 @@ public class GatewayChatService {
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
                 request.isRagEnabled(),
-                request.toString(),
+                toRequestPayloadJson(request),
                 "GATEWAY"));
 
         Integer ragLatencyMs = null;
@@ -492,7 +495,7 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        e.getMessage()));
+                        toErrorResponsePayload(gatewayFailure)));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                         gatewayFailure.httpStatus(),
@@ -518,7 +521,7 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        e.getMessage(),
+                        toErrorResponsePayload(gatewayFailure),
                         null));
             }
             throw toGatewayException(gatewayFailure, e);
@@ -555,9 +558,42 @@ public class GatewayChatService {
                     ragContextHash,
                     ragTopK,
                     ragSimilarityThreshold,
-                    e.getMessage(),
+                    toErrorResponsePayload(gatewayFailure),
                     null));
             throw toGatewayException(gatewayFailure, e);
+        }
+    }
+
+    private static String toRequestPayloadJson(GatewayChatRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            RequestPayloadForLog payload = new RequestPayloadForLog(
+                    request.workspaceId(),
+                    request.promptKey(),
+                    request.isRagEnabled(),
+                    request.variables() != null ? request.variables().size() : 0
+            );
+            return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
+        if (gatewayFailure == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("errorCode", gatewayFailure.errorCode());
+            payload.put("status", gatewayFailure.httpStatus());
+            payload.put("failReason", gatewayFailure.failReason());
+            payload.put("type", "GATEWAY_FAILURE");
+            return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return gatewayFailure.errorCode();
         }
     }
 
@@ -904,5 +940,13 @@ public class GatewayChatService {
         private ProviderAttemptTimeoutException(Throwable cause) {
             super(cause);
         }
+    }
+
+    private record RequestPayloadForLog(
+            Long workspaceId,
+            String promptKey,
+            boolean ragEnabled,
+            int variablesCount
+    ) {
     }
 }

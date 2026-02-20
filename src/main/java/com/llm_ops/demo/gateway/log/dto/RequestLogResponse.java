@@ -50,17 +50,17 @@ public record RequestLogResponse(
                         .toList()
                 : List.of();
 
-        return from(log, docs);
+        return from(log, docs, true);
     }
 
     /**
      * 목록 조회 응답 변환 (N+1 방지를 위해 retrievedDocuments는 비워서 응답)
      */
     public static RequestLogResponse fromSummary(RequestLog log) {
-        return from(log, List.of());
+        return from(log, List.of(), false);
     }
 
-    private static RequestLogResponse from(RequestLog log, List<RetrievedDocumentResponse> docs) {
+    private static RequestLogResponse from(RequestLog log, List<RetrievedDocumentResponse> docs, boolean includePayload) {
         return new RequestLogResponse(
                 log.getRequestId(),
                 log.getTraceId(),
@@ -83,8 +83,8 @@ public record RequestLogResponse(
                 log.getFailReason(),
                 log.getCreatedAt(),
                 log.getFinishedAt(),
-                log.getRequestPayload(),
-                log.getResponsePayload(),
+                includePayload ? log.getRequestPayload() : null,
+                includePayload ? log.getResponsePayload() : null,
                 log.getRequestSource(),
                 docs);
     }
