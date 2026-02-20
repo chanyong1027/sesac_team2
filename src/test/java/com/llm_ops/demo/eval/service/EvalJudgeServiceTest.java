@@ -24,6 +24,57 @@ class EvalJudgeServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    @DisplayName("ruleChecks 경고만 있으면 모델/Judge 통과 결과를 유지한다")
+    void ruleChecks_경고만_있으면_모델_Judge_통과_결과를_유지한다() {
+        // given
+        EvalProperties properties = new EvalProperties();
+        properties.getJudge().setRejudgeOnFail(false);
+        properties.getJudge().setMaxAttempts(1);
+
+        EvalModelRunnerService runner = mock(EvalModelRunnerService.class);
+        when(runner.run(anyLong(), any(), anyString(), anyString(), any(), isNull()))
+                .thenReturn(modelExecution("""
+                        {
+                          "pass": true,
+                          "scores": {"quality": 5},
+                          "labels": [],
+                          "evidence": [],
+                          "suggestions": []
+                        }
+                        """));
+
+        EvalJudgeService service = new EvalJudgeService(properties, runner, objectMapper);
+        ResolvedRubricConfig rubric = new ResolvedRubricConfig(
+                "CUSTOM",
+                "test",
+                Map.of("quality", 1.0),
+                Map.of("minOverallScore", 70.0)
+        );
+
+        // when
+        EvalJudgeService.JudgeResult result = service.judge(
+                1L,
+                rubric,
+                "input",
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                "candidate output",
+                Map.of(
+                        "pass", true,
+                        "failedChecks", List.of(),
+                        "warningChecks", List.of("must_include")
+                ),
+                null
+        );
+
+        // then
+        assertThat(result.pass()).isTrue();
+        assertThat(result.judgeOutput().get("pass")).isEqualTo(true);
+        verify(runner, times(1)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
+    }
+
+    @Test
     @DisplayName("중요 기준 최소 점수 게이트를 못 넘으면 fail 처리한다")
     void 중요_기준_최소_점수_게이트를_못_넘으면_fail_처리한다() {
         // given

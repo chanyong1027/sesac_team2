@@ -52,9 +52,9 @@ class EvalRuleCheckerServiceTest {
     }
 
     @Test
-    @DisplayName("must_include 룰이 만족되지 않으면 실패 항목에 기록된다")
+    @DisplayName("must_include 룰이 만족되지 않으면 경고 항목에 기록되고 pass는 유지된다")
     @SuppressWarnings("unchecked")
-    void must_include_룰이_만족되지_않으면_실패_항목에_기록된다() {
+    void must_include_룰이_만족되지_않으면_경고_항목에_기록되고_pass는_유지된다() {
         // given
         String output = "환불은 접수 후 처리됩니다.";
         Map<String, Object> constraints = Map.of(
@@ -65,9 +65,10 @@ class EvalRuleCheckerServiceTest {
         Map<String, Object> result = service.check(output, constraints, null, RubricTemplateCode.GENERAL_TEXT);
 
         // then
-        assertThat(result.get("pass")).isEqualTo(false);
-        assertThat(result.get("must_include")).isEqualTo("FAIL");
-        assertThat((List<String>) result.get("failedChecks")).contains("must_include");
+        assertThat(result.get("pass")).isEqualTo(true);
+        assertThat(result.get("must_include")).isEqualTo("WARN");
+        assertThat((List<String>) result.get("failedChecks")).doesNotContain("must_include");
+        assertThat((List<String>) result.get("warningChecks")).contains("must_include");
     }
 
     @Test
@@ -91,6 +92,7 @@ class EvalRuleCheckerServiceTest {
 
     @Test
     @DisplayName("키워드 정규화(BASIC)를 사용하면 공백/구두점 차이를 허용한다")
+    @SuppressWarnings("unchecked")
     void 키워드_정규화_BASIC를_사용하면_공백_구두점_차이를_허용한다() {
         // given
         String output = "사전신청은 온라인으로 진행됩니다. Refund-policy!!";
@@ -105,6 +107,7 @@ class EvalRuleCheckerServiceTest {
         // then
         assertThat(result.get("pass")).isEqualTo(true);
         assertThat(result.get("must_include")).isEqualTo("PASS");
+        assertThat((List<String>) result.get("warningChecks")).isEmpty();
     }
 
     @Test
@@ -142,5 +145,6 @@ class EvalRuleCheckerServiceTest {
         assertThat(result.get("max_chars")).isEqualTo("PASS");
         assertThat(result.get("max_lines")).isEqualTo("PASS");
         assertThat((List<String>) result.get("failedChecks")).isEmpty();
+        assertThat((List<String>) result.get("warningChecks")).isEmpty();
     }
 }

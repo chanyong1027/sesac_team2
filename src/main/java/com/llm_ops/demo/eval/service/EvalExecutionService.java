@@ -438,13 +438,21 @@ public class EvalExecutionService {
             }
         }
         Map<String, Long> ruleFailCounts = collectRuleFailCounts(okResults);
+        Map<String, Long> ruleWarningCounts = collectRuleWarningCounts(okResults);
         Map<String, Long> errorCodeCounts = collectErrorCodeCounts(allResults);
         Map<String, Long> labelCounts = collectLabelCounts(okResults);
         summary.put("ruleFailCounts", ruleFailCounts);
+        summary.put("ruleWarningCounts", ruleWarningCounts);
         summary.put("errorCodeCounts", errorCodeCounts);
         summary.put("labelCounts", labelCounts);
 
-        List<String> topIssues = buildTopIssues(releaseDecision, ruleFailCounts, errorCodeCounts, labelCounts);
+        List<String> topIssues = buildTopIssues(
+                releaseDecision,
+                ruleFailCounts,
+                ruleWarningCounts,
+                errorCodeCounts,
+                labelCounts
+        );
         summary.put("topIssues", topIssues);
         summary.put("plainSummary", buildPlainSummary(releaseDecision, passRate, avgScore, avgScoreDelta, topIssues));
 
@@ -521,6 +529,7 @@ public class EvalExecutionService {
     private List<String> buildTopIssues(
             EvalReleaseDecision releaseDecision,
             Map<String, Long> ruleFailCounts,
+            Map<String, Long> ruleWarningCounts,
             Map<String, Long> errorCodeCounts,
             Map<String, Long> labelCounts
     ) {
@@ -529,6 +538,7 @@ public class EvalExecutionService {
             issues.add(mapDecisionReasonLabel(reason));
         }
         topKey(ruleFailCounts).ifPresent(rule -> issues.add("형식 검사 주요 실패: " + rule));
+        topKey(ruleWarningCounts).ifPresent(rule -> issues.add("형식 검사 주요 경고: " + rule));
         topKey(errorCodeCounts).ifPresent(code -> issues.add("실행 오류 코드: " + code));
         topKey(labelCounts).ifPresent(label -> issues.add("AI 심사 주요 이슈: " + label));
         return issues.stream().limit(5).toList();
@@ -576,17 +586,25 @@ public class EvalExecutionService {
     }
 
     private Map<String, Long> collectRuleFailCounts(List<EvalCaseResult> okResults) {
+        return collectRuleCounts(okResults, "failedChecks");
+    }
+
+    private Map<String, Long> collectRuleWarningCounts(List<EvalCaseResult> okResults) {
+        return collectRuleCounts(okResults, "warningChecks");
+    }
+
+    private Map<String, Long> collectRuleCounts(List<EvalCaseResult> okResults, String keyName) {
         Map<String, Long> counts = new LinkedHashMap<>();
         for (EvalCaseResult result : okResults) {
             Map<String, Object> ruleChecks = result.getRuleChecksJson();
             Map<String, Object> candidate = extractCandidateRuleChecks(ruleChecks);
-            Object failed = candidate.get("failedChecks");
-            if (failed instanceof List<?> failedChecks) {
-                for (Object failedCheck : failedChecks) {
-                    if (failedCheck == null) {
+            Object checkValues = candidate.get(keyName);
+            if (checkValues instanceof List<?> checks) {
+                for (Object check : checks) {
+                    if (check == null) {
                         continue;
                     }
-                    String key = String.valueOf(failedCheck);
+                    String key = String.valueOf(check);
                     counts.put(key, counts.getOrDefault(key, 0L) + 1L);
                 }
             }

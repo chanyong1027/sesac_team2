@@ -1470,7 +1470,7 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
 
                                                     {!isExpanded ? (
                                                         <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-gray-400">
-                                                            AI 핵심포인트 {mustCover.length}개, 룰 필수단어 {mustIncludeWords.length}개, 룰 금지단어 {mustNotIncludeWords.length}개, 구조요건 {structureCount}개
+                                                            AI 핵심포인트 {mustCover.length}개, 룰 권장단어 {mustIncludeWords.length}개, 룰 금지단어 {mustNotIncludeWords.length}개, 구조요건 {structureCount}개
                                                         </div>
                                                     ) : null}
 
@@ -1535,7 +1535,7 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                                                             onChange={(values) => setCaseArrayField(row.id, 'expectedJsonText', 'must_cover', values)}
                                                         />
                                                         <p className="text-[11px] text-emerald-100/80">
-                                                            필수/금지 키워드(문자 그대로)는 아래 <span className="text-sky-200 font-semibold">룰 체크(하드 룰)</span>에서 설정하세요.
+                                                            권장/금지 키워드(문자 그대로)는 아래 <span className="text-sky-200 font-semibold">룰 체크</span>에서 설정하세요.
                                                         </p>
                                                         <div className="space-y-2">
                                                             <p className="text-[11px] text-emerald-200">필수 구조</p>
@@ -1560,7 +1560,7 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                                                             </div>
 
                                                             <div className="rounded-lg border border-sky-400/20 bg-sky-500/5 p-3 space-y-3">
-                                                        <p className="text-[11px] uppercase tracking-wide text-sky-300 font-semibold">룰 체크 (하드 룰)</p>
+                                                        <p className="text-[11px] uppercase tracking-wide text-sky-300 font-semibold">룰 체크 (하드 + 경고)</p>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                             <div>
                                                                 <FieldTooltipLabel
@@ -1594,7 +1594,7 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                                                         </div>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                                             <TagListEditor
-                                                                label="필수 포함 키워드 (하드룰, 문자 그대로)"
+                                                                label="권장 포함 키워드 (경고, 문자 그대로)"
                                                                 values={mustIncludeWords}
                                                                 placeholder="예: 환불, 사전 신청"
                                                                 onChange={(values) => {
@@ -3219,9 +3219,9 @@ function CaseDetailPanel({
                         <p className="text-xs text-emerald-100 whitespace-pre-wrap">{guidelineText}</p>
                     </div>
                     <div className="rounded border border-white/10 bg-black/30 px-3 py-2 space-y-2">
-                        <p className="text-[11px] text-gray-400">Required Keywords</p>
+                        <p className="text-[11px] text-gray-400">Recommended Keywords (warning)</p>
                         {requiredKeywords.length === 0 ? (
-                            <p className="text-xs text-gray-500">명시된 필수 키워드 없음</p>
+                            <p className="text-xs text-gray-500">명시된 권장 키워드 없음</p>
                         ) : (
                             <div className="flex flex-wrap gap-1">
                                 {requiredKeywords.map((keyword) => (
@@ -3229,7 +3229,7 @@ function CaseDetailPanel({
                                         key={keyword}
                                         className={`text-[11px] px-2 py-0.5 rounded border ${
                                             missingKeywords.includes(keyword)
-                                                ? 'bg-rose-500/15 border-rose-400/40 text-rose-200'
+                                                ? 'bg-amber-500/15 border-amber-400/40 text-amber-200'
                                                 : 'bg-white/10 border-white/20 text-gray-200'
                                         }`}
                                     >
@@ -3239,7 +3239,7 @@ function CaseDetailPanel({
                             </div>
                         )}
                         {missingKeywords.length > 0 ? (
-                            <p className="text-[11px] text-rose-200">누락 키워드: {missingKeywords.join(', ')}</p>
+                            <p className="text-[11px] text-amber-200">권장 키워드 미포함(경고): {missingKeywords.join(', ')}</p>
                         ) : null}
                     </div>
                 </div>
@@ -3535,20 +3535,22 @@ function OverviewFailureAnalysisPanel({
     totalFailures: number;
     onViewCases: () => void;
 }) {
+    const totalWarnings = topEntries(summary?.ruleWarningCounts)
+        .reduce((acc, [, count]) => acc + count, 0);
     const clusters = buildFailureClusters(summary, totalFailures);
     const top = clusters[0];
     return (
         <div className="rounded-xl border border-white/10 bg-black/20 overflow-hidden">
             <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-                <h4 className="text-white font-semibold">실패 원인 분석 (Failure Clusters)</h4>
+                <h4 className="text-white font-semibold">이슈 원인 분석 (Issue Clusters)</h4>
                 <span className="px-2 py-0.5 rounded text-xs border border-rose-400/30 bg-rose-500/10 text-rose-200">
-                    Total Failures: {totalFailures}
+                    Failures: {totalFailures} {totalWarnings > 0 ? `/ Warnings: ${totalWarnings}` : ''}
                 </span>
             </div>
             <div className="p-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
                 <div className="space-y-3">
                     {clusters.length === 0 ? (
-                        <p className="text-xs text-gray-500">실패 클러스터 데이터가 없습니다.</p>
+                        <p className="text-xs text-gray-500">이슈 클러스터 데이터가 없습니다.</p>
                     ) : (
                         clusters.map((cluster) => (
                             <div key={cluster.name} className="space-y-1">
@@ -3572,11 +3574,11 @@ function OverviewFailureAnalysisPanel({
                     <p className="text-lg font-semibold text-white">{top ? top.name : '핵심 이슈 없음'}</p>
                     <p className="text-sm text-gray-300">
                         {top
-                            ? `${top.description} 현재 실패의 주 원인입니다.`
+                            ? `${top.description} 현재 핵심 이슈입니다.`
                             : '현재는 주요 실패 클러스터가 식별되지 않았습니다.'}
                     </p>
                     <p className="text-xs text-gray-400">
-                        권장: 상위 실패 항목부터 프롬프트 제약(형식/필수 키워드/안전 규칙)을 보강하고 케이스 재실행으로 회귀를 확인하세요.
+                        권장: 상위 이슈 항목부터 프롬프트 제약(형식/권장 키워드/안전 규칙)을 보강하고 케이스 재실행으로 회귀를 확인하세요.
                     </p>
                     <button
                         type="button"
@@ -3600,36 +3602,50 @@ type FailureClusterItem = {
 };
 
 function buildFailureClusters(summary: Record<string, any> | null, totalFailures: number): FailureClusterItem[] {
-    const total = totalFailures > 0 ? totalFailures : 1;
-    const ruleClusters = topEntries(summary?.ruleFailCounts).map(([name, count]) => ({
+    const ruleFailClusters = topEntries(summary?.ruleFailCounts).map(([name, count]) => ({
         name: mapRuleFailLabel(name),
         count,
-        ratio: (count / total) * 100,
         description: mapRuleFailDescription(name),
         tone: 'danger' as const,
+    }));
+    const ruleWarningClusters = topEntries(summary?.ruleWarningCounts).map(([name, count]) => ({
+        name: mapRuleWarningLabel(name),
+        count,
+        description: mapRuleWarningDescription(name),
+        tone: 'warn' as const,
     }));
     const labelClusters = topEntries(summary?.labelCounts).map(([name, count]) => ({
         name: `Judge: ${name}`,
         count,
-        ratio: (count / total) * 100,
         description: mapJudgeLabelDescription(name),
         tone: 'warn' as const,
     }));
     const errorClusters = topEntries(summary?.errorCodeCounts).map(([name, count]) => ({
         name: `Error: ${name}`,
         count,
-        ratio: (count / total) * 100,
         description: mapErrorCodeDescription(name),
         tone: 'info' as const,
     }));
 
-    return [...ruleClusters, ...labelClusters, ...errorClusters]
+    const clusters = [...ruleFailClusters, ...ruleWarningClusters, ...labelClusters, ...errorClusters];
+    const issueTotal = clusters.reduce((acc, cluster) => acc + cluster.count, 0);
+    const total = totalFailures > 0
+        ? totalFailures
+        : issueTotal > 0
+            ? issueTotal
+            : 1;
+
+    return clusters
+        .map((cluster) => ({
+            ...cluster,
+            ratio: (cluster.count / total) * 100,
+        }))
         .sort((a, b) => b.count - a.count)
         .slice(0, 5);
 }
 
 function mapRuleFailLabel(name: string): string {
-    if (name === 'must_include') return '필수 키워드 누락';
+    if (name === 'must_include') return '권장 키워드 누락';
     if (name === 'must_not_include') return '금지 키워드 포함';
     if (name === 'json_parse') return 'JSON 포맷 오류';
     if (name === 'schema') return '스키마 불일치';
@@ -3641,17 +3657,27 @@ function mapRuleFailLabel(name: string): string {
 function mapRuleFailDescription(name: string): string {
     if (name === 'json_parse') return 'JSON 형식이 깨져 파싱에 실패했습니다.';
     if (name === 'schema') return '필수 필드/타입이 스키마와 다릅니다.';
-    if (name === 'must_include') return '필수 키워드가 응답에 포함되지 않았습니다.';
+    if (name === 'must_include') return '권장 키워드가 응답에 포함되지 않았습니다.';
     if (name === 'must_not_include') return '금지 키워드가 응답에 포함되었습니다.';
     if (name === 'max_chars') return '답변 길이가 제한을 초과했습니다.';
     if (name === 'max_lines') return '답변 줄 수가 제한을 초과했습니다.';
     return '규칙 검사에서 반복 실패가 발생했습니다.';
 }
 
+function mapRuleWarningLabel(name: string): string {
+    if (name === 'must_include') return '권장 키워드 누락 경고';
+    return `Rule Warning: ${name}`;
+}
+
+function mapRuleWarningDescription(name: string): string {
+    if (name === 'must_include') return '권장 포함 키워드가 일부 누락되었습니다. pass에는 영향이 없고 개선 대상으로 기록됩니다.';
+    return '룰 검사 경고가 반복되었습니다.';
+}
+
 function mapJudgeLabelDescription(name: string): string {
     const lower = name.toLowerCase();
     if (lower.includes('missing_must_cover')) return '필수 핵심 포인트(must_cover) 중 일부가 응답에 반영되지 않았습니다.';
-    if (lower.includes('missing_must_include')) return '엄격 포함 키워드(must_include)가 응답에 누락되었습니다.';
+    if (lower.includes('missing_must_include')) return '권장 포함 키워드(must_include)가 응답에 누락되었습니다.';
     if (lower.includes('forbidden_token_present')) return '엄격 금지 키워드(must_not_include)가 응답에 포함되었습니다.';
     if (lower.includes('rubric_criterion_definition_missing') || lower.includes('criterion_definition_missing')) {
         return '커스텀 루브릭 항목 정의가 부족합니다. 설명(description)에 `key: 의미` 형식으로 각 항목 의미를 추가하세요.';
@@ -3795,8 +3821,9 @@ function KpiCard({
 function RuleSummaryCard({ title, checks }: { title: string; checks: Record<string, any> | null }) {
     const pass = toNullableBoolean(checks?.pass);
     const failedChecks = toStringArray(checks?.failedChecks);
+    const warningChecks = toStringArray(checks?.warningChecks);
     const checkEntries = Object.entries(checks || {})
-        .filter(([key]) => key !== 'pass' && key !== 'failedChecks' && key !== 'candidate' && key !== 'baseline')
+        .filter(([key]) => key !== 'pass' && key !== 'failedChecks' && key !== 'warningChecks' && key !== 'candidate' && key !== 'baseline')
         .slice(0, 8);
 
     return (
@@ -3810,6 +3837,8 @@ function RuleSummaryCard({ title, checks }: { title: string; checks: Record<stri
 
             {failedChecks.length > 0 ? (
                 <p className="text-[11px] text-amber-200">실패 항목: {failedChecks.join(', ')}</p>
+            ) : warningChecks.length > 0 ? (
+                <p className="text-[11px] text-amber-200">경고 항목: {warningChecks.join(', ')}</p>
             ) : (
                 <p className="text-[11px] text-emerald-300">문제 없음</p>
             )}
@@ -4333,7 +4362,7 @@ function classifyCaseRisk(item: EvalCaseResultResponse): 'HIGH' | 'MEDIUM' | 'LO
         return 'MEDIUM';
     }
 
-    const failedChecks = toStringArray(item.ruleChecks?.failedChecks);
+    const failedChecks = getRuleFailedChecks(item.ruleChecks);
     if (failedChecks.length > 0) {
         return 'MEDIUM';
     }
@@ -4341,6 +4370,10 @@ function classifyCaseRisk(item: EvalCaseResultResponse): 'HIGH' | 'MEDIUM' | 'LO
     const labels = toStringArray(item.judgeOutput?.labels);
     if (labels.length > 0) {
         return 'MEDIUM';
+    }
+    const warningChecks = getRuleWarningChecks(item.ruleChecks);
+    if (warningChecks.length > 0) {
+        return 'LOW';
     }
     return 'LOW';
 }
@@ -4386,9 +4419,14 @@ function renderCaseReason(item: EvalCaseResultResponse): string {
         return item.errorCode;
     }
 
-    const failedChecks = toStringArray(item.ruleChecks?.failedChecks);
+    const failedChecks = getRuleFailedChecks(item.ruleChecks);
     if (failedChecks.length > 0) {
         return `룰 실패: ${failedChecks.join(', ')}`;
+    }
+
+    const warningChecks = getRuleWarningChecks(item.ruleChecks);
+    if (warningChecks.length > 0) {
+        return `룰 경고: ${warningChecks.join(', ')}`;
     }
 
     const labels = toStringArray(item.judgeOutput?.labels);
@@ -4405,7 +4443,7 @@ type CaseFailureType =
     | '스키마 불일치'
     | '응답 길이 초과'
     | '핵심 포인트 누락'
-    | '필수 키워드 누락'
+    | '권장 키워드 경고'
     | '금지 키워드 포함'
     | '타임아웃'
     | '요청 제한'
@@ -4420,13 +4458,17 @@ function resolveCaseFailureOrigin(item: EvalCaseResultResponse): CaseFailureOrig
     if (item.status === 'ERROR' || item.errorCode) {
         return 'EXECUTION';
     }
-    const failedChecks = toStringArray(item.ruleChecks?.failedChecks);
+    const failedChecks = getRuleFailedChecks(item.ruleChecks);
     if (failedChecks.length > 0) {
         return 'RULE';
     }
     const labels = toStringArray(item.judgeOutput?.labels);
     if (labels.length > 0 || item.pass === false) {
         return 'JUDGE';
+    }
+    const warningChecks = getRuleWarningChecks(item.ruleChecks);
+    if (warningChecks.length > 0) {
+        return 'RULE';
     }
     return 'UNKNOWN';
 }
@@ -4451,14 +4493,16 @@ function resolveCaseFailureType(item: EvalCaseResultResponse): CaseFailureType {
     if (errorCode.includes('UNAVAILABLE') || errorCode.includes('5XX')) return '업스트림 장애';
     if (errorCode) return '실행 오류';
 
-    const failedChecks = toStringArray(item.ruleChecks?.failedChecks).map((v) => v.toLowerCase());
+    const failedChecks = getRuleFailedChecks(item.ruleChecks).map((v) => v.toLowerCase());
     if (failedChecks.includes('json_parse')) return 'JSON 형식 오류';
     if (failedChecks.includes('schema')) return '스키마 불일치';
     if (failedChecks.includes('max_chars') || failedChecks.includes('max_lines')) return '응답 길이 초과';
+    const warningChecks = getRuleWarningChecks(item.ruleChecks).map((v) => v.toLowerCase());
+    if (warningChecks.includes('must_include')) return '권장 키워드 경고';
 
     const labels = toStringArray(item.judgeOutput?.labels).map((v) => v.toLowerCase());
     if (labels.some((v) => v.includes('missing_must_cover'))) return '핵심 포인트 누락';
-    if (labels.some((v) => v.includes('missing_must_include'))) return '필수 키워드 누락';
+    if (labels.some((v) => v.includes('missing_must_include'))) return '권장 키워드 경고';
     if (labels.some((v) => v.includes('forbidden_token_present'))) return '금지 키워드 포함';
     if (labels.some((v) => v.includes('hallucination') || v.includes('factual'))) return '사실성/환각';
     if (labels.some((v) => v.includes('tone') || v.includes('style'))) return '톤/스타일 이슈';
@@ -4472,7 +4516,7 @@ function FailureTypeBadge({ type }: { type: CaseFailureType }) {
         || type === '스키마 불일치'
         || type === '응답 길이 초과'
         || type === '핵심 포인트 누락'
-        || type === '필수 키워드 누락'
+        || type === '권장 키워드 경고'
         || type === '금지 키워드 포함'
         ? 'warn'
         : type === '타임아웃' || type === '요청 제한' || type === '업스트림 장애' || type === '실행 오류'
@@ -4514,6 +4558,25 @@ function toStringArray(value: any): string[] {
     return value.filter((item) => item != null).map((item) => String(item));
 }
 
+function getRuleCheckBucket(
+    ruleChecks: Record<string, any> | null | undefined,
+    key: 'failedChecks' | 'warningChecks'
+): string[] {
+    if (!isObject(ruleChecks)) {
+        return [];
+    }
+    const candidateChecks = isObject(ruleChecks.candidate) ? ruleChecks.candidate : ruleChecks;
+    return toStringArray(candidateChecks[key]);
+}
+
+function getRuleFailedChecks(ruleChecks: Record<string, any> | null | undefined): string[] {
+    return getRuleCheckBucket(ruleChecks, 'failedChecks');
+}
+
+function getRuleWarningChecks(ruleChecks: Record<string, any> | null | undefined): string[] {
+    return getRuleCheckBucket(ruleChecks, 'warningChecks');
+}
+
 function topEntries(value: unknown): Array<[string, number]> {
     if (!isObject(value)) {
         return [];
@@ -4552,7 +4615,7 @@ function summarizeCaseChecks(
     const pieces: string[] = [];
     const mustInclude = toStringArray(constraintsJson?.must_include ?? expectedJson?.must_include);
     if (mustInclude.length > 0) {
-        pieces.push(`필수 포함: ${mustInclude.slice(0, 2).join(', ')}`);
+        pieces.push(`권장 포함(경고): ${mustInclude.slice(0, 2).join(', ')}`);
     }
 
     const mustNotInclude = toStringArray(constraintsJson?.must_not_include ?? expectedJson?.must_not_include);
@@ -4793,7 +4856,7 @@ function evaluateConstraintStrength(
             conditionCount,
             badgeClass: 'border-rose-400/40 bg-rose-500/15 text-rose-200',
             ruleLabel: `점수 ${score}`,
-            tooltip: '계산 기준: max_chars/max_lines 임계값 + json_only/required_keys + must_include/must_not_include (+ 키워드 정규화)',
+            tooltip: '계산 기준: max_chars/max_lines 임계값 + json_only/required_keys + must_include(경고)/must_not_include(하드) (+ 키워드 정규화)',
         };
     }
 
@@ -4804,7 +4867,7 @@ function evaluateConstraintStrength(
             conditionCount,
             badgeClass: 'border-amber-400/40 bg-amber-500/15 text-amber-200',
             ruleLabel: `점수 ${score}`,
-            tooltip: '계산 기준: max_chars/max_lines 임계값 + json_only/required_keys + must_include/must_not_include (+ 키워드 정규화)',
+            tooltip: '계산 기준: max_chars/max_lines 임계값 + json_only/required_keys + must_include(경고)/must_not_include(하드) (+ 키워드 정규화)',
         };
     }
 
@@ -4814,7 +4877,7 @@ function evaluateConstraintStrength(
         conditionCount,
         badgeClass: 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200',
         ruleLabel: `점수 ${score}`,
-        tooltip: '계산 기준: max_chars/max_lines 임계값 + json_only/required_keys + must_include/must_not_include (+ 키워드 정규화)',
+        tooltip: '계산 기준: max_chars/max_lines 임계값 + json_only/required_keys + must_include(경고)/must_not_include(하드) (+ 키워드 정규화)',
     };
 }
 
