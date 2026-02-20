@@ -66,7 +66,7 @@ export default function DashboardPage() {
         enabled: !!organizationId,
     });
 
-    // 2. Timeseries (Request Volume & Errors)
+    // 2. Timeseries (Request Volume)
     const { data: timeseriesData, isLoading: isTimeseriesLoading } = useQuery({
         queryKey: ['stats-timeseries', organizationId, period, selectedWorkspaceId],
         queryFn: () => statisticsApi.getTimeseries(organizationId, {
@@ -536,11 +536,11 @@ export default function DashboardPage() {
 
             {/* Bottom Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Chart 1: Request Volume & Error Trends */}
+                {/* Chart 1: Request Volume Trends */}
                 <div className="glass-card p-6 rounded-2xl border border-white/5">
                     <div className="flex items-center gap-2 mb-6">
                         <TrendingUp size={16} className="text-gray-400" />
-                        <h2 className="text-sm font-bold text-white">Request Volume & Error Trends</h2>
+                        <h2 className="text-sm font-bold text-white">Request Volume Trends</h2>
                     </div>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
@@ -571,7 +571,6 @@ export default function DashboardPage() {
                                     labelStyle={{ color: '#9CA3AF', marginBottom: '5px' }}
                                 />
                                 <Bar dataKey="requests" fill="url(#colorReqs)" barSize={20} radius={[4, 4, 0, 0]} name="Requests" />
-                                <Bar dataKey="errorCount" fill="#EF4444" barSize={20} radius={[4, 4, 0, 0]} name="Errors" />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>

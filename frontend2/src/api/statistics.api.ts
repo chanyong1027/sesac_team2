@@ -19,7 +19,6 @@ export interface OverviewResponse {
 export interface TimeseriesDataPoint {
     date: string;
     requests: number;
-    errorCount: number;
     tokens: number;
     cost: number;
 }
@@ -61,6 +60,15 @@ export interface StatisticsQueryParams {
     to?: string;
 }
 
+export type Period = StatisticsQueryParams['period'];
+
+const toDateOnly = (dateTime?: string): string => {
+    if (!dateTime) {
+        return new Date().toISOString().slice(0, 10);
+    }
+    return dateTime.slice(0, 10);
+};
+
 // API Functions
 export const statisticsApi = {
     getOverview: (orgId: number, params: StatisticsQueryParams) =>
@@ -81,8 +89,32 @@ export const statisticsApi = {
     getRagQuality: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
         api.get<RagQualityResponse>(`/organizations/${orgId}/stats/rag-quality`, { params }),
 
-    getRagQualityTimeseries: (orgId: number, params: StatisticsQueryParams) =>
-        api.get<RagQualityTimeseriesResponse>(`/organizations/${orgId}/stats/rag-quality/timeseries`, { params }),
+    getRagQualityTimeseries: async (orgId: number, params: StatisticsQueryParams) => {
+        const response = await api.get<RagQualityResponse>(`/organizations/${orgId}/stats/rag-quality`, {
+            params: {
+                workspaceId: params.workspaceId,
+                from: params.from,
+                to: params.to,
+            },
+        });
+
+        const point: RagQualityDataPoint = {
+            date: toDateOnly(params.to),
+            ragTotalCount: response.data.ragTotalCount,
+            ragHitCount: response.data.ragHitCount,
+            hitRate: response.data.hitRate,
+            avgSimilarityThreshold: response.data.avgSimilarityThreshold,
+            truncatedCount: response.data.truncatedCount,
+            truncationRate: response.data.truncationRate,
+            totalChunks: response.data.totalChunks,
+            avgRagLatencyMs: response.data.avgRagLatencyMs,
+        };
+
+        return {
+            ...response,
+            data: { data: [point] },
+        };
+    },
 };
 
 export interface ErrorDistributionItem {
