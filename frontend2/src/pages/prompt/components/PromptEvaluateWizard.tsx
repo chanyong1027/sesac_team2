@@ -106,31 +106,105 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
     }, [logs]);
 
 
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { promptApi } from '@/api/prompt.api';
+import { organizationApi } from '@/api/organization.api';
+import type { EvalMode, EvalRunResponse, EvalCaseResultResponse } from '@/types/api.types';
+import { 
+    CaseEditorRow, 
+    type CaseFormRow, 
+    createEmptyCaseFormRow, 
+    parseCaseRows 
+} from './CaseEditorRow';
+
+// --- Types & Interfaces ---
+type WizardStep = 'SETUP' | 'RUNNING' | 'REPORT';
+
+interface PromptEvaluateWizardProps {
+    workspaceId: number;
+    promptId: number;
+    onSwitchToAdvanced: () => void;
+}
+
+// --- Component ---
+export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced }: PromptEvaluateWizardProps) {
+    const queryClient = useQueryClient();
+    const [step, setStep] = useState<WizardStep>('SETUP');
+    const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
+    const [compareMode, setCompareMode] = useState<boolean>(false);
+    const [currentRunId, setCurrentRunId] = useState<number | null>(null);
+    const [logs, setLogs] = useState<string[]>([]);
+    const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Dataset Creation States
     const [isCreatingDataset, setIsCreatingDataset] = useState(false);
+    const [isDetailedCreation, setIsDetailedCreation] = useState(false);
     const [quickDatasetForm, setQuickDatasetForm] = useState({ name: '', inputs: '' });
+    const [caseFormRows, setCaseFormRows] = useState<CaseFormRow[]>([createEmptyCaseFormRow()]);
+    
+    // Editor States (for detailed mode)
+    const [expandedEditorCaseId, setExpandedEditorCaseId] = useState<string | null>(null);
+    const [advancedJsonOpenByRow, setAdvancedJsonOpenByRow] = useState<Record<string, boolean>>({});
+
+    // Sync helpers
+    const switchToDetailed = () => {
+        const lines = quickDatasetForm.inputs.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+        if (lines.length > 0) {
+            const newRows = lines.map((input, idx) => ({
+                ...createEmptyCaseFormRow(),
+                input,
+                id: `case-converted-${idx}`
+            }));
+            setCaseFormRows(newRows);
+        } else if (caseFormRows.length === 0) {
+            setCaseFormRows([createEmptyCaseFormRow()]);
+        }
+        setIsDetailedCreation(true);
+    };
+
+    const switchToSimple = () => {
+        const inputs = caseFormRows.map(row => row.input).filter(s => s.trim().length > 0).join('\n');
+        setQuickDatasetForm(prev => ({ ...prev, inputs }));
+        setIsDetailedCreation(false);
+    };
 
     // --- Mutations ---
     const createQuickDatasetMutation = useMutation({
         mutationFn: async () => {
             const name = quickDatasetForm.name.trim();
-            const rawInputs = quickDatasetForm.inputs.trim();
             if (!name) throw new Error('데이터셋 이름을 입력해주세요.');
-            if (!rawInputs) throw new Error('질문을 최소 1개 이상 입력해주세요.');
 
-            const inputs = rawInputs.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-            if (inputs.length === 0) throw new Error('유효한 질문이 없습니다.');
+            let testCases: any[] = [];
+
+            if (isDetailedCreation) {
+                // Parse from detailed rows
+                try {
+                    testCases = parseCaseRows(caseFormRows);
+                } catch (e: any) {
+                    throw new Error(e.message || '케이스 데이터가 올바르지 않습니다.');
+                }
+            } else {
+                // Parse from simple text
+                const rawInputs = quickDatasetForm.inputs.trim();
+                if (!rawInputs) throw new Error('질문을 최소 1개 이상 입력해주세요.');
+                const inputs = rawInputs.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                if (inputs.length === 0) throw new Error('유효한 질문이 없습니다.');
+                
+                testCases = inputs.map(input => ({
+                    input,
+                    expectedJson: { must_cover: [] },
+                    constraintsJson: {}
+                }));
+            }
+
+            if (testCases.length === 0) throw new Error('저장할 케이스가 없습니다.');
 
             // 1. Create Dataset
             const dsRes = await promptApi.createEvalDataset(workspaceId, promptId, { name });
             const datasetId = dsRes.data.id;
 
             // 2. Upload Cases
-            const testCases = inputs.map(input => ({
-                input,
-                expectedJson: { must_cover: [] }, // Default empty criteria
-                constraintsJson: {}
-            }));
-
             await promptApi.bulkUploadEvalDatasetCases(workspaceId, promptId, datasetId, {
                 testCases,
                 replaceExisting: true
@@ -143,6 +217,8 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
             setSelectedDatasetId(newDatasetId);
             setIsCreatingDataset(false);
             setQuickDatasetForm({ name: '', inputs: '' });
+            setCaseFormRows([createEmptyCaseFormRow()]);
+            setIsDetailedCreation(false);
         },
         onError: (err) => {
             alert('데이터셋 생성 실패: ' + err);
@@ -179,6 +255,69 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
             alert('실행 실패: ' + err);
         }
     });
+
+    // Helper functions for CaseEditorRow props
+    const updateCaseRow = (rowId: string, field: keyof Omit<CaseFormRow, 'id'>, value: string) => {
+        setCaseFormRows(prev => prev.map(row => row.id === rowId ? { ...row, [field]: value } : row));
+    };
+    // (Other helpers are simplified for wizard context or not needed if we use CaseEditorRow purely)
+    // Actually CaseEditorRow needs many handlers. We should implement minimal versions.
+    
+    // Minimal implementations for CaseEditorRow support in Wizard
+    const updateCaseJsonObject = (rowId: string, field: any, updater: any) => {
+        setCaseFormRows(prev => prev.map(row => {
+            if (row.id !== rowId) return row;
+            // Simplified: just parse, update, stringify. 
+            // In real app, reuse the robust logic from Tab component.
+            // For now, we assume users use the UI fields mainly.
+            // But CaseEditorRow expects these props.
+            // We need to duplicate the logic or import it.
+            // Since we extracted CaseEditorRow but not the helper logic functions (they are inside Tab component or local),
+            // we should have extracted helpers to CaseEditorRow.tsx as well.
+            // I did include helpers in CaseEditorRow.tsx export in previous step? 
+            // No, I put them in CaseEditorRow.tsx but didn't export them all.
+            // Let's implement simple versions here or rely on CaseEditorRow's internal logic if it was self-contained?
+            // CaseEditorRow is a presentational component mostly, it relies on parent for state updates.
+            
+            // Let's use a simpler approach: CaseEditorRow.tsx should export the helper functions too!
+            // I'll assume they are exported or I will reimplement necessary ones.
+            return row; 
+        }));
+    };
+    // Wait, the previous step's CaseEditorRow.tsx included helper functions inside the file but NOT exported.
+    // That means I cannot import `updateCaseJsonObject` logic.
+    // I should have exported them.
+    // I will reimplement the updater logic locally here to be safe and avoid another file edit if possible.
+    
+    // Re-implementing logic locally for Wizard
+    const _parseObject = (txt: string) => { try { return JSON.parse(txt) || {} } catch { return {} } };
+    const _updateJson = (rowId: string, field: keyof CaseFormRow, updater: (prev: any) => any) => {
+        setCaseFormRows(prev => prev.map(row => {
+            if (row.id !== rowId) return row;
+            const current = _parseObject(row[field as string]);
+            const next = updater(current);
+            return { ...row, [field]: JSON.stringify(next, null, 2) };
+        }));
+    };
+
+    const handlers = {
+        updateCaseRow,
+        setContextLanguage: (id: string, val: string) => _updateJson(id, 'contextJsonText', (o) => ({ ...o, lang: val })),
+        setCaseArrayField: (id: string, field: any, key: string, val: string[]) => _updateJson(id, field, (o) => { const n = {...o}; if(val.length) n[key] = val; else delete n[key]; return n; }),
+        setCaseBooleanFlag: (id: string, key: string, checked: boolean) => _updateJson(id, 'expectedJsonText', (o) => { 
+            const flags = o.structure_flags || {};
+            if(checked) flags[key] = true; else delete flags[key];
+            return { ...o, structure_flags: flags };
+        }),
+        setConstraintMaxChars: (id: string, val: string) => _updateJson(id, 'constraintsJsonText', (o) => ({ ...o, max_chars: val ? Number(val) : undefined })),
+        setConstraintLanguage: (id: string, val: string) => _updateJson(id, 'constraintsJsonText', (o) => ({ ...o, allowed_language: val })),
+        setConstraintKeywordNormalization: (id: string, val: boolean) => _updateJson(id, 'constraintsJsonText', (o) => ({ ...o, keyword_normalization: val ? 'BASIC' : undefined })),
+        setConstraintJsonOnly: (id: string, val: boolean) => _updateJson(id, 'constraintsJsonText', (o) => ({ ...o, format: val ? 'json_only' : undefined })),
+        updateCaseJsonObject: (id: string, field: any, updater: any) => _updateJson(id, field, updater),
+        removeCaseRow: (id: string) => setCaseFormRows(prev => prev.filter(r => r.id !== id)),
+        setExpandedEditorCaseId,
+        setAdvancedJsonOpenByRow,
+    };
 
     // --- Render Helpers ---
     const selectedDataset = datasets?.find(d => d.id === selectedDatasetId);
@@ -231,30 +370,65 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
                         </div>
 
                         {isCreatingDataset ? (
-                            <div className="space-y-4 flex-1 animate-in fade-in zoom-in-95 duration-200">
-                                <div>
+                            <div className="space-y-4 flex-1 animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+                                <div className="flex items-center justify-between">
                                     <label className="block text-xs text-gray-400 mb-1">데이터셋 이름</label>
-                                    <input 
-                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[var(--primary)] outline-none"
-                                        placeholder="예: 2026-02-21 테스트용"
-                                        value={quickDatasetForm.name}
-                                        onChange={(e) => setQuickDatasetForm(prev => ({ ...prev, name: e.target.value }))}
-                                        autoFocus
-                                    />
+                                    <button 
+                                        onClick={isDetailedCreation ? switchToSimple : switchToDetailed}
+                                        className="text-[10px] flex items-center gap-1 text-purple-300 hover:text-purple-200 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/20"
+                                    >
+                                        <span className="material-symbols-outlined text-[12px]">
+                                            {isDetailedCreation ? 'edit_note' : 'settings_suggest'}
+                                        </span>
+                                        {isDetailedCreation ? '간편 입력(텍스트)로 전환' : '상세 설정(정답/규칙) 켜기'}
+                                    </button>
                                 </div>
-                                <div className="flex-1">
-                                    <label className="block text-xs text-gray-400 mb-1">질문 입력 (엔터로 구분)</label>
-                                    <textarea 
-                                        className="w-full h-40 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white resize-none focus:border-[var(--primary)] outline-none"
-                                        placeholder={`환불 규정 알려줘\n상담원 연결해줘\n...`}
-                                        value={quickDatasetForm.inputs}
-                                        onChange={(e) => setQuickDatasetForm(prev => ({ ...prev, inputs: e.target.value }))}
-                                    />
+                                <input 
+                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[var(--primary)] outline-none"
+                                    placeholder="예: 2026-02-21 테스트용"
+                                    value={quickDatasetForm.name}
+                                    onChange={(e) => setQuickDatasetForm(prev => ({ ...prev, name: e.target.value }))}
+                                    autoFocus
+                                />
+                                
+                                <div className="flex-1 overflow-hidden flex flex-col">
+                                    {isDetailedCreation ? (
+                                        <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-[200px] border border-white/10 rounded-lg bg-black/20 p-2">
+                                            {caseFormRows.map((row, idx) => (
+                                                <CaseEditorRow
+                                                    key={row.id}
+                                                    row={row}
+                                                    idx={idx}
+                                                    caseFormRowsLength={caseFormRows.length}
+                                                    expandedEditorCaseId={expandedEditorCaseId}
+                                                    advancedJsonOpenByRow={advancedJsonOpenByRow}
+                                                    {...handlers}
+                                                />
+                                            ))}
+                                            <button
+                                                onClick={() => setCaseFormRows(prev => [...prev, createEmptyCaseFormRow()])}
+                                                className="w-full py-2 rounded-lg border border-dashed border-white/20 text-xs text-gray-400 hover:text-white hover:border-white/40"
+                                            >
+                                                + 케이스 추가
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1 flex flex-col">
+                                            <label className="block text-xs text-gray-400 mb-1">질문 입력 (엔터로 구분)</label>
+                                            <textarea 
+                                                className="w-full flex-1 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white resize-none focus:border-[var(--primary)] outline-none min-h-[200px]"
+                                                placeholder={`환불 규정 알려줘\n상담원 연결해줘\n...`}
+                                                value={quickDatasetForm.inputs}
+                                                onChange={(e) => setQuickDatasetForm(prev => ({ ...prev, inputs: e.target.value }))}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
+
                                 <button
                                     onClick={() => createQuickDatasetMutation.mutate()}
-                                    disabled={createQuickDatasetMutation.isPending || !quickDatasetForm.name || !quickDatasetForm.inputs}
-                                    className="w-full py-2 rounded-lg bg-[var(--primary)] text-black font-semibold hover:opacity-90 disabled:opacity-50"
+                                    disabled={createQuickDatasetMutation.isPending || !quickDatasetForm.name}
+                                    className="w-full py-2 rounded-lg bg-[var(--primary)] text-black font-semibold hover:opacity-90 disabled:opacity-50 mt-auto"
                                 >
                                     {createQuickDatasetMutation.isPending ? '생성 중...' : '생성하고 바로 선택'}
                                 </button>
