@@ -1423,298 +1423,356 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                                                 : '질문을 입력해 주세요.';
                                             const structureCount = [structureStepByStep, structureNumbered, structureGreeting].filter(Boolean).length;
 
-                                            return (
-                                                <div key={row.id} className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
-                                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                                        <div className="min-w-0 space-y-1">
-                                                            <p className="text-xs text-gray-200 font-semibold">Case #{idx + 1}</p>
-                                                            <p className="text-xs text-gray-400 truncate">{summaryInput}</p>
-                                                        </div>
-                                                        <div className="flex flex-wrap items-center justify-end gap-2">
-                                                            <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] ${strength.badgeClass}`}>
-                                                                제약 강도 {strength.level}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] text-gray-300 cursor-help"
-                                                                title={strength.tooltip}
-                                                                aria-label="제약 강도 계산 기준"
-                                                            >
-                                                                ?
-                                                            </button>
-                                                            <span className="text-[10px] text-gray-500">
-                                                                {strength.ruleLabel}
-                                                            </span>
-                                                            <span className="inline-flex px-2 py-0.5 rounded-full border border-white/20 bg-white/5 text-[10px] text-gray-300">
-                                                                조건 {strength.conditionCount}개
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setExpandedEditorCaseId((prev) => (prev === row.id ? null : row.id))}
-                                                                className="px-2 py-1 rounded border border-white/20 bg-white/5 text-xs text-gray-200 hover:bg-white/10"
-                                                                aria-expanded={isExpanded}
-                                                                aria-controls={`case-editor-${row.id}`}
-                                                            >
-                                                                {isExpanded ? '접기' : '펼치기'}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeCaseRow(row.id)}
-                                                                className="px-2 py-1 rounded bg-white/10 border border-white/20 text-[11px] text-gray-200"
-                                                                disabled={caseFormRows.length <= 1}
-                                                            >
-                                                                삭제
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {!isExpanded ? (
-                                                        <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-gray-400">
-                                                            AI 핵심포인트 {mustCover.length}개, 룰 필수단어 {mustIncludeWords.length}개, 룰 금지단어 {mustNotIncludeWords.length}개, 구조요건 {structureCount}개
-                                                        </div>
-                                                    ) : null}
-
-                                                    {isExpanded ? (
-                                                        <div id={`case-editor-${row.id}`} className="border-t border-white/10 pt-3 space-y-3">
-                                                            <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
-                                                        <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">기본 정보</p>
-                                                        <div>
-                                                            <FieldTooltipLabel
-                                                                label="사용자 질문 (필수)"
-                                                                help='모델에 전달할 사용자 질문입니다. 예: "환불 가능 기간 알려주세요"'
-                                                            />
-                                                            <textarea
-                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white h-20"
-                                                                placeholder="예: 다음 주 상담 신청 방법 알려주세요."
-                                                                value={row.input}
-                                                                onChange={(e) => updateCaseRow(row.id, 'input', e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                            <div>
-                                                                <FieldTooltipLabel
-                                                                    label="케이스 ID (선택)"
-                                                                    help='케이스 식별용 ID입니다. 예: "refund_case_01"'
-                                                                />
-                                                                <input
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                                                    placeholder="refund_case_01"
-                                                                    value={row.externalId}
-                                                                    onChange={(e) => updateCaseRow(row.id, 'externalId', e.target.value)}
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <FieldTooltipLabel
-                                                                    label="언어 (선택)"
-                                                                    help='컨텍스트 변수 lang에 저장됩니다.'
-                                                                />
-                                                                <select
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                                                    value={contextLanguage}
-                                                                    onChange={(e) => setContextLanguage(row.id, e.target.value)}
-                                                                >
-                                                                    {CASE_LANGUAGE_OPTIONS.map((option) => (
-                                                                        <option key={option.value || 'auto'} value={option.value}>{option.label}</option>
-                                                                    ))}
-                                                                </select>
-                                                                <p className="mt-1 text-[11px] text-gray-500">추가 문맥 변수: {extraContextKeys.length}개</p>
-                                                            </div>
-                                                        </div>
-                                                            </div>
-
-                                                            <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 p-3 space-y-3">
-                                                        <p className="text-[11px] uppercase tracking-wide text-emerald-300 font-semibold">AI 체크 (의미 기반)</p>
-                                                        <div className="rounded-md border border-emerald-400/15 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-100">
-                                                            <span className="font-semibold">팁</span>: 고객 프롬프트 유형을 모를 때는 먼저 <span className="text-emerald-200">핵심 포인트(must_cover)</span>로
-                                                            "의미적으로 다뤄야 하는 요구사항"을 적는 걸 추천합니다.
-                                                        </div>
-                                                        <TagListEditor
-                                                            label="핵심 포인트 (의미 기반, Judge가 판단)"
-                                                            values={mustCover}
-                                                            placeholder='예: "환불 가능 기간을 안내", "문의 다음 단계 제시"'
-                                                            onChange={(values) => setCaseArrayField(row.id, 'expectedJsonText', 'must_cover', values)}
-                                                        />
-                                                        <p className="text-[11px] text-emerald-100/80">
-                                                            필수/금지 키워드(문자 그대로)는 아래 <span className="text-sky-200 font-semibold">룰 체크(하드 룰)</span>에서 설정하세요.
-                                                        </p>
-                                                        <div className="space-y-2">
-                                                            <p className="text-[11px] text-emerald-200">필수 구조</p>
-                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                                <StructureToggleCard
-                                                                    label="단계별 안내 포함"
-                                                                    checked={structureStepByStep}
-                                                                    onChange={(checked) => setCaseBooleanFlag(row.id, 'step_by_step', checked)}
-                                                                />
-                                                                <StructureToggleCard
-                                                                    label="번호 목록 형식"
-                                                                    checked={structureNumbered}
-                                                                    onChange={(checked) => setCaseBooleanFlag(row.id, 'numbered_list', checked)}
-                                                                />
-                                                                <StructureToggleCard
-                                                                    label="인사말 포함"
-                                                                    checked={structureGreeting}
-                                                                    onChange={(checked) => setCaseBooleanFlag(row.id, 'greeting', checked)}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                            </div>
-
-                                                            <div className="rounded-lg border border-sky-400/20 bg-sky-500/5 p-3 space-y-3">
-                                                        <p className="text-[11px] uppercase tracking-wide text-sky-300 font-semibold">룰 체크 (하드 룰)</p>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                            <div>
-                                                                <FieldTooltipLabel
-                                                                    label="최대 글자 수"
-                                                                    help='응답 길이를 제한합니다. 비우면 제한하지 않습니다.'
-                                                                />
-                                                                <input
-                                                                    type="number"
-                                                                    min={1}
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                                                    placeholder="예: 400"
-                                                                    value={maxChars ?? ''}
-                                                                    onChange={(e) => setConstraintMaxChars(row.id, e.target.value)}
-                                                                />
-                                                            </div>
-                                                            <div>
-                                                                <FieldTooltipLabel
-                                                                    label="허용 응답 언어"
-                                                                    help='모델 출력 언어를 제한하고 싶을 때 사용합니다.'
-                                                                />
-                                                                <select
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                                                    value={allowedLanguage}
-                                                                    onChange={(e) => setConstraintLanguage(row.id, e.target.value)}
-                                                                >
-                                                                    {CASE_LANGUAGE_OPTIONS.map((option) => (
-                                                                        <option key={option.value || 'auto'} value={option.value}>{option.label}</option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                            <TagListEditor
-                                                                label="필수 포함 키워드 (하드룰, 문자 그대로)"
-                                                                values={mustIncludeWords}
-                                                                placeholder="예: 환불, 사전 신청"
-                                                                onChange={(values) => {
-                                                                    setCaseArrayField(row.id, 'constraintsJsonText', 'must_include', values);
-                                                                    updateCaseJsonObject(row.id, 'expectedJsonText', (obj) => {
-                                                                        const next = { ...obj };
-                                                                        delete next.must_include;
-                                                                        return next;
-                                                                    });
-                                                                }}
-                                                            />
-                                                            <TagListEditor
-                                                                label="금지 키워드 (하드룰, 문자 그대로)"
-                                                                values={mustNotIncludeWords}
-                                                                placeholder="예: 확실히, 절대"
-                                                                onChange={(values) => {
-                                                                    setCaseArrayField(row.id, 'constraintsJsonText', 'must_not_include', values);
-                                                                    updateCaseJsonObject(row.id, 'constraintsJsonText', (obj) => {
-                                                                        const next = { ...obj };
-                                                                        delete next.forbidden_words;
-                                                                        return next;
-                                                                    });
-                                                                    updateCaseJsonObject(row.id, 'expectedJsonText', (obj) => {
-                                                                        const next = { ...obj };
-                                                                        delete next.must_not_include;
-                                                                        return next;
-                                                                    });
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <label className="inline-flex items-center gap-2 text-xs text-gray-300">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={keywordNormalizationEnabled}
-                                                                onChange={(e) => setConstraintKeywordNormalization(row.id, e.target.checked)}
-                                                            />
-                                                            키워드 정규화 (공백/대소문자/구두점 무시)
-                                                        </label>
-                                                        {keywordNormalizationEnabled ? (
-                                                            <p className="text-[11px] text-gray-400">
-                                                                예: "사전 신청"과 "사전신청", "refund policy"와 "Refund-policy!!"를 동일하게 매칭합니다.
-                                                            </p>
-                                                        ) : null}
-                                                        <label className="inline-flex items-center gap-2 text-xs text-gray-300">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={jsonOnly}
-                                                                onChange={(e) => setConstraintJsonOnly(row.id, e.target.checked)}
-                                                            />
-                                                            응답은 JSON 객체 형식만 허용
-                                                        </label>
-                                                        {!jsonOnly ? (
-                                                            <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-gray-400">
-                                                                JSON 필수 키(required_keys)는 <span className="text-gray-200">json_only</span>일 때만 검사됩니다.
-                                                            </div>
-                                                        ) : null}
-                                                        {jsonOnly ? (
-                                                            <TagListEditor
-                                                                label="JSON 필수 키(required_keys)"
-                                                                values={requiredKeys}
-                                                                placeholder="예: answer, category"
-                                                                onChange={(values) => setCaseArrayField(row.id, 'constraintsJsonText', 'required_keys', values)}
-                                                            />
-                                                        ) : null}
-                                                            </div>
-
-                                                            <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setAdvancedJsonOpenByRow((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}
-                                                            className="px-2 py-1 rounded-md bg-white/10 border border-white/20 text-[11px] text-gray-200 hover:bg-white/15"
-                                                        >
-                                                            ⚙ JSON 직접 편집 {isAdvancedOpen ? '닫기' : '열기'}
-                                                        </button>
-                                                        {isAdvancedOpen ? (
-                                                            <div className="grid grid-cols-1 gap-2">
-                                                                <div>
-                                                                    <FieldTooltipLabel
-                                                                        label="Context JSON (Advanced)"
-                                                                        help='기본 UI에서 다루지 않는 추가 문맥 변수는 여기서 직접 입력하세요.'
-                                                                    />
-                                                                    <textarea
-                                                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] text-white h-20 font-mono"
-                                                                        placeholder='{"lang":"ko","grade":"middle"}'
-                                                                        value={row.contextJsonText}
-                                                                        onChange={(e) => updateCaseRow(row.id, 'contextJsonText', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <FieldTooltipLabel
-                                                                        label="Expected JSON (Advanced)"
-                                                                        help='빌더가 생성한 expectedJson을 직접 수정할 수 있습니다.'
-                                                                    />
-                                                                    <textarea
-                                                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] text-emerald-200 h-20 font-mono"
-                                                                        placeholder='{"must_cover":["..."],"must_include":["..."]}'
-                                                                        value={row.expectedJsonText}
-                                                                        onChange={(e) => updateCaseRow(row.id, 'expectedJsonText', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <FieldTooltipLabel
-                                                                        label="Constraints JSON (Advanced)"
-                                                                        help='빌더가 생성한 constraintsJson을 직접 수정할 수 있습니다.'
-                                                                    />
-                                                                    <textarea
-                                                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] text-white h-20 font-mono"
-                                                                        placeholder='{"max_chars":400}'
-                                                                        value={row.constraintsJsonText}
-                                                                        onChange={(e) => updateCaseRow(row.id, 'constraintsJsonText', e.target.value)}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        ) : null}
-                                                            </div>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            );
-                                        })}
+                                                                                        const [editorTab, setEditorTab] = useState<'BASIC' | 'AI_CHECK' | 'RULE_CHECK' | 'ADVANCED'>('BASIC');
+                                            
+                                                                                        return (
+                                                                                            <div key={row.id} className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
+                                                                                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                                                                                    <div className="min-w-0 space-y-1">
+                                                                                                        <p className="text-xs text-gray-200 font-semibold">Case #{idx + 1}</p>
+                                                                                                        <p className="text-xs text-gray-400 truncate">{summaryInput}</p>
+                                                                                                    </div>
+                                                                                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                                                                                        <span className={`inline-flex px-2 py-0.5 rounded-full border text-[10px] ${strength.badgeClass}`}>
+                                                                                                            제약 강도 {strength.level}
+                                                                                                        </span>
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-white/25 text-[10px] text-gray-300 cursor-help"
+                                                                                                            title={strength.tooltip}
+                                                                                                            aria-label="제약 강도 계산 기준"
+                                                                                                        >
+                                                                                                            ?
+                                                                                                        </button>
+                                                                                                        <span className="text-[10px] text-gray-500">
+                                                                                                            {strength.ruleLabel}
+                                                                                                        </span>
+                                                                                                        <span className="inline-flex px-2 py-0.5 rounded-full border border-white/20 bg-white/5 text-[10px] text-gray-300">
+                                                                                                            조건 {strength.conditionCount}개
+                                                                                                        </span>
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            onClick={() => setExpandedEditorCaseId((prev) => (prev === row.id ? null : row.id))}
+                                                                                                            className="px-2 py-1 rounded border border-white/20 bg-white/5 text-xs text-gray-200 hover:bg-white/10"
+                                                                                                            aria-expanded={isExpanded}
+                                                                                                            aria-controls={`case-editor-${row.id}`}
+                                                                                                        >
+                                                                                                            {isExpanded ? '접기' : '펼치기'}
+                                                                                                        </button>
+                                                                                                        <button
+                                                                                                            type="button"
+                                                                                                            onClick={() => removeCaseRow(row.id)}
+                                                                                                            className="px-2 py-1 rounded bg-white/10 border border-white/20 text-[11px] text-gray-200"
+                                                                                                            disabled={caseFormRows.length <= 1}
+                                                                                                        >
+                                                                                                            삭제
+                                                                                                        </button>
+                                                                                                    </div>
+                                                                                                </div>
+                                            
+                                                                                                {!isExpanded ? (
+                                                                                                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-gray-400">
+                                                                                                        AI 핵심포인트 {mustCover.length}개, 룰 필수단어 {mustIncludeWords.length}개, 룰 금지단어 {mustNotIncludeWords.length}개, 구조요건 {structureCount}개
+                                                                                                    </div>
+                                                                                                ) : null}
+                                            
+                                                                                                {isExpanded ? (
+                                                                                                    <div id={`case-editor-${row.id}`} className="border-t border-white/10 pt-3 space-y-3">
+                                                                                                        {/* Editor Tabs */}
+                                                                                                        <div className="flex items-center gap-1 border-b border-white/10 pb-2 mb-3">
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                onClick={() => setEditorTab('BASIC')}
+                                                                                                                className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                                                                                                                    editorTab === 'BASIC'
+                                                                                                                        ? 'text-white border-b-2 border-[var(--primary)] bg-white/5'
+                                                                                                                        : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                                                                                                                }`}
+                                                                                                            >
+                                                                                                                기본 정보
+                                                                                                            </button>
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                onClick={() => setEditorTab('AI_CHECK')}
+                                                                                                                className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                                                                                                                    editorTab === 'AI_CHECK'
+                                                                                                                        ? 'text-emerald-300 border-b-2 border-emerald-500 bg-emerald-500/10'
+                                                                                                                        : 'text-gray-400 hover:text-emerald-200 hover:bg-emerald-500/5'
+                                                                                                                }`}
+                                                                                                            >
+                                                                                                                AI 체크 (의미)
+                                                                                                            </button>
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                onClick={() => setEditorTab('RULE_CHECK')}
+                                                                                                                className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                                                                                                                    editorTab === 'RULE_CHECK'
+                                                                                                                        ? 'text-sky-300 border-b-2 border-sky-500 bg-sky-500/10'
+                                                                                                                        : 'text-gray-400 hover:text-sky-200 hover:bg-sky-500/5'
+                                                                                                                }`}
+                                                                                                            >
+                                                                                                                룰 체크 (형식)
+                                                                                                            </button>
+                                                                                                            <button
+                                                                                                                type="button"
+                                                                                                                onClick={() => setEditorTab('ADVANCED')}
+                                                                                                                className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                                                                                                                    editorTab === 'ADVANCED'
+                                                                                                                        ? 'text-amber-300 border-b-2 border-amber-500 bg-amber-500/10'
+                                                                                                                        : 'text-gray-400 hover:text-amber-200 hover:bg-amber-500/5'
+                                                                                                                }`}
+                                                                                                            >
+                                                                                                                고급 (JSON)
+                                                                                                            </button>
+                                                                                                        </div>
+                                            
+                                                                                                        {editorTab === 'BASIC' && (
+                                                                                                            <div className="space-y-3 animate-in fade-in duration-200">
+                                                                                                                <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
+                                                                                                                    <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">기본 정보</p>
+                                                                                                                    <div>
+                                                                                                                        <FieldTooltipLabel
+                                                                                                                            label="사용자 질문 (필수)"
+                                                                                                                            help='모델에 전달할 사용자 질문입니다. 예: "환불 가능 기간 알려주세요"'
+                                                                                                                        />
+                                                                                                                        <textarea
+                                                                                                                            className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white h-20"
+                                                                                                                            placeholder="예: 다음 주 상담 신청 방법 알려주세요."
+                                                                                                                            value={row.input}
+                                                                                                                            onChange={(e) => updateCaseRow(row.id, 'input', e.target.value)}
+                                                                                                                        />
+                                                                                                                    </div>
+                                                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="케이스 ID (선택)"
+                                                                                                                                help='케이스 식별용 ID입니다. 예: "refund_case_01"'
+                                                                                                                            />
+                                                                                                                            <input
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                                                                                                placeholder="refund_case_01"
+                                                                                                                                value={row.externalId}
+                                                                                                                                onChange={(e) => updateCaseRow(row.id, 'externalId', e.target.value)}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="언어 (선택)"
+                                                                                                                                help='컨텍스트 변수 lang에 저장됩니다.'
+                                                                                                                            />
+                                                                                                                            <select
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                                                                                                value={contextLanguage}
+                                                                                                                                onChange={(e) => setContextLanguage(row.id, e.target.value)}
+                                                                                                                            >
+                                                                                                                                {CASE_LANGUAGE_OPTIONS.map((option) => (
+                                                                                                                                    <option key={option.value || 'auto'} value={option.value}>{option.label}</option>
+                                                                                                                                ))}
+                                                                                                                            </select>
+                                                                                                                            <p className="mt-1 text-[11px] text-gray-500">추가 문맥 변수: {extraContextKeys.length}개</p>
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        )}
+                                            
+                                                                                                        {editorTab === 'AI_CHECK' && (
+                                                                                                            <div className="space-y-3 animate-in fade-in duration-200">
+                                                                                                                <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/5 p-3 space-y-3">
+                                                                                                                    <p className="text-[11px] uppercase tracking-wide text-emerald-300 font-semibold">AI 체크 (의미 기반)</p>
+                                                                                                                    <div className="rounded-md border border-emerald-400/15 bg-emerald-500/5 px-3 py-2 text-[11px] text-emerald-100">
+                                                                                                                        <span className="font-semibold">팁</span>: 고객 프롬프트 유형을 모를 때는 먼저 <span className="text-emerald-200">핵심 포인트(must_cover)</span>로
+                                                                                                                        "의미적으로 다뤄야 하는 요구사항"을 적는 걸 추천합니다.
+                                                                                                                    </div>
+                                                                                                                    <TagListEditor
+                                                                                                                        label="핵심 포인트 (의미 기반, Judge가 판단)"
+                                                                                                                        values={mustCover}
+                                                                                                                        placeholder='예: "환불 가능 기간을 안내", "문의 다음 단계 제시"'
+                                                                                                                        onChange={(values) => setCaseArrayField(row.id, 'expectedJsonText', 'must_cover', values)}
+                                                                                                                    />
+                                                                                                                    <p className="text-[11px] text-emerald-100/80">
+                                                                                                                        필수/금지 키워드(문자 그대로)는 <span className="text-sky-200 font-semibold">룰 체크(형식)</span> 탭에서 설정하세요.
+                                                                                                                    </p>
+                                                                                                                    <div className="space-y-2">
+                                                                                                                        <p className="text-[11px] text-emerald-200">필수 구조</p>
+                                                                                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                                                                                            <StructureToggleCard
+                                                                                                                                label="단계별 안내 포함"
+                                                                                                                                checked={structureStepByStep}
+                                                                                                                                onChange={(checked) => setCaseBooleanFlag(row.id, 'step_by_step', checked)}
+                                                                                                                            />
+                                                                                                                            <StructureToggleCard
+                                                                                                                                label="번호 목록 형식"
+                                                                                                                                checked={structureNumbered}
+                                                                                                                                onChange={(checked) => setCaseBooleanFlag(row.id, 'numbered_list', checked)}
+                                                                                                                            />
+                                                                                                                            <StructureToggleCard
+                                                                                                                                label="인사말 포함"
+                                                                                                                                checked={structureGreeting}
+                                                                                                                                onChange={(checked) => setCaseBooleanFlag(row.id, 'greeting', checked)}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        )}
+                                            
+                                                                                                        {editorTab === 'RULE_CHECK' && (
+                                                                                                            <div className="space-y-3 animate-in fade-in duration-200">
+                                                                                                                <div className="rounded-lg border border-sky-400/20 bg-sky-500/5 p-3 space-y-3">
+                                                                                                                    <p className="text-[11px] uppercase tracking-wide text-sky-300 font-semibold">룰 체크 (하드 룰)</p>
+                                                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="최대 글자 수"
+                                                                                                                                help='응답 길이를 제한합니다. 비우면 제한하지 않습니다.'
+                                                                                                                            />
+                                                                                                                            <input
+                                                                                                                                type="number"
+                                                                                                                                min={1}
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                                                                                                placeholder="예: 400"
+                                                                                                                                value={maxChars ?? ''}
+                                                                                                                                onChange={(e) => setConstraintMaxChars(row.id, e.target.value)}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="허용 응답 언어"
+                                                                                                                                help='모델 출력 언어를 제한하고 싶을 때 사용합니다.'
+                                                                                                                            />
+                                                                                                                            <select
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                                                                                                value={allowedLanguage}
+                                                                                                                                onChange={(e) => setConstraintLanguage(row.id, e.target.value)}
+                                                                                                                            >
+                                                                                                                                {CASE_LANGUAGE_OPTIONS.map((option) => (
+                                                                                                                                    <option key={option.value || 'auto'} value={option.value}>{option.label}</option>
+                                                                                                                                ))}
+                                                                                                                            </select>
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                                                        <TagListEditor
+                                                                                                                            label="필수 포함 키워드 (하드룰, 문자 그대로)"
+                                                                                                                            values={mustIncludeWords}
+                                                                                                                            placeholder="예: 환불, 사전 신청"
+                                                                                                                            onChange={(values) => {
+                                                                                                                                setCaseArrayField(row.id, 'constraintsJsonText', 'must_include', values);
+                                                                                                                                updateCaseJsonObject(row.id, 'expectedJsonText', (obj) => {
+                                                                                                                                    const next = { ...obj };
+                                                                                                                                    delete next.must_include;
+                                                                                                                                    return next;
+                                                                                                                                });
+                                                                                                                            }}
+                                                                                                                        />
+                                                                                                                        <TagListEditor
+                                                                                                                            label="금지 키워드 (하드룰, 문자 그대로)"
+                                                                                                                            values={mustNotIncludeWords}
+                                                                                                                            placeholder="예: 확실히, 절대"
+                                                                                                                            onChange={(values) => {
+                                                                                                                                setCaseArrayField(row.id, 'constraintsJsonText', 'must_not_include', values);
+                                                                                                                                updateCaseJsonObject(row.id, 'constraintsJsonText', (obj) => {
+                                                                                                                                    const next = { ...obj };
+                                                                                                                                    delete next.forbidden_words;
+                                                                                                                                    return next;
+                                                                                                                                });
+                                                                                                                                updateCaseJsonObject(row.id, 'expectedJsonText', (obj) => {
+                                                                                                                                    const next = { ...obj };
+                                                                                                                                    delete next.must_not_include;
+                                                                                                                                    return next;
+                                                                                                                                });
+                                                                                                                            }}
+                                                                                                                        />
+                                                                                                                    </div>
+                                                                                                                    <label className="inline-flex items-center gap-2 text-xs text-gray-300">
+                                                                                                                        <input
+                                                                                                                            type="checkbox"
+                                                                                                                            checked={keywordNormalizationEnabled}
+                                                                                                                            onChange={(e) => setConstraintKeywordNormalization(row.id, e.target.checked)}
+                                                                                                                        />
+                                                                                                                        키워드 정규화 (공백/대소문자/구두점 무시)
+                                                                                                                    </label>
+                                                                                                                    {keywordNormalizationEnabled ? (
+                                                                                                                        <p className="text-[11px] text-gray-400">
+                                                                                                                            예: "사전 신청"과 "사전신청", "refund policy"와 "Refund-policy!!"를 동일하게 매칭합니다.
+                                                                                                                        </p>
+                                                                                                                    ) : null}
+                                                                                                                    <label className="inline-flex items-center gap-2 text-xs text-gray-300">
+                                                                                                                        <input
+                                                                                                                            type="checkbox"
+                                                                                                                            checked={jsonOnly}
+                                                                                                                            onChange={(e) => setConstraintJsonOnly(row.id, e.target.checked)}
+                                                                                                                        />
+                                                                                                                        응답은 JSON 객체 형식만 허용
+                                                                                                                    </label>
+                                                                                                                    {!jsonOnly ? (
+                                                                                                                        <div className="rounded-md border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-gray-400">
+                                                                                                                            JSON 필수 키(required_keys)는 <span className="text-gray-200">json_only</span>일 때만 검사됩니다.
+                                                                                                                        </div>
+                                                                                                                    ) : null}
+                                                                                                                    {jsonOnly ? (
+                                                                                                                        <TagListEditor
+                                                                                                                            label="JSON 필수 키(required_keys)"
+                                                                                                                            values={requiredKeys}
+                                                                                                                            placeholder="예: answer, category"
+                                                                                                                            onChange={(values) => setCaseArrayField(row.id, 'constraintsJsonText', 'required_keys', values)}
+                                                                                                                        />
+                                                                                                                    ) : null}
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        )}
+                                            
+                                                                                                        {editorTab === 'ADVANCED' && (
+                                                                                                            <div className="space-y-3 animate-in fade-in duration-200">
+                                                                                                                <div className="rounded-lg border border-amber-400/20 bg-amber-500/5 p-3 space-y-3">
+                                                                                                                    <p className="text-[11px] uppercase tracking-wide text-amber-300 font-semibold">고급 설정 (JSON 직접 편집)</p>
+                                                                                                                    <div className="grid grid-cols-1 gap-2">
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="Context JSON (Advanced)"
+                                                                                                                                help='기본 UI에서 다루지 않는 추가 문맥 변수는 여기서 직접 입력하세요.'
+                                                                                                                            />
+                                                                                                                            <textarea
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] text-white h-20 font-mono"
+                                                                                                                                placeholder='{"lang":"ko","grade":"middle"}'
+                                                                                                                                value={row.contextJsonText}
+                                                                                                                                onChange={(e) => updateCaseRow(row.id, 'contextJsonText', e.target.value)}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="Expected JSON (Advanced)"
+                                                                                                                                help='빌더가 생성한 expectedJson을 직접 수정할 수 있습니다.'
+                                                                                                                            />
+                                                                                                                            <textarea
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] text-emerald-200 h-20 font-mono"
+                                                                                                                                placeholder='{"must_cover":["..."],"must_include":["..."]}'
+                                                                                                                                value={row.expectedJsonText}
+                                                                                                                                onChange={(e) => updateCaseRow(row.id, 'expectedJsonText', e.target.value)}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                        <div>
+                                                                                                                            <FieldTooltipLabel
+                                                                                                                                label="Constraints JSON (Advanced)"
+                                                                                                                                help='빌더가 생성한 constraintsJson을 직접 수정할 수 있습니다.'
+                                                                                                                            />
+                                                                                                                            <textarea
+                                                                                                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-2 py-2 text-[11px] text-white h-20 font-mono"
+                                                                                                                                placeholder='{"max_chars":400}'
+                                                                                                                                value={row.constraintsJsonText}
+                                                                                                                                onChange={(e) => updateCaseRow(row.id, 'constraintsJsonText', e.target.value)}
+                                                                                                                            />
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            </div>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                ) : null}
+                                                                                            </div>
+                                                                                        );
+                                                                                    })}
 	                                        <button
 	                                            type="button"
 	                                            onClick={addCaseRow}
@@ -3173,6 +3231,8 @@ function CaseDetailPanel({
     inputText?: string;
     caseContext?: RunCaseContext;
 }) {
+    const [detailTab, setDetailTab] = useState<'SUMMARY' | 'COMPARE' | 'ANALYSIS' | 'RAW'>('SUMMARY');
+
     const compare = extractCompareSummary(item.judgeOutput);
     const candidateRuleChecks = extractCandidateRuleChecks(item.ruleChecks);
     const baselineRuleChecks = extractBaselineRuleChecks(item.ruleChecks);
@@ -3190,148 +3250,210 @@ function CaseDetailPanel({
 
     return (
         <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
-            <div className="grid grid-cols-12 gap-0 rounded-lg border border-white/10 overflow-hidden">
-                <div className="col-span-12 lg:col-span-3 p-4 border-b lg:border-b-0 lg:border-r border-white/10 bg-black/30 space-y-3">
-                    <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Input</h4>
-                    <div>
-                        <p className="text-[11px] text-gray-500 mb-1">User Query</p>
-                        <p className="text-sm text-gray-200 leading-relaxed bg-black/30 border border-white/10 rounded px-2 py-2">
-                            {caseInput}
-                        </p>
-                    </div>
-                    {contextJson ? (
-                        <div>
-                            <p className="text-[11px] text-gray-500 mb-1">Context Variables</p>
-                            <pre className="text-[11px] font-mono text-gray-300 bg-black/40 border border-white/10 rounded px-2 py-2 overflow-auto whitespace-pre-wrap">
-                                {prettyJson(contextJson)}
-                            </pre>
-                        </div>
-                    ) : null}
-                </div>
-
-                <div className="col-span-12 lg:col-span-5 p-4 border-b lg:border-b-0 lg:border-r border-white/10 relative space-y-3">
-                    <div className={`absolute left-0 top-0 h-full w-1 ${failed ? 'bg-rose-400' : 'bg-emerald-400'}`} />
-                    <h4 className={`text-[11px] font-semibold uppercase tracking-wide flex items-center gap-2 ${failed ? 'text-rose-300' : 'text-emerald-300'}`}>
-                        Actual Output ({failed ? 'Failed' : 'Passed'})
-                    </h4>
-                    <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
-                        {item.candidateOutput || '-'}
-                    </p>
-                    {item.baselineOutput ? (
-                        <details className="rounded border border-white/10 bg-black/25 p-2">
-                            <summary className="cursor-pointer text-[11px] text-gray-400">현재 운영 버전 응답 보기</summary>
-                            <p className="mt-2 text-sm text-gray-300 whitespace-pre-wrap">{item.baselineOutput}</p>
-                        </details>
-                    ) : null}
-                    <div className={`rounded-md border px-3 py-2 ${failed ? 'border-rose-400/30 bg-rose-500/10' : 'border-emerald-400/30 bg-emerald-500/10'}`}>
-                        <p className={`text-xs font-semibold ${failed ? 'text-rose-200' : 'text-emerald-200'}`}>Failure Reason</p>
-                        <p className={`mt-1 text-xs ${failed ? 'text-rose-100' : 'text-emerald-100'}`}>{failureReason}</p>
-                    </div>
-                </div>
-
-                <div className="col-span-12 lg:col-span-4 p-4 bg-black/30 space-y-3">
-                    <h4 className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wide flex items-center gap-2">
-                        Expected / Guideline
-                    </h4>
-                    <div className="rounded border border-emerald-400/20 bg-emerald-500/10 px-3 py-2">
-                        <p className="text-[11px] text-emerald-200 font-semibold mb-1">Ideal Response Logic</p>
-                        <p className="text-xs text-emerald-100 whitespace-pre-wrap">{guidelineText}</p>
-                    </div>
-                    <div className="rounded border border-white/10 bg-black/30 px-3 py-2 space-y-2">
-                        <p className="text-[11px] text-gray-400">Required Keywords</p>
-                        {requiredKeywords.length === 0 ? (
-                            <p className="text-xs text-gray-500">명시된 필수 키워드 없음</p>
-                        ) : (
-                            <div className="flex flex-wrap gap-1">
-                                {requiredKeywords.map((keyword) => (
-                                    <span
-                                        key={keyword}
-                                        className={`text-[11px] px-2 py-0.5 rounded border ${
-                                            missingKeywords.includes(keyword)
-                                                ? 'bg-rose-500/15 border-rose-400/40 text-rose-200'
-                                                : 'bg-white/10 border-white/20 text-gray-200'
-                                        }`}
-                                    >
-                                        {keyword}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-                        {missingKeywords.length > 0 ? (
-                            <p className="text-[11px] text-rose-200">누락 키워드: {missingKeywords.join(', ')}</p>
-                        ) : null}
-                    </div>
-                </div>
+            {/* Detail Tabs */}
+            <div className="flex items-center gap-1 border-b border-white/10 pb-2 mb-3">
+                <button
+                    type="button"
+                    onClick={() => setDetailTab('SUMMARY')}
+                    className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                        detailTab === 'SUMMARY'
+                            ? 'text-white border-b-2 border-[var(--primary)] bg-white/5'
+                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                    }`}
+                >
+                    요약 (Summary)
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setDetailTab('COMPARE')}
+                    className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                        detailTab === 'COMPARE'
+                            ? 'text-indigo-300 border-b-2 border-indigo-500 bg-indigo-500/10'
+                            : 'text-gray-400 hover:text-indigo-200 hover:bg-indigo-500/5'
+                    }`}
+                >
+                    비교 (Compare)
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setDetailTab('ANALYSIS')}
+                    className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                        detailTab === 'ANALYSIS'
+                            ? 'text-emerald-300 border-b-2 border-emerald-500 bg-emerald-500/10'
+                            : 'text-gray-400 hover:text-emerald-200 hover:bg-emerald-500/5'
+                    }`}
+                >
+                    분석 (Analysis)
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setDetailTab('RAW')}
+                    className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${
+                        detailTab === 'RAW'
+                            ? 'text-amber-300 border-b-2 border-amber-500 bg-amber-500/10'
+                            : 'text-gray-400 hover:text-amber-200 hover:bg-amber-500/5'
+                    }`}
+                >
+                    원본 (Raw)
+                </button>
             </div>
 
-            {compare ? (
-                <div className="rounded-md border border-indigo-400/30 bg-indigo-500/10 px-3 py-2">
-                    <p className="text-xs text-indigo-200 font-medium">이번 버전 vs 운영 버전 비교 요약</p>
-                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div className="rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1">
-                            <p className="text-[11px] text-emerald-200">이번 테스트 버전</p>
-                            <p className="text-xs text-emerald-100">
-                                점수 {formatOptionalNumber(compare.candidateOverallScore)} / pass {renderPassValue(compare.candidatePass ?? null)}
-                            </p>
+            {detailTab === 'SUMMARY' && (
+                <div className="space-y-3 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-12 gap-0 rounded-lg border border-white/10 overflow-hidden">
+                        <div className="col-span-12 lg:col-span-5 p-4 border-b lg:border-b-0 lg:border-r border-white/10 bg-black/30 space-y-3">
+                            <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Input</h4>
+                            <div>
+                                <p className="text-[11px] text-gray-500 mb-1">User Query</p>
+                                <p className="text-sm text-gray-200 leading-relaxed bg-black/30 border border-white/10 rounded px-2 py-2 whitespace-pre-wrap">
+                                    {caseInput}
+                                </p>
+                            </div>
+                            {contextJson ? (
+                                <div>
+                                    <p className="text-[11px] text-gray-500 mb-1">Context Variables</p>
+                                    <pre className="text-[11px] font-mono text-gray-300 bg-black/40 border border-white/10 rounded px-2 py-2 overflow-auto whitespace-pre-wrap">
+                                        {prettyJson(contextJson)}
+                                    </pre>
+                                </div>
+                            ) : null}
                         </div>
-                        <div className="rounded border border-sky-400/30 bg-sky-500/10 px-2 py-1">
-                            <p className="text-[11px] text-sky-200">현재 운영 버전</p>
-                            <p className="text-xs text-sky-100">
-                                점수 {formatOptionalNumber(compare.baselineOverallScore)} / pass {renderPassValue(compare.baselinePass ?? null)}
+
+                        <div className="col-span-12 lg:col-span-7 p-4 relative space-y-3">
+                            <div className={`absolute left-0 top-0 h-full w-1 ${failed ? 'bg-rose-400' : 'bg-emerald-400'}`} />
+                            <h4 className={`text-[11px] font-semibold uppercase tracking-wide flex items-center gap-2 ${failed ? 'text-rose-300' : 'text-emerald-300'}`}>
+                                Actual Output ({failed ? 'Failed' : 'Passed'})
+                            </h4>
+                            <p className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap">
+                                {item.candidateOutput || '-'}
                             </p>
+                            <div className={`rounded-md border px-3 py-2 ${failed ? 'border-rose-400/30 bg-rose-500/10' : 'border-emerald-400/30 bg-emerald-500/10'}`}>
+                                <p className={`text-xs font-semibold ${failed ? 'text-rose-200' : 'text-emerald-200'}`}>
+                                    {failed ? 'Failure Reason' : 'Success Factor'}
+                                </p>
+                                <p className={`mt-1 text-xs ${failed ? 'text-rose-100' : 'text-emerald-100'}`}>
+                                    {failureReason}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                    <p className="text-xs text-indigo-100 mt-2">
-                        점수 차이 Δ {formatSignedNumber(compare.scoreDelta)} / 우세: {renderWinner(compare.winner)}
-                    </p>
                 </div>
-            ) : null}
+            )}
 
-            <details className="rounded-md border border-emerald-400/20 bg-emerald-500/5 px-3 py-2">
-                <summary className="cursor-pointer text-xs text-emerald-200 font-medium">이번 테스트 버전 평가 결과</summary>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-2">
-                    <RuleSummaryCard title="룰 검사 (이번 테스트 버전)" checks={candidateRuleChecks} />
-                    <JudgeSummaryCard title="AI 심사 요약 (이번 테스트 버전)" judge={candidateJudgeOutput} />
-                </div>
-            </details>
-
-            {baselineRuleChecks || baselineJudgeOutput ? (
-                <details className="rounded-md border border-sky-400/20 bg-sky-500/5 px-3 py-2">
-                    <summary className="cursor-pointer text-xs text-sky-200 font-medium">현재 운영 버전 평가 결과</summary>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-2">
-                        <RuleSummaryCard title="룰 검사 (현재 운영 버전)" checks={baselineRuleChecks} />
-                        <JudgeSummaryCard title="AI 심사 요약 (현재 운영 버전)" judge={baselineJudgeOutput} />
+            {detailTab === 'COMPARE' && (
+                <div className="space-y-3 animate-in fade-in duration-200">
+                    {compare ? (
+                        <div className="rounded-md border border-indigo-400/30 bg-indigo-500/10 px-3 py-2">
+                            <p className="text-xs text-indigo-200 font-medium">이번 버전 vs 운영 버전 비교 요약</p>
+                            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div className="rounded border border-emerald-400/30 bg-emerald-500/10 px-2 py-1">
+                                    <p className="text-[11px] text-emerald-200">이번 테스트 버전</p>
+                                    <p className="text-xs text-emerald-100">
+                                        점수 {formatOptionalNumber(compare.candidateOverallScore)} / pass {renderPassValue(compare.candidatePass ?? null)}
+                                    </p>
+                                </div>
+                                <div className="rounded border border-sky-400/30 bg-sky-500/10 px-2 py-1">
+                                    <p className="text-[11px] text-sky-200">현재 운영 버전</p>
+                                    <p className="text-xs text-sky-100">
+                                        점수 {formatOptionalNumber(compare.baselineOverallScore)} / pass {renderPassValue(compare.baselinePass ?? null)}
+                                    </p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-indigo-100 mt-2">
+                                점수 차이 Δ {formatSignedNumber(compare.scoreDelta)} / 우세: {renderWinner(compare.winner)}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-gray-400 p-2">비교 데이터가 없습니다.</p>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="rounded border border-white/10 bg-black/20 p-3 space-y-2">
+                            <p className="text-[11px] text-emerald-300 font-semibold uppercase">이번 테스트 버전 (Candidate)</p>
+                            <p className="text-sm text-gray-200 whitespace-pre-wrap">{item.candidateOutput || '-'}</p>
+                        </div>
+                        <div className="rounded border border-white/10 bg-black/20 p-3 space-y-2">
+                            <p className="text-[11px] text-sky-300 font-semibold uppercase">현재 운영 버전 (Baseline)</p>
+                            <p className="text-sm text-gray-300 whitespace-pre-wrap">{item.baselineOutput || '-'}</p>
+                        </div>
                     </div>
-                </details>
-            ) : null}
-
-            <details className="rounded-md border border-white/10 bg-black/25 p-2">
-                <summary className="cursor-pointer text-[11px] text-gray-300">모델 메타 정보 보기 (토큰/지연/비용)</summary>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-2">
-                    <MetaSummaryCard title="이번 테스트 버전 메타" meta={item.candidateMeta} />
-                    <MetaSummaryCard title="현재 운영 버전 메타" meta={item.baselineMeta} />
                 </div>
-            </details>
+            )}
 
-            {item.errorCode || item.errorMessage ? (
-                <div className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2">
-                    <p className="text-xs text-rose-200 font-medium">실행 오류</p>
-                    <p className="text-xs text-rose-300 mt-1">code: {item.errorCode || '-'}</p>
-                    <p className="text-xs text-rose-300">{item.errorMessage || '-'}</p>
-                </div>
-            ) : null}
+            {detailTab === 'ANALYSIS' && (
+                <div className="space-y-3 animate-in fade-in duration-200">
+                    <div className="p-4 bg-black/30 rounded-lg border border-white/10 space-y-3">
+                        <h4 className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wide flex items-center gap-2">
+                            Expected / Guideline
+                        </h4>
+                        <div className="rounded border border-emerald-400/20 bg-emerald-500/10 px-3 py-2">
+                            <p className="text-[11px] text-emerald-200 font-semibold mb-1">Ideal Response Logic</p>
+                            <p className="text-xs text-emerald-100 whitespace-pre-wrap">{guidelineText}</p>
+                        </div>
+                        <div className="rounded border border-white/10 bg-black/30 px-3 py-2 space-y-2">
+                            <p className="text-[11px] text-gray-400">Required Keywords</p>
+                            {requiredKeywords.length === 0 ? (
+                                <p className="text-xs text-gray-500">명시된 필수 키워드 없음</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-1">
+                                    {requiredKeywords.map((keyword) => (
+                                        <span
+                                            key={keyword}
+                                            className={`text-[11px] px-2 py-0.5 rounded border ${
+                                                missingKeywords.includes(keyword)
+                                                    ? 'bg-rose-500/15 border-rose-400/40 text-rose-200'
+                                                    : 'bg-white/10 border-white/20 text-gray-200'
+                                            }`}
+                                        >
+                                            {keyword}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                            {missingKeywords.length > 0 ? (
+                                <p className="text-[11px] text-rose-200">누락 키워드: {missingKeywords.join(', ')}</p>
+                            ) : null}
+                        </div>
+                    </div>
 
-            <details className="rounded-md border border-white/10 bg-black/25 p-2">
-                <summary className="cursor-pointer text-[11px] text-gray-400">원본 JSON 보기 (개발/디버깅용)</summary>
-                <div className="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <DetailBlock title="룰 체크 원본 (이번 테스트 버전)" value={prettyJson(candidateRuleChecks)} mono />
-                    <DetailBlock title="Judge 원본 (이번 테스트 버전)" value={prettyJson(candidateJudgeOutput)} mono />
-                    <DetailBlock title="룰 체크 원본 (현재 운영 버전)" value={prettyJson(baselineRuleChecks)} mono />
-                    <DetailBlock title="Judge 원본 (현재 운영 버전)" value={prettyJson(baselineJudgeOutput)} mono />
-                    <DetailBlock title="메타 원본 (이번 테스트 버전)" value={prettyJson(item.candidateMeta)} mono />
-                    <DetailBlock title="메타 원본 (현재 운영 버전)" value={prettyJson(item.baselineMeta)} mono />
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <RuleSummaryCard title="룰 검사 (이번 테스트 버전)" checks={candidateRuleChecks} />
+                        <JudgeSummaryCard title="AI 심사 요약 (이번 테스트 버전)" judge={candidateJudgeOutput} />
+                    </div>
+
+                    {baselineRuleChecks || baselineJudgeOutput ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 border-t border-white/10 pt-3">
+                            <RuleSummaryCard title="룰 검사 (현재 운영 버전)" checks={baselineRuleChecks} />
+                            <JudgeSummaryCard title="AI 심사 요약 (현재 운영 버전)" judge={baselineJudgeOutput} />
+                        </div>
+                    ) : null}
                 </div>
-            </details>
+            )}
+
+            {detailTab === 'RAW' && (
+                <div className="space-y-3 animate-in fade-in duration-200">
+                    {item.errorCode || item.errorMessage ? (
+                        <div className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2">
+                            <p className="text-xs text-rose-200 font-medium">실행 오류</p>
+                            <p className="text-xs text-rose-300 mt-1">code: {item.errorCode || '-'}</p>
+                            <p className="text-xs text-rose-300">{item.errorMessage || '-'}</p>
+                        </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <MetaSummaryCard title="이번 테스트 버전 메타" meta={item.candidateMeta} />
+                        <MetaSummaryCard title="현재 운영 버전 메타" meta={item.baselineMeta} />
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        <DetailBlock title="룰 체크 원본 (이번 테스트 버전)" value={prettyJson(candidateRuleChecks)} mono />
+                        <DetailBlock title="Judge 원본 (이번 테스트 버전)" value={prettyJson(candidateJudgeOutput)} mono />
+                        <DetailBlock title="룰 체크 원본 (현재 운영 버전)" value={prettyJson(baselineRuleChecks)} mono />
+                        <DetailBlock title="Judge 원본 (현재 운영 버전)" value={prettyJson(baselineJudgeOutput)} mono />
+                        <DetailBlock title="메타 원본 (이번 테스트 버전)" value={prettyJson(item.candidateMeta)} mono />
+                        <DetailBlock title="메타 원본 (현재 운영 버전)" value={prettyJson(item.baselineMeta)} mono />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
