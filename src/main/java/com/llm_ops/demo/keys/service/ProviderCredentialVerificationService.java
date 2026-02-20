@@ -29,8 +29,7 @@ public class ProviderCredentialVerificationService {
             credential.markActive();
         } catch (BusinessException e) {
             if (isAuthFailure(e)) {
-                providerCredentialRepository.delete(credential);
-                return;
+                credential.markInvalid();
             } else {
                 credential.markVerifying();
             }
@@ -44,8 +43,6 @@ public class ProviderCredentialVerificationService {
     private boolean isAuthFailure(BusinessException exception) {
         ErrorCode code = exception.getErrorCode();
         return code == ErrorCode.UNAUTHENTICATED
-                || code == ErrorCode.FORBIDDEN
-                || code == ErrorCode.INVALID_INPUT_VALUE
-                || code == ErrorCode.NOT_FOUND;
+                || code == ErrorCode.FORBIDDEN;
     }
 }

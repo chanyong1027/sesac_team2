@@ -179,7 +179,7 @@ function ProviderCard({
       const res = await budgetApi.getProviderUsage(orgId, providerSlug);
       return res.data;
     },
-    enabled: supportsBudget && !!credential && !isEnterpriseOnly,
+    enabled: supportsBudget && isConnected && !isEnterpriseOnly,
     retry: false,
   });
 
@@ -189,7 +189,7 @@ function ProviderCard({
       const res = await budgetApi.getProviderPolicy(orgId, providerSlug);
       return res.data;
     },
-    enabled: supportsBudget && !!credential && !isEnterpriseOnly,
+    enabled: supportsBudget && isConnected && !isEnterpriseOnly,
     retry: false,
   });
 
@@ -240,7 +240,7 @@ function ProviderCard({
         )}
       </div>
 
-       {isConnected && credential ? (
+       {credential ? (
          <div className="space-y-3">
            <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
              <p className="text-xs font-medium text-gray-500 mb-1">
@@ -249,48 +249,57 @@ function ProviderCard({
              <p className="font-mono text-sm text-gray-300">{formatKoreanDate(credential.createdAt)}</p>
            </div>
 
-           <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
-             <div className="flex items-center justify-between mb-2">
-               <p className="text-xs font-medium text-gray-500">이번 달 사용량</p>
-               <div className="flex items-center gap-2">
-                 {enabledBudget ? (
-                   <span
-                     className={[
-                       'px-2 py-0.5 rounded-full text-[10px] font-bold border',
-                       isHardExceeded
-                         ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
-                         : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
-                     ].join(' ')}
+           {isConnected && (
+             <div className="p-4 rounded-xl bg-[#0a050d]/50 border border-white/5 backdrop-blur-sm">
+               <div className="flex items-center justify-between mb-2">
+                 <p className="text-xs font-medium text-gray-500">이번 달 사용량</p>
+                 <div className="flex items-center gap-2">
+                   {enabledBudget ? (
+                     <span
+                       className={[
+                         'px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                         isHardExceeded
+                           ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+                           : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
+                       ].join(' ')}
+                     >
+                       {isHardExceeded ? 'BLOCK' : 'ON'}
+                     </span>
+                   ) : (
+                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 border-white/10 text-gray-300">
+                       OFF
+                     </span>
+                   )}
+                   <button
+                     type="button"
+                     onClick={onConfigureBudget}
+                     disabled={!supportsBudget}
+                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
                    >
-                     {isHardExceeded ? 'BLOCK' : 'ON'}
-                   </span>
-                 ) : (
-                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 border-white/10 text-gray-300">
-                     OFF
-                   </span>
-                 )}
-                 <button
-                   type="button"
-                   onClick={onConfigureBudget}
-                   disabled={!supportsBudget}
-                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
-                 >
-                   예산 설정
-                 </button>
+                     예산 설정
+                   </button>
+                 </div>
                </div>
+               <div className="flex items-baseline justify-between">
+                 <p className="font-mono text-sm text-gray-300">{formatUsd(usedUsd)}</p>
+                 <p className="text-[11px] font-mono text-gray-500">
+                   {hardLimitUsd != null ? `${formatUsd(usedUsd)} / ${formatUsd(hardLimitUsd)}` : `${formatUsd(usedUsd)} / -`}
+                 </p>
+               </div>
+               {enabledBudget && isHardExceeded ? (
+                 <p className="mt-2 text-[11px] text-rose-200">
+                   Hard-limit을 초과했습니다. 이 Provider 키로 나가는 호출이 차단됩니다.
+                 </p>
+               ) : null}
              </div>
-             <div className="flex items-baseline justify-between">
-               <p className="font-mono text-sm text-gray-300">{formatUsd(usedUsd)}</p>
-               <p className="text-[11px] font-mono text-gray-500">
-                 {hardLimitUsd != null ? `${formatUsd(usedUsd)} / ${formatUsd(hardLimitUsd)}` : `${formatUsd(usedUsd)} / -`}
-               </p>
-             </div>
-             {enabledBudget && isHardExceeded ? (
-               <p className="mt-2 text-[11px] text-rose-200">
-                 Hard-limit을 초과했습니다. 이 Provider 키로 나가는 호출이 차단됩니다.
-               </p>
-             ) : null}
-           </div>
+           )}
+
+           {isInvalid && (
+             <p className="text-xs text-rose-300 flex items-center gap-1.5">
+               <span className="material-symbols-outlined text-sm">error</span>
+               API 키 인증에 실패했습니다. 키를 업데이트하거나 재검증해 주세요.
+             </p>
+           )}
 
            <div className="flex gap-2">
              <button
@@ -571,15 +580,17 @@ export function SettingsProviderKeysPage() {
    const [updatingCredential, setUpdatingCredential] = useState<ProviderCredentialSummaryResponse | null>(null);
    const [budgetProvider, setBudgetProvider] = useState<ProviderKey | null>(null);
    const [toastMessage, setToastMessage] = useState<string | null>(null);
+   const [toastType, setToastType] = useState<'success' | 'error'>('success');
    const toastTimerRef = useRef<number | null>(null);
    const { currentOrgId } = useOrganizationStore();
    const queryClient = useQueryClient();
 
-  const showToast = (message: string) => {
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
     }
     setToastMessage(message);
+    setToastType(type);
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
@@ -608,8 +619,12 @@ export function SettingsProviderKeysPage() {
       return payload?.data ?? [];
     },
     enabled: !!currentOrgId,
-    refetchInterval: (data) =>
-      Array.isArray(data) && data.some((cred) => cred.status === 'VERIFYING') ? 5000 : false,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      return Array.isArray(data) && data.some((cred: ProviderCredentialSummaryResponse) => cred.status === 'VERIFYING')
+        ? 5000
+        : false;
+    },
   });
 
   const reverifyMutation = useMutation({
@@ -622,7 +637,7 @@ export function SettingsProviderKeysPage() {
       showToast('재검증이 시작되었습니다.');
     },
     onError: (error) => {
-      showToast(resolveCredentialError(error, '재검증 요청에 실패했습니다.'));
+      showToast(resolveCredentialError(error, '재검증 요청에 실패했습니다.'), 'error');
     },
   });
 
@@ -660,7 +675,7 @@ export function SettingsProviderKeysPage() {
       setBudgetProvider(null);
     },
     onError: () => {
-      showToast('예산 설정 저장에 실패했습니다.');
+      showToast('예산 설정 저장에 실패했습니다.', 'error');
     },
   });
 
@@ -686,7 +701,14 @@ export function SettingsProviderKeysPage() {
       />
 
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-4 py-3 text-sm font-medium text-emerald-200 shadow-lg backdrop-blur-xl">
+        <div
+          className={[
+            'fixed top-6 right-6 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-xl border',
+            toastType === 'error'
+              ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+              : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
+          ].join(' ')}
+        >
           {toastMessage}
         </div>
       )}
@@ -765,7 +787,7 @@ export function SettingsProviderKeysPage() {
       <div className="mt-8 pt-8 border-t border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm text-gray-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span>{Object.keys(credentialMap).length}개 연결됨</span>
+          <span>{(credentials || []).filter(c => c.status === 'ACTIVE').length}개 연결됨</span>
         </div>
       </div>
 
