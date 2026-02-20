@@ -117,11 +117,15 @@ const CASE_LANGUAGE_OPTIONS = [
 let fallbackCustomCriterionIdSeed = 0;
 let fallbackCaseRowIdSeed = 0;
 
+import { PromptEvaluateWizard } from './PromptEvaluateWizard';
+
 export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: number; promptId: number }) {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const { orgId: orgIdParam } = useParams<{ orgId: string }>();
     const orgId = Number(orgIdParam);
+
+    const [isWizardMode, setIsWizardMode] = useState(true);
 
     const [datasetName, setDatasetName] = useState('');
     const [datasetDescription, setDatasetDescription] = useState('');
@@ -1179,8 +1183,39 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
         }, 260);
     };
 
+    if (isWizardMode) {
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-end">
+                    <button
+                        onClick={() => setIsWizardMode(false)}
+                        className="px-4 py-2 text-xs font-semibold rounded-full border border-white/10 bg-white/5 hover:bg-white/10 transition-all flex items-center gap-2"
+                    >
+                        <span className="material-symbols-outlined text-sm">tune</span>
+                        Advanced Mode로 전환
+                    </button>
+                </div>
+                <PromptEvaluateWizard 
+                    workspaceId={workspaceId} 
+                    promptId={promptId} 
+                    onSwitchToAdvanced={() => setIsWizardMode(false)} 
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
+            <div className="flex justify-end">
+                <button
+                    onClick={() => setIsWizardMode(true)}
+                    className="px-4 py-2 text-xs font-semibold rounded-full border border-[var(--primary)]/30 bg-[var(--primary)]/10 text-[var(--primary)] hover:bg-[var(--primary)]/20 transition-all flex items-center gap-2"
+                >
+                    <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                    Simple Wizard로 전환
+                </button>
+            </div>
+
             {toastMessage && (
                 <div className={`fixed top-6 right-6 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg backdrop-blur-xl border ${
                     toastTone === 'success'
