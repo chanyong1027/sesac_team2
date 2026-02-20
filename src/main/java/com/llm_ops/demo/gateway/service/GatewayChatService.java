@@ -44,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -165,6 +166,7 @@ public class GatewayChatService {
         GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
         Long promptVersionId = null;
+        List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
 
         try {
@@ -244,6 +246,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
+                        retrievedDocumentInfos = toRetrievedDocumentInfos(ragResponse, result.chunksIncluded());
                         userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
@@ -460,7 +463,7 @@ public class GatewayChatService {
                     ragTopK,
                     ragSimilarityThreshold,
                     answer,
-                    null));
+                    retrievedDocumentInfos));
 
             return GatewayChatResponse.from(
                     traceId,
@@ -495,7 +498,8 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        toErrorResponsePayload(gatewayFailure)));
+                        toErrorResponsePayload(gatewayFailure),
+                        retrievedDocumentInfos));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                         gatewayFailure.httpStatus(),
@@ -522,7 +526,7 @@ public class GatewayChatService {
                         ragTopK,
                         ragSimilarityThreshold,
                         toErrorResponsePayload(gatewayFailure),
-                        null));
+                        retrievedDocumentInfos));
             }
             throw toGatewayException(gatewayFailure, e);
         } catch (Exception e) {
@@ -559,7 +563,7 @@ public class GatewayChatService {
                     ragTopK,
                     ragSimilarityThreshold,
                     toErrorResponsePayload(gatewayFailure),
-                    null));
+                    retrievedDocumentInfos));
             throw toGatewayException(gatewayFailure, e);
         }
     }
@@ -595,6 +599,27 @@ public class GatewayChatService {
         } catch (Exception ignored) {
             return gatewayFailure.errorCode();
         }
+    }
+
+    private static List<RequestLogWriter.RetrievedDocumentInfo> toRetrievedDocumentInfos(
+            RagSearchResponse ragResponse,
+            int includedCount
+    ) {
+        if (ragResponse == null || ragResponse.chunks() == null || ragResponse.chunks().isEmpty() || includedCount <= 0) {
+            return List.of();
+        }
+        List<RequestLogWriter.RetrievedDocumentInfo> infos = new java.util.ArrayList<>();
+        for (int i = 0; i < ragResponse.chunks().size() && i < includedCount; i++) {
+            var chunk = ragResponse.chunks().get(i);
+            infos.add(new RequestLogWriter.RetrievedDocumentInfo(
+                    chunk.documentName(),
+                    chunk.score(),
+                    chunk.content(),
+                    null,
+                    i + 1
+            ));
+        }
+        return infos;
     }
 
 
