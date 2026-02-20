@@ -31,6 +31,7 @@ public class EvalProperties {
     public static class Worker {
         private long pollIntervalMs = 3000L;
         private int batchSize = 3;
+        private int caseConcurrency = 1;
     }
 
     @Getter

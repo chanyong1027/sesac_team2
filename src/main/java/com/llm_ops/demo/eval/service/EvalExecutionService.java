@@ -1,6 +1,7 @@
 package com.llm_ops.demo.eval.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.llm_ops.demo.eval.config.EvalProperties;
 import com.llm_ops.demo.eval.domain.EvalCaseResult;
 import com.llm_ops.demo.eval.domain.EvalCaseStatus;
 import com.llm_ops.demo.eval.domain.EvalMode;
@@ -14,6 +15,7 @@ import com.llm_ops.demo.eval.repository.EvalRunRepository;
 import com.llm_ops.demo.eval.rubric.EvalRubricTemplateRegistry;
 import com.llm_ops.demo.eval.rubric.ResolvedRubricConfig;
 import com.llm_ops.demo.eval.rule.EvalRuleCheckerService;
+import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import java.math.BigDecimal;
@@ -24,6 +26,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +43,7 @@ public class EvalExecutionService {
     private final EvalRunRepository evalRunRepository;
     private final EvalCaseResultRepository evalCaseResultRepository;
     private final PromptReleaseRepository promptReleaseRepository;
+    private final EvalProperties evalProperties;
     private final EvalModelRunnerService evalModelRunnerService;
     private final EvalRuleCheckerService evalRuleCheckerService;
     private final EvalRubricTemplateRegistry evalRubricTemplateRegistry;
@@ -49,6 +56,7 @@ public class EvalExecutionService {
             EvalRunRepository evalRunRepository,
             EvalCaseResultRepository evalCaseResultRepository,
             PromptReleaseRepository promptReleaseRepository,
+            EvalProperties evalProperties,
             EvalModelRunnerService evalModelRunnerService,
             EvalRuleCheckerService evalRuleCheckerService,
             EvalRubricTemplateRegistry evalRubricTemplateRegistry,
@@ -60,6 +68,7 @@ public class EvalExecutionService {
         this.evalRunRepository = evalRunRepository;
         this.evalCaseResultRepository = evalCaseResultRepository;
         this.promptReleaseRepository = promptReleaseRepository;
+        this.evalProperties = evalProperties;
         this.evalModelRunnerService = evalModelRunnerService;
         this.evalRuleCheckerService = evalRuleCheckerService;
         this.evalRubricTemplateRegistry = evalRubricTemplateRegistry;
@@ -94,15 +103,28 @@ public class EvalExecutionService {
             boolean compareBaselineAvailable = run.mode() != EvalMode.COMPARE_ACTIVE || baselineVersion != null;
             List<EvalCaseResult> caseResults = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(run.getId());
 
-            for (EvalCaseResult caseResult : caseResults) {
-                if (isRunCancelled(run.getId())) {
-                    log.info("Eval run cancelled while processing. runId={}", run.getId());
-                    return;
-                }
-                if (caseResult.status() != EvalCaseStatus.QUEUED) {
-                    continue;
-                }
-                processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
+            List<Long> queuedCaseResultIds = caseResults.stream()
+                    .filter(caseResult -> caseResult.status() == EvalCaseStatus.QUEUED)
+                    .map(EvalCaseResult::getId)
+                    .toList();
+
+            if (isRunCancelled(run.getId())) {
+                log.info("Eval run cancelled while processing. runId={}", run.getId());
+                return;
+            }
+
+            RunExecutionContext context = new RunExecutionContext(
+                    run.getId(),
+                    run.rubricTemplateCode(),
+                    run.getPrompt().getWorkspace().getOrganization().getId(),
+                    toVersionSnapshot(run.getPromptVersion()),
+                    baselineVersion != null ? toVersionSnapshot(baselineVersion) : null
+            );
+            processQueuedCases(context, queuedCaseResultIds, rubric, costAccumulator);
+
+            if (isRunCancelled(run.getId())) {
+                log.info("Eval run cancelled while processing. runId={}", run.getId());
+                return;
             }
 
             finishRun(run.getId(), costAccumulator, compareBaselineAvailable);
@@ -112,25 +134,77 @@ public class EvalExecutionService {
         }
     }
 
-    private void processCase(
-            EvalRun run,
-            EvalCaseResult caseResult,
+    private void processQueuedCases(
+            RunExecutionContext context,
+            List<Long> queuedCaseResultIds,
             ResolvedRubricConfig rubric,
-            PromptVersion baselineVersion,
             CostAccumulator costAccumulator
     ) {
+        if (queuedCaseResultIds.isEmpty()) {
+            return;
+        }
+
+        int configuredConcurrency = Math.max(1, evalProperties.getWorker().getCaseConcurrency());
+        int threadCount = Math.min(configuredConcurrency, queuedCaseResultIds.size());
+        Object runCounterLock = new Object();
+
+        if (threadCount == 1) {
+            for (Long caseResultId : queuedCaseResultIds) {
+                processCase(context, caseResultId, rubric, costAccumulator, runCounterLock);
+            }
+            return;
+        }
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        try {
+            List<Future<?>> futures = new ArrayList<>();
+            for (Long caseResultId : queuedCaseResultIds) {
+                futures.add(executor.submit(
+                        () -> processCase(context, caseResultId, rubric, costAccumulator, runCounterLock)));
+            }
+            for (Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("Eval case processing interrupted.", e);
+                } catch (ExecutionException e) {
+                    log.error("Eval case processing task failed. runId={}", context.runId(), e.getCause());
+                }
+            }
+        } finally {
+            executor.shutdown();
+        }
+    }
+
+    private void processCase(
+            RunExecutionContext context,
+            Long caseResultId,
+            ResolvedRubricConfig rubric,
+            CostAccumulator costAccumulator,
+            Object runCounterLock
+    ) {
+        if (isRunCancelled(context.runId())) {
+            return;
+        }
+
+        EvalCaseResult caseResult = evalCaseResultRepository
+                .findByIdAndEvalRunId(caseResultId, context.runId())
+                .orElse(null);
+        if (caseResult == null || caseResult.status() != EvalCaseStatus.QUEUED) {
+            return;
+        }
+
         caseResult.markRunning();
         evalCaseResultRepository.save(caseResult);
 
         try {
             EvalTestCase testCase = caseResult.getTestCase();
-            PromptVersion candidateVersion = run.getPromptVersion();
-
-            Long organizationId = run.getPrompt().getWorkspace().getOrganization().getId();
+            VersionSnapshot candidateVersion = context.candidateVersion();
             String candidatePrompt = buildFinalPrompt(candidateVersion, testCase);
 
             EvalModelRunnerService.ModelExecution candidateExecution = evalModelRunnerService.run(
-                    organizationId,
+                    context.organizationId(),
                     candidateVersion.getProvider(),
                     candidateVersion.getModel(),
                     candidatePrompt,
@@ -138,17 +212,18 @@ public class EvalExecutionService {
                     resolveMaxOutputTokens(candidateVersion.getProvider(), candidateVersion.getModelConfig())
             );
             costAccumulator.add(candidateExecution.meta());
-            RubricTemplateCode rubricTemplateCode = run.rubricTemplateCode();
+            RubricTemplateCode rubricTemplateCode = context.rubricTemplateCode();
 
             String baselineOutput = null;
             Map<String, Object> baselineMeta = null;
             Map<String, Object> baselineRuleChecks = null;
             EvalJudgeService.JudgeResult baselineJudgeResult = null;
+            VersionSnapshot baselineVersion = context.baselineVersion();
             if (baselineVersion != null) {
                 try {
                     String baselinePrompt = buildFinalPrompt(baselineVersion, testCase);
                     EvalModelRunnerService.ModelExecution baselineExecution = evalModelRunnerService.run(
-                            organizationId,
+                            context.organizationId(),
                             baselineVersion.getProvider(),
                             baselineVersion.getModel(),
                             baselinePrompt,
@@ -166,7 +241,7 @@ public class EvalExecutionService {
                             rubricTemplateCode
                     );
                     baselineJudgeResult = evalJudgeService.judge(
-                            organizationId,
+                            context.organizationId(),
                             rubric,
                             testCase.getInputText(),
                             testCase.getContextJson(),
@@ -196,7 +271,7 @@ public class EvalExecutionService {
             );
 
             EvalJudgeService.JudgeResult judgeResult = evalJudgeService.judge(
-                    organizationId,
+                    context.organizationId(),
                     rubric,
                     testCase.getInputText(),
                     testCase.getContextJson(),
@@ -230,17 +305,19 @@ public class EvalExecutionService {
                     judgeResult.pass()
             );
             evalCaseResultRepository.save(caseResult);
-
-            EvalRun latestRun = evalRunRepository.findById(run.getId()).orElseThrow();
-            latestRun.onCaseOk(judgeResult.pass());
-            evalRunRepository.save(latestRun);
+            synchronized (runCounterLock) {
+                EvalRun latestRun = evalRunRepository.findById(context.runId()).orElseThrow();
+                latestRun.onCaseOk(judgeResult.pass());
+                evalRunRepository.save(latestRun);
+            }
         } catch (Exception e) {
             caseResult.markError("EVAL_CASE_EXECUTION_ERROR", sanitizeMessage(e.getMessage()));
             evalCaseResultRepository.save(caseResult);
-
-            EvalRun latestRun = evalRunRepository.findById(run.getId()).orElseThrow();
-            latestRun.onCaseError();
-            evalRunRepository.save(latestRun);
+            synchronized (runCounterLock) {
+                EvalRun latestRun = evalRunRepository.findById(context.runId()).orElseThrow();
+                latestRun.onCaseError();
+                evalRunRepository.save(latestRun);
+            }
         }
     }
 
@@ -310,7 +387,7 @@ public class EvalExecutionService {
         return summary;
     }
 
-    private String buildFinalPrompt(PromptVersion version, EvalTestCase testCase) {
+    private String buildFinalPrompt(VersionSnapshot version, EvalTestCase testCase) {
         Map<String, String> variables = new LinkedHashMap<>();
         variables.put("question", testCase.getInputText());
 
@@ -726,11 +803,24 @@ public class EvalExecutionService {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
     }
 
+    private static VersionSnapshot toVersionSnapshot(PromptVersion version) {
+        Map<String, Object> copiedModelConfig = version.getModelConfig() == null
+                ? null
+                : new LinkedHashMap<>(version.getModelConfig());
+        return new VersionSnapshot(
+                version.getProvider(),
+                version.getModel(),
+                version.getSystemPrompt(),
+                version.getUserTemplate(),
+                copiedModelConfig
+        );
+    }
+
     private static final class CostAccumulator {
         private long totalTokens = 0L;
         private BigDecimal totalCostUsd = BigDecimal.ZERO;
 
-        void add(Map<String, Object> meta) {
+        synchronized void add(Map<String, Object> meta) {
             if (meta == null) {
                 return;
             }
@@ -751,11 +841,48 @@ public class EvalExecutionService {
             }
         }
 
-        Map<String, Object> asMap() {
+        synchronized Map<String, Object> asMap() {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("totalTokens", totalTokens);
             map.put("totalCostUsd", totalCostUsd.setScale(6, RoundingMode.HALF_UP));
             return map;
+        }
+    }
+
+    private record RunExecutionContext(
+            Long runId,
+            RubricTemplateCode rubricTemplateCode,
+            Long organizationId,
+            VersionSnapshot candidateVersion,
+            VersionSnapshot baselineVersion
+    ) {
+    }
+
+    private record VersionSnapshot(
+            ProviderType provider,
+            String model,
+            String systemPrompt,
+            String userTemplate,
+            Map<String, Object> modelConfig
+    ) {
+        ProviderType getProvider() {
+            return provider;
+        }
+
+        String getModel() {
+            return model;
+        }
+
+        String getSystemPrompt() {
+            return systemPrompt;
+        }
+
+        String getUserTemplate() {
+            return userTemplate;
+        }
+
+        Map<String, Object> getModelConfig() {
+            return modelConfig;
         }
     }
 }
