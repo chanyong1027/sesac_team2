@@ -1,5 +1,6 @@
 package com.llm_ops.demo.gateway.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetDecisionAction;
@@ -40,6 +41,8 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -59,6 +62,7 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
+    private static final ObjectMapper REQUEST_PAYLOAD_MAPPER = new ObjectMapper();
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
     private static final int PROVIDER_CALL_MAX_THREADS = 16;
     private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
@@ -151,7 +155,7 @@ public class GatewayChatService {
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
                 request.isRagEnabled(),
-                request.toString(),
+                toRequestPayloadJson(request),
                 "GATEWAY"));
 
         Integer ragLatencyMs = null;
@@ -170,6 +174,7 @@ public class GatewayChatService {
         GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
         Long promptVersionId = null;
+        List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
 
         try {
@@ -249,6 +254,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
+                        retrievedDocumentInfos = toRetrievedDocumentInfos(ragResponse, result.chunksIncluded());
                         userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
@@ -465,7 +471,7 @@ public class GatewayChatService {
                     ragTopK,
                     ragSimilarityThreshold,
                     answer,
-                    null));
+                    retrievedDocumentInfos));
 
             return GatewayChatResponse.from(
                     traceId,
@@ -500,7 +506,7 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        e.getMessage()));
+                        toErrorResponsePayload(gatewayFailure)));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                         gatewayFailure.httpStatus(),
@@ -526,8 +532,8 @@ public class GatewayChatService {
                         ragContextHash,
                         ragTopK,
                         ragSimilarityThreshold,
-                        e.getMessage(),
-                        null));
+                        toErrorResponsePayload(gatewayFailure),
+                        retrievedDocumentInfos));
             }
             throw toGatewayException(gatewayFailure, e);
         } catch (Exception e) {
@@ -563,8 +569,8 @@ public class GatewayChatService {
                     ragContextHash,
                     ragTopK,
                     ragSimilarityThreshold,
-                    e.getMessage(),
-                    null));
+                    toErrorResponsePayload(gatewayFailure),
+                    retrievedDocumentInfos));
             throw toGatewayException(gatewayFailure, e);
         }
     }
@@ -655,6 +661,60 @@ public class GatewayChatService {
             }
         }
         return renderedUserPrompt;
+    }
+
+    private static String toRequestPayloadJson(GatewayChatRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            RequestPayloadForLog payload = new RequestPayloadForLog(
+                    request.workspaceId(),
+                    request.promptKey(),
+                    request.isRagEnabled(),
+                    request.variables() != null ? request.variables().size() : 0
+            );
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
+        if (gatewayFailure == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("errorCode", gatewayFailure.errorCode());
+            payload.put("message", gatewayFailure.errorMessage());
+            payload.put("httpStatus", gatewayFailure.httpStatus());
+            payload.put("failReason", gatewayFailure.failReason());
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return gatewayFailure.errorCode();
+        }
+    }
+
+    private static List<RequestLogWriter.RetrievedDocumentInfo> toRetrievedDocumentInfos(
+            RagSearchResponse ragResponse,
+            int includedCount
+    ) {
+        if (ragResponse == null || ragResponse.chunks() == null || ragResponse.chunks().isEmpty() || includedCount <= 0) {
+            return List.of();
+        }
+        List<RequestLogWriter.RetrievedDocumentInfo> infos = new java.util.ArrayList<>();
+        for (int i = 0; i < ragResponse.chunks().size() && i < includedCount; i++) {
+            var chunk = ragResponse.chunks().get(i);
+            infos.add(new RequestLogWriter.RetrievedDocumentInfo(
+                    chunk.documentName(),
+                    chunk.score(),
+                    chunk.content(),
+                    null,
+                    i + 1
+            ));
+        }
+        return infos;
     }
 
     /**
@@ -912,5 +972,13 @@ public class GatewayChatService {
         private ProviderAttemptTimeoutException(Throwable cause) {
             super(cause);
         }
+    }
+
+    private record RequestPayloadForLog(
+            Long workspaceId,
+            String promptKey,
+            boolean ragEnabled,
+            int variablesCount
+    ) {
     }
 }
