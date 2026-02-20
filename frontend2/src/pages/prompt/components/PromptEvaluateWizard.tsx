@@ -106,7 +106,49 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
     }, [logs]);
 
 
+    const [isCreatingDataset, setIsCreatingDataset] = useState(false);
+    const [quickDatasetForm, setQuickDatasetForm] = useState({ name: '', inputs: '' });
+
     // --- Mutations ---
+    const createQuickDatasetMutation = useMutation({
+        mutationFn: async () => {
+            const name = quickDatasetForm.name.trim();
+            const rawInputs = quickDatasetForm.inputs.trim();
+            if (!name) throw new Error('데이터셋 이름을 입력해주세요.');
+            if (!rawInputs) throw new Error('질문을 최소 1개 이상 입력해주세요.');
+
+            const inputs = rawInputs.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+            if (inputs.length === 0) throw new Error('유효한 질문이 없습니다.');
+
+            // 1. Create Dataset
+            const dsRes = await promptApi.createEvalDataset(workspaceId, promptId, { name });
+            const datasetId = dsRes.data.id;
+
+            // 2. Upload Cases
+            const testCases = inputs.map(input => ({
+                input,
+                expectedJson: { must_cover: [] }, // Default empty criteria
+                constraintsJson: {}
+            }));
+
+            await promptApi.bulkUploadEvalDatasetCases(workspaceId, promptId, datasetId, {
+                testCases,
+                replaceExisting: true
+            });
+
+            return datasetId;
+        },
+        onSuccess: (newDatasetId) => {
+            queryClient.invalidateQueries({ queryKey: ['evalDatasets', workspaceId, promptId] });
+            setSelectedDatasetId(newDatasetId);
+            setIsCreatingDataset(false);
+            setQuickDatasetForm({ name: '', inputs: '' });
+        },
+        onError: (err) => {
+            alert('데이터셋 생성 실패: ' + err);
+        }
+    });
+
     const startRunMutation = useMutation({
         mutationFn: async () => {
             if (!selectedDatasetId) throw new Error('데이터셋을 선택해주세요.');
@@ -156,38 +198,96 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
     // --- Step 1: SETUP ---
     if (step === 'SETUP') {
         return (
-            <div className="max-w-3xl mx-auto py-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="max-w-4xl mx-auto py-10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="text-center space-y-2">
                     <h2 className="text-3xl font-bold text-white tracking-tight">AI 품질 평가 위자드</h2>
                     <p className="text-gray-400">복잡한 설정 없이, 3번의 클릭으로 현재 프롬프트의 품질을 검증하세요.</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Dataset Selection */}
-                    <div className="glass-card p-6 rounded-2xl border border-white/10 hover:border-purple-500/30 transition-all cursor-pointer group bg-gradient-to-br from-white/5 to-transparent">
-                        <div className="flex items-center gap-3 mb-4">
-                            <span className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-300">1</span>
-                            <h3 className="text-lg font-semibold text-white">데이터셋 선택</h3>
-                        </div>
-                        <div className="space-y-2">
-                            {datasets?.map(ds => (
-                                <div 
-                                    key={ds.id}
-                                    onClick={() => setSelectedDatasetId(ds.id)}
-                                    className={`p-3 rounded-xl border transition-all flex justify-between items-center ${
-                                        selectedDatasetId === ds.id 
-                                            ? 'bg-purple-500/20 border-purple-500 text-white' 
-                                            : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/10'
-                                    }`}
+                    <div className="glass-card p-6 rounded-2xl border border-white/10 hover:border-purple-500/30 transition-all cursor-pointer group bg-gradient-to-br from-white/5 to-transparent flex flex-col">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <span className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-300">1</span>
+                                <h3 className="text-lg font-semibold text-white">데이터셋 선택</h3>
+                            </div>
+                            {isCreatingDataset ? (
+                                <button 
+                                    onClick={() => setIsCreatingDataset(false)}
+                                    className="text-xs text-gray-400 hover:text-white"
                                 >
-                                    <span>{ds.name}</span>
-                                    {selectedDatasetId === ds.id && <span className="material-symbols-outlined text-sm">check</span>}
-                                </div>
-                            ))}
-                            {(!datasets || datasets.length === 0) && (
-                                <div className="text-sm text-gray-500 text-center py-4">데이터셋이 없습니다. Advanced 모드에서 생성해주세요.</div>
+                                    목록으로
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={() => setIsCreatingDataset(true)}
+                                    className="text-xs flex items-center gap-1 text-[var(--primary)] hover:underline"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add</span>
+                                    새로 만들기
+                                </button>
                             )}
                         </div>
+
+                        {isCreatingDataset ? (
+                            <div className="space-y-4 flex-1 animate-in fade-in zoom-in-95 duration-200">
+                                <div>
+                                    <label className="block text-xs text-gray-400 mb-1">데이터셋 이름</label>
+                                    <input 
+                                        className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[var(--primary)] outline-none"
+                                        placeholder="예: 2026-02-21 테스트용"
+                                        value={quickDatasetForm.name}
+                                        onChange={(e) => setQuickDatasetForm(prev => ({ ...prev, name: e.target.value }))}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-xs text-gray-400 mb-1">질문 입력 (엔터로 구분)</label>
+                                    <textarea 
+                                        className="w-full h-40 bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white resize-none focus:border-[var(--primary)] outline-none"
+                                        placeholder={`환불 규정 알려줘\n상담원 연결해줘\n...`}
+                                        value={quickDatasetForm.inputs}
+                                        onChange={(e) => setQuickDatasetForm(prev => ({ ...prev, inputs: e.target.value }))}
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => createQuickDatasetMutation.mutate()}
+                                    disabled={createQuickDatasetMutation.isPending || !quickDatasetForm.name || !quickDatasetForm.inputs}
+                                    className="w-full py-2 rounded-lg bg-[var(--primary)] text-black font-semibold hover:opacity-90 disabled:opacity-50"
+                                >
+                                    {createQuickDatasetMutation.isPending ? '생성 중...' : '생성하고 바로 선택'}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                                {datasets?.map(ds => (
+                                    <button 
+                                        key={ds.id}
+                                        onClick={() => setSelectedDatasetId(ds.id)}
+                                        className={`w-full p-3 rounded-xl border transition-all flex justify-between items-center text-left group/item ${
+                                            selectedDatasetId === ds.id 
+                                                ? 'bg-purple-500/20 border-purple-500 text-white' 
+                                                : 'bg-black/20 border-white/10 text-gray-400 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium">{ds.name}</p>
+                                            <p className="text-[10px] opacity-60 truncate">{ds.description || '설명 없음'}</p>
+                                        </div>
+                                        {selectedDatasetId === ds.id && <span className="material-symbols-outlined text-sm text-purple-400">check_circle</span>}
+                                    </button>
+                                ))}
+                                {(!datasets || datasets.length === 0) && (
+                                    <div className="text-sm text-gray-500 text-center py-8 border border-dashed border-white/10 rounded-xl">
+                                        데이터셋이 없습니다.<br />
+                                        <button onClick={() => setIsCreatingDataset(true)} className="text-[var(--primary)] underline mt-2">
+                                            지금 바로 만드세요
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Mode Selection */}
@@ -225,13 +325,23 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
                                 </div>
                             </button>
                         </div>
+
+                        {selectedDatasetId && !isCreatingDataset && (
+                            <div className="mt-6 pt-6 border-t border-white/10">
+                                <p className="text-xs text-gray-400 mb-2 font-semibold">선택한 데이터셋 미리보기</p>
+                                <div className="bg-black/30 rounded-lg p-3 text-xs text-gray-300 space-y-1 max-h-32 overflow-y-auto">
+                                    <p className="text-[10px] text-gray-500 mb-1">{selectedDataset?.name}</p>
+                                    <p className="text-gray-400 italic text-[10px]">실제 데이터 로딩 기능은 간소화를 위해 생략됨 (Advanced에서 확인 가능)</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex justify-center pt-6">
                     <button
                         onClick={() => startRunMutation.mutate()}
-                        disabled={startRunMutation.isPending || !selectedDatasetId}
+                        disabled={startRunMutation.isPending || !selectedDatasetId || isCreatingDataset}
                         className="group relative px-8 py-4 bg-white text-black rounded-full font-bold text-lg shadow-[0_0_20px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:shadow-none"
                     >
                         {startRunMutation.isPending ? '준비 중...' : '평가 시작하기 🚀'}
