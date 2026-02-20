@@ -35,6 +35,7 @@ import type {
 import { workspaceApi } from '@/api/workspace.api';
 
 type Tab = 'model' | 'prompt';
+const DEFAULT_WORKSPACE_LIMIT_USD = 100; // TODO: replace with workspace/org budget setting API value
 
 export default function DashboardPage() {
     const { orgId } = useParams<{ orgId: string }>();
@@ -139,6 +140,23 @@ export default function DashboardPage() {
         color: item.status === 'BLOCKED' ? '#F59E0B' : '#EF4444' // Amber for Blocked, Red for Fail
     }));
 
+    const totalAvgLatencyMs = Number(overview?.avgLatencyMs ?? 0);
+    const ragAvgLatencyMs = Number(ragQuality?.avgRagLatencyMs ?? NaN);
+    const canShowLatencyBreakdown = Number.isFinite(totalAvgLatencyMs)
+        && Number.isFinite(ragAvgLatencyMs)
+        && totalAvgLatencyMs > 0
+        && ragAvgLatencyMs >= 0;
+    const ragPercent = canShowLatencyBreakdown
+        ? Math.min(100, Math.max(0, (ragAvgLatencyMs / totalAvgLatencyMs) * 100))
+        : 0;
+    const llmPercent = canShowLatencyBreakdown ? Math.max(0, 100 - ragPercent) : 0;
+
+    const totalCost = Number(overview?.totalCost ?? 0);
+    const costLimit = DEFAULT_WORKSPACE_LIMIT_USD;
+    const costProgressPercent = costLimit > 0
+        ? Math.min(100, Math.max(0, (totalCost / costLimit) * 100))
+        : 0;
+
     // Data for Usage Analysis Table
     const usageData = usageTab === 'model'
         ? models.map((m, i) => ({
@@ -152,8 +170,10 @@ export default function DashboardPage() {
         }))
         : prompts.map((p, i) => ({
             rank: i + 1,
-            name: p.promptKey,
-            sub: p.promptId ? `Ver. ${p.promptId}` : 'Raw',
+            name: p.promptKey || p.key || p.name || 'Unknown Prompt',
+            sub: p.promptVersion || p.version
+                ? `Ver. ${p.promptVersion ?? p.version}`
+                : (p.promptId ?? p.id) ? `ID: ${p.promptId ?? p.id}` : 'Raw',
             requests: p.requests,
             tokens: p.tokens,
             latency: 0, // Prompt usage doesn't have latency yet in API
@@ -367,14 +387,18 @@ export default function DashboardPage() {
                     <div className="text-[10px] text-gray-500 mb-3">
                         P95: {overview?.p95LatencyMs}ms · P99: {overview?.p99LatencyMs}ms
                     </div>
-                    <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden flex">
-                        <div className="bg-blue-500 h-full" style={{ width: '30%' }} title="RAG Overhead" />
-                        <div className="bg-[var(--primary)] h-full" style={{ width: '70%' }} title="LLM Generation" />
-                    </div>
-                    <div className="flex justify-between mt-1 text-[9px] text-gray-500 font-mono">
-                        <span>RAG</span>
-                        <span>LLM</span>
-                    </div>
+                    {canShowLatencyBreakdown && (
+                        <>
+                            <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden flex">
+                                <div className="bg-blue-500 h-full" style={{ width: `${ragPercent}%` }} title="RAG Overhead" />
+                                <div className="bg-[var(--primary)] h-full" style={{ width: `${llmPercent}%` }} title="LLM Generation" />
+                            </div>
+                            <div className="flex justify-between mt-1 text-[9px] text-gray-500 font-mono">
+                                <span>RAG</span>
+                                <span>LLM</span>
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* 4. Total Cost */}
@@ -386,7 +410,7 @@ export default function DashboardPage() {
                         </div>
                     </div>
                     <div className="flex items-baseline gap-2 mb-2">
-                        <span className="text-2xl font-bold text-white tracking-tight">{formatCurrency(overview?.totalCost || 0)}</span>
+                        <span className="text-2xl font-bold text-white tracking-tight">{formatCurrency(totalCost)}</span>
                         {(overview?.costChange ?? 0) !== 0 && (
                             <span className={`text-[10px] font-bold ${(overview?.costChange ?? 0) <= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                 {(overview?.costChange ?? 0) > 0 ? '↗' : '↘'} {Math.abs(overview?.costChange || 0).toFixed(1)}%
@@ -396,12 +420,12 @@ export default function DashboardPage() {
                     <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-3">
                         <div
                             className="bg-emerald-500 h-full rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]"
-                            style={{ width: `${Math.min(100, (overview?.totalCost || 0) / 100 * 100)}%` }}
+                            style={{ width: `${costProgressPercent}%` }}
                         />
                     </div>
                     <div className="flex justify-between mt-1 text-[9px] text-gray-500 font-mono">
-                        <span>{formatCurrency(overview?.totalCost || 0)} spent</span>
-                        <span>$100.00 limit</span>
+                        <span>{formatCurrency(totalCost)} spent</span>
+                        <span>{formatCurrency(costLimit)} limit</span>
                     </div>
                 </div>
 
