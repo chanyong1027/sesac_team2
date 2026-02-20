@@ -3,6 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { promptApi } from '@/api/prompt.api';
 import { organizationApi } from '@/api/organization.api';
 import type { EvalMode, EvalRunResponse, EvalCaseResultResponse } from '@/types/api.types';
+import { 
+    CaseEditorRow, 
+    type CaseFormRow, 
+    createEmptyCaseFormRow, 
+    parseCaseRows 
+} from './CaseEditorRow';
 
 // --- Types & Interfaces ---
 type WizardStep = 'SETUP' | 'RUNNING' | 'REPORT';
@@ -22,6 +28,16 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
     const [currentRunId, setCurrentRunId] = useState<number | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
     const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Dataset Creation States
+    const [isCreatingDataset, setIsCreatingDataset] = useState(false);
+    const [isDetailedCreation, setIsDetailedCreation] = useState(false);
+    const [quickDatasetForm, setQuickDatasetForm] = useState({ name: '', inputs: '' });
+    const [caseFormRows, setCaseFormRows] = useState<CaseFormRow[]>([createEmptyCaseFormRow()]);
+    
+    // Editor States (for detailed mode)
+    const [expandedEditorCaseId, setExpandedEditorCaseId] = useState<string | null>(null);
+    const [advancedJsonOpenByRow, setAdvancedJsonOpenByRow] = useState<Record<string, boolean>>({});
 
     // --- Queries ---
     const { data: datasets } = useQuery({
@@ -86,12 +102,10 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
                     const icon = c.pass ? '✅' : '❌';
                     const msg = `Case #${c.testCaseId}: ${c.pass ? 'PASS' : 'FAIL'}`;
                     if (!logs.includes(msg) && !logs.includes(`${icon} ${msg}`)) {
-                        // Simple dedup logic for demo
-                        // In real app, track processed IDs
+                        // dedup logic can be improved
                     }
                 }
             });
-            // Simplified log simulation for visual effect
             const processed = runCases.filter(c => c.status === 'COMPLETED').length;
             if (processed > 0 && processed > logs.length) {
                 const latest = runCases[processed - 1];
@@ -106,48 +120,7 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
     }, [logs]);
 
 
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { promptApi } from '@/api/prompt.api';
-import { organizationApi } from '@/api/organization.api';
-import type { EvalMode, EvalRunResponse, EvalCaseResultResponse } from '@/types/api.types';
-import { 
-    CaseEditorRow, 
-    type CaseFormRow, 
-    createEmptyCaseFormRow, 
-    parseCaseRows 
-} from './CaseEditorRow';
-
-// --- Types & Interfaces ---
-type WizardStep = 'SETUP' | 'RUNNING' | 'REPORT';
-
-interface PromptEvaluateWizardProps {
-    workspaceId: number;
-    promptId: number;
-    onSwitchToAdvanced: () => void;
-}
-
-// --- Component ---
-export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced }: PromptEvaluateWizardProps) {
-    const queryClient = useQueryClient();
-    const [step, setStep] = useState<WizardStep>('SETUP');
-    const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
-    const [compareMode, setCompareMode] = useState<boolean>(false);
-    const [currentRunId, setCurrentRunId] = useState<number | null>(null);
-    const [logs, setLogs] = useState<string[]>([]);
-    const logsEndRef = useRef<HTMLDivElement>(null);
-
-    // Dataset Creation States
-    const [isCreatingDataset, setIsCreatingDataset] = useState(false);
-    const [isDetailedCreation, setIsDetailedCreation] = useState(false);
-    const [quickDatasetForm, setQuickDatasetForm] = useState({ name: '', inputs: '' });
-    const [caseFormRows, setCaseFormRows] = useState<CaseFormRow[]>([createEmptyCaseFormRow()]);
-    
-    // Editor States (for detailed mode)
-    const [expandedEditorCaseId, setExpandedEditorCaseId] = useState<string | null>(null);
-    const [advancedJsonOpenByRow, setAdvancedJsonOpenByRow] = useState<Record<string, boolean>>({});
-
-    // Sync helpers
+    // --- Sync Helpers ---
     const switchToDetailed = () => {
         const lines = quickDatasetForm.inputs.split('\n').map(s => s.trim()).filter(s => s.length > 0);
         if (lines.length > 0) {
@@ -256,40 +229,8 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
         }
     });
 
-    // Helper functions for CaseEditorRow props
-    const updateCaseRow = (rowId: string, field: keyof Omit<CaseFormRow, 'id'>, value: string) => {
-        setCaseFormRows(prev => prev.map(row => row.id === rowId ? { ...row, [field]: value } : row));
-    };
-    // (Other helpers are simplified for wizard context or not needed if we use CaseEditorRow purely)
-    // Actually CaseEditorRow needs many handlers. We should implement minimal versions.
-    
-    // Minimal implementations for CaseEditorRow support in Wizard
-    const updateCaseJsonObject = (rowId: string, field: any, updater: any) => {
-        setCaseFormRows(prev => prev.map(row => {
-            if (row.id !== rowId) return row;
-            // Simplified: just parse, update, stringify. 
-            // In real app, reuse the robust logic from Tab component.
-            // For now, we assume users use the UI fields mainly.
-            // But CaseEditorRow expects these props.
-            // We need to duplicate the logic or import it.
-            // Since we extracted CaseEditorRow but not the helper logic functions (they are inside Tab component or local),
-            // we should have extracted helpers to CaseEditorRow.tsx as well.
-            // I did include helpers in CaseEditorRow.tsx export in previous step? 
-            // No, I put them in CaseEditorRow.tsx but didn't export them all.
-            // Let's implement simple versions here or rely on CaseEditorRow's internal logic if it was self-contained?
-            // CaseEditorRow is a presentational component mostly, it relies on parent for state updates.
-            
-            // Let's use a simpler approach: CaseEditorRow.tsx should export the helper functions too!
-            // I'll assume they are exported or I will reimplement necessary ones.
-            return row; 
-        }));
-    };
-    // Wait, the previous step's CaseEditorRow.tsx included helper functions inside the file but NOT exported.
-    // That means I cannot import `updateCaseJsonObject` logic.
-    // I should have exported them.
-    // I will reimplement the updater logic locally here to be safe and avoid another file edit if possible.
-    
-    // Re-implementing logic locally for Wizard
+    // --- Editor Handlers (Minimal Logic) ---
+    // Re-implementing simplified logic locally for Wizard to support CaseEditorRow
     const _parseObject = (txt: string) => { try { return JSON.parse(txt) || {} } catch { return {} } };
     const _updateJson = (rowId: string, field: keyof CaseFormRow, updater: (prev: any) => any) => {
         setCaseFormRows(prev => prev.map(row => {
@@ -301,7 +242,9 @@ export function PromptEvaluateWizard({ workspaceId, promptId, onSwitchToAdvanced
     };
 
     const handlers = {
-        updateCaseRow,
+        updateCaseRow: (rowId: string, field: keyof Omit<CaseFormRow, 'id'>, value: string) => {
+            setCaseFormRows(prev => prev.map(row => row.id === rowId ? { ...row, [field]: value } : row));
+        },
         setContextLanguage: (id: string, val: string) => _updateJson(id, 'contextJsonText', (o) => ({ ...o, lang: val })),
         setCaseArrayField: (id: string, field: any, key: string, val: string[]) => _updateJson(id, field, (o) => { const n = {...o}; if(val.length) n[key] = val; else delete n[key]; return n; }),
         setCaseBooleanFlag: (id: string, key: string, checked: boolean) => _updateJson(id, 'expectedJsonText', (o) => { 
