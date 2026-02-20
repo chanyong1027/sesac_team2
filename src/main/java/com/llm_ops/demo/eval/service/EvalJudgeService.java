@@ -212,8 +212,9 @@ public class EvalJudgeService {
                 - expected.must_cover 가 있으면, 각 항목이 candidateOutput에 "의미적으로" 포함/해결되었는지 판단하라(동의어/다른 표현 허용).
                   하나라도 누락되면 pass=false 로 두고 labels에 "MISSING_MUST_COVER" 를 포함하라.
                   mustCoverChecks에 항목별 covered=true/false를 채우고, 누락 항목은 evidence에 명시하라.
-                - ruleChecks는 하드 룰(형식/길이/키워드/JSON 등) 결과이므로, ruleChecks.pass=false 인 경우 pass는 false여야 한다.
-                - 하드룰(must_include/must_not_include 등)은 ruleChecks에서 이미 판정된다. 너는 candidateOutput을 다시 문자열로 재검증하지 말고 ruleChecks만 따르라.
+                - ruleChecks는 하드 룰(형식/길이/JSON/스키마/금지 키워드 등) 결과이므로, ruleChecks.pass=false 인 경우 pass는 false여야 한다.
+                - ruleChecks.warningChecks는 소프트 경고다(예: must_include 누락). warningChecks만으로 pass를 false로 바꾸지 말고 labels/evidence/suggestions에 개선 포인트로 반영하라.
+                - 키워드 문자열 체크(must_include/must_not_include 등)는 ruleChecks에서 이미 판정된다. 너는 candidateOutput을 다시 문자열로 재검증하지 말고 ruleChecks만 따르라.
 
                 %s
                 입력:
