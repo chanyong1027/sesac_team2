@@ -52,6 +52,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
                         SELECT
                             CAST(created_at AS date) as date,
                             COUNT(*) as requests,
+                            COALESCE(SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END), 0) as errorCount,
                             COALESCE(SUM(total_tokens), 0) as tokens,
                             COALESCE(SUM(estimated_cost), 0) as cost
                         FROM request_logs
@@ -74,6 +75,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
                         SELECT
                             DATE_TRUNC('week', created_at)::date as date,
                             COUNT(*) as requests,
+                            COALESCE(SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END), 0) as errorCount,
                             COALESCE(SUM(total_tokens), 0) as tokens,
                             COALESCE(SUM(estimated_cost), 0) as cost
                         FROM request_logs
@@ -96,6 +98,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
                         SELECT
                             DATE_TRUNC('month', created_at)::date as date,
                             COUNT(*) as requests,
+                            COALESCE(SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END), 0) as errorCount,
                             COALESCE(SUM(total_tokens), 0) as tokens,
                             COALESCE(SUM(estimated_cost), 0) as cost
                         FROM request_logs

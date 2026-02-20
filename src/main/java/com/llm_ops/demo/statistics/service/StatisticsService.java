@@ -121,6 +121,7 @@ public class StatisticsService {
                                 .map(p -> new TimeseriesDataPoint(
                                                 p.getDate(),
                                                 p.getRequests(),
+                                                p.getErrorCount(),
                                                 p.getTokens(),
                                                 p.getCost()))
                                 .toList();

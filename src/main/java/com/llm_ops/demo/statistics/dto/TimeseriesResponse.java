@@ -9,6 +9,7 @@ public record TimeseriesResponse(
         public record TimeseriesDataPoint(
                         LocalDate date,
                         Long requests,
+                        Long errorCount,
                         Long tokens,
                         BigDecimal cost) {
         }
