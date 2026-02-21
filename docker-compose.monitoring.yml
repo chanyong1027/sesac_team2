@@ -30,8 +30,19 @@ services:
     image: prom/alertmanager:v0.27.0
     ports:
       - "9093:9093"
+    environment:
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-http://placeholder}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cat /etc/alertmanager/alertmanager.yml.template \
+          | sed "s|\$${SLACK_WEBHOOK_URL}|$$SLACK_WEBHOOK_URL|g" \
+          > /tmp/alertmanager.yml \
+        && /bin/alertmanager --config.file=/tmp/alertmanager.yml
     volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml.template:ro
+      - alertmanager-data:/alertmanager
     restart: unless-stopped
 
   node-exporter:
@@ -47,3 +58,4 @@ services:
 volumes:
   prometheus-data:
   grafana-data:
+  alertmanager-data:
