@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Database,
   Activity,
-  Layers,
   Hash,
   MessageSquare,
   Zap,
@@ -106,10 +105,10 @@ function extractUserQuestions(requestPayload: string | null): string[] {
 }
 
 function formatFullDateTime(iso: string) {
-  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`;
-  const d = new Date(normalized);
-  if (Number.isNaN(d.getTime())) return iso;
+  const d = parseApiDate(iso);
+  if (!d) return iso;
   return d.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -118,6 +117,67 @@ function formatFullDateTime(iso: string) {
     second: '2-digit',
     weekday: 'short',
   });
+}
+
+function formatKstDateTimeOrFallback(iso: string | null | undefined, fallback = '-') {
+  if (!iso) return fallback;
+  const d = parseApiDate(iso);
+  if (!d) return fallback;
+  return d.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    weekday: 'short',
+  });
+}
+
+function parseApiDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`;
+  const d = new Date(normalized);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function resolveResponsePayloadTimestamp(createdAt: string, finishedAt: string | null, latencyMs: number | null): string {
+  const createdDate = parseApiDate(createdAt);
+  const finishedDate = parseApiDate(finishedAt);
+
+  if (!createdDate) {
+    return finishedAt ?? createdAt;
+  }
+
+  const createdMs = createdDate.getTime();
+  const derivedFromLatencyMs = typeof latencyMs === 'number' && latencyMs >= 0
+    ? createdMs + latencyMs
+    : null;
+
+  if (!finishedDate) {
+    if (derivedFromLatencyMs != null) {
+      return new Date(derivedFromLatencyMs).toISOString();
+    }
+    return createdAt;
+  }
+
+  const finishedMs = finishedDate.getTime();
+  const suspiciousSkewByOrder = finishedMs < createdMs;
+  const suspiciousSkewByGap = derivedFromLatencyMs != null
+    ? Math.abs(finishedMs - derivedFromLatencyMs) > 60 * 60 * 1000
+    : false;
+
+  if ((suspiciousSkewByOrder || suspiciousSkewByGap) && derivedFromLatencyMs != null) {
+    return new Date(derivedFromLatencyMs).toISOString();
+  }
+
+  return finishedAt ?? createdAt;
+}
+
+function formatSeconds(ms: number): string {
+  return `${(ms / 1000).toFixed(3).replace(/\.?0+$/, '')}s`;
 }
 
 function statusBadge(status: RequestLogStatus) {
@@ -172,7 +232,20 @@ export function WorkspaceLogDetailPage() {
 
   const rawJson = log ? JSON.stringify(log, null, 2) : '';
   const extractedUserQuestions = extractUserQuestions(log?.requestPayload ?? null);
-  const responsePayloadTimestamp = log?.finishedAt ?? log?.createdAt ?? null;
+  const responsePayloadTimestamp = log
+    ? resolveResponsePayloadTimestamp(log.createdAt, log.finishedAt, log.latencyMs)
+    : null;
+  const totalLatencyMs = Math.max(0, log?.latencyMs ?? 0);
+  const ragLatencyMs = Math.max(0, log?.ragLatencyMs ?? 0);
+  const llmLatencyMs = Math.max(0, totalLatencyMs - ragLatencyMs);
+  const ragPercent = totalLatencyMs > 0 ? Math.round((ragLatencyMs / totalLatencyMs) * 100) : 0;
+  const llmPercent = totalLatencyMs > 0 ? Math.round((llmLatencyMs / totalLatencyMs) * 100) : 0;
+  const ragRatio = totalLatencyMs > 0 ? Math.max(0, Math.min(100, (ragLatencyMs / totalLatencyMs) * 100)) : 0;
+  const donutGradient = totalLatencyMs <= 0
+    ? 'conic-gradient(from -90deg, rgba(148,163,184,0.25) 0% 100%)'
+    : log?.ragEnabled
+      ? `conic-gradient(from -90deg, rgba(59,130,246,0.95) 0% ${ragRatio}%, rgba(168,85,247,0.95) ${ragRatio}% 100%)`
+      : 'conic-gradient(from -90deg, rgba(168,85,247,0.95) 0% 100%)';
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
@@ -268,7 +341,7 @@ export function WorkspaceLogDetailPage() {
             {/* 1. Model Info Card */}
             <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
               <div className="flex items-center gap-2 mb-4 text-[var(--primary)] border-l-2 border-[var(--primary)] pl-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider">Model Info</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">모델 정보</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
@@ -276,11 +349,11 @@ export function WorkspaceLogDetailPage() {
                   <span className="text-white font-medium">{log.provider}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Requested</span>
+                  <span className="text-gray-500">요청 모델</span>
                   <span className="text-gray-300 font-mono text-xs">{log.requestedModel}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Used Model</span>
+                  <span className="text-gray-500">사용 모델</span>
                   <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium ${log.isFailover ? 'bg-[var(--primary)]/20 text-[var(--primary)]' : 'bg-white/10 text-gray-300'}`}>
                     {log.usedModel}
                   </span>
@@ -297,25 +370,27 @@ export function WorkspaceLogDetailPage() {
             {/* 2. Token & Cost Card */}
             <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
               <div className="flex items-center gap-2 mb-4 text-blue-400 border-l-2 border-blue-500 pl-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider">Token & Cost</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">토큰 및 비용</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Input Tokens</span>
+                  <span className="text-gray-500">입력 토큰</span>
                   <span className="text-white font-mono">{log.inputTokens?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Output Tokens</span>
+                  <span className="text-gray-500">출력 토큰</span>
                   <span className="text-white font-mono">{log.outputTokens?.toLocaleString()}</span>
                 </div>
                 <div className="w-full h-px bg-white/5 my-2" />
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Total Tokens</span>
+                  <span className="text-gray-500">총 토큰</span>
                   <span className="text-white font-bold font-mono">{log.totalTokens?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Cost</span>
-                  <span className="text-emerald-400 font-bold font-mono">${log.cost?.toFixed(5)}</span>
+                  <span className="text-gray-500">비용</span>
+                  <span className="text-emerald-400 font-bold font-mono">
+                    {typeof log.cost === 'number' ? `$${log.cost.toFixed(5)}` : '-'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -323,7 +398,7 @@ export function WorkspaceLogDetailPage() {
             {/* 3. RAG Configuration Card */}
             <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
               <div className="flex items-center gap-2 mb-4 text-purple-400 border-l-2 border-purple-500 pl-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider">RAG Configuration</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">RAG 설정</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
@@ -331,20 +406,20 @@ export function WorkspaceLogDetailPage() {
                   <span className="text-white font-mono">{log.ragTopK || '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Similarity Threshold</span>
+                  <span className="text-gray-500">유사도 임계값</span>
                   <span className="text-white font-mono">{log.ragSimilarityThreshold || '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Chunks Retrieved</span>
+                  <span className="text-gray-500">검색 청크 수</span>
                   <span className="text-white font-mono">{log.ragChunksCount || 0}</span>
                 </div>
                 {/* Mocked fields for UI completeness based on design */}
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Context Chars</span>
+                  <span className="text-gray-500">컨텍스트 글자 수</span>
                   <span className="text-white font-mono">2450</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Context Truncated</span>
+                  <span className="text-gray-500">컨텍스트 잘림</span>
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1">
                     <Activity size={10} /> Yes
                   </span>
@@ -355,38 +430,43 @@ export function WorkspaceLogDetailPage() {
             {/* 4. Request Info Card */}
             <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
               <div className="flex items-center gap-2 mb-4 text-gray-400 border-l-2 border-gray-500 pl-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider">Request Info</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider">요청 정보</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="space-y-1">
                   <span className="text-xs text-gray-500">Trace ID</span>
-                  <div className="flex items-center justify-between p-1.5 rounded bg-black/30 border border-white/5">
-                    <code className="text-[10px] text-blue-300 font-mono truncate max-w-[120px]">{log.traceId}</code>
+                  <div className="flex items-start justify-between gap-2 p-1.5 rounded bg-black/30 border border-white/5">
+                    <code className="text-[10px] text-blue-300 font-mono break-all leading-tight flex-1">
+                      {log.traceId}
+                    </code>
                     <button onClick={() => navigator.clipboard.writeText(log.traceId!)} className="text-gray-500 hover:text-white">
                       <Copy size={10} />
                     </button>
                   </div>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">HTTP Status</span>
+                  <span className="text-gray-500">HTTP 상태</span>
                   <span className={`font-mono font-bold ${log.httpStatus === 200 ? 'text-white' : 'text-rose-400'}`}>
                     {log.httpStatus}
                   </span>
                 </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-500">Request Path</span>
-                  <div className="text-xs text-gray-300 font-mono break-all leading-tight">
-                    {log.requestPath || '/v1/models/chat'}
-                  </div>
-                </div>
                 <div className="flex justify-between items-center text-sm pt-1 border-t border-white/5">
-                  <span className="text-gray-500">Source</span>
+                  <span className="text-gray-500">요청 소스</span>
                   <span className="text-gray-300 uppercase font-bold text-xs tracking-wider">{log.requestSource}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Created At</span>
-                  <span className="text-gray-400 text-[10px] font-mono">{new Date(log.createdAt).toLocaleString()}</span>
+                  <span className="text-gray-500">생성 시각</span>
+                  <span className="text-gray-400 text-[10px] font-mono">{formatKstDateTimeOrFallback(log.createdAt)}</span>
                 </div>
+                <details className="pt-1 border-t border-white/5">
+                  <summary className="text-xs text-gray-500 cursor-pointer select-none">개발 정보</summary>
+                  <div className="mt-2 space-y-1">
+                    <span className="text-xs text-gray-500">요청 경로</span>
+                    <div className="text-xs text-gray-300 font-mono break-all leading-tight">
+                      {log.requestPath || '/v1/models/chat'}
+                    </div>
+                  </div>
+                </details>
               </div>
             </div>
           </div>
@@ -394,62 +474,72 @@ export function WorkspaceLogDetailPage() {
           {/* Execution Timeline */}
           <div className="glass-card p-6 rounded-2xl border border-white/10">
             <div className="flex items-center gap-2 mb-6 text-blue-400">
-              <Clock size={16} /> {/* Note: Need to re-import Clock */}
-              <h3 className="text-sm font-bold">Execution Timeline</h3>
+              <Clock size={16} />
+              <h3 className="text-sm font-bold">실행 타임라인</h3>
             </div>
 
             <div className="relative pt-2 pb-6 px-2">
-              {/* Total Request Bar - Background track */}
-              <div className="relative h-12 w-full bg-white/5 rounded-lg border border-white/5 flex items-center overflow-hidden">
-                <div className="absolute inset-0 flex items-center px-4 justify-between z-20 pointer-events-none">
-                  <span className="text-xs font-medium text-gray-400">Total Request</span>
-                  <span className="text-xs font-bold text-white font-mono">{(log.latencyMs || 0) / 1000}s</span>
-                </div>
-              </div>
-
-              {/* Breakdown Bars */}
-              <div className="mt-4 flex flex-col gap-2">
-                {/* RAG Retrieval */}
+              <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-gray-400">
+                <span className="inline-flex items-center gap-1.5 rounded border border-white/10 bg-white/5 px-2 py-1">
+                  <span className="h-2 w-2 rounded-full bg-slate-300/80" />
+                  전체 요청
+                </span>
                 {log.ragEnabled && (
-                  <div className="flex items-center gap-4">
-                    <div className="w-32 text-xs text-gray-500 text-right">RAG Retrieval</div>
-                    <div className="flex-1 relative h-8 bg-white/5 rounded-md overflow-hidden">
-                      <div
-                        className="absolute top-0 left-0 h-full bg-blue-500/80 rounded-md flex items-center px-2"
-                        style={{ width: `${Math.max(5, ((log.ragLatencyMs || 0) / (log.latencyMs || 1)) * 100)}%` }}
-                      >
-                        <span className="text-[10px] font-bold text-white whitespace-nowrap">{log.ragLatencyMs}ms</span>
-                      </div>
-                    </div>
-                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-blue-300">
+                    <span className="h-2 w-2 rounded-full bg-blue-400/90" />
+                    RAG 검색
+                  </span>
                 )}
+                <span className="inline-flex items-center gap-1.5 rounded border border-purple-500/20 bg-purple-500/10 px-2 py-1 text-purple-300">
+                  <span className="h-2 w-2 rounded-full bg-purple-400/90" />
+                  LLM 생성
+                </span>
+              </div>
 
-                {/* LLM Generation */}
-                <div className="flex items-center gap-4">
-                  <div className="w-32 text-xs text-gray-500 text-right">LLM Generation</div>
-                  <div className="flex-1 relative h-8 bg-white/5 rounded-md overflow-hidden">
-                    <div
-                      className="absolute top-0 left-0 h-full bg-purple-500/80 rounded-md flex items-center px-2"
-                      style={{
-                        left: log.ragEnabled ? `${((log.ragLatencyMs || 0) / (log.latencyMs || 1)) * 100}%` : '0%',
-                        width: `${Math.max(5, (((log.latencyMs || 0) - (log.ragLatencyMs || 0)) / (log.latencyMs || 1)) * 100)}%`
-                      }}
-                    >
-                      <span className="text-[10px] font-bold text-white whitespace-nowrap">
-                        {((log.latencyMs || 0) - (log.ragLatencyMs || 0))}ms
+              <div className="mx-auto max-w-[460px]">
+                <div className="relative mx-auto h-44 w-44 rounded-full p-[1px] border border-white/10 bg-white/[0.02]">
+                  <div
+                    className="absolute inset-0 rounded-full"
+                    style={{ background: donutGradient }}
+                  />
+                  <div className="absolute inset-[16px] rounded-full border border-white/10 bg-[#0b0d1d]/95 flex flex-col items-center justify-center text-center">
+                    <span className="text-[11px] text-gray-500">총 지연</span>
+                    <span className="text-2xl font-bold text-white font-mono leading-none">{totalLatencyMs}ms</span>
+                    <span className="mt-1 text-[11px] text-gray-400 font-mono">{formatSeconds(totalLatencyMs)}</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-xs text-gray-300">
+                      <span className="h-2 w-2 rounded-full bg-slate-300/80" />
+                      전체 요청
+                    </span>
+                    <span className="text-xs font-mono text-gray-200">{totalLatencyMs}ms</span>
+                  </div>
+
+                  {log.ragEnabled && (
+                    <div className="flex items-center justify-between rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2">
+                      <span className="inline-flex items-center gap-2 text-xs text-blue-200">
+                        <span className="h-2 w-2 rounded-full bg-blue-400/90" />
+                        RAG 검색
                       </span>
+                      <span className="text-xs font-mono text-blue-200">{ragLatencyMs}ms · {ragPercent}%</span>
                     </div>
+                  )}
+
+                  <div className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/10 px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-xs text-purple-200">
+                      <span className="h-2 w-2 rounded-full bg-purple-400/90" />
+                      LLM 생성
+                    </span>
+                    <span className="text-xs font-mono text-purple-200">{llmLatencyMs}ms · {llmPercent}%</span>
                   </div>
                 </div>
               </div>
 
-              {/* Time Axis (Visual only) */}
-              <div className="mt-6 border-t border-white/10 pt-2 flex justify-between text-[10px] text-gray-600 font-mono">
-                <span>0s</span>
-                <span>{(log.latencyMs || 0) * 0.25 / 1000}s</span>
-                <span>{(log.latencyMs || 0) * 0.5 / 1000}s</span>
-                <span>{(log.latencyMs || 0) * 0.75 / 1000}s</span>
-                <span>{(log.latencyMs || 0) / 1000}s</span>
+              <div className="mt-3 text-[11px] text-gray-500">
+                현재 표시: 전체 요청, RAG 검색, LLM 생성(추정). 네트워크/DB 세부 시간은 백엔드 계측 추가 시 제공 가능합니다.
               </div>
             </div>
           </div>
@@ -512,7 +602,7 @@ export function WorkspaceLogDetailPage() {
               <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
                 <div className="px-6 py-4 border-b border-white/5 flex items-center gap-2 bg-white/[0.02] text-orange-300">
                   <Database size={16} />
-                  <h3 className="text-sm font-bold">RAG Context</h3>
+                  <h3 className="text-sm font-bold">RAG 컨텍스트</h3>
                 </div>
                 <div className="p-4 space-y-4">
                   <div className="grid grid-cols-2 gap-4 pb-4 border-b border-white/5">
@@ -566,23 +656,6 @@ export function WorkspaceLogDetailPage() {
                 </div>
               </div>
 
-              {/* System Info */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
-                <div className="px-6 py-4 border-b border-white/5 flex items-center gap-2 bg-white/[0.02] text-gray-300">
-                  <Layers size={16} />
-                  <h3 className="text-sm font-bold">System Info</h3>
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Source</span>
-                    <span className="text-white font-mono">{log.requestSource || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Timestamp</span>
-                    <span className="text-white font-mono text-xs">{new Date(log.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
