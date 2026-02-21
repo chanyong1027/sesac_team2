@@ -19,6 +19,7 @@ export interface OverviewResponse {
 export interface TimeseriesDataPoint {
     date: string;
     requests: number;
+    errorCount: number;
     tokens: number;
     cost: number;
 }
@@ -34,7 +35,7 @@ export interface ModelUsage {
     tokens: number;
     cost: number;
     percentage: number;
-    avgLatencyMs: number;
+    avgLatencyMs?: number | null;
 }
 
 export interface ModelUsageResponse {
@@ -65,14 +66,13 @@ export interface StatisticsQueryParams {
     to?: string;
 }
 
-export type Period = StatisticsQueryParams['period'];
+export interface StatisticsRangeQueryParams {
+    workspaceId?: number;
+    from?: string;
+    to?: string;
+}
 
-const toDateOnly = (dateTime?: string): string => {
-    if (!dateTime) {
-        return new Date().toISOString().slice(0, 10);
-    }
-    return dateTime.slice(0, 10);
-};
+export type Period = StatisticsQueryParams['period'];
 
 // API Functions
 export const statisticsApi = {
@@ -82,44 +82,20 @@ export const statisticsApi = {
     getTimeseries: (orgId: number, params: StatisticsQueryParams) =>
         api.get<TimeseriesResponse>(`/organizations/${orgId}/stats/timeseries`, { params }),
 
-    getByModel: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
+    getByModel: (orgId: number, params: StatisticsRangeQueryParams) =>
         api.get<ModelUsageResponse>(`/organizations/${orgId}/stats/by-model`, { params }),
 
-    getByPrompt: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
+    getByPrompt: (orgId: number, params: StatisticsRangeQueryParams) =>
         api.get<PromptUsageResponse>(`/organizations/${orgId}/stats/by-prompt`, { params }),
 
-    getErrorDistribution: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
+    getErrorDistribution: (orgId: number, params: StatisticsRangeQueryParams) =>
         api.get<ErrorDistributionResponse>(`/organizations/${orgId}/stats/errors`, { params }),
 
-    getRagQuality: (orgId: number, params: Omit<StatisticsQueryParams, 'period'>) =>
+    getRagQuality: (orgId: number, params: StatisticsRangeQueryParams) =>
         api.get<RagQualityResponse>(`/organizations/${orgId}/stats/rag-quality`, { params }),
 
-    getRagQualityTimeseries: async (orgId: number, params: StatisticsQueryParams) => {
-        const response = await api.get<RagQualityResponse>(`/organizations/${orgId}/stats/rag-quality`, {
-            params: {
-                workspaceId: params.workspaceId,
-                from: params.from,
-                to: params.to,
-            },
-        });
-
-        const point: RagQualityDataPoint = {
-            date: toDateOnly(params.to),
-            ragTotalCount: response.data.ragTotalCount,
-            ragHitCount: response.data.ragHitCount,
-            hitRate: response.data.hitRate,
-            avgSimilarityThreshold: response.data.avgSimilarityThreshold,
-            truncatedCount: response.data.truncatedCount,
-            truncationRate: response.data.truncationRate,
-            totalChunks: response.data.totalChunks,
-            avgRagLatencyMs: response.data.avgRagLatencyMs,
-        };
-
-        return {
-            ...response,
-            data: { data: [point] },
-        };
-    },
+    getRagQualityTimeseries: (orgId: number, params: StatisticsQueryParams) =>
+        api.get<RagQualityTimeseriesResponse>(`/organizations/${orgId}/stats/rag-quality/timeseries`, { params }),
 };
 
 export interface ErrorDistributionItem {

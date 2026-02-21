@@ -6,6 +6,7 @@ import com.llm_ops.demo.gateway.log.dto.projection.ModelUsageProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.OverviewStatsProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.PromptUsageProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.RagQualityProjection;
+import com.llm_ops.demo.gateway.log.dto.projection.RagQualityTimeseriesProjection;
 import com.llm_ops.demo.gateway.log.dto.projection.TimeseriesDataProjection;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -197,6 +198,84 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
                           AND created_at BETWEEN :from AND :to
                         """, nativeQuery = true)
         RagQualityProjection getRagQuality(
+                        @Param("organizationId") Long organizationId,
+                        @Param("workspaceId") Long workspaceId,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
+
+        /**
+         * RAG 품질 시계열 집계 - 일별 (Daily)
+         */
+        @Query(value = """
+                        SELECT
+                            CAST(created_at AS date) AS date,
+                            COUNT(*) AS ragTotalCount,
+                            COUNT(CASE WHEN rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
+                            AVG(rag_similarity_threshold) AS avgSimilarityThreshold,
+                            SUM(CASE WHEN rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
+                            COALESCE(SUM(rag_chunks_count), 0) AS totalChunks,
+                            AVG(rag_latency_ms) AS avgRagLatencyMs
+                        FROM request_logs
+                        WHERE organization_id = :organizationId
+                          AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
+                          AND rag_enabled = true
+                          AND created_at BETWEEN :from AND :to
+                        GROUP BY CAST(created_at AS date)
+                        ORDER BY date
+                        """, nativeQuery = true)
+        List<RagQualityTimeseriesProjection> getRagQualityTimeseriesDaily(
+                        @Param("organizationId") Long organizationId,
+                        @Param("workspaceId") Long workspaceId,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
+
+        /**
+         * RAG 품질 시계열 집계 - 주별 (Weekly)
+         */
+        @Query(value = """
+                        SELECT
+                            DATE_TRUNC('week', created_at)::date AS date,
+                            COUNT(*) AS ragTotalCount,
+                            COUNT(CASE WHEN rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
+                            AVG(rag_similarity_threshold) AS avgSimilarityThreshold,
+                            SUM(CASE WHEN rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
+                            COALESCE(SUM(rag_chunks_count), 0) AS totalChunks,
+                            AVG(rag_latency_ms) AS avgRagLatencyMs
+                        FROM request_logs
+                        WHERE organization_id = :organizationId
+                          AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
+                          AND rag_enabled = true
+                          AND created_at BETWEEN :from AND :to
+                        GROUP BY DATE_TRUNC('week', created_at)
+                        ORDER BY date
+                        """, nativeQuery = true)
+        List<RagQualityTimeseriesProjection> getRagQualityTimeseriesWeekly(
+                        @Param("organizationId") Long organizationId,
+                        @Param("workspaceId") Long workspaceId,
+                        @Param("from") LocalDateTime from,
+                        @Param("to") LocalDateTime to);
+
+        /**
+         * RAG 품질 시계열 집계 - 월별 (Monthly)
+         */
+        @Query(value = """
+                        SELECT
+                            DATE_TRUNC('month', created_at)::date AS date,
+                            COUNT(*) AS ragTotalCount,
+                            COUNT(CASE WHEN rag_chunks_count > 0 THEN 1 END) AS ragHitCount,
+                            AVG(rag_similarity_threshold) AS avgSimilarityThreshold,
+                            SUM(CASE WHEN rag_context_truncated THEN 1 ELSE 0 END) AS truncatedCount,
+                            COALESCE(SUM(rag_chunks_count), 0) AS totalChunks,
+                            AVG(rag_latency_ms) AS avgRagLatencyMs
+                        FROM request_logs
+                        WHERE organization_id = :organizationId
+                          AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
+                          AND rag_enabled = true
+                          AND created_at BETWEEN :from AND :to
+                        GROUP BY DATE_TRUNC('month', created_at)
+                        ORDER BY date
+                        """, nativeQuery = true)
+        List<RagQualityTimeseriesProjection> getRagQualityTimeseriesMonthly(
                         @Param("organizationId") Long organizationId,
                         @Param("workspaceId") Long workspaceId,
                         @Param("from") LocalDateTime from,

@@ -1,21 +1,26 @@
 import api from './axios';
 import type { ApiResponse, RequestLogListResponse, RequestLogResponse } from '@/types/api.types';
 
+export interface LogsListParams {
+  page?: number;
+  size?: number;
+  status?: string;
+  failover?: boolean;
+  provider?: string;
+  usedModel?: string;
+  ragEnabled?: boolean;
+  promptKey?: string;
+  traceId?: string;
+  errorCode?: string;
+  requestSource?: string;
+  from?: string;
+  to?: string;
+}
+
 export const logsApi = {
   list: async (
     workspaceId: number,
-    params?: {
-      page?: number;
-      size?: number;
-      status?: string;
-      provider?: string;
-      usedModel?: string;
-      ragEnabled?: boolean;
-      promptKey?: string;
-      traceId?: string;
-      from?: string;
-      to?: string;
-    }
+    params?: LogsListParams
   ): Promise<RequestLogListResponse> => {
     const res = await api.get<ApiResponse<RequestLogListResponse>>(
       `/workspaces/${workspaceId}/logs`,

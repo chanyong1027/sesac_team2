@@ -17,9 +17,8 @@ import {
   Activity
 } from 'lucide-react';
 import { logsApi } from '@/api/logs.api';
+import type { LogsListParams } from '@/api/logs.api';
 import type { RequestLogStatus } from '@/types/api.types';
-
-const PAGE_SIZE = 20;
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -61,16 +60,17 @@ export function WorkspaceLogsPage() {
   const [ragEnabled, setRagEnabled] = useState<'ALL' | 'true' | 'false'>('ALL');
   const [isFailover, setIsFailover] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, status, model, provider, source, ragEnabled, isFailover, workspaceId]);
+  }, [searchQuery, status, model, provider, source, ragEnabled, isFailover, workspaceId, pageSize]);
 
   // Debounced params for query
   const queryParams = useMemo(() => {
-    const params: Record<string, unknown> = {
+    const params: LogsListParams = {
       page: page - 1,
-      size: PAGE_SIZE,
+      size: pageSize,
     };
 
     // Simple heuristic for search query: if it looks like a trace ID (long), use traceId, else promptKey
@@ -90,7 +90,7 @@ export function WorkspaceLogsPage() {
     if (isFailover) params.failover = true;
 
     return params;
-  }, [searchQuery, status, provider, model, source, ragEnabled, isFailover, page]);
+  }, [searchQuery, status, provider, model, source, ragEnabled, isFailover, page, pageSize]);
 
   const { data: list, isLoading, refetch } = useQuery({
     queryKey: ['workspace-logs', workspaceId, queryParams],
@@ -99,7 +99,10 @@ export function WorkspaceLogsPage() {
   });
 
   const logs = list?.content ?? [];
+  const totalElements = list?.totalElements ?? 0;
   const totalPages = list?.totalPages ?? 0;
+  const startRow = totalElements === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endRow = totalElements === 0 ? 0 : Math.min(totalElements, page * pageSize);
   const canGoPrev = page > 1;
   const canGoNext = totalPages > 0 && page < totalPages;
 
@@ -110,6 +113,16 @@ export function WorkspaceLogsPage() {
   const handleNext = () => {
     if (!canGoNext) return;
     setPage((prev) => prev + 1);
+  };
+
+  const handleFirst = () => {
+    setPage(1);
+  };
+
+  const handleLast = () => {
+    if (totalPages > 0) {
+      setPage(totalPages);
+    }
   };
 
   // Helper Functions
@@ -416,10 +429,36 @@ export function WorkspaceLogsPage() {
 
         {/* Pagination (Simple) */}
         <div className="border-t border-white/5 px-6 py-3 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            Showing {logs.length} of {list?.totalElements || 0} logs
-          </span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-gray-500">
+              {startRow}-{endRow} / {totalElements}
+            </span>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <label htmlFor="page-size">Rows</label>
+              <select
+                id="page-size"
+                value={pageSize}
+                onChange={(e) => {
+                  const nextSize = Number(e.target.value);
+                  setPageSize(nextSize);
+                  setPage(1);
+                }}
+                className="bg-[#141522] text-gray-300 text-xs px-2 py-1 rounded-lg border border-white/10 focus:border-[var(--primary)] outline-none"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={!canGoPrev}
+              onClick={handleFirst}
+              className="px-2.5 py-1 rounded-lg border border-white/10 text-xs text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
             <button
               disabled={!canGoPrev}
               onClick={handlePrev}
@@ -427,12 +466,22 @@ export function WorkspaceLogsPage() {
             >
               Previous
             </button>
+            <span className="text-xs text-gray-500 min-w-16 text-center">
+              {totalPages > 0 ? `${page}/${totalPages}` : '0/0'}
+            </span>
             <button
               disabled={!canGoNext}
               onClick={handleNext}
               className="px-3 py-1 rounded-lg border border-white/10 text-xs text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Next
+            </button>
+            <button
+              disabled={!canGoNext}
+              onClick={handleLast}
+              className="px-2.5 py-1 rounded-lg border border-white/10 text-xs text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
             </button>
           </div>
         </div>

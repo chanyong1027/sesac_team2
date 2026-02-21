@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -37,6 +37,31 @@ import { workspaceApi } from '@/api/workspace.api';
 type Tab = 'model' | 'prompt';
 const DEFAULT_WORKSPACE_LIMIT_USD = 100; // TODO: replace with workspace/org budget setting API value
 
+const toApiDateTime = (date: Date): string => date.toISOString().slice(0, 19);
+
+const resolvePeriodRange = (period: Period): { from: string; to: string } => {
+    const to = new Date();
+    const from = new Date(to);
+
+    switch (period) {
+        case 'weekly':
+            from.setUTCDate(from.getUTCDate() - 7);
+            break;
+        case 'monthly':
+            from.setUTCDate(from.getUTCDate() - 30);
+            break;
+        case 'daily':
+        default:
+            from.setUTCDate(from.getUTCDate() - 1);
+            break;
+    }
+
+    return {
+        from: toApiDateTime(from),
+        to: toApiDateTime(to),
+    };
+};
+
 export default function DashboardPage() {
     const { orgId } = useParams<{ orgId: string }>();
     const organizationId = Number(orgId);
@@ -45,6 +70,12 @@ export default function DashboardPage() {
     const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<number | undefined>(undefined);
     const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
     const [usageTab, setUsageTab] = useState<Tab>('model');
+    const periodRange = useMemo(() => resolvePeriodRange(period), [period]);
+    const rangeParams = useMemo(() => ({
+        workspaceId: selectedWorkspaceId,
+        from: periodRange.from,
+        to: periodRange.to,
+    }), [selectedWorkspaceId, periodRange.from, periodRange.to]);
 
     // Fetch workspaces
     const { data: workspacesResponse } = useQuery({
@@ -59,66 +90,58 @@ export default function DashboardPage() {
 
     // 1. Overview
     const { data: overviewData, error: overviewError } = useQuery({
-        queryKey: ['stats-overview', organizationId, period, selectedWorkspaceId],
+        queryKey: ['stats-overview', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
         queryFn: () => statisticsApi.getOverview(organizationId, {
             period,
-            workspaceId: selectedWorkspaceId
+            ...rangeParams
         }),
         enabled: !!organizationId,
     });
 
     // 2. Timeseries (Request Volume)
     const { data: timeseriesData } = useQuery({
-        queryKey: ['stats-timeseries', organizationId, period, selectedWorkspaceId],
+        queryKey: ['stats-timeseries', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
         queryFn: () => statisticsApi.getTimeseries(organizationId, {
             period,
-            workspaceId: selectedWorkspaceId
+            ...rangeParams
         }),
         enabled: !!organizationId,
     });
 
     // 3. Model Usage
     const { data: modelData } = useQuery({
-        queryKey: ['stats-model', organizationId, selectedWorkspaceId],
-        queryFn: () => statisticsApi.getByModel(organizationId, {
-            workspaceId: selectedWorkspaceId
-        }),
+        queryKey: ['stats-model', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
+        queryFn: () => statisticsApi.getByModel(organizationId, rangeParams),
         enabled: !!organizationId,
     });
 
     // 4. Prompt Usage
     const { data: promptData } = useQuery({
-        queryKey: ['stats-prompt', organizationId, selectedWorkspaceId],
-        queryFn: () => statisticsApi.getByPrompt(organizationId, {
-            workspaceId: selectedWorkspaceId
-        }),
+        queryKey: ['stats-prompt', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
+        queryFn: () => statisticsApi.getByPrompt(organizationId, rangeParams),
         enabled: !!organizationId,
     });
 
     // 5. Error Distribution
     const { data: errorData } = useQuery({
-        queryKey: ['stats-errors', organizationId, selectedWorkspaceId],
-        queryFn: () => statisticsApi.getErrorDistribution(organizationId, {
-            workspaceId: selectedWorkspaceId
-        }),
+        queryKey: ['stats-errors', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
+        queryFn: () => statisticsApi.getErrorDistribution(organizationId, rangeParams),
         enabled: !!organizationId,
     });
 
     // 6. RAG Quality
     const { data: ragData } = useQuery({
-        queryKey: ['stats-rag', organizationId, selectedWorkspaceId],
-        queryFn: () => statisticsApi.getRagQuality(organizationId, {
-            workspaceId: selectedWorkspaceId
-        }),
+        queryKey: ['stats-rag', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
+        queryFn: () => statisticsApi.getRagQuality(organizationId, rangeParams),
         enabled: !!organizationId,
     });
 
     // 7. RAG Quality Timeseries
     const { data: ragTimeseriesData } = useQuery({
-        queryKey: ['stats-rag-timeseries', organizationId, period, selectedWorkspaceId],
+        queryKey: ['stats-rag-timeseries', organizationId, period, selectedWorkspaceId, periodRange.from, periodRange.to],
         queryFn: () => statisticsApi.getRagQualityTimeseries(organizationId, {
             period,
-            workspaceId: selectedWorkspaceId
+            ...rangeParams
         }),
         enabled: !!organizationId,
     });
@@ -165,7 +188,7 @@ export default function DashboardPage() {
             sub: m.provider,
             requests: m.requests,
             tokens: m.tokens,
-            latency: m.avgLatencyMs,
+            latencyMs: typeof m.avgLatencyMs === 'number' ? m.avgLatencyMs : null,
             cost: m.cost
         }))
         : prompts.map((p, i) => ({
@@ -176,7 +199,7 @@ export default function DashboardPage() {
                 : (p.promptId ?? p.id) ? `ID: ${p.promptId ?? p.id}` : 'Raw',
             requests: p.requests,
             tokens: p.tokens,
-            latency: 0, // Prompt usage doesn't have latency yet in API
+            latencyMs: null,
             cost: p.cost
         }));
 
@@ -525,7 +548,11 @@ export default function DashboardPage() {
                                         </td>
                                         <td className="px-6 py-3 text-right text-sm text-gray-300 font-mono">{formatNumber(item.requests)}</td>
                                         <td className="px-6 py-3 text-right text-sm text-gray-300 font-mono">{formatNumber(item.tokens)}</td>
-                                        <td className="px-6 py-3 text-right text-sm text-gray-300 font-mono">{item.latency > 0 ? formatNumber(item.latency) + 'ms' : '-'}</td>
+                                        <td className="px-6 py-3 text-right text-sm text-gray-300 font-mono">
+                                            {item.latencyMs != null && item.latencyMs > 0
+                                                ? `${formatNumber(item.latencyMs)}ms`
+                                                : '-'}
+                                        </td>
                                         <td className="px-6 py-3 text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <span className="text-sm font-bold text-white font-mono">{formatCurrency(item.cost)}</span>
@@ -614,63 +641,69 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={ragTimeseries.map(d => ({ ...d, date: formatDate(d.date) }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                                <XAxis
-                                    dataKey="date"
-                                    tick={{ fontSize: 10, fill: '#6B7280' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    yAxisId="left"
-                                    tick={{ fontSize: 10, fill: '#6B7280' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    domain={[0, 1]}
-                                />
-                                <YAxis
-                                    yAxisId="right"
-                                    orientation="right"
-                                    tick={{ fontSize: 10, fill: '#6B7280' }}
-                                    axisLine={false}
-                                    tickLine={false}
-                                    domain={[0, 1]}
-                                />
-                                <Tooltip
-                                    contentStyle={{ backgroundColor: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                                    itemStyle={{ fontSize: '12px' }}
-                                    labelStyle={{ color: '#9CA3AF', marginBottom: '5px' }}
-                                />
-                                <Area
-                                    yAxisId="left"
-                                    type="monotone"
-                                    dataKey="avgSimilarityThreshold"
-                                    stroke="#A855F7"
-                                    fill="url(#colorScore)"
-                                    strokeWidth={2}
-                                    name="Avg Score"
-                                />
-                                <defs>
-                                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#A855F7" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#A855F7" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <Line
-                                    yAxisId="right"
-                                    type="monotone"
-                                    dataKey="hitRate"
-                                    stroke="#34D399"
-                                    strokeWidth={2}
-                                    dot={false}
-                                    name="Hit Rate"
-                                    strokeDasharray="4 4"
-                                />
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                        {ragTimeseries.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={ragTimeseries.map(d => ({ ...d, date: formatDate(d.date) }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                                    <XAxis
+                                        dataKey="date"
+                                        tick={{ fontSize: 10, fill: '#6B7280' }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        dy={10}
+                                    />
+                                    <YAxis
+                                        yAxisId="left"
+                                        tick={{ fontSize: 10, fill: '#6B7280' }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        domain={[0, 1]}
+                                    />
+                                    <YAxis
+                                        yAxisId="right"
+                                        orientation="right"
+                                        tick={{ fontSize: 10, fill: '#6B7280' }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        domain={[0, 1]}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#111827', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                        itemStyle={{ fontSize: '12px' }}
+                                        labelStyle={{ color: '#9CA3AF', marginBottom: '5px' }}
+                                    />
+                                    <Area
+                                        yAxisId="left"
+                                        type="monotone"
+                                        dataKey="avgSimilarityThreshold"
+                                        stroke="#A855F7"
+                                        fill="url(#colorScore)"
+                                        strokeWidth={2}
+                                        name="Avg Score"
+                                    />
+                                    <defs>
+                                        <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#A855F7" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#A855F7" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <Line
+                                        yAxisId="right"
+                                        type="monotone"
+                                        dataKey="hitRate"
+                                        stroke="#34D399"
+                                        strokeWidth={2}
+                                        dot={false}
+                                        name="Hit Rate"
+                                        strokeDasharray="4 4"
+                                    />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-sm text-gray-500">
+                                RAG 시계열 데이터가 없습니다.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
