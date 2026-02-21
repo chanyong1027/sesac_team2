@@ -1,0 +1,58 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default
+  group_by: ["alertname", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 2h
+
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: oncall-slack
+      repeat_interval: 30m
+
+    - matchers:
+        - severity="warning"
+      receiver: team-slack
+      repeat_interval: 2h
+
+receivers:
+  - name: default
+    webhook_configs:
+      - url: "http://placeholder"
+
+  - name: oncall-slack
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#alerts-critical"
+        title: "[CRITICAL] {{ .GroupLabels.alertname }}"
+        text: "{{ .CommonAnnotations.summary }}"
+
+  - name: team-slack
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK_URL}"
+        channel: "#alerts-warning"
+        title: "[WARNING] {{ .GroupLabels.alertname }}"
+        text: "{{ .CommonAnnotations.summary }}"
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="AppInstanceDown"
+      - severity="critical"
+    target_matchers:
+      - severity="warning"
+
+  - source_matchers:
+      - alertname="GatewayHighErrorRate"
+    target_matchers:
+      - alertname=~"GatewayFailoverSpike|GatewayProviderBudgetExceeded"
+
+  - source_matchers:
+      - alertname="JvmHeapCritical"
+      - severity="critical"
+    target_matchers:
+      - alertname="JvmGcPauseHigh"
+      - severity="warning"
