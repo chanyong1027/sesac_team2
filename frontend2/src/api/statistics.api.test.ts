@@ -1,10 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import api from './axios';
 import { statisticsApi } from './statistics.api';
+
+const { getMock } = vi.hoisted(() => ({
+  getMock: vi.fn(),
+}));
 
 vi.mock('./axios', () => ({
   default: {
-    get: vi.fn(),
+    get: getMock,
   },
 }));
 
@@ -14,8 +17,7 @@ describe('statisticsApi', () => {
   });
 
   it('getRagQualityTimeseries uses real backend endpoint and passes params', async () => {
-    const mockedApi = vi.mocked(api);
-    mockedApi.get.mockResolvedValue({ data: { data: [] } } as never);
+    getMock.mockResolvedValue({ data: { data: [] } } as never);
 
     await statisticsApi.getRagQualityTimeseries(2, {
       period: 'daily',
@@ -24,7 +26,7 @@ describe('statisticsApi', () => {
       to: '2026-02-21T00:00:00',
     });
 
-    expect(mockedApi.get).toHaveBeenCalledWith(
+    expect(getMock).toHaveBeenCalledWith(
       '/organizations/2/stats/rag-quality/timeseries',
       {
         params: {
@@ -38,8 +40,7 @@ describe('statisticsApi', () => {
   });
 
   it('range-based APIs pass workspaceId/from/to without period', async () => {
-    const mockedApi = vi.mocked(api);
-    mockedApi.get.mockResolvedValue({ data: {} } as never);
+    getMock.mockResolvedValue({ data: {} } as never);
 
     const rangeParams = {
       workspaceId: 2,
@@ -52,22 +53,22 @@ describe('statisticsApi', () => {
     await statisticsApi.getErrorDistribution(2, rangeParams);
     await statisticsApi.getRagQuality(2, rangeParams);
 
-    expect(mockedApi.get).toHaveBeenNthCalledWith(
+    expect(getMock).toHaveBeenNthCalledWith(
       1,
       '/organizations/2/stats/by-model',
       { params: rangeParams }
     );
-    expect(mockedApi.get).toHaveBeenNthCalledWith(
+    expect(getMock).toHaveBeenNthCalledWith(
       2,
       '/organizations/2/stats/by-prompt',
       { params: rangeParams }
     );
-    expect(mockedApi.get).toHaveBeenNthCalledWith(
+    expect(getMock).toHaveBeenNthCalledWith(
       3,
       '/organizations/2/stats/errors',
       { params: rangeParams }
     );
-    expect(mockedApi.get).toHaveBeenNthCalledWith(
+    expect(getMock).toHaveBeenNthCalledWith(
       4,
       '/organizations/2/stats/rag-quality',
       { params: rangeParams }
