@@ -1,9 +1,12 @@
 package com.llm_ops.demo.statistics.controller;
 
 import com.llm_ops.demo.organization.service.OrganizationService;
+import com.llm_ops.demo.statistics.dto.ErrorDistributionResponse;
 import com.llm_ops.demo.statistics.dto.ModelUsageResponse;
 import com.llm_ops.demo.statistics.dto.OverviewResponse;
 import com.llm_ops.demo.statistics.dto.PromptUsageResponse;
+import com.llm_ops.demo.statistics.dto.RagQualityResponse;
+import com.llm_ops.demo.statistics.dto.RagQualityTimeseriesResponse;
 import com.llm_ops.demo.statistics.dto.TimeseriesResponse;
 import com.llm_ops.demo.statistics.service.StatisticsService;
 import java.time.LocalDateTime;
@@ -32,12 +35,12 @@ public class StatisticsController {
      * 개요 통계 조회
      * GET /api/v1/organizations/{orgId}/stats/overview
      *
-     * @param orgId 조직 ID
-     * @param userId 인증된 사용자 ID
-     * @param period 기간 (daily, weekly, monthly)
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
+     * @param period      기간 (daily, weekly, monthly)
      * @param workspaceId 워크스페이스 필터 (optional)
-     * @param from 시작일 (optional, 기본: 30일 전)
-     * @param to 종료일 (optional, 기본: 오늘)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
      * @return 개요 통계 (요청수, 성공률, 토큰, latency, 비용)
      */
     @GetMapping("/overview")
@@ -60,12 +63,12 @@ public class StatisticsController {
      * 시계열 데이터 조회
      * GET /api/v1/organizations/{orgId}/stats/timeseries
      *
-     * @param orgId 조직 ID
-     * @param userId 인증된 사용자 ID
-     * @param period 기간 (daily, weekly, monthly)
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
+     * @param period      기간 (daily, weekly, monthly)
      * @param workspaceId 워크스페이스 필터 (optional)
-     * @param from 시작일 (optional, 기본: 30일 전)
-     * @param to 종료일 (optional, 기본: 오늘)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
      * @return 날짜별 요청, 토큰, 비용
      */
     @GetMapping("/timeseries")
@@ -88,11 +91,11 @@ public class StatisticsController {
      * 모델별 사용량 조회
      * GET /api/v1/organizations/{orgId}/stats/by-model
      *
-     * @param orgId 조직 ID
-     * @param userId 인증된 사용자 ID
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
      * @param workspaceId 워크스페이스 필터 (optional)
-     * @param from 시작일 (optional, 기본: 30일 전)
-     * @param to 종료일 (optional, 기본: 오늘)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
      * @return 모델별 요청, 토큰, 비용, 비율
      */
     @GetMapping("/by-model")
@@ -114,11 +117,11 @@ public class StatisticsController {
      * 프롬프트별 사용량 조회
      * GET /api/v1/organizations/{orgId}/stats/by-prompt
      *
-     * @param orgId 조직 ID
-     * @param userId 인증된 사용자 ID
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
      * @param workspaceId 워크스페이스 필터 (optional)
-     * @param from 시작일 (optional, 기본: 30일 전)
-     * @param to 종료일 (optional, 기본: 오늘)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
      * @return 프롬프트별 요청, 토큰, 비용
      */
     @GetMapping("/by-prompt")
@@ -133,6 +136,92 @@ public class StatisticsController {
         organizationService.getDetail(orgId, userId);
 
         PromptUsageResponse response = statisticsService.getByPrompt(orgId, workspaceId, from, to);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 에러 분포 통계 조회
+     * GET /api/v1/organizations/{orgId}/stats/errors
+     *
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
+     * @param workspaceId 워크스페이스 필터 (optional)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
+     * @return 에러 분포 (status, errorCode, failReason, count)
+     */
+    @GetMapping("/errors")
+    public ResponseEntity<ErrorDistributionResponse> getErrorDistribution(
+            @PathVariable Long orgId,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) Long workspaceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        // 조직 권한 검증
+        organizationService.getDetail(orgId, userId);
+
+        ErrorDistributionResponse response = statisticsService.getErrorDistribution(orgId, workspaceId, from, to);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * RAG 품질 통계 조회
+     * GET /api/v1/organizations/{orgId}/stats/rag-quality
+     *
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
+     * @param workspaceId 워크스페이스 필터 (optional)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
+     * @return RAG 품질 통계 (hitRate, avgSimilarity, truncation 등)
+     */
+    @GetMapping("/rag-quality")
+    public ResponseEntity<RagQualityResponse> getRagQuality(
+            @PathVariable Long orgId,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) Long workspaceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        // 조직 권한 검증
+        organizationService.getDetail(orgId, userId);
+
+        RagQualityResponse response = statisticsService.getRagQuality(orgId, workspaceId, from, to);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * RAG 품질 시계열 통계 조회
+     * GET /api/v1/organizations/{orgId}/stats/rag-quality/timeseries
+     *
+     * @param orgId       조직 ID
+     * @param userId      인증된 사용자 ID
+     * @param period      기간 (daily, weekly, monthly)
+     * @param workspaceId 워크스페이스 필터 (optional)
+     * @param from        시작일 (optional, 기본: 30일 전)
+     * @param to          종료일 (optional, 기본: 오늘)
+     * @return 날짜별 RAG 품질 통계
+     */
+    @GetMapping("/rag-quality/timeseries")
+    public ResponseEntity<RagQualityTimeseriesResponse> getRagQualityTimeseries(
+            @PathVariable Long orgId,
+            @AuthenticationPrincipal Long userId,
+            @RequestParam String period,
+            @RequestParam(required = false) Long workspaceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+        // 조직 권한 검증
+        organizationService.getDetail(orgId, userId);
+
+        RagQualityTimeseriesResponse response = statisticsService.getRagQualityTimeseries(
+                orgId,
+                workspaceId,
+                period,
+                from,
+                to
+        );
         return ResponseEntity.ok(response);
     }
 }

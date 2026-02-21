@@ -124,7 +124,7 @@ class RequestLogQueryServiceTest {
         void 상태_필터로_SUCCESS만_조회한다() {
             // given
             RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                    null, null, RequestLogStatus.SUCCESS, null, null, null, null, null, null);
+                    null, null, RequestLogStatus.SUCCESS, null, null, null, null, null, null, null, null);
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when
@@ -156,7 +156,7 @@ class RequestLogQueryServiceTest {
         void 복합_필터로_검색한다() {
             // given: SUCCESS + openai 조합 검색
             RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null);
+                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null, null, null);
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when

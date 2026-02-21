@@ -9,6 +9,7 @@ import java.time.LocalDate;
 public interface TimeseriesDataProjection {
     LocalDate getDate();
     Long getRequests();
+    Long getErrorCount();
     Long getTokens();
     BigDecimal getCost();
 }

@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -62,6 +63,7 @@ public class GatewayChatService {
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final ObjectMapper REQUEST_PAYLOAD_MAPPER = new ObjectMapper();
+    private static final int LOGGED_QUESTION_MAX_CHARS = 500;
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
     private static final int PROVIDER_CALL_MAX_THREADS = 16;
     private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
@@ -253,16 +255,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
-                        retrievedDocumentInfos = new java.util.ArrayList<>();
-                        for (int i = 0; i < ragResponse.chunks().size() && i < result.chunksIncluded(); i++) {
-                            var chunk = ragResponse.chunks().get(i);
-                            retrievedDocumentInfos.add(new RequestLogWriter.RetrievedDocumentInfo(
-                                    chunk.documentName(),
-                                    chunk.score(),
-                                    chunk.content(),
-                                    null,
-                                    i + 1));
-                        }
+                        retrievedDocumentInfos = toRetrievedDocumentInfos(ragResponse, result.chunksIncluded());
                         userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
@@ -681,12 +674,48 @@ public class GatewayChatService {
                     request.workspaceId(),
                     request.promptKey(),
                     request.isRagEnabled(),
-                    request.variables() != null ? request.variables().size() : 0
+                    request.variables() != null ? request.variables().size() : 0,
+                    extractQuestionForLog(request.variables())
             );
             return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String extractQuestionForLog(Map<String, String> variables) {
+        if (variables == null || variables.isEmpty()) {
+            return null;
+        }
+
+        String[] preferredKeys = {"question", "query", "input", "message", "userInput", "userQuery"};
+        for (String key : preferredKeys) {
+            String candidate = normalizeQuestion(variables.get(key));
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+
+        if (variables.size() == 1) {
+            String onlyValue = variables.values().iterator().next();
+            return normalizeQuestion(onlyValue);
+        }
+
+        return null;
+    }
+
+    private static String normalizeQuestion(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > LOGGED_QUESTION_MAX_CHARS) {
+            return trimmed.substring(0, LOGGED_QUESTION_MAX_CHARS);
+        }
+        return trimmed;
     }
 
     private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
@@ -705,6 +734,26 @@ public class GatewayChatService {
         }
     }
 
+    private static List<RequestLogWriter.RetrievedDocumentInfo> toRetrievedDocumentInfos(
+            RagSearchResponse ragResponse,
+            int includedCount
+    ) {
+        if (ragResponse == null || ragResponse.chunks() == null || ragResponse.chunks().isEmpty() || includedCount <= 0) {
+            return List.of();
+        }
+        List<RequestLogWriter.RetrievedDocumentInfo> infos = new java.util.ArrayList<>();
+        for (int i = 0; i < ragResponse.chunks().size() && i < includedCount; i++) {
+            var chunk = ragResponse.chunks().get(i);
+            infos.add(new RequestLogWriter.RetrievedDocumentInfo(
+                    chunk.documentName(),
+                    chunk.score(),
+                    chunk.content(),
+                    null,
+                    i + 1
+            ));
+        }
+        return infos;
+    }
     /**
      * 프롬프트 키(템플릿)와 변수 맵을 사용하여 최종 프롬프트 문자열을 생성(렌더링)합니다.
      */
@@ -966,7 +1015,8 @@ public class GatewayChatService {
             Long workspaceId,
             String promptKey,
             boolean ragEnabled,
-            int variablesCount
+            int variablesCount,
+            String question
     ) {
     }
 }
