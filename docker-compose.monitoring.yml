@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   prometheus:
-    image: prom/prometheus:v2.51.2
+    image: prom/prometheus:v2.55.1
     ports:
       - "9090:9090"
     volumes:
@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:10.3.3
+    image: grafana/grafana:11.6.1
     ports:
       - "3000:3000"
     environment:
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
 
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.28.1
     ports:
       - "9093:9093"
     environment:
@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   node-exporter:
-    image: prom/node-exporter:v1.7.0
+    image: prom/node-exporter:v1.10.2
     ports:
       - "9100:9100"
     command:
