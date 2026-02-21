@@ -2,6 +2,7 @@ package com.llm_ops.demo.gateway.log.dto;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +23,7 @@ public record RequestLogResponse(
         Integer inputTokens,
         Integer outputTokens,
         Integer totalTokens,
+        BigDecimal cost,
         String promptKey,
         boolean ragEnabled,
         Integer ragLatencyMs,
@@ -56,6 +58,7 @@ public record RequestLogResponse(
                 log.getInputTokens(),
                 log.getOutputTokens(),
                 log.getTotalTokens(),
+                log.getEstimatedCost(),
                 log.getPromptKey(),
                 log.isRagEnabled(),
                 log.getRagLatencyMs(),
