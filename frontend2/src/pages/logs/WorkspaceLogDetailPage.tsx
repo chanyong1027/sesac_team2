@@ -106,7 +106,8 @@ function extractUserQuestions(requestPayload: string | null): string[] {
 }
 
 function formatFullDateTime(iso: string) {
-  const d = new Date(iso);
+  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`;
+  const d = new Date(normalized);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString('ko-KR', {
     year: 'numeric',
@@ -171,6 +172,7 @@ export function WorkspaceLogDetailPage() {
 
   const rawJson = log ? JSON.stringify(log, null, 2) : '';
   const extractedUserQuestions = extractUserQuestions(log?.requestPayload ?? null);
+  const responsePayloadTimestamp = log?.finishedAt ?? log?.createdAt ?? null;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
@@ -478,11 +480,11 @@ export function WorkspaceLogDetailPage() {
                     </div>
                   </div>
                 )}
-                <div className="p-0">
-                  <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
-                    {log.requestPayload || <span className="text-gray-600 italic">No request payload available</span>}
-                  </pre>
-                </div>
+                {extractedUserQuestions.length === 0 && (
+                  <div className="px-6 py-6 text-sm text-gray-500">
+                    표시할 사용자 질문이 없습니다. 필요하면 Raw JSON 탭에서 원본 payload를 확인하세요.
+                  </div>
+                )}
               </div>
 
               {/* Response Payload */}
@@ -493,7 +495,7 @@ export function WorkspaceLogDetailPage() {
                     <h3 className="text-sm font-bold">Response Payload</h3>
                   </div>
                   <span className="text-xs text-gray-500 font-mono">
-                    {log.finishedAt ? formatFullDateTime(log.finishedAt) : '-'}
+                    {responsePayloadTimestamp ? formatFullDateTime(responsePayloadTimestamp) : '-'}
                   </span>
                 </div>
                 <div className="p-0">
