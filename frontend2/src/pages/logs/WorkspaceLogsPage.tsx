@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   RefreshCw,
@@ -43,6 +43,7 @@ export function WorkspaceLogsPage() {
     orgId: string;
     workspaceId: string;
   }>();
+  const navigate = useNavigate();
 
   const workspaceId = Number(workspaceIdParam);
   const basePath = orgId
@@ -351,7 +352,11 @@ export function WorkspaceLogsPage() {
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.requestId} className="group hover:bg-white/[0.02] transition-colors">
+                  <tr
+                    key={log.requestId}
+                    onClick={() => navigate(`${basePath}/logs/${log.traceId}`)}
+                    className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(log.status)}`}>
                         {getStatusIcon(log.status)}
@@ -413,12 +418,9 @@ export function WorkspaceLogsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <Link
-                        to={`${basePath}/logs/${log.traceId}`}
-                        className="text-gray-500 hover:text-[var(--primary)] transition-colors"
-                      >
+                      <span className="text-gray-500 group-hover:text-[var(--primary)] transition-colors inline-flex">
                         <ArrowRight size={16} />
-                      </Link>
+                      </span>
                     </td>
                   </tr>
                 ))

@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
@@ -68,7 +68,6 @@ function isIndexingStatus(s: string) {
 
 export function WorkspaceDashboardPage() {
     const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
-    const navigate = useNavigate();
     const queryClient = useQueryClient();
     const parsedWorkspaceId = Number(workspaceIdParam);
     const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
@@ -239,6 +238,7 @@ export function WorkspaceDashboardPage() {
     const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.luminaops.com';
     const safePromptKey = promptKey || 'your-prompt-key';
+    const logsListPath = `${basePath}/logs${promptKey ? `?promptKey=${encodeURIComponent(promptKey)}` : ''}`;
     
     const curlExample = `curl -X POST "${apiBaseUrl}/v1/chat/completions" \\
 	  -H "X-API-Key: ${gatewayApiKey}" \\
@@ -416,13 +416,6 @@ export function WorkspaceDashboardPage() {
                                     >
                                         <RefreshCw size={18} />
                                     </button>
-                                    <Link
-                                        to={`${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`}
-                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
-                                        aria-label="open logs page"
-                                    >
-                                        <ExternalLink size={18} />
-                                    </Link>
                                 </div>
                             </div>
 
@@ -455,10 +448,8 @@ export function WorkspaceDashboardPage() {
                             ) : (
                                 <div className="divide-y divide-white/5">
                                     {recentLogs!.content.map((log) => (
-                                        <button
+                                        <div
                                             key={log.traceId}
-                                            type="button"
-                                            onClick={() => navigate(`${basePath}/logs/${log.traceId}`)}
                                             className="w-full text-left p-4 hover:bg-white/[0.02] transition-colors group"
                                         >
                                             <div className="flex items-center justify-between mb-2">
@@ -479,6 +470,13 @@ export function WorkspaceDashboardPage() {
                                                         <span className={`w-1.5 h-1.5 rounded-full ${log.ragEnabled ? 'bg-[var(--primary)] animate-pulse' : 'bg-gray-500'}`} />
                                                         RAG {log.ragEnabled ? 'ON' : 'OFF'}
                                                     </span>
+                                                    <Link
+                                                        to={`${basePath}/logs/${log.traceId}`}
+                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-300 border border-white/10 hover:text-white hover:border-white/20 transition-colors"
+                                                    >
+                                                        상세 로그
+                                                        <ExternalLink size={12} />
+                                                    </Link>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between">
@@ -515,10 +513,19 @@ export function WorkspaceDashboardPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                        </button>
+                                        </div>
                                     ))}
                                 </div>
                             )}
+                            <div className="p-3 border-t border-white/5 bg-white/[0.01] flex justify-end">
+                                <Link
+                                    to={logsListPath}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200 border border-white/10 hover:bg-white/5 hover:text-white transition-colors"
+                                >
+                                    전체 로그 보기
+                                    <ExternalLink size={14} />
+                                </Link>
+                            </div>
                         </section>
                     </div>
 
