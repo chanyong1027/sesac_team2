@@ -30,7 +30,7 @@ public class RequestLogQueryService {
     public RequestLogResponse findByTraceId(Long workspaceId, String traceId) {
         RequestLog log = requestLogRepository.findByWorkspaceIdAndTraceId(workspaceId, traceId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
-        return RequestLogResponse.from(log);
+        return RequestLogResponse.fromDetail(log);
     }
 
     /**
@@ -41,7 +41,7 @@ public class RequestLogQueryService {
         Page<RequestLog> page = requestLogRepository.findAll(
                 RequestLogSpecification.searchByCondition(workspaceId, safeCondition),
                 pageable);
-        Page<RequestLogResponse> responsePage = page.map(RequestLogResponse::from);
+        Page<RequestLogResponse> responsePage = page.map(RequestLogResponse::fromSummary);
         return RequestLogListResponse.from(responsePage);
     }
 }

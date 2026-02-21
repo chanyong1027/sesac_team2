@@ -156,6 +156,11 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getHttpStatus()).isEqualTo(200);
                 assertThat(requestLog.getLatencyMs()).isNotNull();
                 assertThat(requestLog.getFinishedAt()).isNotNull();
+                assertThat(requestLog.getRequestPayload()).isNotBlank();
+                assertThat(requestLog.getRequestPayload()).contains("\"workspaceId\":" + workspaceId);
+                assertThat(requestLog.getRequestPayload()).contains("\"promptKey\":\"" + promptKey + "\"");
+                assertThat(requestLog.getRequestPayload()).contains("\"variablesCount\":1");
+                assertThat(requestLog.getRequestPayload()).doesNotContain("lumina");
 
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
@@ -199,6 +204,10 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getHttpStatus()).isEqualTo(403);
                 assertThat(requestLog.getErrorCode()).isEqualTo("GW-REQ-FORBIDDEN");
                 assertThat(requestLog.getFailReason()).isEqualTo("FORBIDDEN");
+                assertThat(requestLog.getResponsePayload()).isNotBlank();
+                assertThat(requestLog.getResponsePayload()).contains("\"errorCode\":\"GW-REQ-FORBIDDEN\"");
+                assertThat(requestLog.getResponsePayload()).contains("\"type\":\"GATEWAY_FAILURE\"");
+                assertThat(requestLog.getResponsePayload()).doesNotContain("워크스페이스 접근 권한이 없습니다.");
                 assertThat(requestLog.getFinishedAt()).isNotNull();
                 assertThat(requestLog.getApiKeyId()).isEqualTo(apiKeyEntity.getId());
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());

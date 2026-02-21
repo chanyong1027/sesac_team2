@@ -5,13 +5,12 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record TimeseriesResponse(
-        List<TimeseriesDataPoint> data
-) {
-    public record TimeseriesDataPoint(
-            LocalDate date,
-            Long requests,
-            Long tokens,
-            BigDecimal cost
-    ) {
-    }
+                List<TimeseriesDataPoint> data) {
+        public record TimeseriesDataPoint(
+                        LocalDate date,
+                        Long requests,
+                        Long errorCount,
+                        Long tokens,
+                        BigDecimal cost) {
+        }
 }

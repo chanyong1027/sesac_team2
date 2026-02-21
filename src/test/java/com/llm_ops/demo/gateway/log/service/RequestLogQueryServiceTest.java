@@ -124,7 +124,7 @@ class RequestLogQueryServiceTest {
         void 상태_필터로_SUCCESS만_조회한다() {
             // given
             RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                    null, null, RequestLogStatus.SUCCESS, null, null, null, null, null, null);
+                    null, null, RequestLogStatus.SUCCESS, null, null, null, null, null, null, null, null);
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when
@@ -156,7 +156,7 @@ class RequestLogQueryServiceTest {
         void 복합_필터로_검색한다() {
             // given: SUCCESS + openai 조합 검색
             RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null);
+                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null, null, null);
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when
@@ -179,6 +179,42 @@ class RequestLogQueryServiceTest {
 
             // then
             assertThat(response.totalElements()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("목록_조회_응답에서는_payload를_노출하지_않는다")
+        void 목록_조회_응답에서는_payload를_노출하지_않는다() {
+            // given
+            String traceId = "trace-payload-hidden";
+            RequestLog log = RequestLog.loggingStart(
+                    UUID.randomUUID(),
+                    traceId,
+                    1L,
+                    WORKSPACE_ID,
+                    1L,
+                    "prefix",
+                    "/v1/chat",
+                    "POST",
+                    "test-prompt",
+                    false,
+                    "{\"question\":\"secret\"}",
+                    "GATEWAY");
+            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, "{\"answer\":\"ok\"}");
+            requestLogRepository.save(log);
+
+            RequestLogSearchCondition condition = RequestLogSearchCondition.empty();
+            PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            RequestLogResponse summary = response.content().stream()
+                    .filter(item -> traceId.equals(item.traceId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(summary.requestPayload()).isNull();
+            assertThat(summary.responsePayload()).isNull();
         }
     }
 
