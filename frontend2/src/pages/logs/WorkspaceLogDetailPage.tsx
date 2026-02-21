@@ -17,6 +17,94 @@ import {
 import { logsApi } from '@/api/logs.api';
 import type { RequestLogStatus } from '@/types/api.types';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function extractMessageContent(content: unknown): string | null {
+  const direct = readString(content);
+  if (direct) return direct;
+
+  if (Array.isArray(content)) {
+    const merged = content
+      .map((part) => {
+        if (typeof part === 'string') return part.trim();
+        if (!isRecord(part)) return '';
+        return readString(part.text) ?? '';
+      })
+      .filter((part) => part.length > 0)
+      .join(' ')
+      .trim();
+    return merged.length > 0 ? merged : null;
+  }
+
+  if (isRecord(content)) {
+    return readString(content.text);
+  }
+
+  return null;
+}
+
+function appendUnique(target: string[], value: string | null) {
+  if (!value) return;
+  if (!target.includes(value)) {
+    target.push(value);
+  }
+}
+
+function extractUserQuestions(requestPayload: string | null): string[] {
+  if (!requestPayload) return [];
+
+  const payload = requestPayload.trim();
+  if (payload.length === 0) return [];
+
+  const questions: string[] = [];
+  let parsed: unknown = null;
+
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    parsed = null;
+  }
+
+  if (isRecord(parsed)) {
+    const messages = parsed.messages;
+    if (Array.isArray(messages)) {
+      for (const message of messages) {
+        if (!isRecord(message)) continue;
+        const role = readString(message.role)?.toLowerCase();
+        if (role && role !== 'user') continue;
+        appendUnique(questions, extractMessageContent(message.content));
+      }
+    }
+
+    const directFields = ['userInput', 'userPrompt', 'prompt', 'question', 'query', 'input'] as const;
+    for (const key of directFields) {
+      appendUnique(questions, readString(parsed[key]));
+    }
+
+    const variables = parsed.variables;
+    if (isRecord(variables)) {
+      const variableFields = ['question', 'query', 'input', 'message', 'prompt', 'userInput', 'userQuery'] as const;
+      for (const key of variableFields) {
+        appendUnique(questions, readString(variables[key]));
+      }
+    }
+  }
+
+  if (questions.length === 0 && !payload.startsWith('{') && !payload.startsWith('[')) {
+    appendUnique(questions, payload);
+  }
+
+  return questions.slice(0, 3);
+}
+
 function formatFullDateTime(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -82,6 +170,7 @@ export function WorkspaceLogDetailPage() {
   }
 
   const rawJson = log ? JSON.stringify(log, null, 2) : '';
+  const extractedUserQuestions = extractUserQuestions(log?.requestPayload ?? null);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
@@ -371,12 +460,24 @@ export function WorkspaceLogDetailPage() {
                 <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                   <div className="flex items-center gap-2 text-blue-300">
                     <MessageSquare size={16} />
-                    <h3 className="text-sm font-bold">Request Payload</h3>
+                    <h3 className="text-sm font-bold">User Input</h3>
                   </div>
                   <span className="text-xs text-gray-500 font-mono">
                     {formatFullDateTime(log.createdAt)}
                   </span>
                 </div>
+                {extractedUserQuestions.length > 0 && (
+                  <div className="px-6 py-4 border-b border-white/5 bg-blue-500/5">
+                    <div className="text-xs text-gray-400 mb-2">사용자 질문</div>
+                    <div className="space-y-2">
+                      {extractedUserQuestions.map((question, idx) => (
+                        <p key={`${idx}-${question}`} className="text-sm text-white leading-relaxed">
+                          {extractedUserQuestions.length > 1 ? `${idx + 1}. ${question}` : question}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="p-0">
                   <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
                     {log.requestPayload || <span className="text-gray-600 italic">No request payload available</span>}
