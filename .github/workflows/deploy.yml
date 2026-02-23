@@ -115,7 +115,7 @@ jobs:
 
             echo "Waiting for application to be healthy..."
             for i in {1..30}; do
-              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+              if docker exec $(docker compose ps -q app) wget -qO- http://localhost:9091/actuator/health > /dev/null 2>&1; then
                 echo "✅ Application is healthy!"
                 docker compose ps
                 docker compose logs --tail=50
@@ -125,7 +125,7 @@ jobs:
               echo "Retry $i/30..."
               sleep 1
             done
-            
+
             echo "❌ Health check failed!"
             docker compose logs --tail=100
             exit 1

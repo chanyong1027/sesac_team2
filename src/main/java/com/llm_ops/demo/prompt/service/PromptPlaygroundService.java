@@ -1,5 +1,6 @@
 package com.llm_ops.demo.prompt.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
@@ -32,6 +33,9 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +48,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PromptPlaygroundService {
 
+    private static final ObjectMapper LOG_PAYLOAD_MAPPER = new ObjectMapper();
+    private static final String UNHANDLED_EXCEPTION_PAYLOAD = "error-logged";
     private static final String PLAYGROUND_REQUEST_PATH = "/api/v1/prompts/playground/run";
     private static final String PLAYGROUND_HTTP_METHOD = "POST";
     private static final String RAG_CONTEXT_PREFIX = """
@@ -118,6 +124,7 @@ public class PromptPlaygroundService {
                 PLAYGROUND_HTTP_METHOD,
                 prompt.getPromptKey(),
                 ragEnabled,
+                toRequestPayloadJson(request),
                 "PLAYGROUND"));
 
         Integer ragLatencyMs = null;
@@ -127,6 +134,8 @@ public class PromptPlaygroundService {
         String ragContextHash = null;
         Integer ragTopK = null;
         Double ragSimilarityThreshold = null;
+        RagSearchResponse ragResponse = null;
+        List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocuments = new ArrayList<>();
 
         try {
             String userPrompt = renderPrompt(request.userTemplate(), request.variables());
@@ -143,7 +152,7 @@ public class PromptPlaygroundService {
                 ragTopK = ragSettings.topK();
                 ragSimilarityThreshold = ragSettings.similarityThreshold();
                 long ragStartedAtNanos = System.nanoTime();
-                RagSearchResponse ragResponse = ragSearchService.search(
+                ragResponse = ragSearchService.search(
                         workspaceId,
                         resolveRagQuery(userPrompt, request.variables()),
                         new RagSearchOptions(
@@ -164,6 +173,7 @@ public class PromptPlaygroundService {
                     ragContextChars = result.contextChars();
                     ragContextTruncated = result.truncated();
                     ragContextHash = sha256HexOrNull(result.context());
+                    retrievedDocuments = toRetrievedDocumentInfos(ragResponse, result.chunksIncluded());
                     userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                 }
             }
@@ -236,7 +246,9 @@ public class PromptPlaygroundService {
                     ragContextTruncated,
                     ragContextHash,
                     ragTopK,
-                    ragSimilarityThreshold));
+                    ragSimilarityThreshold,
+                    answer,
+                    retrievedDocuments));
 
             return new PlaygroundRunResponse(
                     traceId,
@@ -247,6 +259,7 @@ public class PromptPlaygroundService {
                     LocalDateTime.now());
 
         } catch (BusinessException e) {
+            String errorMessage = resolveBusinessErrorMessage(e);
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     e.getErrorCode().getStatus().value(),
                     toLatencyMs(startedAtNanos),
@@ -258,12 +271,15 @@ public class PromptPlaygroundService {
                     false,
                     null, null, null, null, null,
                     e.getErrorCode().name(),
-                    e.getMessage(),
+                    errorMessage,
                     "BUSINESS_EXCEPTION",
                     ragLatencyMs, ragChunksCount, ragContextChars,
-                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold));
+                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
+                    toBusinessErrorResponsePayload(e),
+                    retrievedDocuments));
             throw e;
         } catch (Exception e) {
+            log.error("Playground run failed: requestId={}", requestId, e);
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                     ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
                     toLatencyMs(startedAtNanos),
@@ -278,7 +294,9 @@ public class PromptPlaygroundService {
                     "Unhandled exception",
                     "UNHANDLED_EXCEPTION",
                     ragLatencyMs, ragChunksCount, ragContextChars,
-                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold));
+                    ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
+                    UNHANDLED_EXCEPTION_PAYLOAD,
+                    retrievedDocuments));
             throw e;
         }
     }
@@ -391,5 +409,85 @@ public class PromptPlaygroundService {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static String toRequestPayloadJson(PlaygroundRunRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            RequestPayloadForLog payload = new RequestPayloadForLog(
+                    request.provider() != null ? request.provider().name() : null,
+                    request.model(),
+                    Boolean.TRUE.equals(request.ragEnabled()),
+                    request.systemPrompt() != null && !request.systemPrompt().isBlank(),
+                    request.userTemplate() != null ? request.userTemplate().length() : 0,
+                    request.modelConfig() != null ? request.modelConfig().size() : 0,
+                    request.variables() != null ? request.variables().size() : 0,
+                    request.baseVersionId()
+            );
+            return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static List<RequestLogWriter.RetrievedDocumentInfo> toRetrievedDocumentInfos(
+            RagSearchResponse ragResponse,
+            int includedCount
+    ) {
+        if (ragResponse == null || ragResponse.chunks() == null || ragResponse.chunks().isEmpty() || includedCount <= 0) {
+            return List.of();
+        }
+        List<RequestLogWriter.RetrievedDocumentInfo> infos = new ArrayList<>();
+        for (int i = 0; i < ragResponse.chunks().size() && i < includedCount; i++) {
+            var chunk = ragResponse.chunks().get(i);
+            infos.add(new RequestLogWriter.RetrievedDocumentInfo(
+                    chunk.documentName(),
+                    chunk.score(),
+                    chunk.content(),
+                    null,
+                    i + 1
+            ));
+        }
+        return infos;
+    }
+
+    private static String resolveBusinessErrorMessage(BusinessException exception) {
+        if (exception == null) {
+            return ErrorCode.INTERNAL_SERVER_ERROR.getDefaultMessage();
+        }
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            return exception.getErrorCode().getDefaultMessage();
+        }
+        return message;
+    }
+
+    private static String toBusinessErrorResponsePayload(BusinessException exception) {
+        if (exception == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("errorCode", exception.getErrorCode().name());
+            payload.put("status", exception.getErrorCode().getStatus().value());
+            payload.put("type", "BUSINESS_EXCEPTION");
+            return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return exception.getErrorCode().name();
+        }
+    }
+
+    private record RequestPayloadForLog(
+            String provider,
+            String model,
+            boolean ragEnabled,
+            boolean hasSystemPrompt,
+            int userTemplateLength,
+            int modelConfigCount,
+            int variablesCount,
+            Long baseVersionId
+    ) {
     }
 }
