@@ -9,7 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -49,7 +49,7 @@ public class EvalReleaseCriteriaAudit {
 
     @CreationTimestamp
     @Column(name = "changed_at", nullable = false, updatable = false)
-    private LocalDateTime changedAt;
+    private OffsetDateTime changedAt;
 
     public static EvalReleaseCriteriaAudit create(EvalReleaseCriteria criteria, Long changedBy) {
         EvalReleaseCriteriaAudit audit = new EvalReleaseCriteriaAudit();

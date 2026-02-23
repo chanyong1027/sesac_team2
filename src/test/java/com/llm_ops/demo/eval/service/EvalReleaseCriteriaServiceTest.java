@@ -16,7 +16,7 @@ import com.llm_ops.demo.eval.repository.EvalReleaseCriteriaAuditRepository;
 import com.llm_ops.demo.eval.repository.EvalReleaseCriteriaRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.lang.reflect.Field;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -82,11 +82,11 @@ class EvalReleaseCriteriaServiceTest {
 
         EvalReleaseCriteriaAudit latest = EvalReleaseCriteriaAudit.create(criteria, 100L);
         setField(latest, "id", 501L);
-        setField(latest, "changedAt", LocalDateTime.of(2026, 2, 23, 14, 0));
+        setField(latest, "changedAt", OffsetDateTime.parse("2026-02-23T14:00:00+09:00"));
 
         EvalReleaseCriteriaAudit older = EvalReleaseCriteriaAudit.create(criteria, 90L);
         setField(older, "id", 500L);
-        setField(older, "changedAt", LocalDateTime.of(2026, 2, 22, 9, 30));
+        setField(older, "changedAt", OffsetDateTime.parse("2026-02-22T09:30:00+09:00"));
 
         when(evalReleaseCriteriaAuditRepository.findTop20ByWorkspaceIdOrderByChangedAtDesc(eq(workspaceId)))
                 .thenReturn(List.of(latest, older));

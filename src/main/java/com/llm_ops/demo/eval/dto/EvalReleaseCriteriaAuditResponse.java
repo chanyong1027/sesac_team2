@@ -1,7 +1,7 @@
 package com.llm_ops.demo.eval.dto;
 
 import com.llm_ops.demo.eval.domain.EvalReleaseCriteriaAudit;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 public record EvalReleaseCriteriaAuditResponse(
         Long id,
@@ -11,7 +11,7 @@ public record EvalReleaseCriteriaAuditResponse(
         Double maxErrorRate,
         Double minImprovementNoticeDelta,
         Long changedBy,
-        LocalDateTime changedAt
+        OffsetDateTime changedAt
 ) {
 
     public static EvalReleaseCriteriaAuditResponse from(EvalReleaseCriteriaAudit audit) {
