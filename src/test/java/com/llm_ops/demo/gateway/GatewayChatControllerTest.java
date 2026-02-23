@@ -125,6 +125,7 @@ class GatewayChatControllerTest {
                 providerCredentialService.register(
                                 organizationId,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
+                activateCredential(organizationId, ProviderType.OPENAI);
 
                 // when & then
                 mockMvc.perform(post("/v1/chat/completions")
@@ -158,7 +159,8 @@ class GatewayChatControllerTest {
                                                   "promptKey": "hello"
                                                 }
                                                 """))
-                                .andExpect(status().isUnauthorized());
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.code").value("GW-REQ-UNAUTHORIZED"));
         }
 
         @Test
@@ -172,6 +174,7 @@ class GatewayChatControllerTest {
                 providerCredentialService.register(
                                 organizationId,
                                 new ProviderCredentialCreateRequest("openai", "provider-key"));
+                activateCredential(organizationId, ProviderType.OPENAI);
 
                 // when & then
                 mockMvc.perform(post("/v1/chat/completions")
@@ -209,6 +212,13 @@ class GatewayChatControllerTest {
                                                 """, workspaceId, promptKey)))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.code").value("C400"));
+        }
+
+        private void activateCredential(Long orgId, ProviderType providerType) {
+                var credential = providerCredentialRepository
+                        .findByOrganizationIdAndProvider(orgId, providerType).orElseThrow();
+                credential.markActive();
+                providerCredentialRepository.save(credential);
         }
 
         private String createReleasedPrompt(String key, String userTemplate) {

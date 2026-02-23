@@ -1,12 +1,16 @@
 package com.llm_ops.demo.auth.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.auth.service.EmailCheckRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -35,9 +39,13 @@ class AuthControllerTest {
         @Autowired
         private UserRepository userRepository;
 
+        @Autowired
+        private EmailCheckRateLimiter emailCheckRateLimiter;
+
         @BeforeEach
         void setUp() {
                 userRepository.deleteAll();
+                emailCheckRateLimiter.clear();
         }
 
         // ==================== 회원가입 테스트 ====================
@@ -160,6 +168,81 @@ class AuthControllerTest {
                                         .content(objectMapper.writeValueAsString(request)))
                                         .andDo(print())
                                         .andExpect(status().isBadRequest());
+                }
+        }
+
+        @Nested
+        @DisplayName("이메일 중복 확인 테스트")
+        class CheckEmailTest {
+
+                @Test
+                @DisplayName("미등록 이메일이면 사용 가능(true)을 반환한다")
+                void 미등록_이메일이면_사용_가능을_반환한다() throws Exception {
+                        // given
+                        String email = "new-user@example.com";
+
+                        // when & then
+                        mockMvc.perform(get("/api/v1/auth/check-email")
+                                        .param("email", email))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"))
+                                        .andExpect(jsonPath("$.data.available").value(true))
+                                        .andExpect(jsonPath("$.data.message").value("사용 가능한 이메일입니다."));
+                }
+
+                @Test
+                @DisplayName("등록된 이메일이면 사용 불가(false)를 반환한다")
+                void 등록된_이메일이면_사용_불가를_반환한다() throws Exception {
+                        // given
+                        SignUpRequest request = new SignUpRequest(
+                                        "duplicate@example.com",
+                                        "Test1234!",
+                                        "testuser");
+
+                        mockMvc.perform(post("/api/v1/auth/signup")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                        .andExpect(status().isCreated());
+
+                        // when & then
+                        mockMvc.perform(get("/api/v1/auth/check-email")
+                                        .param("email", "duplicate@example.com"))
+                                        .andDo(print())
+                                        .andExpect(status().isOk())
+                                        .andExpect(jsonPath("$.code").value("COMMON_SUCCESS"))
+                                        .andExpect(jsonPath("$.data.available").value(false))
+                                        .andExpect(jsonPath("$.data.message").value("이미 사용 중인 이메일입니다."));
+                }
+
+                @Test
+                @DisplayName("동일 IP에서 연속 요청이 한도를 넘으면 429를 반환한다")
+                void 동일_ip에서_연속_요청이_한도를_넘으면_429를_반환한다() throws Exception {
+                        // given
+                        String ip = "198.51.100.10";
+
+                        // when
+                        for (int i = 0; i < 20; i++) {
+                                mockMvc.perform(get("/api/v1/auth/check-email")
+                                                .header("X-Forwarded-For", ip)
+                                                .param("email", "new-user-" + i + "@example.com"))
+                                                .andExpect(status().isOk());
+                        }
+
+                        // then
+                        mockMvc.perform(get("/api/v1/auth/check-email")
+                                        .header("X-Forwarded-For", ip)
+                                        .param("email", "overflow@example.com"))
+                                        .andDo(print())
+                                        .andExpect(status().isTooManyRequests())
+                                        .andExpect(jsonPath("$.code").value("C4291"))
+                                        .andExpect(jsonPath("$.message").value("이메일 확인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요."))
+                                        .andExpect(header().exists("Retry-After"))
+                                        .andExpect(result -> {
+                                                String retryAfter = result.getResponse().getHeader("Retry-After");
+                                                assertThat(retryAfter).isNotBlank();
+                                                assertThat(Long.parseLong(retryAfter)).isGreaterThan(0L);
+                                        });
                 }
         }
 

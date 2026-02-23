@@ -1,20 +1,21 @@
 package com.llm_ops.demo.gateway.service;
 
-import com.google.genai.Client;
-import com.google.genai.types.GenerateContentResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetDecisionAction;
 import com.llm_ops.demo.budget.service.BudgetGuardrailService;
 import com.llm_ops.demo.budget.service.BudgetUsageService;
+import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
+import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.global.error.BusinessException;
-import java.math.BigDecimal;
 import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.global.error.GatewayException;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
@@ -32,33 +33,24 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
-import org.springframework.ai.anthropic.AnthropicChatModel;
-import org.springframework.ai.anthropic.api.AnthropicApi;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.metadata.ChatResponseMetadata;
-import org.springframework.ai.chat.metadata.DefaultUsage;
-import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.model.Generation;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.ResourceAccessException;
 
-import java.net.ConnectException;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.List;
+import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.time.YearMonth;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -69,20 +61,34 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
-    private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
-    private static final String RAG_CONTEXT_TEMPLATE = """
+    private static final ObjectMapper REQUEST_PAYLOAD_MAPPER = new ObjectMapper();
+    private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
+    private static final int PROVIDER_CALL_MAX_THREADS = 16;
+    private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
+    private static final ExecutorService PROVIDER_CALL_EXECUTOR = Executors.newFixedThreadPool(
+            PROVIDER_CALL_MAX_THREADS,
+            runnable -> {
+                Thread thread = new Thread(runnable);
+                thread.setName("gateway-provider-call-" + PROVIDER_CALL_THREAD_SEQUENCE.getAndIncrement());
+                thread.setDaemon(true);
+                return thread;
+            }
+    );
+    private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
+    private static final String RAG_CONTEXT_PREFIX = """
             다음은 질문과 관련된 참고 문서입니다:
 
-            %s
+            """;
+    private static final String RAG_CONTEXT_SUFFIX = """
 
             위 문서를 참고하여 다음 질문에 답변해주세요:
 
             """;
 
     private final OrganizationApiKeyAuthService organizationApiKeyAuthService;
-    private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
+    private final GatewayReliabilityProperties gatewayReliabilityProperties;
     private final ProviderCredentialService providerCredentialService;
-    private final ObjectProvider<ChatModel> openAiChatModelProvider;
+    private final LlmCallService llmCallService;
     private final RagSearchService ragSearchService;
     private final RagContextBuilder ragContextBuilder;
     private final WorkspaceRepository workspaceRepository;
@@ -95,10 +101,10 @@ public class GatewayChatService {
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
-            GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
+            GatewayReliabilityProperties gatewayReliabilityProperties,
             ProviderCredentialService providerCredentialService,
-            @Qualifier("openAiChatModel") ObjectProvider<ChatModel> openAiChatModelProvider,
-            @Autowired(required = false) RagSearchService ragSearchService,
+            LlmCallService llmCallService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) RagSearchService ragSearchService,
             RagContextBuilder ragContextBuilder,
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
@@ -108,9 +114,9 @@ public class GatewayChatService {
             BudgetGuardrailService budgetGuardrailService,
             BudgetUsageService budgetUsageService) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
-        this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
+        this.gatewayReliabilityProperties = gatewayReliabilityProperties;
         this.providerCredentialService = providerCredentialService;
-        this.openAiChatModelProvider = openAiChatModelProvider;
+        this.llmCallService = llmCallService;
         this.ragSearchService = ragSearchService;
         this.ragContextBuilder = ragContextBuilder;
         this.workspaceRepository = workspaceRepository;
@@ -134,6 +140,7 @@ public class GatewayChatService {
         Long organizationId = authResult.organizationId();
 
         long startedAtNanos = System.nanoTime();
+        long deadlineNanos = startedAtNanos + TimeUnit.MILLISECONDS.toNanos(gatewayReliabilityProperties.resolvedRequestTimeoutMs());
 
         String traceId = UUID.randomUUID().toString();
         UUID requestId = requestLogWriter.start(new RequestLogWriter.StartRequest(
@@ -146,7 +153,9 @@ public class GatewayChatService {
                 GATEWAY_CHAT_COMPLETIONS_PATH,
                 GATEWAY_HTTP_METHOD,
                 request.promptKey(),
-                request.isRagEnabled()));
+                request.isRagEnabled(),
+                toRequestPayloadJson(request),
+                "GATEWAY"));
 
         Integer ragLatencyMs = null;
         Integer ragChunksCount = null;
@@ -158,10 +167,13 @@ public class GatewayChatService {
         ProviderType usedProvider = null;
         String usedRequestedModel = null;
         boolean isFailover = false;
+        boolean failoverAttempted = false;
         Long usedProviderCredentialId = null;
         String budgetFailReason = null;
+        GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
         Long promptVersionId = null;
+        java.util.List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
 
         try {
@@ -171,13 +183,9 @@ public class GatewayChatService {
             promptId = resolution.promptId();
             promptVersionId = resolution.promptVersionId();
 
-            String renderedUserPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
+            String userPrompt = renderPrompt(resolveUserTemplate(activeVersion, request.promptKey()),
                     request.variables());
-            String renderedSystemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
-
-            String prompt = renderedSystemPrompt == null || renderedSystemPrompt.isBlank()
-                    ? renderedUserPrompt
-                    : renderedSystemPrompt + "\n\n" + renderedUserPrompt;
+            String systemPrompt = renderOptionalTemplate(activeVersion.getSystemPrompt(), request.variables());
 
             ProviderType providerType = activeVersion.getProvider();
             String requestedModel = activeVersion.getModel();
@@ -224,7 +232,7 @@ public class GatewayChatService {
                     long ragStartedAtNanos = System.nanoTime();
                     RagSearchResponse ragResponse = ragSearchService.search(
                             request.workspaceId(),
-                            resolveRagQuery(renderedUserPrompt, request.variables()),
+                            resolveRagQuery(userPrompt, request.variables()),
                             new RagSearchOptions(
                                     ragSettings.topK(),
                                     ragSettings.similarityThreshold(),
@@ -245,71 +253,44 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
-                        prompt = String.format(RAG_CONTEXT_TEMPLATE, result.context()) + prompt;
+                        retrievedDocumentInfos = new java.util.ArrayList<>();
+                        for (int i = 0; i < ragResponse.chunks().size() && i < result.chunksIncluded(); i++) {
+                            var chunk = ragResponse.chunks().get(i);
+                            retrievedDocumentInfos.add(new RequestLogWriter.RetrievedDocumentInfo(
+                                    chunk.documentName(),
+                                    chunk.score(),
+                                    chunk.content(),
+                                    null,
+                                    i + 1));
+                        }
+                        userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
             }
 
             ChatResponse response;
-            try {
-                ResolvedProviderApiKey primaryKey = providerCredentialService.resolveApiKey(organizationId, providerType);
-                usedProviderCredentialId = primaryKey.credentialId();
+            ResolvedProviderApiKey primaryKey = providerCredentialService.resolveApiKey(organizationId, providerType);
+            usedProviderCredentialId = primaryKey.credentialId();
 
-                BudgetDecision providerDecision = budgetGuardrailService.evaluateProviderCredential(primaryKey.credentialId());
-                if (providerDecision.action() == BudgetDecisionAction.BLOCK) {
-                    if (hasSecondaryModel(secondaryProvider, secondaryModel)) {
-                        ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
-                        BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
-                        if (secondaryBudget.action() != BudgetDecisionAction.BLOCK) {
-                            isFailover = true;
-                            usedProvider = secondaryProvider;
-                            usedProviderCredentialId = secondaryKey.credentialId();
-                            // failover 시에도 workspace degrade를 provider 기준으로 재평가하여 cheap model 적용
-                            BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
-                                    workspace.getId(),
-                                    secondaryProvider != null ? secondaryProvider.getValue() : null
-                            );
-                            String secondaryOverride = null;
-                            Integer secondaryMaxTokens = maxOutputTokensOverride;
-                            if (wsDecisionSecondary.action() == BudgetDecisionAction.DEGRADE && wsDecisionSecondary.overrides() != null) {
-                                BudgetDecision.Overrides o2 = wsDecisionSecondary.overrides();
-                                if (o2.modelOverride() != null && !o2.modelOverride().isBlank()) {
-                                    secondaryOverride = o2.modelOverride();
-                                }
-                                if (o2.maxOutputTokens() != null && o2.maxOutputTokens() > 0) {
-                                    secondaryMaxTokens = o2.maxOutputTokens();
-                                }
-                            }
-                            String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
-                            usedRequestedModel = secondaryModelEffective;
-                            response = callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
-                        } else {
-                            budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
-                            throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
-                        }
-                    } else {
-                        budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
-                        throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
-                    }
-                }
-
-                response = callProvider(primaryKey, requestedModelEffective, prompt, maxOutputTokensOverride);
-            } catch (Exception primaryException) {
+            BudgetDecision providerDecision = budgetGuardrailService.evaluateProviderCredential(primaryKey.credentialId());
+            if (providerDecision.action() == BudgetDecisionAction.BLOCK) {
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
-                    throw primaryException;
+                    budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                    throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
                 }
-                if (!isRetryableException(primaryException)) {
-                    throw primaryException;
-                }
-                // primary 실패 후 failover 시도 전, secondary 예산 확인
                 ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
                 BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
                 if (secondaryBudget.action() == BudgetDecisionAction.BLOCK) {
-                    // secondary를 사용할 수 없으면 primary 에러를 그대로 반환
-                    throw primaryException;
+                    budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                    throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
+                }
+                if (!hasRemainingBudget(deadlineNanos, gatewayReliabilityProperties.resolvedMinFailoverBudgetMs())) {
+                    lastProviderFailure = FAILURE_CLASSIFIER.requestDeadlineExhaustedFailure();
+                    throw new RequestDeadlineExhaustedException();
                 }
 
                 isFailover = true;
+                failoverAttempted = true;
                 usedProvider = secondaryProvider;
                 usedProviderCredentialId = secondaryKey.credentialId();
 
@@ -330,7 +311,88 @@ public class GatewayChatService {
                 }
                 String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                 usedRequestedModel = secondaryModelEffective;
-                response = callProvider(secondaryKey, secondaryModelEffective, prompt, secondaryMaxTokens);
+
+                ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
+                        secondaryKey,
+                        secondaryModelEffective,
+                        systemPrompt,
+                        userPrompt,
+                        secondaryMaxTokens,
+                        deadlineNanos,
+                        false
+                );
+                if (!secondaryOutcome.success()) {
+                    lastProviderFailure = secondaryOutcome.failure();
+                    throw secondaryOutcome.exception();
+                }
+                response = secondaryOutcome.response();
+            } else {
+                ProviderCallOutcome primaryOutcome = callProviderWithPolicy(
+                        primaryKey,
+                        requestedModelEffective,
+                        systemPrompt,
+                        userPrompt,
+                        maxOutputTokensOverride,
+                        deadlineNanos,
+                        hasSecondaryModel(secondaryProvider, secondaryModel)
+                );
+                if (primaryOutcome.success()) {
+                    response = primaryOutcome.response();
+                } else {
+                    lastProviderFailure = primaryOutcome.failure();
+                    RuntimeException primaryException = primaryOutcome.exception();
+                    if (!hasSecondaryModel(secondaryProvider, secondaryModel) || !lastProviderFailure.failoverEligible()) {
+                        throw primaryException;
+                    }
+                    if (!hasRemainingBudget(deadlineNanos, gatewayReliabilityProperties.resolvedMinFailoverBudgetMs())) {
+                        lastProviderFailure = FAILURE_CLASSIFIER.requestDeadlineExhaustedFailure();
+                        throw new RequestDeadlineExhaustedException();
+                    }
+
+                    ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
+                    BudgetDecision secondaryBudget = budgetGuardrailService.evaluateProviderCredential(secondaryKey.credentialId());
+                    if (secondaryBudget.action() == BudgetDecisionAction.BLOCK) {
+                        throw primaryException;
+                    }
+
+                    isFailover = true;
+                    failoverAttempted = true;
+                    usedProvider = secondaryProvider;
+                    usedProviderCredentialId = secondaryKey.credentialId();
+
+                    BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
+                            workspace.getId(),
+                            secondaryProvider != null ? secondaryProvider.getValue() : null
+                    );
+                    String secondaryOverride = null;
+                    Integer secondaryMaxTokens = maxOutputTokensOverride;
+                    if (wsDecisionSecondary.action() == BudgetDecisionAction.DEGRADE && wsDecisionSecondary.overrides() != null) {
+                        BudgetDecision.Overrides o2 = wsDecisionSecondary.overrides();
+                        if (o2.modelOverride() != null && !o2.modelOverride().isBlank()) {
+                            secondaryOverride = o2.modelOverride();
+                        }
+                        if (o2.maxOutputTokens() != null && o2.maxOutputTokens() > 0) {
+                            secondaryMaxTokens = o2.maxOutputTokens();
+                        }
+                    }
+                    String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
+                    usedRequestedModel = secondaryModelEffective;
+
+                    ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
+                            secondaryKey,
+                            secondaryModelEffective,
+                            systemPrompt,
+                            userPrompt,
+                            secondaryMaxTokens,
+                            deadlineNanos,
+                            false
+                    );
+                    if (!secondaryOutcome.success()) {
+                        lastProviderFailure = secondaryOutcome.failure();
+                        throw secondaryOutcome.exception();
+                    }
+                    response = secondaryOutcome.response();
+                }
             }
 
             String answer = response.getResult().getOutput().getText();
@@ -415,7 +477,9 @@ public class GatewayChatService {
                     ragContextTruncated,
                     ragContextHash,
                     ragTopK,
-                    ragSimilarityThreshold));
+                    ragSimilarityThreshold,
+                    answer,
+                    retrievedDocumentInfos));
 
             return GatewayChatResponse.from(
                     traceId,
@@ -424,9 +488,10 @@ public class GatewayChatService {
                     usedModel,
                     usage);
         } catch (BusinessException e) {
+            GatewayFailureClassifier.GatewayFailure gatewayFailure = classifyBusinessFailure(e, budgetFailReason);
             if (e.getErrorCode() == ErrorCode.BUDGET_EXCEEDED) {
                 requestLogWriter.markBlocked(requestId, new RequestLogWriter.BlockUpdate(
-                        e.getErrorCode().getStatus().value(),
+                        gatewayFailure.httpStatus(),
                         toLatencyMs(startedAtNanos),
                         promptId,
                         promptVersionId,
@@ -439,19 +504,21 @@ public class GatewayChatService {
                         null,
                         null, // cost
                         null, // version
-                        e.getErrorCode().name(),
-                        e.getMessage(),
-                        budgetFailReason != null ? budgetFailReason : "BUDGET_EXCEEDED",
+                        gatewayFailure.errorCode(),
+                        gatewayFailure.errorMessage(),
+                        gatewayFailure.failReason(),
                         ragLatencyMs,
                         ragChunksCount,
                         ragContextChars,
                         ragContextTruncated,
                         ragContextHash,
                         ragTopK,
-                        ragSimilarityThreshold));
+                        ragSimilarityThreshold,
+                        toErrorResponsePayload(gatewayFailure),
+                        retrievedDocumentInfos));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
-                        e.getErrorCode().getStatus().value(),
+                        gatewayFailure.httpStatus(),
                         toLatencyMs(startedAtNanos),
                         promptId,
                         promptVersionId,
@@ -464,21 +531,31 @@ public class GatewayChatService {
                         null,
                         null, // cost
                         null, // version
-                        e.getErrorCode().name(),
-                        e.getMessage(),
-                        "BUSINESS_EXCEPTION",
+                        gatewayFailure.errorCode(),
+                        gatewayFailure.errorMessage(),
+                        gatewayFailure.failReason(),
                         ragLatencyMs,
                         ragChunksCount,
                         ragContextChars,
                         ragContextTruncated,
                         ragContextHash,
                         ragTopK,
-                        ragSimilarityThreshold));
+                        ragSimilarityThreshold,
+                        toErrorResponsePayload(gatewayFailure),
+                        retrievedDocumentInfos));
             }
-            throw e;
+            throw toGatewayException(gatewayFailure, e);
         } catch (Exception e) {
+            GatewayFailureClassifier.GatewayFailure gatewayFailure;
+            if (isRequestDeadlineFailure(lastProviderFailure)) {
+                gatewayFailure = lastProviderFailure;
+            } else if (failoverAttempted) {
+                gatewayFailure = allProvidersFailedFailure(lastProviderFailure);
+            } else {
+                gatewayFailure = lastProviderFailure != null ? lastProviderFailure : classifyProviderFailure(e);
+            }
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
-                    ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
+                    gatewayFailure.httpStatus(),
                     toLatencyMs(startedAtNanos),
                     promptId,
                     promptVersionId,
@@ -491,17 +568,19 @@ public class GatewayChatService {
                     null,
                     null, // cost
                     null, // version
-                    ErrorCode.INTERNAL_SERVER_ERROR.name(),
-                    "Unhandled exception",
-                    "UNHANDLED_EXCEPTION",
+                    gatewayFailure.errorCode(),
+                    gatewayFailure.errorMessage(),
+                    gatewayFailure.failReason(),
                     ragLatencyMs,
                     ragChunksCount,
                     ragContextChars,
                     ragContextTruncated,
                     ragContextHash,
                     ragTopK,
-                    ragSimilarityThreshold));
-            throw e;
+                    ragSimilarityThreshold,
+                    toErrorResponsePayload(gatewayFailure),
+                    retrievedDocumentInfos));
+            throw toGatewayException(gatewayFailure, e);
         }
     }
 
@@ -593,6 +672,39 @@ public class GatewayChatService {
         return renderedUserPrompt;
     }
 
+    private static String toRequestPayloadJson(GatewayChatRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            RequestPayloadForLog payload = new RequestPayloadForLog(
+                    request.workspaceId(),
+                    request.promptKey(),
+                    request.isRagEnabled(),
+                    request.variables() != null ? request.variables().size() : 0
+            );
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
+        if (gatewayFailure == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("errorCode", gatewayFailure.errorCode());
+            payload.put("message", gatewayFailure.errorMessage());
+            payload.put("httpStatus", gatewayFailure.httpStatus());
+            payload.put("failReason", gatewayFailure.failReason());
+            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return gatewayFailure.errorCode();
+        }
+    }
+
     /**
      * 프롬프트 키(템플릿)와 변수 맵을 사용하여 최종 프롬프트 문자열을 생성(렌더링)합니다.
      */
@@ -606,66 +718,30 @@ public class GatewayChatService {
             String key = entry.getKey();
             String value = entry.getValue();
             String doubleBrace = "{{" + key + "}}";
-            String singleBrace = "{" + key + "}";
             rendered = rendered.replace(doubleBrace, value);
-            rendered = rendered.replace(singleBrace, value);
         }
         return rendered;
     }
 
-    private static void applyMaxOutputTokensBestEffort(Object chatOptions, Integer maxOutputTokens) {
-        if (chatOptions == null || maxOutputTokens == null || maxOutputTokens <= 0) {
-            return;
-        }
-        // Spring AI 옵션 타입별 API 차이를 흡수하기 위해 reflection으로 best-effort 적용합니다.
-        // (모델/라이브러리 버전 변경 시에도 컴파일 의존성을 최소화)
-        tryInvokeSetter(chatOptions, "setMaxTokens", maxOutputTokens);
-        tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxOutputTokens);
-        tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxOutputTokens);
-    }
+    // ── Provider 호출 체인 ──────────────────────────────────────────────────
 
-    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
-        try {
-            var m = target.getClass().getMethod(methodName, Integer.class);
-            m.invoke(target, value);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // fallthrough
-        } catch (Exception ignored) {
-            return;
-        }
-        try {
-            var m = target.getClass().getMethod(methodName, int.class);
-            m.invoke(target, value.intValue());
-        } catch (Exception ignored) {
-        }
-    }
-
-    private ChatResponse callOpenAi(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
-        ChatModel chatModel = openAiChatModelProvider.getIfAvailable();
-        if (chatModel == null) {
-            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "OpenAI 호출을 위한 설정이 없습니다.");
-        }
-        var chatOptions = gatewayChatOptionsCreateService.openAiOptions(apiKey);
-        if (modelOverride != null && !modelOverride.isBlank()) {
-            chatOptions.setModel(modelOverride);
-        }
-        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
-        return chatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
-    }
-
+    /**
+     * LlmCallService에 위임하여 실제 LLM 프로바이더를 호출합니다.
+     */
     private ChatResponse callProvider(
             ResolvedProviderApiKey resolved,
             String requestedModel,
-            String prompt,
+            String systemPrompt,
+            String userPrompt,
             Integer maxOutputTokensOverride
     ) {
-        String providerApiKey = resolved.apiKey();
-        return switch (resolved.providerType()) {
-            case OPENAI -> callOpenAi(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
-            case ANTHROPIC -> callAnthropic(prompt, providerApiKey, requestedModel, maxOutputTokensOverride);
-            case GEMINI -> callGemini(prompt, providerApiKey, requestedModel);
-        };
+        return llmCallService.callProvider(
+                resolved,
+                requestedModel,
+                systemPrompt,
+                userPrompt,
+                ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride)
+        );
     }
 
     private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
@@ -673,75 +749,224 @@ public class GatewayChatService {
     }
 
     private boolean isRetryableException(Exception exception) {
-        if (exception instanceof BusinessException) {
-            return false;
-        }
-        Throwable current = exception;
-        while (current != null) {
-            if (current instanceof SocketTimeoutException
-                    || current instanceof ConnectException
-                    || current instanceof UnknownHostException
-                    || current instanceof TimeoutException
-                    || current instanceof ResourceAccessException) {
-                return true;
-            }
-            if (current instanceof HttpStatusCodeException statusException) {
-                if (statusException.getStatusCode().is5xxServerError()) {
-                    return true;
-                }
-            }
-            current = current.getCause();
-        }
-        return false;
+        return classifyProviderFailure(exception).failoverEligible();
     }
 
-    private ChatResponse callAnthropic(String prompt, String apiKey, String modelOverride, Integer maxOutputTokensOverride) {
-        AnthropicChatModel anthropicChatModel = new AnthropicChatModel(new AnthropicApi(apiKey));
-        var chatOptions = gatewayChatOptionsCreateService.anthropicOptions();
-        if (modelOverride != null && !modelOverride.isBlank()) {
-            chatOptions.setModel(modelOverride);
+    private ProviderCallOutcome callProviderWithPolicy(
+            ResolvedProviderApiKey resolved,
+            String requestedModel,
+            String systemPrompt,
+            String userPrompt,
+            Integer maxOutputTokensOverride,
+            long deadlineNanos,
+            boolean reserveFailoverBudget
+    ) {
+        long failoverReserveMs = reserveFailoverBudget
+                ? gatewayReliabilityProperties.resolvedMinFailoverBudgetMs() + FAILOVER_GUARD_BUFFER_MS
+                : 0L;
+        try {
+            ChatResponse first = callProviderWithDeadline(
+                    resolved,
+                    requestedModel,
+                    systemPrompt,
+                    userPrompt,
+                    maxOutputTokensOverride,
+                    deadlineNanos,
+                    failoverReserveMs
+            );
+            return ProviderCallOutcome.success(first);
+        } catch (Exception firstException) {
+            GatewayFailureClassifier.GatewayFailure firstFailure = classifyProviderFailure(firstException);
+            if (!firstFailure.retrySameRouteOnce()) {
+                return ProviderCallOutcome.failure(toRuntimeException(firstException), firstFailure);
+            }
+            long minimumRetryBudgetMs = gatewayReliabilityProperties.resolvedMinRetryBudgetMs() + failoverReserveMs;
+            if (!hasRemainingBudget(deadlineNanos, minimumRetryBudgetMs)) {
+                return ProviderCallOutcome.failure(toRuntimeException(firstException), firstFailure);
+            }
+
+            long retryBackoffMs = gatewayReliabilityProperties.resolvedRetryBackoffMs();
+            if (retryBackoffMs > 0) {
+                long maxSleepMs = Math.max(0L, remainingBudgetMs(deadlineNanos) - failoverReserveMs);
+                sleepQuietly(Math.min(retryBackoffMs, maxSleepMs));
+            }
+            if (!hasRemainingBudget(deadlineNanos, minimumRetryBudgetMs)) {
+                return ProviderCallOutcome.failure(toRuntimeException(firstException), firstFailure);
+            }
+            try {
+                ChatResponse second = callProviderWithDeadline(
+                        resolved,
+                        requestedModel,
+                        systemPrompt,
+                        userPrompt,
+                        maxOutputTokensOverride,
+                        deadlineNanos,
+                        failoverReserveMs
+                );
+                return ProviderCallOutcome.success(second);
+            } catch (Exception secondException) {
+                GatewayFailureClassifier.GatewayFailure secondFailure = classifyProviderFailure(secondException);
+                return ProviderCallOutcome.failure(toRuntimeException(secondException), secondFailure);
+            }
         }
-        applyMaxOutputTokensBestEffort(chatOptions, maxOutputTokensOverride);
-        return anthropicChatModel.call(new Prompt(new UserMessage(prompt), chatOptions));
     }
 
-    private ChatResponse callGemini(String prompt, String apiKey, String modelOverride) {
-        Client client = Client.builder().apiKey(apiKey).build();
-        String model = modelOverride;
-        if (model == null || model.isBlank()) {
-            model = DEFAULT_GEMINI_MODEL;
+    private GatewayFailureClassifier.GatewayFailure classifyProviderFailure(Exception exception) {
+        if (exception instanceof RequestDeadlineExhaustedException) {
+            return FAILURE_CLASSIFIER.requestDeadlineExhaustedFailure();
         }
-        GenerateContentResponse response = client.models.generateContent(
-                model,
-                prompt,
-                null);
-        if (response == null) {
-            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
-                    .withModel(model)
-                    .build();
-            return new ChatResponse(
-                    List.of(new Generation(new AssistantMessage(""))),
-                    metadata);
+        if (exception instanceof ProviderAttemptTimeoutException) {
+            return FAILURE_CLASSIFIER.requestDeadlineExceededFailure();
+        }
+        return FAILURE_CLASSIFIER.classifyProvider(exception);
+    }
+
+    private ChatResponse callProviderWithDeadline(
+            ResolvedProviderApiKey resolved,
+            String requestedModel,
+            String systemPrompt,
+            String userPrompt,
+            Integer maxOutputTokensOverride,
+            long deadlineNanos,
+            long reservedBudgetAfterCallMs
+    ) throws Exception {
+        long remainingMs = remainingBudgetMs(deadlineNanos);
+        long usableBudgetMs = remainingMs - Math.max(0L, reservedBudgetAfterCallMs);
+        if (usableBudgetMs <= 0) {
+            throw new RequestDeadlineExhaustedException();
         }
 
-        String answer = response.text();
-        String resolvedModel = response.modelVersion().orElse(model);
+        long attemptTimeoutMs = Math.max(1L, usableBudgetMs);
+        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(() ->
+                callProvider(resolved, requestedModel, systemPrompt, userPrompt, maxOutputTokensOverride));
 
-        ChatResponseMetadata.Builder metadataBuilder = ChatResponseMetadata.builder()
-                .withModel(resolvedModel);
+        try {
+            return future.get(attemptTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException timeoutException) {
+            future.cancel(true);
+            throw new ProviderAttemptTimeoutException(timeoutException);
+        } catch (InterruptedException interruptedException) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new ProviderAttemptTimeoutException(interruptedException);
+        } catch (ExecutionException executionException) {
+            Throwable cause = executionException.getCause();
+            if (cause instanceof Exception providerException) {
+                throw providerException;
+            }
+            throw new RuntimeException(cause);
+        }
+    }
 
-        response.responseId().ifPresent(metadataBuilder::withId);
+    // ── 실패 분류 / 에러 처리 ────────────────────────────────────────────────
 
-        response.usageMetadata().ifPresent(usage -> {
-            Long promptTokens = usage.promptTokenCount().map(Integer::longValue).orElse(null);
-            Long completionTokens = usage.candidatesTokenCount().map(Integer::longValue).orElse(null);
-            Long totalTokens = usage.totalTokenCount().map(Integer::longValue).orElse(null);
-            metadataBuilder.withUsage(new DefaultUsage(promptTokens, completionTokens, totalTokens));
-        });
+    private GatewayFailureClassifier.GatewayFailure classifyBusinessFailure(BusinessException exception, String budgetFailReason) {
+        String overrideReason = exception.getErrorCode() == ErrorCode.BUDGET_EXCEEDED
+                ? (budgetFailReason != null ? budgetFailReason : "BUDGET_EXCEEDED")
+                : null;
+        return FAILURE_CLASSIFIER.classifyBusiness(exception, overrideReason);
+    }
 
-        ChatResponseMetadata metadata = metadataBuilder.build();
-        return new ChatResponse(
-                List.of(new Generation(new AssistantMessage(answer))),
-                metadata);
+    private GatewayFailureClassifier.GatewayFailure allProvidersFailedFailure(
+            GatewayFailureClassifier.GatewayFailure lastProviderFailure
+    ) {
+        String detailedReason;
+        if (lastProviderFailure != null && lastProviderFailure.failReason() != null && !lastProviderFailure.failReason().isBlank()) {
+            detailedReason = "ALL_FAILED_" + lastProviderFailure.failReason();
+        } else {
+            detailedReason = "ALL_PROVIDERS_FAILED";
+        }
+        return new GatewayFailureClassifier.GatewayFailure(
+                "GW-GW-ALL_PROVIDERS_FAILED",
+                detailedReason,
+                "모든 프로바이더 경로에서 요청이 실패했습니다.",
+                502,
+                GatewayFailureClassifier.FailoverPolicy.FAIL_FAST
+        );
+    }
+
+    private boolean hasRemainingBudget(long deadlineNanos, long minimumRequiredMs) {
+        return remainingBudgetMs(deadlineNanos) >= minimumRequiredMs;
+    }
+
+    private long remainingBudgetMs(long deadlineNanos) {
+        long remainingNanos = deadlineNanos - System.nanoTime();
+        if (remainingNanos <= 0) {
+            return 0L;
+        }
+        return TimeUnit.NANOSECONDS.toMillis(remainingNanos);
+    }
+
+    private boolean isRequestDeadlineFailure(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
+        return gatewayFailure != null && "REQUEST_DEADLINE_EXCEEDED".equals(gatewayFailure.failReason());
+    }
+
+    private GatewayException toGatewayException(
+            GatewayFailureClassifier.GatewayFailure gatewayFailure,
+            Exception cause
+    ) {
+        HttpStatus status = HttpStatus.resolve(gatewayFailure.httpStatus());
+        if (status == null) {
+            status = HttpStatus.BAD_GATEWAY;
+        }
+        return new GatewayException(
+                gatewayFailure.errorCode(),
+                status,
+                gatewayFailure.errorMessage(),
+                cause
+        );
+    }
+
+    private static void sleepQuietly(long millis) {
+        if (millis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static RuntimeException toRuntimeException(Exception exception) {
+        if (exception instanceof RuntimeException runtimeException) {
+            return runtimeException;
+        }
+        return new RuntimeException(exception);
+    }
+
+    private record ProviderCallOutcome(
+            ChatResponse response,
+            RuntimeException exception,
+            GatewayFailureClassifier.GatewayFailure failure
+    ) {
+        static ProviderCallOutcome success(ChatResponse response) {
+            return new ProviderCallOutcome(response, null, null);
+        }
+
+        static ProviderCallOutcome failure(RuntimeException exception, GatewayFailureClassifier.GatewayFailure failure) {
+            return new ProviderCallOutcome(null, exception, failure);
+        }
+
+        boolean success() {
+            return response != null;
+        }
+    }
+
+    private static final class RequestDeadlineExhaustedException extends RuntimeException {
+    }
+
+    private static final class ProviderAttemptTimeoutException extends RuntimeException {
+        private ProviderAttemptTimeoutException(Throwable cause) {
+            super(cause);
+        }
+    }
+
+    private record RequestPayloadForLog(
+            Long workspaceId,
+            String promptKey,
+            boolean ragEnabled,
+            int variablesCount
+    ) {
     }
 }

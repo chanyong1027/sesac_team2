@@ -1,5 +1,5 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { organizationApi } from '@/api/organization.api';
@@ -7,13 +7,20 @@ import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
 import { logsApi } from '@/api/logs.api';
 import { statisticsApi } from '@/api/statistics.api';
+import { budgetApi } from '@/api/budget.api';
+import { BudgetPolicyModal } from '@/components/budget/BudgetPolicyModal';
+import { BudgetUsageCard } from '@/components/budget/BudgetUsageCard';
 import {
     Copy,
     Check,
     RefreshCw,
     ExternalLink
 } from 'lucide-react';
-import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
+import type {
+    BudgetPolicyUpdateRequest,
+    RequestLogResponse,
+    RequestLogStatus,
+} from '@/types/api.types';
 
 function formatTimeHHmmss(iso: string) {
     const d = new Date(iso);
@@ -56,24 +63,21 @@ function formatTokens(tokens: number | null) {
 }
 
 function isIndexingStatus(s: string) {
-    return ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'DELETING'].includes(s);
+    return ['UPLOADED', 'PARSING', 'CHUNKING', 'EMBEDDING', 'INDEXING', 'PROCESSING', 'DELETING']
+        .includes(String(s).toUpperCase());
 }
 
 export function WorkspaceDashboardPage() {
     const { orgId, workspaceId: workspaceIdParam } = useParams<{ orgId: string; workspaceId: string }>();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const parsedWorkspaceId = Number(workspaceIdParam);
     const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
+    const workspaceId = isValidWorkspaceId ? parsedWorkspaceId : 0;
     const parsedOrgId = orgId ? Number(orgId) : undefined;
     const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
         ? parsedOrgId
         : undefined;
-
-    if (!isValidWorkspaceId) {
-        return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
-    }
-
-    const workspaceId = parsedWorkspaceId;
     const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
     // 워크스페이스 정보 조회 (캐시 활용)
@@ -87,7 +91,7 @@ export function WorkspaceDashboardPage() {
             const response = await promptApi.getPrompts(workspaceId);
             return response.data;
         },
-        enabled: !!workspaceId,
+        enabled: isValidWorkspaceId,
     });
 
     const { data: credentials } = useQuery({
@@ -117,7 +121,7 @@ export function WorkspaceDashboardPage() {
             const response = await documentApi.getDocuments(workspaceId);
             return response.data;
         },
-        enabled: !!workspaceId,
+        enabled: isValidWorkspaceId,
     });
 
     const firstPromptId = prompts?.[0]?.id;
@@ -176,11 +180,44 @@ export function WorkspaceDashboardPage() {
                 page: 0,
                 size: 5,
             }),
-        enabled: !!workspaceId && !!promptKey,
+        enabled: isValidWorkspaceId && !!promptKey,
         retry: false,
     });
 
     const [copiedCurl, setCopiedCurl] = useState(false);
+    const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+
+    const { data: workspaceBudgetPolicy } = useQuery({
+        queryKey: ['budget-policy', 'workspace', workspaceId],
+        queryFn: async () => {
+            const res = await budgetApi.getWorkspacePolicy(workspaceId);
+            return res.data;
+        },
+        enabled: isValidWorkspaceId,
+        retry: false,
+    });
+
+    const { data: workspaceBudgetUsage } = useQuery({
+        queryKey: ['budget-usage', 'workspace', workspaceId],
+        queryFn: async () => {
+            const res = await budgetApi.getWorkspaceUsage(workspaceId);
+            return res.data;
+        },
+        enabled: isValidWorkspaceId,
+        retry: false,
+    });
+
+    const updateWorkspaceBudgetPolicyMutation = useMutation({
+        mutationFn: async (payload: BudgetPolicyUpdateRequest) => {
+            const res = await budgetApi.updateWorkspacePolicy(workspaceId, payload);
+            return res.data;
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['budget-policy', 'workspace', workspaceId] });
+            await queryClient.invalidateQueries({ queryKey: ['budget-usage', 'workspace', workspaceId] });
+            setIsBudgetModalOpen(false);
+        },
+    });
     
     const handleCopyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text).then(() => {
@@ -191,6 +228,9 @@ export function WorkspaceDashboardPage() {
         });
     };
 
+    if (!isValidWorkspaceId) {
+        return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
+    }
     if (isWorkspaceLoading) return <div className="p-8 text-gray-300">로딩 중...</div>;
     if (!workspace) return <div className="p-8 text-gray-300">워크스페이스를 찾을 수 없습니다.</div>;
 
@@ -222,6 +262,17 @@ export function WorkspaceDashboardPage() {
             </div>
 
             <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+                <BudgetPolicyModal
+                    open={isBudgetModalOpen}
+                    mode="WORKSPACE"
+                    title="워크스페이스 예산"
+                    description="Soft-limit 초과 시 절약 모드(저가 모델/토큰 제한/RAG off)를 적용합니다."
+                    policy={workspaceBudgetPolicy ?? null}
+                    onClose={() => setIsBudgetModalOpen(false)}
+                    onSave={(payload) => updateWorkspaceBudgetPolicyMutation.mutate(payload)}
+                    isSaving={updateWorkspaceBudgetPolicyMutation.isPending}
+                />
+
                 {/* Workspace Header */}
                 <div className="flex justify-between items-end">
                     <div>
@@ -272,7 +323,13 @@ export function WorkspaceDashboardPage() {
                                     <span className="material-symbols-outlined text-xl">description</span>
                                 </div>
                                 <span className="px-2 py-1 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/5">
-                                    {(documents ?? []).some(d => isIndexingStatus(d.status)) ? 'Indexing..' : 'Ready'}
+                                    {documents == null
+                                        ? 'Checking..'
+                                        : documents.length === 0
+                                            ? 'No Docs'
+                                            : (documents ?? []).some(d => isIndexingStatus(d.status))
+                                                ? 'Indexing..'
+                                                : 'Ready'}
                                 </span>
                             </div>
                             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">RAG 문서</h3>
@@ -474,7 +531,14 @@ export function WorkspaceDashboardPage() {
 
                     {/* Right Column */}
                     <div className="space-y-6">
-                        <MonthlyBudgetCard totalCost={overview?.totalCost ?? 0} />
+                        <BudgetUsageCard
+                            title="Monthly Budget"
+                            subtitle={`이번 달 사용량 (UTC ${workspaceBudgetUsage?.month ?? '-'})`}
+                            usage={workspaceBudgetUsage ?? null}
+                            enabled={!!workspaceBudgetPolicy?.enabled}
+                            onConfigure={() => setIsBudgetModalOpen(true)}
+                            variant="workspace"
+                        />
 
                         <section className="glass-card rounded-2xl p-6">
                             <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
@@ -630,47 +694,6 @@ function QuickActionCard({
             <div className="font-medium text-sm text-gray-200">{title}</div>
             <div className="text-[11px] text-gray-500 mt-1">{subtitle}</div>
         </Link>
-    );
-}
-
-function MonthlyBudgetCard({ totalCost }: { totalCost: number }) {
-    const budget = 100;
-    const spent = Number.isFinite(totalCost) ? Math.max(0, totalCost) : 0;
-    const pct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
-
-    const now = new Date();
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const daysLeft = Math.max(0, Math.ceil((endOfMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-
-    return (
-        <section className="glass-card rounded-2xl p-5 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10 z-0" />
-            <div className="relative z-10">
-                <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <span className="material-symbols-outlined text-base text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">monetization_on</span>
-                        Monthly Budget
-                    </h3>
-                    <span className="text-xs font-mono font-bold text-gray-300">
-                        ${spent.toFixed(2)} / ${budget.toFixed(0)}
-                    </span>
-                </div>
-
-                <div className="w-full bg-gray-800 rounded-full h-2 mb-2 overflow-hidden shadow-inner border border-white/5">
-                    <div
-                        className="h-2 rounded-full relative bg-gradient-to-r from-blue-500 to-[var(--primary)] shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-                        style={{ width: `${pct}%` }}
-                    >
-                        <div className="absolute right-0 top-0 h-full w-2 bg-white blur-[2px]" />
-                    </div>
-                </div>
-
-                <div className="flex justify-between items-center text-[10px]">
-                    <span className="text-gray-400">{Math.round(pct)}% Used</span>
-                    <span className="text-gray-400">Resets in {daysLeft} days</span>
-                </div>
-            </div>
-        </section>
     );
 }
 

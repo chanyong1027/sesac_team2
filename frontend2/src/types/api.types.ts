@@ -44,17 +44,56 @@ export interface RequestLogListResponse {
   totalPages: number;
 }
 
+// ========================================
+// Budget Guardrail
+// ========================================
+export type BudgetScopeType = 'WORKSPACE' | 'PROVIDER_CREDENTIAL';
+export type BudgetSoftAction = 'DEGRADE';
+
+export interface BudgetPolicyResponse {
+  scopeType: BudgetScopeType;
+  scopeId: number;
+  monthLimitUsd: number | null;
+  softLimitUsd: number | null;
+  softAction: BudgetSoftAction;
+  degradeProviderModelMap: Record<string, string>;
+  degradeMaxOutputTokens: number | null;
+  degradeDisableRag: boolean | null;
+  enabled: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface BudgetPolicyUpdateRequest {
+  monthLimitUsd?: number | null;
+  softLimitUsd?: number | null;
+  softAction?: BudgetSoftAction;
+  degradeProviderModelMap?: Record<string, string>;
+  degradeMaxOutputTokens?: number | null;
+  degradeDisableRag?: boolean | null;
+  enabled?: boolean;
+}
+
+export interface BudgetUsageResponse {
+  scopeType: BudgetScopeType;
+  scopeId: number;
+  month: string; // YYYY-MM (UTC)
+  usedUsd: number;
+  hardLimitUsd: number | null;
+  softLimitUsd: number | null;
+  remainingHardUsd: number | null;
+  remainingSoftUsd: number | null;
+  requestCount: number;
+  totalTokens: number;
+  lastUpdatedAt: string | null;
+}
+
 // 에러 응답
 export interface ErrorResponse {
   code: string;
   message: string;
   timestamp: string;
-  fieldErrors: FieldError[] | null;
-}
-
-export interface FieldError {
-  field: string;
-  message: string;
+  fieldErrors: Record<string, string> | null;
 }
 
 // ========================================
@@ -70,6 +109,11 @@ export interface UserSignupResponse {
   id: number;
   email: string;
   name: string;
+}
+
+export interface EmailAvailabilityResponse {
+  available: boolean;
+  message: string;
 }
 
 export interface UserLoginRequest {
@@ -149,6 +193,19 @@ export interface OrganizationMemberRemoveResponse {
   removedAt: string;
 }
 
+export type OrganizationRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+export interface OrganizationMemberRoleUpdateRequest {
+  role: OrganizationRole;
+}
+
+export interface OrganizationMemberRoleUpdateResponse {
+  memberId: number;
+  previousRole: OrganizationRole;
+  newRole: OrganizationRole;
+  updatedAt: string;
+}
+
 // ========================================
 // Workspace
 // ========================================
@@ -200,6 +257,20 @@ export interface WorkspaceInviteCreateResponse {
   invitationUrl: string;
   token: string;
   expiredAt: string;
+}
+
+export type InvitationPreviewStatus = 'VALID';
+
+export interface WorkspaceInvitePreviewResponse {
+  organizationId: number;
+  organizationName: string;
+  workspaceId: number;
+  workspaceName: string;
+  role: string;
+  inviterName: string;
+  expiresAt: string;
+  status: InvitationPreviewStatus;
+  invitationMessage: string | null;
 }
 
 export interface WorkspaceInviteAcceptRequest {
@@ -392,6 +463,7 @@ export interface PromptVersionDetailResponse {
   secondaryModel: string | null;
   systemPrompt: string;
   userTemplate: string;
+  ragEnabled: boolean;
   contextUrl?: string;
   modelConfig: Record<string, any>;
   createdBy: number;
@@ -414,6 +486,186 @@ export interface PromptVersionCreateResponse {
   id: number;
   versionNumber: number;
   createdAt: string;
+}
+
+// ========================================
+// Prompt Eval
+// ========================================
+export type EvalMode = 'CANDIDATE_ONLY' | 'COMPARE_ACTIVE';
+export type EvalRunStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type EvalCaseStatus = 'QUEUED' | 'RUNNING' | 'OK' | 'ERROR' | 'SKIPPED';
+export type EvalTriggerType = 'MANUAL' | 'AUTO_VERSION_CREATE';
+export type RubricTemplateCode = 'GENERAL_TEXT' | 'SUMMARY' | 'JSON_EXTRACTION' | 'CLASSIFICATION' | 'CUSTOM';
+
+export interface EvalDatasetCreateRequest {
+  name: string;
+  description?: string;
+}
+
+export interface EvalDatasetResponse {
+  id: number;
+  workspaceId: number;
+  name: string;
+  description: string | null;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalTestCaseCreateRequest {
+  externalId?: string;
+  input: string;
+  contextJson?: Record<string, any>;
+  expectedJson?: Record<string, any>;
+  constraintsJson?: Record<string, any>;
+}
+
+export interface EvalBulkUploadRequest {
+  testCases: EvalTestCaseCreateRequest[];
+  replaceExisting?: boolean;
+}
+
+export interface EvalBulkUploadResponse {
+  datasetId: number;
+  uploadedCount: number;
+}
+
+export interface EvalTestCaseResponse {
+  id: number;
+  datasetId: number;
+  caseOrder: number;
+  externalId: string | null;
+  input: string;
+  contextJson: Record<string, any> | null;
+  expectedJson: Record<string, any> | null;
+  constraintsJson: Record<string, any> | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PromptEvalDefaultResponse {
+  promptId: number;
+  datasetId: number | null;
+  rubricTemplateCode: RubricTemplateCode;
+  rubricOverrides: Record<string, any> | null;
+  defaultMode: EvalMode;
+  autoEvalEnabled: boolean;
+  updatedBy: number;
+  updatedAt: string;
+}
+
+export interface PromptEvalDefaultUpsertRequest {
+  datasetId?: number;
+  rubricTemplateCode: RubricTemplateCode;
+  rubricOverrides?: Record<string, any>;
+  defaultMode: EvalMode;
+  autoEvalEnabled: boolean;
+}
+
+export interface EvalRunCreateRequest {
+  promptVersionId: number;
+  datasetId: number;
+  mode: EvalMode;
+  rubricTemplateCode: RubricTemplateCode;
+  rubricOverrides?: Record<string, any>;
+}
+
+export interface EvalRunEstimateRequest {
+  promptVersionId: number;
+  datasetId: number;
+  mode: EvalMode;
+  rubricTemplateCode: RubricTemplateCode;
+}
+
+export interface EvalRunEstimateResponse {
+  estimatedCases: number;
+  estimatedCallsMin: number;
+  estimatedCallsMax: number;
+  estimatedTokensMin: number;
+  estimatedTokensMax: number;
+  estimatedCostUsdMin: number;
+  estimatedCostUsdMax: number;
+  estimatedCostTier: 'LOW' | 'MEDIUM' | 'HIGH';
+  estimatedDurationSecMin: number;
+  estimatedDurationSecMax: number;
+  estimateNotice: string;
+  assumptions: Record<string, any>;
+}
+
+export interface EvalReleaseCriteriaResponse {
+  workspaceId: number;
+  minPassRate: number;
+  minAvgOverallScore: number;
+  maxErrorRate: number;
+  minImprovementNoticeDelta: number;
+  updatedAt: string | null;
+}
+
+export interface EvalReleaseCriteriaUpdateRequest {
+  minPassRate: number;
+  minAvgOverallScore: number;
+  maxErrorRate: number;
+  minImprovementNoticeDelta: number;
+}
+
+export interface EvalRunResponse {
+  id: number;
+  promptId: number;
+  promptVersionId: number;
+  workspaceId: number;
+  datasetId: number;
+  mode: EvalMode;
+  triggerType: EvalTriggerType;
+  rubricTemplateCode: RubricTemplateCode;
+  rubricOverrides: Record<string, any> | null;
+  candidateProvider: string | null;
+  candidateModel: string | null;
+  judgeProvider: string | null;
+  judgeModel: string | null;
+  status: EvalRunStatus;
+  totalCases: number;
+  processedCases: number;
+  passedCases: number;
+  failedCases: number;
+  errorCases: number;
+  summary: Record<string, any> | null;
+  cost: Record<string, any> | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface EvalCancelResponse {
+  runId: number;
+  status: EvalRunStatus;
+}
+
+export interface EvalCaseResultResponse {
+  id: number;
+  evalRunId: number;
+  testCaseId: number;
+  status: EvalCaseStatus;
+  candidateOutput: string | null;
+  baselineOutput: string | null;
+  candidateMeta: Record<string, any> | null;
+  baselineMeta: Record<string, any> | null;
+  ruleChecks: Record<string, any> | null;
+  judgeOutput: Record<string, any> | null;
+  overallScore: number | null;
+  pass: boolean | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface EvalCaseResultListResponse {
+  content: EvalCaseResultResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 // ========================================
@@ -490,4 +742,53 @@ export interface WorkspaceRagSettingsUpdateRequest {
   rerankTopN: number;
   chunkSize: number;
   chunkOverlapTokens: number;
+}
+
+// ========================================
+// Prompt Playground
+// ========================================
+export interface PlaygroundRunRequest {
+  provider: ProviderType;
+  model: string;
+  systemPrompt?: string;
+  userTemplate: string;
+  ragEnabled?: boolean;
+  modelConfig?: Record<string, any>;
+  variables: Record<string, string>;
+  baseVersionId?: number;
+}
+
+export interface PlaygroundUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  estimatedCost: number | null;
+}
+
+export interface PlaygroundRunResponse {
+  traceId: string;
+  answer: string;
+  usedModel: string;
+  usage: PlaygroundUsage;
+  latencyMs: number;
+  executedAt: string;
+}
+
+export interface PlaygroundSaveVersionRequest {
+  title?: string;
+  provider: ProviderType;
+  model: string;
+  secondaryProvider?: ProviderType;
+  secondaryModel?: string;
+  systemPrompt?: string;
+  userTemplate: string;
+  ragEnabled?: boolean;
+  contextUrl?: string;
+  modelConfig?: Record<string, any>;
+  releaseAfterSave: boolean;
+}
+
+export interface PlaygroundSaveVersionResponse {
+  version: PromptVersionCreateResponse;
+  released: boolean;
 }

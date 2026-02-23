@@ -2,6 +2,7 @@ package com.llm_ops.demo.prompt.service;
 
 import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.repository.UserRepository;
+import com.llm_ops.demo.eval.service.EvalRunService;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.prompt.domain.Prompt;
@@ -16,30 +17,39 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class PromptVersionService {
+
+    private static final Logger log = LoggerFactory.getLogger(PromptVersionService.class);
 
     private final PromptVersionRepository promptVersionRepository;
     private final PromptRepository promptRepository;
     private final UserRepository userRepository;
     private final WorkspaceMemberRepository workspaceMemberRepository;
     private final PromptModelAllowlistService promptModelAllowlistService;
+    private final EvalRunService evalRunService;
 
     public PromptVersionService(
             PromptVersionRepository promptVersionRepository,
             PromptRepository promptRepository,
             UserRepository userRepository,
             WorkspaceMemberRepository workspaceMemberRepository,
-            PromptModelAllowlistService promptModelAllowlistService
+            PromptModelAllowlistService promptModelAllowlistService,
+            EvalRunService evalRunService
     ) {
         this.promptVersionRepository = promptVersionRepository;
         this.promptRepository = promptRepository;
         this.userRepository = userRepository;
         this.workspaceMemberRepository = workspaceMemberRepository;
         this.promptModelAllowlistService = promptModelAllowlistService;
+        this.evalRunService = evalRunService;
     }
 
     @Transactional
@@ -55,6 +65,19 @@ public class PromptVersionService {
         int nextVersionNo = calculateNextVersionNo(prompt);
         PromptVersion version = buildVersion(prompt, nextVersionNo, request, user);
         PromptVersion saved = promptVersionRepository.save(version);
+        runAfterCommit(() -> {
+            try {
+                evalRunService.enqueueAutoRunIfEnabled(prompt.getId(), saved.getId(), user.getId());
+            } catch (Exception e) {
+                log.warn(
+                        "자동 평가 큐 등록 실패 promptId={}, versionId={}, userId={}",
+                        prompt.getId(),
+                        saved.getId(),
+                        user.getId(),
+                        e
+                );
+            }
+        });
 
         return PromptVersionCreateResponse.from(saved);
     }
@@ -139,7 +162,7 @@ public class PromptVersionService {
     }
 
     private boolean containsQuestionPlaceholder(String template) {
-        return template.contains("{{question}}") || template.contains("{question}");
+        return template.contains("{{question}}");
     }
 
     private void validateSecondaryModel(PromptVersionCreateRequest request) {
@@ -155,5 +178,18 @@ public class PromptVersionService {
         }
 
         promptModelAllowlistService.validateModel(secondaryProvider, secondaryModel);
+    }
+
+    private void runAfterCommit(Runnable task) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+        } else {
+            task.run();
+        }
     }
 }

@@ -51,8 +51,13 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         // 인증 없이 접근 가능한 경로
-                        .requestMatchers("/api/v1/auth/signup", "/api/v1/auth/login", "/api/v1/auth/refresh")
-                        .permitAll()
+                        .requestMatchers(
+                                "/api/v1/auth/signup",
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/check-email",
+                                "/api/v1/invitations/preview"
+                        ).permitAll()
                         // 게이트웨이 외부 호출(조직 API 키로 인증)
                         .requestMatchers("/v1/chat/**").permitAll()
                         .requestMatchers("/health", "/actuator/health").permitAll()

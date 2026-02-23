@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -15,11 +15,17 @@ import type {
     PromptReleaseHistoryResponse,
     PromptReleaseResponse,
     PromptVersionDetailResponse,
-    ProviderType
+    ProviderType,
+    PlaygroundRunResponse,
 } from '@/types/api.types';
 
+const PromptEvaluateTab = lazy(async () => {
+    const mod = await import('./components/PromptEvaluateTab');
+    return { default: mod.PromptEvaluateTab };
+});
+
 // 탭 정의
-type TabType = 'overview' | 'versions' | 'release' | 'playground';
+type TabType = 'overview' | 'versions' | 'release' | 'playground' | 'evaluate';
 
 export function PromptDetailPage() {
     const { orgId, workspaceId: workspaceIdStr, promptId: promptIdStr } = useParams<{ orgId: string; workspaceId: string; promptId: string }>();
@@ -123,6 +129,12 @@ export function PromptDetailPage() {
                         label="Playground"
                         kind="playground"
                     />
+                    <TabButton
+                        active={activeTab === 'evaluate'}
+                        onClick={() => setActiveTab('evaluate')}
+                        iconName="analytics"
+                        label="Evaluate"
+                    />
                 </nav>
             </div>
 
@@ -140,7 +152,12 @@ export function PromptDetailPage() {
                 )}
                 {activeTab === 'versions' && <VersionsTab promptId={promptId} />}
                 {activeTab === 'release' && <ReleaseTab promptId={promptId} />}
-                {activeTab === 'playground' && <PlaygroundTab />}
+                {activeTab === 'playground' && <PlaygroundTab promptId={promptId} />}
+                {activeTab === 'evaluate' ? (
+                    <Suspense fallback={<div className="p-8 text-gray-500">로딩 중...</div>}>
+                        <PromptEvaluateTab workspaceId={workspaceId} promptId={promptId} />
+                    </Suspense>
+                ) : null}
             </div>
         </div>
     );
@@ -166,6 +183,7 @@ function TabButton({
         >
             <span
                 className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300')} transition-colors`}
+                aria-hidden="true"
             >
                 {iconName}
             </span>
@@ -310,7 +328,7 @@ function OverviewTab({
                             />
                             <button
                                 type="button"
-                                onClick={() => navigator.clipboard.writeText(prompt.promptKey)}
+                                onClick={async () => { try { await navigator.clipboard.writeText(prompt.promptKey); } catch { /* ignore */ } }}
                                 className="absolute right-3 top-3 text-gray-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
                                 aria-label="copy prompt key"
                             >
@@ -543,7 +561,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
     });
 
     const availableProviders = Array.from(
-        new Set((credentials || []).map((cred) => normalizeProviderKey(cred.provider)))
+        new Set((credentials || [])
+            .filter((cred) => cred.status === 'ACTIVE')
+            .map((cred) => normalizeProviderKey(cred.provider)))
     ).filter((provider) => providerLabel[provider]);
 
     const filteredPresets = presets.filter((preset) => availableProviders.includes(preset.data.provider));
@@ -1678,74 +1698,670 @@ function ReleaseTab({ promptId }: { promptId: number }) {
     );
 }
 
-function PlaygroundTab() {
+function PlaygroundTab({ promptId }: { promptId: number }) {
+    const queryClient = useQueryClient();
+    const { currentOrgId } = useOrganizationStore();
+    const { orgId } = useParams<{ orgId: string }>();
+    const parsedOrgId = orgId ? Number(orgId) : undefined;
+    const resolvedOrgId = typeof parsedOrgId === 'number' && Number.isFinite(parsedOrgId)
+        ? parsedOrgId
+        : currentOrgId;
+    const isResolvedOrgId = typeof resolvedOrgId === 'number' && !Number.isNaN(resolvedOrgId);
+
+    // --- State ---
+    const [provider, setProvider] = useState<ProviderType>('OPENAI');
+    const [model, setModel] = useState('');
+    const [secondaryProvider, setSecondaryProvider] = useState<ProviderType | ''>('');
+    const [secondaryModel, setSecondaryModel] = useState('');
+    const [systemPrompt, setSystemPrompt] = useState('');
+    const [userTemplate, setUserTemplate] = useState('');
+    const [temperature, setTemperature] = useState(0.7);
+    const [maxTokens, setMaxTokens] = useState(2048);
+    const [topP, setTopP] = useState(1.0);
+    const [frequencyPenalty, setFrequencyPenalty] = useState(0.0);
+    const [ragEnabled, setRagEnabled] = useState(false);
+    const [variables, setVariables] = useState<{ key: string; value: string }[]>([]);
+    const [result, setResult] = useState<PlaygroundRunResponse | null>(null);
+    const [runError, setRunError] = useState<string | null>(null);
+    const [saveOpen, setSaveOpen] = useState(false);
+    const [saveTitle, setSaveTitle] = useState('');
+    const [releaseAfterSave, setReleaseAfterSave] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [outputCopied, setOutputCopied] = useState(false);
+    const [selectedVersionId, setSelectedVersionId] = useState<string>('');
+    const [loadedVersionId, setLoadedVersionId] = useState<number | null>(null);
+    const [versionLoadError, setVersionLoadError] = useState<string | null>(null);
+
+    // --- Queries ---
+    const { data: credentials } = useQuery({
+        queryKey: ['provider-credentials', resolvedOrgId],
+        queryFn: async () => {
+            if (!isResolvedOrgId) return [];
+            const response = await organizationApi.getCredentials(resolvedOrgId);
+            return response.data;
+        },
+        enabled: isResolvedOrgId,
+    });
+
+    const { data: modelAllowlist } = useQuery({
+        queryKey: ['model-allowlist'],
+        queryFn: async () => {
+            const response = await promptApi.getModelAllowlist();
+            return response.data;
+        },
+    });
+
+    const { data: versions } = useQuery({
+        queryKey: ['promptVersions', promptId],
+        queryFn: async () => {
+            const response = await promptApi.getVersions(promptId);
+            return response.data;
+        },
+    });
+
+    // --- Derived ---
+    const providerLabel: Record<string, string> = { OPENAI: 'OpenAI', ANTHROPIC: 'Anthropic', GEMINI: 'Gemini' };
+    const normalizeProviderKey = (raw: string) => {
+        const n = raw.trim().toLowerCase();
+        if (n === 'google') return 'GEMINI';
+        if (n === 'claude') return 'ANTHROPIC';
+        return n.toUpperCase();
+    };
+    const availableProviders = Array.from(
+        new Set((credentials || [])
+            .filter((c) => c.status === 'ACTIVE')
+            .map((c) => normalizeProviderKey(c.provider)))
+    ).filter((p) => providerLabel[p]);
+
+    const providerModels = useMemo(() => {
+        if (!modelAllowlist) return [];
+        return modelAllowlist[provider] ?? [];
+    }, [modelAllowlist, provider]);
+
+    // Extract {{variables}} from userTemplate
+    const templateVars = useMemo(() => {
+        const matches = userTemplate.match(/\{\{(\w+)\}\}/g) || [];
+        return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '')))];
+    }, [userTemplate]);
+
+    // Sync variables list with template vars
+    useEffect(() => {
+        setVariables((prev) => {
+            const existing = new Map(prev.map((v) => [v.key, v.value]));
+            return templateVars.map((key) => ({ key, value: existing.get(key) || '' }));
+        });
+    }, [templateVars]);
+
+    // Auto-select first available provider/model
+    useEffect(() => {
+        if (availableProviders.length && !availableProviders.includes(provider)) {
+            setProvider(availableProviders[0] as ProviderType);
+        }
+    }, [availableProviders, provider]);
+
+    useEffect(() => {
+        if (providerModels.length && !providerModels.includes(model)) {
+            setModel(providerModels[0]);
+        }
+    }, [providerModels, model]);
+
+    const secondaryProviderModels = useMemo(() => {
+        if (!modelAllowlist || !secondaryProvider) return [];
+        return modelAllowlist[secondaryProvider as ProviderType] ?? [];
+    }, [modelAllowlist, secondaryProvider]);
+
+    useEffect(() => {
+        if (!secondaryProvider) return;
+        if (!availableProviders.includes(secondaryProvider)) {
+            setSecondaryProvider('');
+            setSecondaryModel('');
+        }
+    }, [availableProviders, secondaryProvider]);
+
+    useEffect(() => {
+        if (!secondaryProvider) {
+            if (secondaryModel) setSecondaryModel('');
+            return;
+        }
+        if (!secondaryProviderModels.length) {
+            if (secondaryModel) setSecondaryModel('');
+            return;
+        }
+        if (!secondaryProviderModels.includes(secondaryModel)) {
+            setSecondaryModel(secondaryProviderModels[0]);
+        }
+    }, [secondaryProvider, secondaryModel, secondaryProviderModels]);
+
+    // Load version into playground
+    const loadVersion = useCallback((versionId: number) => {
+        setVersionLoadError(null);
+        setResult(null);
+        setRunError(null);
+        promptApi.getVersion(promptId, versionId).then((res) => {
+            const v = res.data;
+            setProvider(v.provider);
+            setModel(v.model);
+            setSecondaryProvider(v.secondaryProvider ?? '');
+            setSecondaryModel(v.secondaryModel ?? '');
+            setSystemPrompt(v.systemPrompt || '');
+            setUserTemplate(v.userTemplate || '');
+            setRagEnabled(v.ragEnabled ?? false);
+            setTemperature(v.modelConfig?.temperature ?? 0.7);
+            setMaxTokens(v.modelConfig?.maxTokens ?? 2048);
+            setTopP(v.modelConfig?.topP ?? 1.0);
+            setFrequencyPenalty(v.modelConfig?.frequencyPenalty ?? 0.0);
+            setLoadedVersionId(versionId);
+        }).catch((err) => {
+            const msg = axios.isAxiosError(err)
+                ? err.response?.data?.message || err.message
+                : (err instanceof Error ? err.message : 'Unknown error');
+            setVersionLoadError(msg);
+        });
+    }, [promptId]);
+
+    // --- Mutations ---
+    const buildModelConfig = useCallback(() => ({
+        temperature,
+        maxTokens,
+        topP,
+        frequencyPenalty,
+    }), [temperature, maxTokens, topP, frequencyPenalty]);
+
+    const runMutation = useMutation({
+        mutationFn: async () => {
+            setRunError(null);
+            const varsMap: Record<string, string> = {};
+            variables.forEach((v) => { varsMap[v.key] = v.value; });
+            const response = await promptApi.playgroundRun(promptId, {
+                provider,
+                model,
+                systemPrompt: systemPrompt || undefined,
+                userTemplate,
+                ragEnabled,
+                modelConfig: buildModelConfig(),
+                variables: varsMap,
+                baseVersionId: loadedVersionId ?? undefined,
+            });
+            return response.data;
+        },
+        onSuccess: (data) => { setResult(data); },
+        onError: (err) => {
+            const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err instanceof Error ? err.message : 'Unknown error');
+            setRunError(msg);
+            setResult(null);
+        },
+    });
+
+    const saveMutation = useMutation({
+        mutationFn: async () => {
+            setSaveError(null);
+            return promptApi.playgroundSave(promptId, {
+                title: saveTitle.trim() || undefined,
+                provider,
+                model,
+                secondaryProvider: secondaryProvider || undefined,
+                secondaryModel: secondaryProvider ? secondaryModel || undefined : undefined,
+                systemPrompt: systemPrompt || undefined,
+                userTemplate,
+                ragEnabled,
+                modelConfig: buildModelConfig(),
+                releaseAfterSave,
+            });
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['promptVersions', promptId] });
+            queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
+            setSaveOpen(false);
+            setSaveTitle('');
+            setReleaseAfterSave(false);
+        },
+        onError: (err) => {
+            const msg = axios.isAxiosError(err) ? err.response?.data?.message || err.message : (err instanceof Error ? err.message : 'Unknown error');
+            setSaveError(msg);
+        },
+    });
+
+    const providerDotClass = (p: string) => {
+        if (p === 'OPENAI') return 'bg-blue-400';
+        if (p === 'GEMINI') return 'bg-emerald-400';
+        if (p === 'ANTHROPIC') return 'bg-amber-400';
+        return 'bg-gray-500';
+    };
+
+    const canRun = userTemplate.trim().length > 0
+        && model.trim().length > 0
+        && availableProviders.includes(provider)
+        && providerModels.includes(model);
+
     return (
-        <div className="h-[600px] flex gap-4">
-            {/* Left: Settings & Prompt */}
-            <div className="w-1/2 flex flex-col gap-4">
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex-1 flex flex-col">
-                    <h3 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
-                        <span>System Prompt</span>
-                        <div className="flex gap-2">
-                            <select
-                                className="text-xs border border-gray-300 rounded px-2 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled
-                                title="준비 중"
-                            >
-                                <option>GPT-4</option>
-                                <option>GPT-3.5-Turbo</option>
-                                <option>Claude-3-Opus</option>
-                            </select>
-                            <button
-                                className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled
-                                title="준비 중"
-                            >
-                                <Save size={12} /> 저장
-                            </button>
-                        </div>
-                    </h3>
-                    <textarea
-                        className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                        defaultValue="You are a helpful customer support assistant. Always be polite and concise."
-                        readOnly
-                        title="준비 중"
-                    />
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm h-1/3 flex flex-col">
-                    <h3 className="font-medium text-gray-900 mb-3">User Input (Test Case)</h3>
-                    <textarea
-                        className="flex-1 w-full p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                        placeholder="테스트할 사용자 입력을 입력하세요..."
-                        defaultValue="환불 규정이 어떻게 되나요?"
-                        readOnly
-                        title="준비 중"
-                    />
+        <div className="space-y-6">
+            {/* Top bar: version loader */}
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[var(--primary)]">play_circle</span>
+                    Playground
+                </h2>
+                <div className="flex items-center gap-3">
+                    {versions && versions.length > 0 && (
+                        <select
+                            className="bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-300 px-3 py-1.5 focus:outline-none focus:border-[var(--primary)]"
+                            value={selectedVersionId}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSelectedVersionId(val);
+                                if (val) {
+                                    loadVersion(Number(val));
+                                    setSelectedVersionId('');
+                                }
+                            }}
+                        >
+                            <option value="">버전 불러오기...</option>
+                            {versions.map((v) => (
+                                <option key={v.id} value={v.id}>v{v.versionNumber} — {v.title || '(untitled)'}</option>
+                            ))}
+                        </select>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => { setSaveError(null); setSaveOpen(true); }}
+                        disabled={!canRun}
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium border border-[#27272a] text-gray-300 hover:text-white hover:border-gray-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <Save size={14} /> 버전 저장
+                    </button>
                 </div>
             </div>
 
-            {/* Right: Output */}
-            <div className="w-1/2 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center rounded-t-xl">
-                    <h3 className="font-medium text-gray-900">Output</h3>
-                    <button
-                        className="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled
-                        title="준비 중"
-                    >
-                        <Play size={14} /> Run
+            {versionLoadError && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-center justify-between">
+                    <span>버전 불러오기 실패: {versionLoadError}</span>
+                    <button type="button" onClick={() => setVersionLoadError(null)} className="text-red-400 hover:text-red-300 ml-3">
+                        <span className="material-symbols-outlined text-sm">close</span>
                     </button>
                 </div>
-                <div className="flex-1 p-4 overflow-auto">
-                    <p className="text-sm text-gray-500">
-                        플레이그라운드 준비 중 - 기능이 활성화되면 여기에 결과가 표시됩니다.
-                    </p>
+            )}
+
+            <div className="flex gap-5" style={{ minHeight: 560 }}>
+                {/* Left panel: settings */}
+                <div className="w-1/2 flex flex-col gap-4">
+                    {/* Provider & Model */}
+                    <div className="glass-card rounded-xl p-5 space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="material-symbols-outlined text-base text-gray-400">tune</span>
+                            <span className="text-sm font-semibold text-gray-300">모델 설정</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Provider</label>
+                                <select
+                                    value={provider}
+                                    onChange={(e) => setProvider(e.target.value as ProviderType)}
+                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)]"
+                                >
+                                    {availableProviders.map((p) => (
+                                        <option key={p} value={p}>{providerLabel[p]}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Model</label>
+                                <select
+                                    value={model}
+                                    onChange={(e) => setModel(e.target.value)}
+                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)]"
+                                >
+                                    {providerModels.map((m) => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={ragEnabled}
+                                    onChange={(e) => setRagEnabled(e.target.checked)}
+                                    className="w-3.5 h-3.5 rounded border-gray-600 accent-[var(--primary)]"
+                                />
+                                RAG 사용
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* System Prompt */}
+                    <div className="glass-card rounded-xl p-5 flex-1 flex flex-col">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
+                            <span className="material-symbols-outlined text-base text-gray-400">psychology</span>
+                            System Prompt
+                        </label>
+                        <textarea
+                            value={systemPrompt}
+                            onChange={(e) => setSystemPrompt(e.target.value)}
+                            placeholder="시스템 프롬프트를 입력하세요..."
+                            className="flex-1 w-full p-3 bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 font-mono focus:outline-none focus:border-[var(--primary)] resize-none placeholder-gray-600"
+                            rows={4}
+                        />
+                    </div>
+
+                    {/* User Template */}
+                    <div className="glass-card rounded-xl p-5 flex flex-col">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
+                            <span className="material-symbols-outlined text-base text-gray-400">chat</span>
+                            User Template
+                        </label>
+                        <textarea
+                            value={userTemplate}
+                            onChange={(e) => setUserTemplate(e.target.value)}
+                            placeholder="사용자 템플릿을 입력하세요. 예: {{question}}에 대해 답변해주세요."
+                            className="w-full p-3 bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 font-mono focus:outline-none focus:border-[var(--primary)] resize-none placeholder-gray-600"
+                            rows={3}
+                        />
+                    </div>
+
+                    {/* Variables */}
+                    {templateVars.length > 0 && (
+                        <div className="glass-card rounded-xl p-5 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-base text-gray-400">data_object</span>
+                                <span className="text-sm font-semibold text-gray-300">Variables</span>
+                            </div>
+                            {variables.map((v, i) => (
+                                <div key={v.key} className="flex items-center gap-3">
+                                    <span className="text-xs text-[var(--primary)] font-mono bg-[var(--primary)]/10 px-2 py-1 rounded border border-[var(--primary)]/20 min-w-[80px] text-center">
+                                        {`{{${v.key}}}`}
+                                    </span>
+                                    <input
+                                        value={v.value}
+                                        onChange={(e) => {
+                                            const next = [...variables];
+                                            next[i] = { ...next[i], value: e.target.value };
+                                            setVariables(next);
+                                        }}
+                                        placeholder={`${v.key} 값 입력`}
+                                        className="flex-1 bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)] placeholder-gray-600"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Parameters */}
+                    <div className="glass-card rounded-xl p-5 space-y-5">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-base text-gray-400">tune</span>
+                            <span className="text-sm font-semibold text-gray-300">Parameters</span>
+                        </div>
+
+                        {/* Temperature */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-400">Temperature</span>
+                                <input
+                                    type="number"
+                                    value={temperature}
+                                    onChange={(e) => setTemperature(Math.min(2, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                    step={0.1}
+                                    min={0}
+                                    max={2}
+                                    className="w-16 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                            </div>
+                            <input
+                                type="range"
+                                value={temperature}
+                                onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                                min={0}
+                                max={2}
+                                step={0.1}
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                            />
+                        </div>
+
+                        {/* Max Tokens */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-400">Max Tokens</span>
+                                <input
+                                    type="number"
+                                    value={maxTokens}
+                                    onChange={(e) => setMaxTokens(Math.min(16384, Math.max(100, parseInt(e.target.value) || 100)))}
+                                    step={100}
+                                    min={100}
+                                    max={16384}
+                                    className="w-20 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                            </div>
+                            <input
+                                type="range"
+                                value={maxTokens}
+                                onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+                                min={100}
+                                max={16384}
+                                step={100}
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                            />
+                        </div>
+
+                        {/* Top P */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-400">Top P</span>
+                                <input
+                                    type="number"
+                                    value={topP}
+                                    onChange={(e) => setTopP(Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                    step={0.05}
+                                    min={0}
+                                    max={1}
+                                    className="w-16 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                            </div>
+                            <input
+                                type="range"
+                                value={topP}
+                                onChange={(e) => setTopP(parseFloat(e.target.value))}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                            />
+                        </div>
+
+                        {/* Frequency Penalty */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs text-gray-400">Frequency Penalty</span>
+                                <input
+                                    type="number"
+                                    value={frequencyPenalty}
+                                    onChange={(e) => setFrequencyPenalty(Math.min(2, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                    step={0.1}
+                                    min={0}
+                                    max={2}
+                                    className="w-16 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                            </div>
+                            <input
+                                type="range"
+                                value={frequencyPenalty}
+                                onChange={(e) => setFrequencyPenalty(parseFloat(e.target.value))}
+                                min={0}
+                                max={2}
+                                step={0.1}
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                            />
+                        </div>
+                    </div>
                 </div>
-                <div className="p-3 border-t border-gray-200 text-xs text-gray-500 flex justify-between bg-gray-50 rounded-b-xl">
-                    <span>Latency: 1.2s</span>
-                    <span>Tokens: 154 / 4096</span>
+
+                {/* Right panel: output */}
+                <div className="w-1/2 flex flex-col gap-4">
+                    {/* Run button area */}
+                    <div className="glass-card rounded-xl p-5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <span className={`w-2 h-2 rounded-full ${providerDotClass(provider)}`} />
+                            <span className="text-sm text-gray-400">{providerLabel[provider] || provider} / {model || '-'}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => runMutation.mutate()}
+                            disabled={!canRun || runMutation.isPending}
+                            className="bg-[var(--primary)] hover:bg-purple-600 text-white px-6 py-2 rounded-lg text-sm font-semibold shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                        >
+                            {runMutation.isPending ? (
+                                <>
+                                    <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                                    실행 중...
+                                </>
+                            ) : (
+                                <>
+                                    <Play size={14} /> Run
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Output */}
+                    <div className="glass-card rounded-xl flex-1 flex flex-col overflow-hidden">
+                        <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
+                            <span className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-base text-gray-400">output</span>
+                                Output
+                            </span>
+                            {result && (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        try {
+                                            await navigator.clipboard.writeText(result.answer ?? '');
+                                            setOutputCopied(true);
+                                            setTimeout(() => setOutputCopied(false), 2000);
+                                        } catch { /* ignore */ }
+                                    }}
+                                    className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
+                                >
+                                    <Copy size={12} />
+                                    {outputCopied ? '복사됨' : '복사'}
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex-1 p-5 overflow-auto">
+                            {runError && (
+                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm mb-3">
+                                    {runError}
+                                </div>
+                            )}
+                            {result ? (
+                                <pre className="text-sm text-gray-200 whitespace-pre-wrap font-sans leading-relaxed">
+                                    {result.answer ?? '(응답 없음)'}
+                                </pre>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-600 gap-3">
+                                    <span className="material-symbols-outlined text-4xl">play_circle</span>
+                                    <p className="text-sm">프롬프트를 설정하고 Run 버튼을 눌러 테스트하세요</p>
+                                </div>
+                            )}
+                        </div>
+                        {result && (
+                            <div className="px-5 py-3 border-t border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                                <span className="flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm">timer</span>
+                                    {result.latencyMs != null ? `${(result.latencyMs / 1000).toFixed(2)}s` : '-'}
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm">token</span>
+                                    {result.usage?.inputTokens ?? '-'} in / {result.usage?.outputTokens ?? '-'} out / {result.usage?.totalTokens ?? '-'} total
+                                </span>
+                                {result.usage?.estimatedCost != null && (
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm">payments</span>
+                                        ${result.usage.estimatedCost.toFixed(6)}
+                                    </span>
+                                )}
+                                <span className="flex items-center gap-1.5">
+                                    <span className="material-symbols-outlined text-sm">smart_toy</span>
+                                    {result.usedModel || '-'}
+                                </span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            {/* Save as version modal */}
+            {saveOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSaveOpen(false)} />
+                    <div className="relative z-10 w-full max-w-md rounded-2xl overflow-hidden border border-[var(--primary)]/30 shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(168,85,247,0.15),0_25px_50px_-12px_rgba(0,0,0,0.80)] bg-[radial-gradient(140%_140%_at_50%_0%,rgba(22,25,35,0.95)_0%,rgba(10,10,12,0.98)_100%)] backdrop-blur-2xl">
+                        <div className="px-6 py-5 border-b border-white/5">
+                            <h4 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <span className="w-1.5 h-5 rounded-full bg-[var(--primary)] shadow-[0_0_10px_rgba(168,85,247,0.50)]" />
+                                새 버전으로 저장
+                            </h4>
+                            <p className="text-xs text-gray-400 mt-1 pl-3.5">현재 플레이그라운드 설정을 새 프롬프트 버전으로 저장합니다</p>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs text-gray-400 mb-1.5">버전 제목 (선택)</label>
+                                <input
+                                    value={saveTitle}
+                                    onChange={(e) => setSaveTitle(e.target.value)}
+                                    placeholder="예: GPT-4o 튜닝 v3"
+                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)] placeholder-gray-600"
+                                />
+                            </div>
+                            <div className="glass-card rounded-lg p-3 flex items-center justify-between">
+                                <div>
+                                    <div className="text-sm text-gray-300 font-medium">저장 후 즉시 배포</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">새 버전을 바로 활성 릴리즈로 설정합니다</div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={releaseAfterSave}
+                                        onChange={(e) => setReleaseAfterSave(e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-gray-400 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--primary)] peer-checked:after:bg-white" />
+                                </label>
+                            </div>
+                            {saveError && (
+                                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                                    {saveError}
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setSaveOpen(false)}
+                                className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white border border-[#27272a] hover:border-gray-500 transition-colors"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => saveMutation.mutate()}
+                                disabled={saveMutation.isPending}
+                                className="bg-[var(--primary)] hover:bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-medium shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {saveMutation.isPending ? (
+                                    <>
+                                        <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                                        저장 중...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={14} />
+                                        {releaseAfterSave ? '저장 & 배포' : '저장'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -149,6 +149,12 @@ public class DefaultProviderCredentialVerifier implements ProviderCredentialVeri
                 if (isAuthError(e)) {
                     throw e;
                 }
+            } catch (NonTransientAiException e) {
+                BusinessException mapped = mapAiAuthException(e);
+                if (mapped != null && isAuthError(mapped)) {
+                    throw mapped;
+                }
+                // 모델 미발견(404) 등은 다음 모델로 fallback
             } catch (Exception ignored) {
                 // try next model
             }
@@ -183,6 +189,12 @@ public class DefaultProviderCredentialVerifier implements ProviderCredentialVeri
                 if (isAuthError(e)) {
                     throw e;
                 }
+            } catch (NonTransientAiException e) {
+                BusinessException mapped = mapAiAuthException(e);
+                if (mapped != null && isAuthError(mapped)) {
+                    throw mapped;
+                }
+                // 모델 미발견(404) 등은 다음 모델로 fallback
             } catch (Exception ignored) {
                 // try next model
             }
