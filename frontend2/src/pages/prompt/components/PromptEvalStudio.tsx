@@ -2173,7 +2173,7 @@ export function resolveReasonDrivenCaseFilter(
 function ResultDashboard({
     run,
     runs,
-    versions,
+    versions: _versions,
     selectedRunId,
     onSelectRun,
     onCancelRun,
@@ -2244,7 +2244,6 @@ function ResultDashboard({
         () => computeCandidateLatencyStats(cases),
         [cases]
     );
-    const p95LatencyMs = asNumber(candidatePerformance?.p95LatencyMs) ?? latencyStatsFromCases.p95LatencyMs;
     const avgLatencyMs = asNumber(candidatePerformance?.avgLatencyMs) ?? latencyStatsFromCases.avgLatencyMs;
     const performanceDelta = asRecord(performance?.delta);
     const avgLatencyDeltaMs = asNumber(asRecord(performanceDelta?.avgLatencyMs)?.value);
@@ -2256,7 +2255,6 @@ function ResultDashboard({
         ? compareCases.map((item) => toCompareCaseDelta(item))
         : [];
     const scoreDeltaSummary = summarizeDeltas(compareCaseDeltas.map((item) => item.scoreDelta));
-    const tokenDeltaSummary = summarizeDeltas(compareCaseDeltas.map((item) => item.tokenDelta));
     const costDeltaSummary = summarizeDeltas(compareCaseDeltas.map((item) => item.costDelta));
     const latencyDeltaSummary = summarizeDeltas(compareCaseDeltas.map((item) => item.latencyDelta));
     const avgScoreDeltaEffective = avgScoreDelta ?? scoreDeltaSummary.avg;

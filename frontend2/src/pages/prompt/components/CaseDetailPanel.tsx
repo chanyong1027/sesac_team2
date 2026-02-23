@@ -1,23 +1,18 @@
 import { useState } from 'react';
-import type { EvalCaseResultResponse, RunCaseContext } from '@/types/api.types';
+import type { EvalCaseResultResponse } from '@/types/api.types';
+
+interface RunCaseContext {
+    input?: string;
+    contextJson?: Record<string, unknown> | null;
+    expectedJson?: Record<string, unknown> | null;
+    constraintsJson?: Record<string, unknown> | null;
+}
 
 // --- Helpers ---
 function prettyJson(value: unknown): string {
     if (value == null) return '-';
     if (typeof value === 'string') return value;
     try { return JSON.stringify(value, null, 2); } catch { return String(value); }
-}
-
-function formatSignedNumber(value: number | null | undefined): string {
-    if (value == null || Number.isNaN(value)) return '-';
-    return `${value > 0 ? '+' : ''}${Number(value).toFixed(2)}`;
-}
-
-function renderWinner(winner: 'CANDIDATE' | 'BASELINE' | 'TIE' | null | undefined): string {
-    if (winner === 'CANDIDATE') return '이번 버전 승 👑';
-    if (winner === 'BASELINE') return '운영 버전 승 🛡️';
-    if (winner === 'TIE') return '무승부 🤝';
-    return winner || '-';
 }
 
 function extractCompareSummary(judgeOutput: any) {
@@ -52,7 +47,6 @@ export function CaseDetailPanel({
     
     const judgeScore = judge?.overallScore ?? 0;
     const judgeReason = judge?.reason || (Array.isArray(judge?.evidence) ? judge.evidence[0] : null);
-    const judgePass = item.pass;
 
     // Compare Mode Check
     const isCompareMode = !!item.baselineOutput;
