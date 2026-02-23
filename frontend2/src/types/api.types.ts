@@ -599,6 +599,7 @@ export interface EvalReleaseCriteriaResponse {
   minAvgOverallScore: number;
   maxErrorRate: number;
   minImprovementNoticeDelta: number;
+  updatedBy: number | null;
   updatedAt: string | null;
 }
 
@@ -607,6 +608,17 @@ export interface EvalReleaseCriteriaUpdateRequest {
   minAvgOverallScore: number;
   maxErrorRate: number;
   minImprovementNoticeDelta: number;
+}
+
+export interface EvalReleaseCriteriaAuditResponse {
+  id: number;
+  workspaceId: number;
+  minPassRate: number;
+  minAvgOverallScore: number;
+  maxErrorRate: number;
+  minImprovementNoticeDelta: number;
+  changedBy: number | null;
+  changedAt: string;
 }
 
 export interface EvalRunResponse {

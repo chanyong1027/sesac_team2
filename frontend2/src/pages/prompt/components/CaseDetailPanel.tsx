@@ -1,41 +1,11 @@
 import { useState } from 'react';
 import type { EvalCaseResultResponse, RunCaseContext } from '@/types/api.types';
 
-// --- Helpers (Should ideally be in a shared utils file) ---
-function toNullableNumber(value: any): number | null {
-    if (value == null || value === '') return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-}
-
-function toNullableBoolean(value: any): boolean | null {
-    if (value == null) return null;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') {
-        if (value.toLowerCase() === 'true') return true;
-        if (value.toLowerCase() === 'false') return false;
-    }
-    return null;
-}
-
-function toStringArray(value: any): string[] {
-    if (!Array.isArray(value)) return [];
-    return value.filter((item) => item != null).map((item) => String(item));
-}
-
-function isObject(value: any): value is Record<string, any> {
-    return value && typeof value === 'object' && !Array.isArray(value);
-}
-
+// --- Helpers ---
 function prettyJson(value: unknown): string {
     if (value == null) return '-';
     if (typeof value === 'string') return value;
     try { return JSON.stringify(value, null, 2); } catch { return String(value); }
-}
-
-function formatOptionalNumber(value: number | null | undefined): string {
-    if (value == null || Number.isNaN(value)) return '-';
-    return Number(value).toFixed(2);
 }
 
 function formatSignedNumber(value: number | null | undefined): string {
@@ -43,68 +13,22 @@ function formatSignedNumber(value: number | null | undefined): string {
     return `${value > 0 ? '+' : ''}${Number(value).toFixed(2)}`;
 }
 
-function renderPassValue(pass: boolean | null): string {
-    if (pass === null) return '-';
-    return pass ? '통과' : '실패';
-}
-
 function renderWinner(winner: 'CANDIDATE' | 'BASELINE' | 'TIE' | null | undefined): string {
-    if (winner === 'CANDIDATE') return '이번 버전 우세';
-    if (winner === 'BASELINE') return '운영 버전 우세';
-    if (winner === 'TIE') return '동점';
+    if (winner === 'CANDIDATE') return '이번 버전 승 👑';
+    if (winner === 'BASELINE') return '운영 버전 승 🛡️';
+    if (winner === 'TIE') return '무승부 🤝';
     return winner || '-';
 }
 
-function badgeToneClass(tone: 'good' | 'warn' | 'danger' | 'info' | 'neutral'): string {
-    if (tone === 'danger') return 'border-rose-400/40 bg-rose-500/15 text-rose-200';
-    if (tone === 'warn') return 'border-amber-400/40 bg-amber-500/15 text-amber-200';
-    if (tone === 'info') return 'border-sky-400/40 bg-sky-500/15 text-sky-200';
-    if (tone === 'good') return 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200';
-    return 'border-white/20 bg-white/10 text-gray-300';
-}
-
-function passBadgeClass(pass: boolean | null): string {
-    if (pass === true) return badgeToneClass('good');
-    if (pass === false) return badgeToneClass('warn');
-    return badgeToneClass('neutral');
-}
-
 function extractCompareSummary(judgeOutput: any) {
-    if (!isObject(judgeOutput) || !isObject(judgeOutput.compare)) return null;
-    return judgeOutput.compare as any;
+    return (judgeOutput && typeof judgeOutput === 'object' && judgeOutput.compare) ? judgeOutput.compare : null;
 }
 
-function extractCandidateRuleChecks(ruleChecks: any) {
-    if (!isObject(ruleChecks)) return null;
-    if (isObject(ruleChecks.candidate)) return ruleChecks.candidate;
-    return ruleChecks; // Fallback for single mode
+function extractFailedChecks(ruleChecks: any): string[] {
+    return (ruleChecks && Array.isArray(ruleChecks.failedChecks)) ? ruleChecks.failedChecks : [];
 }
 
-function extractBaselineRuleChecks(ruleChecks: any) {
-    if (!isObject(ruleChecks) || !isObject(ruleChecks.baseline)) return null;
-    return ruleChecks.baseline;
-}
-
-function extractCandidateJudgeOutput(judgeOutput: any) {
-    if (!isObject(judgeOutput)) return null;
-    if (isObject(judgeOutput.candidate)) return judgeOutput.candidate;
-    return judgeOutput; // Fallback
-}
-
-function extractBaselineJudgeOutput(judgeOutput: any) {
-    if (!isObject(judgeOutput) || !isObject(judgeOutput.baseline)) return null;
-    return judgeOutput.baseline;
-}
-
-function toCompactValue(value: unknown): string {
-    if (value == null || value === '') return '-';
-    if (typeof value === 'boolean') return value ? 'true' : 'false';
-    if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(2);
-    return String(value);
-}
-
-// --- Components ---
-
+// --- Component ---
 export function CaseDetailPanel({
     item,
     inputText,
@@ -114,110 +38,203 @@ export function CaseDetailPanel({
     inputText?: string;
     caseContext?: RunCaseContext;
 }) {
-    const [detailTab, setDetailTab] = useState<'SUMMARY' | 'COMPARE' | 'ANALYSIS' | 'RAW'>('SUMMARY');
+    const [activeTab, setActiveTab] = useState<'REPORT' | 'DATA'>('REPORT');
 
+    // Data Extraction
+    const caseInput = inputText || caseContext?.input || '입력 데이터 없음';
     const compare = extractCompareSummary(item.judgeOutput);
-    const candidateRuleChecks = extractCandidateRuleChecks(item.ruleChecks);
-    const baselineRuleChecks = extractBaselineRuleChecks(item.ruleChecks);
-    const candidateJudgeOutput = extractCandidateJudgeOutput(item.judgeOutput);
-    const baselineJudgeOutput = extractBaselineJudgeOutput(item.judgeOutput);
-    const caseInput = inputText || caseContext?.input || '입력 데이터를 찾지 못했습니다.';
-    const contextJson = caseContext?.contextJson ?? null;
-    const expectedJson = caseContext?.expectedJson ?? null;
-    const constraintsJson = caseContext?.constraintsJson ?? null;
+    const failedChecks = extractFailedChecks(item.ruleChecks);
     
-    // Logic extraction (simplified)
-    const guidelineText = '세부 가이드는 Advanced 탭 참조'; // Simplifying for now
-    const failureReason = item.errorMessage || (item.pass === false ? '품질 기준 미달' : '성공');
-    const failed = item.pass === false || item.status === 'ERROR';
+    // AI Judge Info
+    const judge = (item.judgeOutput && typeof item.judgeOutput === 'object' && 'candidate' in item.judgeOutput) 
+        ? item.judgeOutput.candidate 
+        : item.judgeOutput; // Fallback for single mode or flat structure
+    
+    const judgeScore = judge?.overallScore ?? 0;
+    const judgeReason = judge?.reason || (Array.isArray(judge?.evidence) ? judge.evidence[0] : null);
+    const judgePass = item.pass;
+
+    // Compare Mode Check
+    const isCompareMode = !!item.baselineOutput;
+
+    // Status Colors
+    const statusColor = item.pass 
+        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+        : 'bg-rose-500/10 border-rose-500/30 text-rose-400';
 
     return (
-        <div className="rounded-lg border border-white/10 bg-black/20 p-3 space-y-3">
-            {/* Detail Tabs */}
-            <div className="flex items-center gap-1 border-b border-white/10 pb-2 mb-3">
-                <button onClick={() => setDetailTab('SUMMARY')} className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${detailTab === 'SUMMARY' ? 'text-white border-b-2 border-[var(--primary)] bg-white/5' : 'text-gray-400 hover:bg-white/5'}`}>요약</button>
-                <button onClick={() => setDetailTab('COMPARE')} className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${detailTab === 'COMPARE' ? 'text-indigo-300 border-b-2 border-indigo-500 bg-indigo-500/10' : 'text-gray-400 hover:bg-white/5'}`}>비교</button>
-                <button onClick={() => setDetailTab('ANALYSIS')} className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${detailTab === 'ANALYSIS' ? 'text-emerald-300 border-b-2 border-emerald-500 bg-emerald-500/10' : 'text-gray-400 hover:bg-white/5'}`}>분석</button>
-                <button onClick={() => setDetailTab('RAW')} className={`px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors ${detailTab === 'RAW' ? 'text-amber-300 border-b-2 border-amber-500 bg-amber-500/10' : 'text-gray-400 hover:bg-white/5'}`}>원본</button>
+        <div className="h-full flex flex-col gap-4">
+            {/* Tabs */}
+            <div className="flex border-b border-white/10">
+                <button 
+                    onClick={() => setActiveTab('REPORT')}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'REPORT' ? 'border-[var(--primary)] text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                >
+                    📝 통합 리포트
+                </button>
+                <button 
+                    onClick={() => setActiveTab('DATA')}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                >
+                    💾 원본 데이터 (JSON)
+                </button>
             </div>
 
-            {detailTab === 'SUMMARY' && (
-                <div className="grid grid-cols-12 gap-4 animate-in fade-in">
-                    <div className="col-span-5 p-4 bg-black/30 rounded border border-white/10">
-                        <h4 className="text-xs font-bold text-gray-400 mb-2">INPUT</h4>
-                        <p className="text-sm text-gray-200 whitespace-pre-wrap">{caseInput}</p>
+            {/* Content: Report Tab */}
+            {activeTab === 'REPORT' && (
+                <div className="flex-1 overflow-y-auto space-y-6 pr-2 animate-in fade-in">
+                    
+                    {/* 1. Q&A Section */}
+                    <div className="space-y-4">
+                        {/* User Question */}
+                        <div className="flex gap-3">
+                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-sm text-gray-300">person</span>
+                            </div>
+                            <div className="bg-white/5 rounded-2xl rounded-tl-none p-4 max-w-[80%] border border-white/10">
+                                <p className="text-xs font-bold text-gray-400 mb-1">사용자 질문 (Input)</p>
+                                <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{caseInput}</p>
+                            </div>
+                        </div>
+
+                        {/* Model Answer (Split or Single) */}
+                        <div className="flex gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[var(--primary)]/20 flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-sm text-[var(--primary)]">smart_toy</span>
+                            </div>
+                            
+                            <div className="flex-1 space-y-2">
+                                {isCompareMode ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className={`p-4 rounded-2xl rounded-tl-none border ${compare?.winner === 'CANDIDATE' ? 'bg-[var(--primary)]/10 border-[var(--primary)]/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'bg-black/20 border-white/10'}`}>
+                                            <div className="flex justify-between mb-2">
+                                                <span className="text-xs font-bold text-[var(--primary)]">이번 버전 (Candidate)</span>
+                                                {compare?.winner === 'CANDIDATE' && <span className="text-[10px] bg-[var(--primary)] text-black px-1.5 rounded font-bold">WIN 👑</span>}
+                                            </div>
+                                            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{item.candidateOutput}</p>
+                                        </div>
+                                        <div className={`p-4 rounded-2xl border ${compare?.winner === 'BASELINE' ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black/20 border-white/10 opacity-70'}`}>
+                                            <div className="flex justify-between mb-2">
+                                                <span className="text-xs font-bold text-blue-400">운영 버전 (Baseline)</span>
+                                                {compare?.winner === 'BASELINE' && <span className="text-[10px] bg-blue-500 text-black px-1.5 rounded font-bold">WIN 🛡️</span>}
+                                            </div>
+                                            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{item.baselineOutput}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="p-4 rounded-2xl rounded-tl-none bg-black/20 border border-white/10">
+                                        <p className="text-xs font-bold text-gray-400 mb-1">AI 답변</p>
+                                        <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{item.candidateOutput}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div className="col-span-7 p-4 bg-black/30 rounded border border-white/10 relative">
-                        <div className={`absolute left-0 top-0 bottom-0 w-1 ${failed ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <h4 className="text-xs font-bold text-gray-400 mb-2">OUTPUT ({failed ? 'FAIL' : 'PASS'})</h4>
-                        <p className="text-sm text-gray-200 whitespace-pre-wrap">{item.candidateOutput}</p>
-                        <p className={`mt-2 text-xs p-2 rounded ${failed ? 'bg-rose-500/20 text-rose-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
-                            {failureReason}
-                        </p>
+
+                    <div className="h-px bg-white/10" />
+
+                    {/* 2. Verdict Section (Reason) */}
+                    <div className={`rounded-xl border p-4 ${statusColor}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="material-symbols-outlined text-lg">
+                                {item.pass ? 'check_circle' : 'error'}
+                            </span>
+                            <h4 className="font-bold text-sm">
+                                {item.pass ? '평가 통과 (Passed)' : '평가 실패 (Failed)'}
+                            </h4>
+                            {judgeScore > 0 && <span className="text-xs opacity-80">| AI 점수: {judgeScore}점</span>}
+                        </div>
+                        
+                        {/* 2-1. Rule Failures */}
+                        {failedChecks.length > 0 && (
+                            <div className="mb-3 bg-black/20 rounded p-2 text-xs">
+                                <p className="font-bold text-rose-300 mb-1">🚫 룰 위반 발견:</p>
+                                <ul className="list-disc pl-4 space-y-0.5 text-rose-200/80">
+                                    {failedChecks.map((check, idx) => (
+                                        <li key={idx}>{formatRuleName(check)} 조건 만족 실패</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* 2-2. AI Judge Reason */}
+                        {judgeReason && (
+                            <div className="text-xs opacity-90 leading-relaxed">
+                                <span className="font-bold">AI 심사평:</span> "{judgeReason}"
+                            </div>
+                        )}
                     </div>
+
+                    {/* 3. Collapsible Details (Advanced Info) */}
+                    <details className="group rounded-xl border border-white/10 bg-black/20">
+                        <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors">
+                            <span className="text-xs font-bold text-gray-400">🔍 상세 평가 근거 보기 (룰/AI 심사)</span>
+                            <span className="material-symbols-outlined text-gray-500 text-sm group-open:rotate-180 transition-transform">expand_more</span>
+                        </summary>
+                        <div className="p-4 border-t border-white/10 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Rule Check Detail</p>
+                                    <pre className="text-[10px] text-gray-400 bg-black/30 p-2 rounded overflow-auto max-h-40">{prettyJson(item.ruleChecks)}</pre>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">AI Judge Detail</p>
+                                    <pre className="text-[10px] text-gray-400 bg-black/30 p-2 rounded overflow-auto max-h-40">{prettyJson(item.judgeOutput)}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
                 </div>
             )}
 
-            {detailTab === 'COMPARE' && (
-                <div className="space-y-3 animate-in fade-in">
-                    {compare ? (
-                        <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded text-indigo-200 text-xs text-center">
-                            점수 차이: {formatSignedNumber(compare.scoreDelta)} (승자: {renderWinner(compare.winner)})
-                        </div>
-                    ) : <div className="text-center text-xs text-gray-500">비교 데이터 없음</div>}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="p-3 bg-black/30 rounded border border-white/10">
-                            <p className="text-xs font-bold text-emerald-400 mb-2">Candidate (이번 버전)</p>
-                            <p className="text-sm text-gray-300">{item.candidateOutput}</p>
-                        </div>
-                        <div className="p-3 bg-black/30 rounded border border-white/10">
-                            <p className="text-xs font-bold text-sky-400 mb-2">Baseline (운영 버전)</p>
-                            <p className="text-sm text-gray-300">{item.baselineOutput || '(없음)'}</p>
-                        </div>
+            {/* Content: Data Tab */}
+            {activeTab === 'DATA' && (
+                <div className="flex-1 overflow-y-auto space-y-4 animate-in fade-in">
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-200">
+                        🛠️ 개발자용 디버깅 데이터입니다.
                     </div>
-                </div>
-            )}
-
-            {detailTab === 'ANALYSIS' && (
-                <div className="grid grid-cols-2 gap-4 animate-in fade-in">
-                    <RuleSummaryCard title="Candidate Rules" checks={candidateRuleChecks} />
-                    <JudgeSummaryCard title="Candidate Judge" judge={candidateJudgeOutput} />
-                </div>
-            )}
-
-            {detailTab === 'RAW' && (
-                <div className="grid grid-cols-2 gap-4 animate-in fade-in">
-                    <DetailBlock title="Rule Raw" value={prettyJson(candidateRuleChecks)} />
-                    <DetailBlock title="Judge Raw" value={prettyJson(candidateJudgeOutput)} />
+                    <div className="grid grid-cols-1 gap-4">
+                        <DetailBlock title="Full Response Object" value={prettyJson(item)} />
+                        <DetailBlock title="Candidate Meta (Token/Cost)" value={prettyJson(item.candidateMeta)} />
+                        {isCompareMode && <DetailBlock title="Baseline Meta" value={prettyJson(item.baselineMeta)} />}
+                    </div>
                 </div>
             )}
         </div>
     );
 }
 
-function RuleSummaryCard({ title, checks }: { title: string; checks: any }) {
-    return (
-        <div className="p-3 bg-black/30 rounded border border-white/10">
-            <p className="text-xs font-bold text-gray-400 mb-2">{title}</p>
-            <pre className="text-xs text-gray-300 whitespace-pre-wrap">{prettyJson(checks)}</pre>
-        </div>
-    );
-}
+// --- Sub Components ---
 
-function JudgeSummaryCard({ title, judge }: { title: string; judge: any }) {
-    return (
-        <div className="p-3 bg-black/30 rounded border border-white/10">
-            <p className="text-xs font-bold text-gray-400 mb-2">{title}</p>
-            <pre className="text-xs text-gray-300 whitespace-pre-wrap">{prettyJson(judge)}</pre>
-        </div>
-    );
+function formatRuleName(key: string) {
+    const map: Record<string, string> = {
+        max_chars: '최대 글자수',
+        max_lines: '최대 줄수',
+        format: '형식(JSON)',
+        required_keys: '필수 키',
+        must_include: '필수 포함 단어',
+        must_not_include: '금지 단어',
+    };
+    return map[key] || key;
 }
 
 function DetailBlock({ title, value }: { title: string; value: string }) {
+    const [copied, setCopied] = useState(false);
     return (
-        <div className="p-2 bg-black/40 rounded">
-            <p className="text-[10px] text-gray-500 mb-1">{title}</p>
-            <pre className="text-[10px] text-gray-400 overflow-auto max-h-40">{value}</pre>
+        <div className="group relative p-3 bg-black/40 rounded border border-white/5 hover:border-white/10 transition-colors">
+            <div className="flex justify-between items-center mb-2">
+                <p className="text-[10px] font-bold text-gray-500 uppercase">{title}</p>
+                <button 
+                    onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                    className="text-[10px] text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                    {copied ? 'Copied!' : 'Copy'}
+                </button>
+            </div>
+            <pre className="text-[10px] font-mono text-gray-400 overflow-auto max-h-60 leading-relaxed custom-scrollbar">
+                {value}
+            </pre>
         </div>
     );
 }

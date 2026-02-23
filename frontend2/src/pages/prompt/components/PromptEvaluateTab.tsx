@@ -15,15 +15,12 @@ import type {
     EvalReleaseCriteriaUpdateRequest,
     RubricTemplateCode
 } from '@/types/api.types';
-import { 
-    CaseEditorRow, 
-    type CaseFormRow, 
-    createEmptyCaseFormRow, 
+import { CaseEditorRow } from './CaseEditorRow';
+import {
+    type CaseFormRow,
+    createEmptyCaseFormRow,
     parseCaseRows,
-    type CaseJsonField,
-    // Note: Utils needed for Advanced mode logic are imported or need to be kept if not exported.
-    // Ideally we should move logic to hooks/utils, but for now we keep minimal required locally.
-} from './CaseEditorRow';
+} from './CaseEditorUtils';
 import { CaseDetailPanel } from './CaseDetailPanel';
 import { PromptEvaluateUnified } from './PromptEvaluateUnified';
 
@@ -595,7 +592,6 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
         updateCaseJsonObject: (id: string, f: any, u: any) => _updateJson(id, f, u),
         removeCaseRow: (id: string) => setCaseFormRows(prev => prev.filter(r => r.id !== id)),
         setExpandedEditorCaseId,
-        setAdvancedJsonOpenByRow,
     };
 
     // --- Render ---
@@ -604,8 +600,7 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
             <div className="space-y-6">
                 <PromptEvaluateUnified 
                     workspaceId={workspaceId} 
-                    promptId={promptId} 
-                    onSwitchToLegacy={() => setIsUnifiedMode(false)} 
+                    promptId={promptId}
                 />
             </div>
         );
@@ -657,9 +652,8 @@ export function PromptEvaluateTab({ workspaceId, promptId }: { workspaceId: numb
                                         key={row.id}
                                         row={row}
                                         idx={idx}
-                                        caseFormRowsLength={caseFormRows.length}
+                                        caseCount={caseFormRows.length}
                                         expandedEditorCaseId={expandedEditorCaseId}
-                                        advancedJsonOpenByRow={advancedJsonOpenByRow}
                                         {...handlers}
                                     />
                                 ))}
