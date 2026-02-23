@@ -68,7 +68,7 @@ export function toKoreanIssueText(issue: string): string {
         return value;
     }
 
-    if (DECISION_REASON_LABELS[value]) {
+    if (value in DECISION_REASON_LABELS) {
         return DECISION_REASON_LABELS[value];
     }
 

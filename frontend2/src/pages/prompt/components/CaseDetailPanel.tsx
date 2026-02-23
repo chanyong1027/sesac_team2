@@ -45,7 +45,7 @@ export function CaseDetailPanel({
         ? item.judgeOutput.candidate 
         : item.judgeOutput; // Fallback for single mode or flat structure
     
-    const judgeScore = judge?.overallScore ?? 0;
+    const judgeScore = judge?.overallScore ?? null;
     const judgeReason = judge?.reason || (Array.isArray(judge?.evidence) ? judge.evidence[0] : null);
 
     // Compare Mode Check
@@ -136,7 +136,7 @@ export function CaseDetailPanel({
                             <h4 className="font-bold text-sm">
                                 {item.pass ? '평가 통과 (Passed)' : '평가 실패 (Failed)'}
                             </h4>
-                            {judgeScore > 0 && <span className="text-xs opacity-80">| AI 점수: {judgeScore}점</span>}
+                            {judgeScore != null && <span className="text-xs opacity-80">| AI 점수: {judgeScore}점</span>}
                         </div>
                         
                         {/* 2-1. Rule Failures */}
@@ -220,7 +220,15 @@ function DetailBlock({ title, value }: { title: string; value: string }) {
             <div className="flex justify-between items-center mb-2">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">{title}</p>
                 <button 
-                    onClick={() => { navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                    onClick={async () => {
+                        try {
+                            await navigator.clipboard.writeText(value);
+                            setCopied(true);
+                            setTimeout(() => setCopied(false), 1500);
+                        } catch {
+                            // Clipboard API unavailable (e.g. insecure context)
+                        }
+                    }}
                     className="text-[10px] text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                     {copied ? 'Copied!' : 'Copy'}
