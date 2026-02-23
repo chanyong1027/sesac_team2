@@ -19,6 +19,9 @@ public class ModelPricing {
         // OpenAI
         PRICING_TABLE.put("gpt-4o", new PriceInfo("0.005", "0.015"));
         PRICING_TABLE.put("gpt-4o-mini", new PriceInfo("0.00015", "0.0006"));
+        PRICING_TABLE.put("gpt-4.1", new PriceInfo("0.002", "0.008"));
+        PRICING_TABLE.put("gpt-4.1-mini", new PriceInfo("0.0004", "0.0016"));
+        PRICING_TABLE.put("gpt-4.1-nano", new PriceInfo("0.0001", "0.0004"));
         PRICING_TABLE.put("gpt-4", new PriceInfo("0.03", "0.06"));
         PRICING_TABLE.put("gpt-3.5-turbo", new PriceInfo("0.0005", "0.0015"));
 
