@@ -19,6 +19,7 @@ import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -447,6 +448,7 @@ public class EvalExecutionService {
         List<String> topIssues = buildTopIssues(releaseDecision, ruleFailCounts, errorCodeCounts, labelCounts);
         summary.put("topIssues", topIssues);
         summary.put("plainSummary", buildPlainSummary(releaseDecision, passRate, avgScore, avgScoreDelta, topIssues));
+        appendRunOverallReview(run, summary, allResults, costAccumulator);
 
         run.finish(summary, costAccumulator.asMap());
         evalRunRepository.save(run);
@@ -468,6 +470,120 @@ public class EvalExecutionService {
 
         run.fail(summary, costAccumulator.asMap());
         evalRunRepository.save(run);
+    }
+
+    private void appendRunOverallReview(
+            EvalRun run,
+            Map<String, Object> summary,
+            List<EvalCaseResult> allResults,
+            CostAccumulator costAccumulator
+    ) {
+        try {
+            Long organizationId = run.getPrompt().getWorkspace().getOrganization().getId();
+            List<Map<String, Object>> caseHighlights = buildCaseHighlightsForOverallReview(allResults);
+            EvalJudgeService.RunOverallReviewResult reviewResult = evalJudgeService.summarizeRun(
+                    organizationId,
+                    run.mode(),
+                    summary,
+                    caseHighlights
+            );
+            summary.put("llmOverallReview", reviewResult.review());
+            costAccumulator.add(reviewResult.meta());
+        } catch (Exception e) {
+            log.warn("Run overall review generation failed. runId={}", run.getId(), e);
+            summary.put("llmOverallReview", fallbackRunOverallReview(sanitizeMessage(e.getMessage())));
+        }
+    }
+
+    private List<Map<String, Object>> buildCaseHighlightsForOverallReview(List<EvalCaseResult> allResults) {
+        if (allResults == null || allResults.isEmpty()) {
+            return List.of();
+        }
+        return allResults.stream()
+                .sorted(
+                        Comparator.comparingInt(this::overallReviewPriority)
+                                .thenComparing(EvalCaseResult::getOverallScore, Comparator.nullsLast(Double::compareTo))
+                                .thenComparing(EvalCaseResult::getId, Comparator.nullsLast(Long::compareTo))
+                )
+                .limit(8)
+                .map(this::toOverallReviewCaseHighlight)
+                .toList();
+    }
+
+    private int overallReviewPriority(EvalCaseResult result) {
+        if (result.status() == EvalCaseStatus.ERROR) {
+            return 0;
+        }
+        if (Boolean.FALSE.equals(result.getPass())) {
+            return 1;
+        }
+        if (Boolean.TRUE.equals(result.getPass())) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private Map<String, Object> toOverallReviewCaseHighlight(EvalCaseResult result) {
+        Map<String, Object> highlight = new LinkedHashMap<>();
+        highlight.put("caseResultId", result.getId());
+        highlight.put("testCaseId", result.getTestCase() != null ? result.getTestCase().getId() : null);
+        highlight.put("status", result.status().name());
+        highlight.put("pass", result.getPass());
+        highlight.put("overallScore", result.getOverallScore() != null ? round(result.getOverallScore()) : null);
+        highlight.put(
+                "input",
+                truncateText(result.getTestCase() != null ? result.getTestCase().getInputText() : null, 280)
+        );
+        highlight.put("judgeReason", extractJudgeReason(result.getJudgeOutputJson()));
+        highlight.put("failedChecks", extractFailedChecks(result.getRuleChecksJson()));
+        highlight.put("compareScoreDelta", extractCompareScoreDelta(result.getJudgeOutputJson()));
+        highlight.put("errorCode", result.getErrorCode());
+        highlight.put("errorMessage", truncateText(result.getErrorMessage(), 180));
+        return highlight;
+    }
+
+    private String extractJudgeReason(Map<String, Object> judgeOutput) {
+        if (judgeOutput == null) {
+            return null;
+        }
+        Object reason = judgeOutput.get("reason");
+        if (reason == null) {
+            return null;
+        }
+        return truncateText(String.valueOf(reason), 180);
+    }
+
+    private List<String> extractFailedChecks(Map<String, Object> ruleChecks) {
+        Map<String, Object> candidate = extractCandidateRuleChecks(ruleChecks);
+        Object failed = candidate.get("failedChecks");
+        if (!(failed instanceof List<?> list)) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (Object item : list) {
+            if (item == null) {
+                continue;
+            }
+            values.add(String.valueOf(item));
+            if (values.size() >= 5) {
+                break;
+            }
+        }
+        return values;
+    }
+
+    private Map<String, Object> fallbackRunOverallReview(String reason) {
+        Map<String, Object> fallback = new LinkedHashMap<>();
+        fallback.put("overallComment", "전체 케이스 종합평가를 생성하지 못했습니다.");
+        fallback.put("verdictReason", "종합평가 호출 중 오류가 발생했습니다.");
+        fallback.put("strengths", List.of());
+        fallback.put("risks", List.of("LLM 종합평가 생성 실패"));
+        fallback.put("nextActions", List.of("잠시 후 다시 실행하거나 로그를 확인해 주세요."));
+        fallback.put("labels", List.of("RUN_OVERALL_REVIEW_FAILED"));
+        if (reason != null && !reason.isBlank()) {
+            fallback.put("errorMessage", reason);
+        }
+        return fallback;
     }
 
     private boolean hasCompareSummary(Map<String, Object> judgeOutput) {
@@ -662,6 +778,17 @@ public class EvalExecutionService {
         } catch (Exception e) {
             return String.valueOf(value);
         }
+    }
+
+    private String truncateText(String text, int limit) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        String value = text.trim();
+        if (value.length() <= limit || limit <= 0) {
+            return value;
+        }
+        return value.substring(0, limit) + "...";
     }
 
     private static Double readTemperature(Map<String, Object> modelConfig) {
