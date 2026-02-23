@@ -4424,14 +4424,14 @@ function renderCaseReason(item: EvalCaseResultResponse): string {
         return `룰 실패: ${failedChecks.join(', ')}`;
     }
 
-    const warningChecks = getRuleWarningChecks(item.ruleChecks);
-    if (warningChecks.length > 0) {
-        return `룰 경고: ${warningChecks.join(', ')}`;
-    }
-
     const labels = toStringArray(item.judgeOutput?.labels);
     if (labels.length > 0) {
         return `AI 이슈: ${labels.join(', ')}`;
+    }
+
+    const warningChecks = getRuleWarningChecks(item.ruleChecks);
+    if (warningChecks.length > 0) {
+        return `룰 경고: ${warningChecks.join(', ')}`;
     }
 
     return '-';
@@ -4497,8 +4497,6 @@ function resolveCaseFailureType(item: EvalCaseResultResponse): CaseFailureType {
     if (failedChecks.includes('json_parse')) return 'JSON 형식 오류';
     if (failedChecks.includes('schema')) return '스키마 불일치';
     if (failedChecks.includes('max_chars') || failedChecks.includes('max_lines')) return '응답 길이 초과';
-    const warningChecks = getRuleWarningChecks(item.ruleChecks).map((v) => v.toLowerCase());
-    if (warningChecks.includes('must_include')) return '권장 키워드 경고';
 
     const labels = toStringArray(item.judgeOutput?.labels).map((v) => v.toLowerCase());
     if (labels.some((v) => v.includes('missing_must_cover'))) return '핵심 포인트 누락';
@@ -4506,6 +4504,9 @@ function resolveCaseFailureType(item: EvalCaseResultResponse): CaseFailureType {
     if (labels.some((v) => v.includes('forbidden_token_present'))) return '금지 키워드 포함';
     if (labels.some((v) => v.includes('hallucination') || v.includes('factual'))) return '사실성/환각';
     if (labels.some((v) => v.includes('tone') || v.includes('style'))) return '톤/스타일 이슈';
+
+    const warningChecks = getRuleWarningChecks(item.ruleChecks).map((v) => v.toLowerCase());
+    if (warningChecks.includes('must_include')) return '권장 키워드 경고';
 
     if (item.pass === false) return '기타 품질 이슈';
     return '기타 품질 이슈';
