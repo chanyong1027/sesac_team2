@@ -19,6 +19,7 @@ import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,10 +41,12 @@ public class EvalExecutionService {
     private final EvalModelRunnerService evalModelRunnerService;
     private final EvalRuleCheckerService evalRuleCheckerService;
     private final EvalRubricTemplateRegistry evalRubricTemplateRegistry;
+    private final EvalPerformanceSummaryCalculator evalPerformanceSummaryCalculator;
     private final EvalJudgeService evalJudgeService;
     private final EvalReleaseCriteriaService evalReleaseCriteriaService;
     private final EvalReleaseDecisionCalculator evalReleaseDecisionCalculator;
     private final ObjectMapper objectMapper;
+    private final EvalMetrics evalMetrics;
 
     public EvalExecutionService(
             EvalRunRepository evalRunRepository,
@@ -52,10 +55,12 @@ public class EvalExecutionService {
             EvalModelRunnerService evalModelRunnerService,
             EvalRuleCheckerService evalRuleCheckerService,
             EvalRubricTemplateRegistry evalRubricTemplateRegistry,
+            EvalPerformanceSummaryCalculator evalPerformanceSummaryCalculator,
             EvalJudgeService evalJudgeService,
             EvalReleaseCriteriaService evalReleaseCriteriaService,
             EvalReleaseDecisionCalculator evalReleaseDecisionCalculator,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            EvalMetrics evalMetrics
     ) {
         this.evalRunRepository = evalRunRepository;
         this.evalCaseResultRepository = evalCaseResultRepository;
@@ -63,10 +68,12 @@ public class EvalExecutionService {
         this.evalModelRunnerService = evalModelRunnerService;
         this.evalRuleCheckerService = evalRuleCheckerService;
         this.evalRubricTemplateRegistry = evalRubricTemplateRegistry;
+        this.evalPerformanceSummaryCalculator = evalPerformanceSummaryCalculator;
         this.evalJudgeService = evalJudgeService;
         this.evalReleaseCriteriaService = evalReleaseCriteriaService;
         this.evalReleaseDecisionCalculator = evalReleaseDecisionCalculator;
         this.objectMapper = objectMapper;
+        this.evalMetrics = evalMetrics;
     }
 
     public void processRun(Long runId) {
@@ -102,7 +109,14 @@ public class EvalExecutionService {
                 if (caseResult.status() != EvalCaseStatus.QUEUED) {
                     continue;
                 }
-                processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
+                long caseStartNanos = System.nanoTime();
+                String caseStatus = "unknown";
+                try {
+                    processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
+                    caseStatus = caseResult.status() != null ? caseResult.status().name() : "unknown";
+                } finally {
+                    evalMetrics.recordCaseExecution(caseStatus, System.nanoTime() - caseStartNanos);
+                }
             }
 
             finishRun(run.getId(), costAccumulator, compareBaselineAvailable);
@@ -438,15 +452,32 @@ public class EvalExecutionService {
             }
         }
         Map<String, Long> ruleFailCounts = collectRuleFailCounts(okResults);
+        Map<String, Long> ruleWarningCounts = collectRuleWarningCounts(okResults);
         Map<String, Long> errorCodeCounts = collectErrorCodeCounts(allResults);
         Map<String, Long> labelCounts = collectLabelCounts(okResults);
         summary.put("ruleFailCounts", ruleFailCounts);
+        summary.put("ruleWarningCounts", ruleWarningCounts);
+        summary.put(
+                "performance",
+                evalPerformanceSummaryCalculator.buildSummary(
+                        collectMetaMaps(allResults, true),
+                        collectMetaMaps(allResults, false),
+                        run.mode() == EvalMode.COMPARE_ACTIVE
+                )
+        );
         summary.put("errorCodeCounts", errorCodeCounts);
         summary.put("labelCounts", labelCounts);
 
-        List<String> topIssues = buildTopIssues(releaseDecision, ruleFailCounts, errorCodeCounts, labelCounts);
+        List<String> topIssues = buildTopIssues(
+                releaseDecision,
+                ruleFailCounts,
+                ruleWarningCounts,
+                errorCodeCounts,
+                labelCounts
+        );
         summary.put("topIssues", topIssues);
         summary.put("plainSummary", buildPlainSummary(releaseDecision, passRate, avgScore, avgScoreDelta, topIssues));
+        appendRunOverallReview(run, summary, allResults, costAccumulator);
 
         run.finish(summary, costAccumulator.asMap());
         evalRunRepository.save(run);
@@ -468,6 +499,120 @@ public class EvalExecutionService {
 
         run.fail(summary, costAccumulator.asMap());
         evalRunRepository.save(run);
+    }
+
+    private void appendRunOverallReview(
+            EvalRun run,
+            Map<String, Object> summary,
+            List<EvalCaseResult> allResults,
+            CostAccumulator costAccumulator
+    ) {
+        try {
+            Long organizationId = run.getPrompt().getWorkspace().getOrganization().getId();
+            List<Map<String, Object>> caseHighlights = buildCaseHighlightsForOverallReview(allResults);
+            EvalJudgeService.RunOverallReviewResult reviewResult = evalJudgeService.summarizeRun(
+                    organizationId,
+                    run.mode(),
+                    summary,
+                    caseHighlights
+            );
+            summary.put("llmOverallReview", reviewResult.review());
+            costAccumulator.add(reviewResult.meta());
+        } catch (Exception e) {
+            log.warn("Run overall review generation failed. runId={}", run.getId(), e);
+            summary.put("llmOverallReview", fallbackRunOverallReview(sanitizeMessage(e.getMessage())));
+        }
+    }
+
+    private List<Map<String, Object>> buildCaseHighlightsForOverallReview(List<EvalCaseResult> allResults) {
+        if (allResults == null || allResults.isEmpty()) {
+            return List.of();
+        }
+        return allResults.stream()
+                .sorted(
+                        Comparator.comparingInt(this::overallReviewPriority)
+                                .thenComparing(EvalCaseResult::getOverallScore, Comparator.nullsLast(Double::compareTo))
+                                .thenComparing(EvalCaseResult::getId, Comparator.nullsLast(Long::compareTo))
+                )
+                .limit(8)
+                .map(this::toOverallReviewCaseHighlight)
+                .toList();
+    }
+
+    private int overallReviewPriority(EvalCaseResult result) {
+        if (result.status() == EvalCaseStatus.ERROR) {
+            return 0;
+        }
+        if (Boolean.FALSE.equals(result.getPass())) {
+            return 1;
+        }
+        if (Boolean.TRUE.equals(result.getPass())) {
+            return 2;
+        }
+        return 3;
+    }
+
+    private Map<String, Object> toOverallReviewCaseHighlight(EvalCaseResult result) {
+        Map<String, Object> highlight = new LinkedHashMap<>();
+        highlight.put("caseResultId", result.getId());
+        highlight.put("testCaseId", result.getTestCase() != null ? result.getTestCase().getId() : null);
+        highlight.put("status", result.status().name());
+        highlight.put("pass", result.getPass());
+        highlight.put("overallScore", result.getOverallScore() != null ? round(result.getOverallScore()) : null);
+        highlight.put(
+                "input",
+                truncateText(result.getTestCase() != null ? result.getTestCase().getInputText() : null, 280)
+        );
+        highlight.put("judgeReason", extractJudgeReason(result.getJudgeOutputJson()));
+        highlight.put("failedChecks", extractFailedChecks(result.getRuleChecksJson()));
+        highlight.put("compareScoreDelta", extractCompareScoreDelta(result.getJudgeOutputJson()));
+        highlight.put("errorCode", result.getErrorCode());
+        highlight.put("errorMessage", truncateText(result.getErrorMessage(), 180));
+        return highlight;
+    }
+
+    private String extractJudgeReason(Map<String, Object> judgeOutput) {
+        if (judgeOutput == null) {
+            return null;
+        }
+        Object reason = judgeOutput.get("reason");
+        if (reason == null) {
+            return null;
+        }
+        return truncateText(String.valueOf(reason), 180);
+    }
+
+    private List<String> extractFailedChecks(Map<String, Object> ruleChecks) {
+        Map<String, Object> candidate = extractCandidateRuleChecks(ruleChecks);
+        Object failed = candidate.get("failedChecks");
+        if (!(failed instanceof List<?> list)) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (Object item : list) {
+            if (item == null) {
+                continue;
+            }
+            values.add(String.valueOf(item));
+            if (values.size() >= 5) {
+                break;
+            }
+        }
+        return values;
+    }
+
+    private Map<String, Object> fallbackRunOverallReview(String reason) {
+        Map<String, Object> fallback = new LinkedHashMap<>();
+        fallback.put("overallComment", "전체 케이스 종합평가를 생성하지 못했습니다.");
+        fallback.put("verdictReason", "종합평가 호출 중 오류가 발생했습니다.");
+        fallback.put("strengths", List.of());
+        fallback.put("risks", List.of("LLM 종합평가 생성 실패"));
+        fallback.put("nextActions", List.of("잠시 후 다시 실행하거나 로그를 확인해 주세요."));
+        fallback.put("labels", List.of("RUN_OVERALL_REVIEW_FAILED"));
+        if (reason != null && !reason.isBlank()) {
+            fallback.put("errorMessage", reason);
+        }
+        return fallback;
     }
 
     private boolean hasCompareSummary(Map<String, Object> judgeOutput) {
@@ -521,6 +666,7 @@ public class EvalExecutionService {
     private List<String> buildTopIssues(
             EvalReleaseDecision releaseDecision,
             Map<String, Long> ruleFailCounts,
+            Map<String, Long> ruleWarningCounts,
             Map<String, Long> errorCodeCounts,
             Map<String, Long> labelCounts
     ) {
@@ -529,6 +675,7 @@ public class EvalExecutionService {
             issues.add(mapDecisionReasonLabel(reason));
         }
         topKey(ruleFailCounts).ifPresent(rule -> issues.add("형식 검사 주요 실패: " + rule));
+        topKey(ruleWarningCounts).ifPresent(rule -> issues.add("형식 검사 주요 경고: " + rule));
         topKey(errorCodeCounts).ifPresent(code -> issues.add("실행 오류 코드: " + code));
         topKey(labelCounts).ifPresent(label -> issues.add("AI 심사 주요 이슈: " + label));
         return issues.stream().limit(5).toList();
@@ -576,17 +723,25 @@ public class EvalExecutionService {
     }
 
     private Map<String, Long> collectRuleFailCounts(List<EvalCaseResult> okResults) {
+        return collectRuleCounts(okResults, "failedChecks");
+    }
+
+    private Map<String, Long> collectRuleWarningCounts(List<EvalCaseResult> okResults) {
+        return collectRuleCounts(okResults, "warningChecks");
+    }
+
+    private Map<String, Long> collectRuleCounts(List<EvalCaseResult> okResults, String keyName) {
         Map<String, Long> counts = new LinkedHashMap<>();
         for (EvalCaseResult result : okResults) {
             Map<String, Object> ruleChecks = result.getRuleChecksJson();
             Map<String, Object> candidate = extractCandidateRuleChecks(ruleChecks);
-            Object failed = candidate.get("failedChecks");
-            if (failed instanceof List<?> failedChecks) {
-                for (Object failedCheck : failedChecks) {
-                    if (failedCheck == null) {
+            Object checkValues = candidate.get(keyName);
+            if (checkValues instanceof List<?> checks) {
+                for (Object check : checks) {
+                    if (check == null) {
                         continue;
                     }
-                    String key = String.valueOf(failedCheck);
+                    String key = String.valueOf(check);
                     counts.put(key, counts.getOrDefault(key, 0L) + 1L);
                 }
             }
@@ -622,6 +777,18 @@ public class EvalExecutionService {
             }
         }
         return sortCountsDesc(counts);
+    }
+
+    private List<Map<String, Object>> collectMetaMaps(List<EvalCaseResult> results, boolean candidate) {
+        List<Map<String, Object>> metas = new ArrayList<>();
+        for (EvalCaseResult result : results) {
+            Map<String, Object> meta = candidate ? result.getCandidateMetaJson() : result.getBaselineMetaJson();
+            if (meta == null || meta.isEmpty()) {
+                continue;
+            }
+            metas.add(meta);
+        }
+        return metas;
     }
 
     private Map<String, Object> extractCandidateRuleChecks(Map<String, Object> ruleChecks) {
@@ -662,6 +829,17 @@ public class EvalExecutionService {
         } catch (Exception e) {
             return String.valueOf(value);
         }
+    }
+
+    private String truncateText(String text, int limit) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        String value = text.trim();
+        if (value.length() <= limit || limit <= 0) {
+            return value;
+        }
+        return value.substring(0, limit) + "...";
     }
 
     private static Double readTemperature(Map<String, Object> modelConfig) {

@@ -1,0 +1,145 @@
+{
+  "uid": "gateway-overview",
+  "title": "Gateway Overview",
+  "tags": ["gateway"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "RPS (Requests Per Second)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_llm_success_total[1m])) + sum(rate(gateway_llm_failure_total[1m]))",
+          "legendFormat": "Total RPS",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(gateway_llm_success_total[1m]))",
+          "legendFormat": "Success RPS",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(gateway_llm_failure_total[1m]))",
+          "legendFormat": "Failure RPS",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Latency P50 / P95 / P99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(gateway_request_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_request_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(gateway_request_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Error Rate (%)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_llm_failure_total[5m])) / (sum(rate(gateway_llm_success_total[5m])) + sum(rate(gateway_llm_failure_total[5m]))) * 100",
+          "legendFormat": "Error Rate %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "max": 100
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Thread Pool & Queue",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "gateway_provider_call_threads_active",
+          "legendFormat": "Active Threads",
+          "refId": "A"
+        },
+        {
+          "expr": "gateway_provider_call_queue_size",
+          "legendFormat": "Queue Size",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Failover Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_failover_total[1m])) by (from_provider, to_provider)",
+          "legendFormat": "{{ from_provider }} → {{ to_provider }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Budget Blocked / Degraded",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_budget_blocked_total[1m])) by (scope_type)",
+          "legendFormat": "Blocked ({{ scope_type }})",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(gateway_budget_degrade_total[1m])) by (scope_type)",
+          "legendFormat": "Degraded ({{ scope_type }})",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    }
+  ]
+}

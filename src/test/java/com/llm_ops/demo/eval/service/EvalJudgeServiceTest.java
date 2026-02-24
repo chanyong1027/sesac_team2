@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.eval.config.EvalProperties;
+import com.llm_ops.demo.eval.domain.EvalMode;
 import com.llm_ops.demo.eval.rubric.ResolvedRubricConfig;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,57 @@ import org.junit.jupiter.api.Test;
 class EvalJudgeServiceTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    @DisplayName("ruleChecks 경고만 있으면 모델/Judge 통과 결과를 유지한다")
+    void ruleChecks_경고만_있으면_모델_Judge_통과_결과를_유지한다() {
+        // given
+        EvalProperties properties = new EvalProperties();
+        properties.getJudge().setRejudgeOnFail(false);
+        properties.getJudge().setMaxAttempts(1);
+
+        EvalModelRunnerService runner = mock(EvalModelRunnerService.class);
+        when(runner.run(anyLong(), any(), anyString(), anyString(), any(), isNull()))
+                .thenReturn(modelExecution("""
+                        {
+                          "pass": true,
+                          "scores": {"quality": 5},
+                          "labels": [],
+                          "evidence": [],
+                          "suggestions": []
+                        }
+                        """));
+
+        EvalJudgeService service = new EvalJudgeService(properties, runner, objectMapper);
+        ResolvedRubricConfig rubric = new ResolvedRubricConfig(
+                "CUSTOM",
+                "test",
+                Map.of("quality", 1.0),
+                Map.of("minOverallScore", 70.0)
+        );
+
+        // when
+        EvalJudgeService.JudgeResult result = service.judge(
+                1L,
+                rubric,
+                "input",
+                Map.of(),
+                Map.of(),
+                Map.of(),
+                "candidate output",
+                Map.of(
+                        "pass", true,
+                        "failedChecks", List.of(),
+                        "warningChecks", List.of("must_include")
+                ),
+                null
+        );
+
+        // then
+        assertThat(result.pass()).isTrue();
+        assertThat(result.judgeOutput().get("pass")).isEqualTo(true);
+        verify(runner, times(1)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
+    }
 
     @Test
     @DisplayName("중요 기준 최소 점수 게이트를 못 넘으면 fail 처리한다")
@@ -212,6 +264,66 @@ class EvalJudgeServiceTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Judge prompt payload serialization failed");
         verify(runner, times(0)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
+    }
+
+    @Test
+    @DisplayName("Run 종합평가를 JSON으로 파싱해 summary 객체를 반환한다")
+    void Run_종합평가를_JSON으로_파싱해_summary_객체를_반환한다() {
+        // given
+        EvalProperties properties = new EvalProperties();
+        EvalModelRunnerService runner = mock(EvalModelRunnerService.class);
+        when(runner.run(anyLong(), any(), anyString(), anyString(), any(), isNull()))
+                .thenReturn(modelExecution("""
+                        {
+                          "overallComment": "후보 버전은 전반적으로 안정적이며 품질이 개선되었습니다.",
+                          "verdictReason": "PassRate 100%와 평균점수 90점으로 배포 가능 수준입니다.",
+                          "strengths": ["핵심 정보 누락이 없음", "답변 일관성 향상"],
+                          "risks": ["응답 지연 증가 가능성"],
+                          "nextActions": ["피크 트래픽 구간에서 재검증"]
+                        }
+                        """));
+
+        EvalJudgeService service = new EvalJudgeService(properties, runner, objectMapper);
+
+        // when
+        EvalJudgeService.RunOverallReviewResult result = service.summarizeRun(
+                1L,
+                EvalMode.CANDIDATE_ONLY,
+                Map.of("passRate", 100.0, "avgOverallScore", 90.0),
+                List.of(Map.of("caseResultId", 1L, "pass", true))
+        );
+
+        // then
+        assertThat(result.review().get("overallComment")).isEqualTo("후보 버전은 전반적으로 안정적이며 품질이 개선되었습니다.");
+        assertThat(result.review().get("verdictReason")).isEqualTo("PassRate 100%와 평균점수 90점으로 배포 가능 수준입니다.");
+        assertThat(result.review().get("strengths")).isEqualTo(List.of("핵심 정보 누락이 없음", "답변 일관성 향상"));
+        assertThat(result.meta()).isNotNull();
+        verify(runner, times(1)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
+    }
+
+    @Test
+    @DisplayName("Run 종합평가 응답이 JSON이 아니면 fallback 문구를 반환한다")
+    void Run_종합평가_응답이_JSON이_아니면_fallback_문구를_반환한다() {
+        // given
+        EvalProperties properties = new EvalProperties();
+        EvalModelRunnerService runner = mock(EvalModelRunnerService.class);
+        when(runner.run(anyLong(), any(), anyString(), anyString(), any(), isNull()))
+                .thenReturn(modelExecution("overall: ok"));
+
+        EvalJudgeService service = new EvalJudgeService(properties, runner, objectMapper);
+
+        // when
+        EvalJudgeService.RunOverallReviewResult result = service.summarizeRun(
+                1L,
+                EvalMode.COMPARE_ACTIVE,
+                Map.of("passRate", 80.0),
+                List.of()
+        );
+
+        // then
+        assertThat(result.review().get("overallComment")).isEqualTo("전체 결과를 기반으로 한 종합평가를 생성하지 못했습니다.");
+        assertThat(result.review().get("risks")).isEqualTo(List.of("LLM 종합평가 생성 실패"));
+        verify(runner, times(1)).run(anyLong(), any(), anyString(), anyString(), any(), isNull());
     }
 
     private EvalModelRunnerService.ModelExecution modelExecution(String output) {

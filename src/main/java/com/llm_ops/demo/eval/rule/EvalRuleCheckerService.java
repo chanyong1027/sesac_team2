@@ -31,6 +31,7 @@ public class EvalRuleCheckerService {
     ) {
         Map<String, Object> result = new LinkedHashMap<>();
         List<String> failures = new ArrayList<>();
+        List<String> warnings = new ArrayList<>();
 
         Map<String, Object> safeConstraints = constraints != null ? constraints : Map.of();
         Map<String, Object> safeExpected = expected != null ? expected : Map.of();
@@ -77,9 +78,9 @@ public class EvalRuleCheckerService {
                     break;
                 }
             }
-            result.put("must_include", pass ? "PASS" : "FAIL");
+            result.put("must_include", pass ? "PASS" : "WARN");
             if (!pass) {
-                failures.add("must_include");
+                warnings.add("must_include");
             }
         }
 
@@ -150,6 +151,7 @@ public class EvalRuleCheckerService {
 
         result.put("pass", failures.isEmpty());
         result.put("failedChecks", failures);
+        result.put("warningChecks", warnings);
         return result;
     }
 

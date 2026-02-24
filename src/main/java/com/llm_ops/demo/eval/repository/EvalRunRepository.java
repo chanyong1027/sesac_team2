@@ -36,4 +36,6 @@ public interface EvalRunRepository extends JpaRepository<EvalRun, Long> {
 
     @EntityGraph(attributePaths = {"prompt", "prompt.workspace", "prompt.workspace.organization", "promptVersion", "dataset"})
     Optional<EvalRun> findById(Long id);
+
+    long countByStatus(String status);
 }

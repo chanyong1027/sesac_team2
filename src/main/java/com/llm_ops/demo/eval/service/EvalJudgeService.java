@@ -3,6 +3,7 @@ package com.llm_ops.demo.eval.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.llm_ops.demo.eval.config.EvalProperties;
+import com.llm_ops.demo.eval.domain.EvalMode;
 import com.llm_ops.demo.eval.rubric.ResolvedRubricConfig;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import java.util.ArrayList;
@@ -89,11 +90,15 @@ public class EvalJudgeService {
             selected = fallbackAttemptEvaluation();
         }
 
+        List<String> evidence = toStringList(selected.raw().get("evidence"));
+        String reason = normalizeReasonText(selected.raw().get("reason"), evidence, selected.pass());
+
         Map<String, Object> normalized = new LinkedHashMap<>();
         normalized.put("pass", selected.pass());
         normalized.put("scores", selected.normalizedScores());
         normalized.put("labels", toStringList(selected.raw().get("labels")));
-        normalized.put("evidence", toStringList(selected.raw().get("evidence")));
+        normalized.put("reason", reason);
+        normalized.put("evidence", evidence);
         normalized.put("suggestions", toStringList(selected.raw().get("suggestions")));
         normalized.put("overallScore", selected.overallScore());
         normalized.put("judgeMeta", selected.judgeExecution().meta());
@@ -103,6 +108,31 @@ public class EvalJudgeService {
         }
 
         return new JudgeResult(normalized, selected.overallScore(), selected.pass());
+    }
+
+    public RunOverallReviewResult summarizeRun(
+            Long organizationId,
+            EvalMode mode,
+            Map<String, Object> summary,
+            List<Map<String, Object>> caseHighlights
+    ) {
+        String reviewPrompt = buildRunOverallReviewPrompt(mode, summary, caseHighlights);
+        ProviderType provider = evalProperties.getJudge().getProvider();
+        String model = evalProperties.getJudge().getModel();
+        Double temperature = evalProperties.getJudge().getTemperature();
+
+        EvalModelRunnerService.ModelExecution reviewExecution = evalModelRunnerService.run(
+                organizationId,
+                provider,
+                model,
+                reviewPrompt,
+                temperature,
+                null
+        );
+
+        Map<String, Object> raw = parseRunOverallReviewOutput(reviewExecution.outputText());
+        Map<String, Object> normalized = normalizeRunOverallReview(raw);
+        return new RunOverallReviewResult(normalized, reviewExecution.meta());
     }
 
     private AttemptEvaluation evaluateAttempt(
@@ -135,6 +165,49 @@ public class EvalJudgeService {
         );
         Map<String, Object> raw = fallbackParseFailure("JUDGE_ATTEMPT_NOT_CREATED");
         return new AttemptEvaluation(1, fallbackExecution, raw, Map.of(), 0.0, false);
+    }
+
+    private String buildRunOverallReviewPrompt(
+            EvalMode mode,
+            Map<String, Object> summary,
+            List<Map<String, Object>> caseHighlights
+    ) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("mode", mode != null ? mode.name() : null);
+        payload.put("summary", summary);
+        payload.put("caseHighlights", caseHighlights);
+
+        String payloadJson;
+        try {
+            payloadJson = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            log.error("Run overall review payload 직렬화 실패", e);
+            throw new IllegalStateException("Run overall review payload serialization failed", e);
+        }
+
+        return """
+                너는 프롬프트 평가 실행 결과를 종합해 최종 리뷰를 작성하는 운영 리뷰어다.
+                입력 JSON(run summary + 대표 케이스)을 읽고, 아래 스키마의 JSON 객체만 출력하라.
+                Markdown, 코드블럭, 설명 문장 금지.
+
+                출력 스키마:
+                {
+                  "overallComment": "전체 케이스를 종합한 한두 문장 요약 (한국어)",
+                  "verdictReason": "현재 판정(pass/hold)의 핵심 사유 1문장 (한국어)",
+                  "strengths": ["강점 1", "강점 2"],
+                  "risks": ["리스크 1", "리스크 2"],
+                  "nextActions": ["다음 액션 1", "다음 액션 2"]
+                }
+
+                작성 규칙:
+                - 전체 필드는 한국어로 작성하라.
+                - strengths/risks/nextActions는 각각 최대 3개로 제한하라.
+                - verdictReason에는 수치 근거(passRate/score/errorRate 또는 compare delta)를 포함하라.
+                - 입력 데이터에 없는 사실을 지어내지 마라.
+
+                입력:
+                %s
+                """.formatted(payloadJson);
     }
 
     private String buildJudgePrompt(
@@ -200,6 +273,7 @@ public class EvalJudgeService {
                 출력 스키마:
                 {
                   "pass": true,
+                  "reason": "실패 사유: 핵심 누락 ...",
                   "scores": {"<criterion>": 1~5 숫자},
                   "labels": ["문제라벨"],
                   "evidence": ["근거"],
@@ -209,11 +283,16 @@ public class EvalJudgeService {
 
                 해석 규칙:
                 - scores는 rubric.weights에 있는 모든 criterion 키를 반드시 포함해야 한다(각 1~5점).
+                - reason은 반드시 한국어 한 문장으로 작성하라.
+                  pass=false면 "실패 사유: ..." 형식, pass=true면 "판정 사유: ..." 형식으로 시작하라.
                 - expected.must_cover 가 있으면, 각 항목이 candidateOutput에 "의미적으로" 포함/해결되었는지 판단하라(동의어/다른 표현 허용).
                   하나라도 누락되면 pass=false 로 두고 labels에 "MISSING_MUST_COVER" 를 포함하라.
                   mustCoverChecks에 항목별 covered=true/false를 채우고, 누락 항목은 evidence에 명시하라.
-                - ruleChecks는 하드 룰(형식/길이/키워드/JSON 등) 결과이므로, ruleChecks.pass=false 인 경우 pass는 false여야 한다.
-                - 하드룰(must_include/must_not_include 등)은 ruleChecks에서 이미 판정된다. 너는 candidateOutput을 다시 문자열로 재검증하지 말고 ruleChecks만 따르라.
+                - ruleChecks는 하드 룰(형식/길이/JSON/스키마/금지 키워드 등) 결과이므로, ruleChecks.pass=false 인 경우 pass는 false여야 한다.
+                - ruleChecks.warningChecks는 소프트 경고다(예: must_include 누락). warningChecks만으로 pass를 false로 바꾸지 말고 labels/evidence/suggestions에 개선 포인트로 반영하라.
+                - 키워드 문자열 체크(must_include/must_not_include 등)는 ruleChecks에서 이미 판정된다. 너는 candidateOutput을 다시 문자열로 재검증하지 말고 ruleChecks만 따르라.
+                - ruleChecks에서 실패가 있으면 reason/evidence에 어떤 룰 키가 실패했는지(예: must_include) 명시하라.
+                - must_cover 누락이 있으면 reason/evidence에 누락 항목명을 구체적으로 명시하라.
 
                 %s
                 입력:
@@ -315,11 +394,63 @@ public class EvalJudgeService {
     private Map<String, Object> fallbackParseFailure(String label) {
         Map<String, Object> fallback = new LinkedHashMap<>();
         fallback.put("pass", false);
+        fallback.put("reason", "실패 사유: 심사 결과(JSON) 파싱에 실패했습니다.");
         fallback.put("scores", Map.of());
         fallback.put("labels", List.of(label));
-        fallback.put("evidence", List.of("judge output parse failed"));
+        fallback.put("evidence", List.of("심사 모델 응답에서 JSON 객체를 찾지 못했거나 파싱에 실패했습니다."));
         fallback.put("suggestions", List.of("judge 모델 응답 포맷을 점검하세요."));
         return fallback;
+    }
+
+    private Map<String, Object> parseRunOverallReviewOutput(String text) {
+        try {
+            String json = extractFirstJsonObject(text);
+            if (json == null) {
+                return fallbackRunOverallReview("RUN_OVERALL_REVIEW_JSON_NOT_FOUND");
+            }
+            return objectMapper.readValue(json, new TypeReference<>() {
+            });
+        } catch (Exception e) {
+            return fallbackRunOverallReview("RUN_OVERALL_REVIEW_JSON_PARSE_FAIL");
+        }
+    }
+
+    private Map<String, Object> fallbackRunOverallReview(String label) {
+        Map<String, Object> fallback = new LinkedHashMap<>();
+        fallback.put("overallComment", "전체 결과를 기반으로 한 종합평가를 생성하지 못했습니다.");
+        fallback.put("verdictReason", "판정 사유를 자동 분석하지 못했습니다.");
+        fallback.put("strengths", List.of());
+        fallback.put("risks", List.of("LLM 종합평가 생성 실패"));
+        fallback.put("nextActions", List.of("실행 로그를 확인한 뒤 다시 실행해 주세요."));
+        fallback.put("labels", List.of(label));
+        return fallback;
+    }
+
+    private Map<String, Object> normalizeRunOverallReview(Map<String, Object> raw) {
+        Map<String, Object> normalized = new LinkedHashMap<>();
+
+        String overallComment = trimToNull(raw != null ? raw.get("overallComment") : null);
+        String verdictReason = trimToNull(raw != null ? raw.get("verdictReason") : null);
+        List<String> strengths = limitNonBlankStrings(toStringList(raw != null ? raw.get("strengths") : null), 3);
+        List<String> risks = limitNonBlankStrings(toStringList(raw != null ? raw.get("risks") : null), 3);
+        List<String> nextActions = limitNonBlankStrings(toStringList(raw != null ? raw.get("nextActions") : null), 3);
+        List<String> labels = limitNonBlankStrings(toStringList(raw != null ? raw.get("labels") : null), 5);
+
+        normalized.put(
+                "overallComment",
+                overallComment != null ? overallComment : "전체 케이스 결과를 종합하는 중 문제가 발생했습니다."
+        );
+        normalized.put(
+                "verdictReason",
+                verdictReason != null ? verdictReason : "판정 근거를 자동 생성하지 못했습니다."
+        );
+        normalized.put("strengths", strengths);
+        normalized.put("risks", risks);
+        normalized.put("nextActions", nextActions);
+        if (!labels.isEmpty()) {
+            normalized.put("labels", labels);
+        }
+        return normalized;
     }
 
     private String extractFirstJsonObject(String text) {
@@ -492,6 +623,52 @@ public class EvalJudgeService {
         return result;
     }
 
+    private static String trimToNull(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private static List<String> limitNonBlankStrings(List<String> source, int limit) {
+        List<String> result = new ArrayList<>();
+        if (source == null || source.isEmpty() || limit <= 0) {
+            return result;
+        }
+        for (String item : source) {
+            if (item == null) {
+                continue;
+            }
+            String trimmed = item.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            result.add(trimmed);
+            if (result.size() >= limit) {
+                break;
+            }
+        }
+        return result;
+    }
+
+    private static String normalizeReasonText(Object rawReason, List<String> evidence, boolean pass) {
+        String prefix = pass ? "판정 사유: " : "실패 사유: ";
+        String reason = rawReason != null ? String.valueOf(rawReason).trim() : "";
+
+        if (reason.isBlank() && evidence != null && !evidence.isEmpty()) {
+            reason = evidence.get(0);
+        }
+        if (reason.isBlank()) {
+            reason = pass ? "평가 기준을 충족했습니다." : "평가 기준을 충족하지 못했습니다.";
+        }
+
+        if (reason.startsWith("실패 사유:") || reason.startsWith("판정 사유:")) {
+            return reason;
+        }
+        return prefix + reason;
+    }
+
     private static Double readDouble(Object value) {
         if (value == null) {
             return null;
@@ -522,5 +699,8 @@ public class EvalJudgeService {
     }
 
     public record JudgeResult(Map<String, Object> judgeOutput, double overallScore, boolean pass) {
+    }
+
+    public record RunOverallReviewResult(Map<String, Object> review, Map<String, Object> meta) {
     }
 }
