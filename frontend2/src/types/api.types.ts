@@ -610,6 +610,17 @@ export interface EvalReleaseCriteriaUpdateRequest {
   minImprovementNoticeDelta: number;
 }
 
+export interface EvalReleaseCriteriaAuditResponse {
+  id: number;
+  workspaceId: number;
+  minPassRate: number;
+  minAvgOverallScore: number;
+  maxErrorRate: number;
+  minImprovementNoticeDelta: number;
+  changedBy: number | null;
+  changedAt: string;
+}
+
 export interface EvalRunResponse {
   id: number;
   promptId: number;

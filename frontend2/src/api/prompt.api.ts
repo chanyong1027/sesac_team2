@@ -26,6 +26,7 @@ import type {
     EvalRunEstimateResponse,
     EvalReleaseCriteriaResponse,
     EvalReleaseCriteriaUpdateRequest,
+    EvalReleaseCriteriaAuditResponse,
     EvalRunResponse,
     EvalCancelResponse,
     EvalCaseResultListResponse,
@@ -153,6 +154,9 @@ export const promptApi = {
 
     updateEvalReleaseCriteria: (workspaceId: number, data: EvalReleaseCriteriaUpdateRequest) =>
         api.put<EvalReleaseCriteriaResponse>(`/workspaces/${workspaceId}/eval/release-criteria`, data),
+
+    getEvalReleaseCriteriaHistory: (workspaceId: number) =>
+        api.get<EvalReleaseCriteriaAuditResponse[]>(`/workspaces/${workspaceId}/eval/release-criteria/history`),
 
     // Prompt Playground
     // =================================================================

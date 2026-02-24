@@ -41,6 +41,7 @@ public class EvalExecutionService {
     private final EvalModelRunnerService evalModelRunnerService;
     private final EvalRuleCheckerService evalRuleCheckerService;
     private final EvalRubricTemplateRegistry evalRubricTemplateRegistry;
+    private final EvalPerformanceSummaryCalculator evalPerformanceSummaryCalculator;
     private final EvalJudgeService evalJudgeService;
     private final EvalReleaseCriteriaService evalReleaseCriteriaService;
     private final EvalReleaseDecisionCalculator evalReleaseDecisionCalculator;
@@ -53,6 +54,7 @@ public class EvalExecutionService {
             EvalModelRunnerService evalModelRunnerService,
             EvalRuleCheckerService evalRuleCheckerService,
             EvalRubricTemplateRegistry evalRubricTemplateRegistry,
+            EvalPerformanceSummaryCalculator evalPerformanceSummaryCalculator,
             EvalJudgeService evalJudgeService,
             EvalReleaseCriteriaService evalReleaseCriteriaService,
             EvalReleaseDecisionCalculator evalReleaseDecisionCalculator,
@@ -64,6 +66,7 @@ public class EvalExecutionService {
         this.evalModelRunnerService = evalModelRunnerService;
         this.evalRuleCheckerService = evalRuleCheckerService;
         this.evalRubricTemplateRegistry = evalRubricTemplateRegistry;
+        this.evalPerformanceSummaryCalculator = evalPerformanceSummaryCalculator;
         this.evalJudgeService = evalJudgeService;
         this.evalReleaseCriteriaService = evalReleaseCriteriaService;
         this.evalReleaseDecisionCalculator = evalReleaseDecisionCalculator;
@@ -442,6 +445,14 @@ public class EvalExecutionService {
         Map<String, Long> errorCodeCounts = collectErrorCodeCounts(allResults);
         Map<String, Long> labelCounts = collectLabelCounts(okResults);
         summary.put("ruleFailCounts", ruleFailCounts);
+        summary.put(
+                "performance",
+                evalPerformanceSummaryCalculator.buildSummary(
+                        collectMetaMaps(allResults, true),
+                        collectMetaMaps(allResults, false),
+                        run.mode() == EvalMode.COMPARE_ACTIVE
+                )
+        );
         summary.put("errorCodeCounts", errorCodeCounts);
         summary.put("labelCounts", labelCounts);
 
@@ -738,6 +749,18 @@ public class EvalExecutionService {
             }
         }
         return sortCountsDesc(counts);
+    }
+
+    private List<Map<String, Object>> collectMetaMaps(List<EvalCaseResult> results, boolean candidate) {
+        List<Map<String, Object>> metas = new ArrayList<>();
+        for (EvalCaseResult result : results) {
+            Map<String, Object> meta = candidate ? result.getCandidateMetaJson() : result.getBaselineMetaJson();
+            if (meta == null || meta.isEmpty()) {
+                continue;
+            }
+            metas.add(meta);
+        }
+        return metas;
     }
 
     private Map<String, Object> extractCandidateRuleChecks(Map<String, Object> ruleChecks) {
