@@ -35,6 +35,17 @@ import type {
     PlaygroundRunResponse,
     PlaygroundSaveVersionRequest,
     PlaygroundSaveVersionResponse,
+    // Extended eval types
+    EvalCaseHumanReviewUpsertRequest,
+    EvalCaseHumanReviewAuditResponse,
+    EvalCaseResultTableListResponse,
+    EvalCaseResultStatsResponse,
+    EvalJudgeAccuracyMetricsResponse,
+    EvalJudgeAccuracyRollupResponse,
+    PromptEvalDefaultDraftResponse,
+    PromptEvalDefaultDraftSectionRequest,
+    EvalHumanReviewVerdict,
+    EvalCaseStatus,
 } from '@/types/api.types';
 
 export const promptApi = {
@@ -165,4 +176,100 @@ export const promptApi = {
 
     playgroundSave: (promptId: number, data: PlaygroundSaveVersionRequest) =>
         api.post<PlaygroundSaveVersionResponse>(`/prompts/${promptId}/playground/save`, data),
+
+    // =================================================================
+    // Prompt Eval - Extended (Human Review, Stats, Drafts)
+    // =================================================================
+    upsertHumanReview: (
+        workspaceId: number,
+        promptId: number,
+        runId: number,
+        caseResultId: number,
+        data: EvalCaseHumanReviewUpsertRequest
+    ) => api.put<EvalCaseResultResponse>(
+        `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/cases/${caseResultId}/human-review`,
+        data
+    ),
+
+    getHumanReviewHistory: (workspaceId: number, promptId: number, runId: number, caseResultId: number) =>
+        api.get<EvalCaseHumanReviewAuditResponse[]>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/cases/${caseResultId}/human-review/history`
+        ),
+
+    getEvalRunCasesTable: (
+        workspaceId: number,
+        promptId: number,
+        runId: number,
+        params?: {
+            page?: number;
+            size?: number;
+            status?: EvalCaseStatus;
+            pass?: boolean;
+            reviewVerdict?: EvalHumanReviewVerdict;
+            overridden?: boolean;
+        }
+    ) => api.get<EvalCaseResultTableListResponse>(
+        `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/cases:table`,
+        { params }
+    ),
+
+    getEvalRunCasesStats: (workspaceId: number, promptId: number, runId: number) =>
+        api.get<EvalCaseResultStatsResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/cases:stats`
+        ),
+
+    getEvalRunJudgeAccuracy: (workspaceId: number, promptId: number, runId: number) =>
+        api.get<EvalJudgeAccuracyMetricsResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/runs/${runId}/judge-accuracy`
+        ),
+
+    getPromptJudgeAccuracyRollup: (
+        workspaceId: number,
+        promptId: number,
+        params?: {
+            from?: string;
+            to?: string;
+            promptVersionId?: number;
+        }
+    ) => api.get<EvalJudgeAccuracyRollupResponse>(
+        `/workspaces/${workspaceId}/prompts/${promptId}/eval/judge-accuracy`,
+        { params }
+    ),
+
+    getEvalDefaultsDraft: (workspaceId: number, promptId: number) =>
+        api.get<PromptEvalDefaultDraftResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft`
+        ),
+
+    patchEvalDefaultsDraftDataset: (workspaceId: number, promptId: number, datasetId?: number) =>
+        api.patch<PromptEvalDefaultDraftResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft/sections/dataset`,
+            { datasetId }
+        ),
+
+    patchEvalDefaultsDraftRubric: (
+        workspaceId: number,
+        promptId: number,
+        data: PromptEvalDefaultDraftSectionRequest
+    ) => api.patch<PromptEvalDefaultDraftResponse>(
+        `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft/sections/rubric`,
+        data
+    ),
+
+    patchEvalDefaultsDraftMode: (workspaceId: number, promptId: number, defaultMode?: string) =>
+        api.patch<PromptEvalDefaultDraftResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft/sections/mode`,
+            { defaultMode }
+        ),
+
+    patchEvalDefaultsDraftAutomation: (workspaceId: number, promptId: number, autoEvalEnabled?: boolean) =>
+        api.patch<PromptEvalDefaultDraftResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft/sections/automation`,
+            { autoEvalEnabled }
+        ),
+
+    finalizeEvalDefaultsDraft: (workspaceId: number, promptId: number) =>
+        api.post<PromptEvalDefaultResponse>(
+            `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft:finalize`
+        ),
 };

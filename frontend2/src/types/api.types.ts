@@ -804,3 +804,155 @@ export interface PlaygroundSaveVersionResponse {
   version: PromptVersionCreateResponse;
   released: boolean;
 }
+
+
+// ========================================
+// Prompt Eval - Extended (Human Review, Stats, Drafts)
+// ========================================
+export type EvalHumanReviewVerdict = 'CORRECT' | 'INCORRECT' | 'UNREVIEWED';
+
+export interface EvalCaseResultResponse {
+  id: number;
+  evalRunId: number;
+  testCaseId: number;
+  status: EvalCaseStatus;
+  candidateOutput: string | null;
+  baselineOutput: string | null;
+  candidateMeta: Record<string, any> | null;
+  baselineMeta: Record<string, any> | null;
+  ruleChecks: Record<string, any> | null;
+  judgeOutput: Record<string, any> | null;
+  overallScore: number | null;
+  pass: boolean | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  // Human review fields
+  humanReviewVerdict: EvalHumanReviewVerdict;
+  humanOverridePass: boolean | null;
+  humanReviewComment: string | null;
+  humanReviewCategory: string | null;
+  humanReviewedBy: number | null;
+  humanReviewedAt: string | null;
+  effectivePass: boolean | null;
+}
+
+export interface EvalCaseHumanReviewUpsertRequest {
+  verdict: EvalHumanReviewVerdict;
+  overridePass?: boolean;
+  comment?: string;
+  category?: string;
+  requestId?: string;
+}
+
+export interface EvalCaseHumanReviewAuditResponse {
+  id: number;
+  workspaceId: number;
+  evalRunId: number;
+  evalCaseResultId: number;
+  verdict: EvalHumanReviewVerdict;
+  overridePass: boolean | null;
+  comment: string | null;
+  category: string | null;
+  requestId: string | null;
+  changedBy: number | null;
+  changedAt: string;
+}
+
+export interface EvalCaseResultTableRowResponse {
+  id: number;
+  testCaseId: number;
+  status: EvalCaseStatus;
+  overallScore: number | null;
+  pass: boolean | null;
+  effectivePass: boolean | null;
+  humanReviewVerdict: EvalHumanReviewVerdict;
+  labels: string[];
+  reason: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface EvalCaseResultTableListResponse {
+  content: EvalCaseResultTableRowResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface EvalCaseResultStatsResponse {
+  okCount: number;
+  runningCount: number;
+  errorCount: number;
+  passTrueCount: number;
+  passFalseCount: number;
+  effectivePassTrueCount: number;
+  effectivePassFalseCount: number;
+  humanCorrectCount: number;
+  humanIncorrectCount: number;
+  humanUnreviewedCount: number;
+  topLabelCounts: Record<string, number>;
+}
+
+export interface EvalJudgeAccuracyMetricsResponse {
+  runId: number;
+  totalCases: number;
+  reviewedCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  accuracy: number | null;
+  overrideRate: number | null;
+  tp: number;
+  tn: number;
+  fp: number;
+  fn: number;
+  precision: number | null;
+  recall: number | null;
+  f1: number | null;
+  specificity: number | null;
+  balancedAccuracy: number | null;
+  note: string;
+}
+
+export interface EvalJudgeAccuracyRollupResponse {
+  promptId: number;
+  promptVersionId: number | null;
+  totalCases: number;
+  reviewedCount: number;
+  correctCount: number;
+  incorrectCount: number;
+  accuracy: number | null;
+  overrideRate: number | null;
+}
+
+export interface PromptEvalDefaultDraftResponse {
+  promptId: number;
+  datasetId: number | null;
+  rubricTemplateCode: RubricTemplateCode | null;
+  rubricOverrides: Record<string, any> | null;
+  criteriaAnchors: Record<string, any> | null;
+  defaultMode: EvalMode | null;
+  autoEvalEnabled: boolean | null;
+  completedSections: string[];
+  updatedAt: string;
+}
+
+export interface PromptEvalDefaultDraftSectionRequest {
+  datasetId?: number;
+  rubricTemplateCode?: RubricTemplateCode;
+  rubricOverrides?: Record<string, any>;
+  criteriaAnchors?: Record<string, any>;
+  defaultMode?: EvalMode;
+  autoEvalEnabled?: boolean;
+}
+
+export interface RubricCriterionAnchor {
+  score: number;
+  example: string;
+}
+
+export interface RubricAnchorsConfig {
+  [criterionKey: string]: RubricCriterionAnchor[];
+}
