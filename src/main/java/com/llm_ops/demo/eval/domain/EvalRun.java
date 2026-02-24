@@ -109,6 +109,11 @@ public class EvalRun {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    // Explicit getters for IDE/LSP environments without Lombok support
+    public Long getId() {
+        return id;
+    }
+
     public static EvalRun queue(
             Prompt prompt,
             PromptVersion promptVersion,

@@ -234,6 +234,9 @@ public class EvalJudgeService {
         rubricPayload.put("description", rubric.description());
         rubricPayload.put("weights", rubric.weights());
         rubricPayload.put("gates", rubric.gates());
+        if (rubric.criteriaAnchors() != null && !rubric.criteriaAnchors().isEmpty()) {
+            rubricPayload.put("criteriaAnchors", rubric.criteriaAnchors());
+        }
         if (isCustomRubric) {
             rubricPayload.put("criteriaDefinitions", criteriaDefinitions);
             rubricPayload.put("missingCriteriaDefinitions", missingCriteriaDefinitions);
@@ -263,6 +266,16 @@ public class EvalJudgeService {
 
                 """
                 : "";
+
+        String anchorInstructions = rubric.criteriaAnchors() != null && !rubric.criteriaAnchors().isEmpty()
+                ? """
+                 - rubric.criteriaAnchors가 제공되면, 각 criterion에 대해 1~5점 앵커 예시를 참고해 점수를 산정하라.
+                   앵커 예시는 완전 일치가 아니라 의미적 유사성을 기준으로 적용하라.
+
+                 """
+                : "";
+
+        String anchorExamplesSection = buildCriteriaAnchorExamplesSection(rubric.criteriaAnchors());
 
         return """
                 너는 프롬프트 평가 심사자다.
@@ -294,10 +307,48 @@ public class EvalJudgeService {
                 - ruleChecks에서 실패가 있으면 reason/evidence에 어떤 룰 키가 실패했는지(예: must_include) 명시하라.
                 - must_cover 누락이 있으면 reason/evidence에 누락 항목명을 구체적으로 명시하라.
 
-                %s
+                %s%s%s
                 입력:
                 %s
-                """.formatted(customRubricInstructions, payloadJson);
+                """.formatted(customRubricInstructions, anchorInstructions, anchorExamplesSection, payloadJson);
+    }
+
+    private static String buildCriteriaAnchorExamplesSection(Map<String, Map<String, String>> criteriaAnchors) {
+        if (criteriaAnchors == null || criteriaAnchors.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("[점수 기준 예시]\n");
+
+        for (Map.Entry<String, Map<String, String>> entry : criteriaAnchors.entrySet()) {
+            String criterion = entry.getKey() != null ? entry.getKey().trim() : "";
+            if (criterion.isEmpty()) {
+                continue;
+            }
+            Map<String, String> anchors = entry.getValue();
+            if (anchors == null || anchors.isEmpty()) {
+                continue;
+            }
+
+            builder.append("- ").append(criterion).append('\n');
+            for (String score : List.of("1", "3", "5")) {
+                String text = anchors.get(score);
+                if (text == null) {
+                    continue;
+                }
+                String trimmed = text.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                builder.append("  - ").append(score).append(": ").append(trimmed).append('\n');
+            }
+        }
+
+        if (builder.length() <= "[점수 기준 예시]\n".length()) {
+            return "";
+        }
+        return builder.append('\n').toString();
     }
 
     private static Map<String, Object> sanitizeForJudge(Map<String, Object> value) {

@@ -5,6 +5,7 @@ import java.util.Map;
 public record RubricTemplateDefinition(
         String description,
         Map<String, Double> defaultWeights,
-        Map<String, Object> defaultGates
+        Map<String, Object> defaultGates,
+        Map<String, Map<String, String>> defaultCriteriaAnchors
 ) {
 }
