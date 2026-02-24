@@ -180,6 +180,7 @@ public class GatewayChatService {
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
         boolean ragEnabledEffective = request.isRagEnabled();
         long providerCallStartNanos = 0;
+        long providerCallEndNanos = 0;
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -345,6 +346,7 @@ public class GatewayChatService {
                     throw secondaryOutcome.exception();
                 }
                 response = secondaryOutcome.response();
+                providerCallEndNanos = System.nanoTime();
             } else {
                 providerCallStartNanos = System.nanoTime();
                 ProviderCallOutcome primaryOutcome = callProviderWithPolicy(
@@ -358,6 +360,7 @@ public class GatewayChatService {
                 );
                 if (primaryOutcome.success()) {
                     response = primaryOutcome.response();
+                    providerCallEndNanos = System.nanoTime();
                 } else {
                     lastProviderFailure = primaryOutcome.failure();
                     RuntimeException primaryException = primaryOutcome.exception();
@@ -416,6 +419,7 @@ public class GatewayChatService {
                         throw secondaryOutcome.exception();
                     }
                     response = secondaryOutcome.response();
+                    providerCallEndNanos = System.nanoTime();
                 }
             }
 
@@ -508,7 +512,7 @@ public class GatewayChatService {
             // ── Metrics: success path ──
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", System.nanoTime() - startedAtNanos);
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", System.nanoTime() - providerCallStartNanos);
+            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", providerCallEndNanos - providerCallStartNanos);
             gatewayMetrics.incrementLlmSuccess(providerTag, usedRequestedModel);
             if (inputTokens != null) {
                 gatewayMetrics.recordInputTokens(providerTag, usedRequestedModel, inputTokens);
