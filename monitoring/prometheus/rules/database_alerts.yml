@@ -1,0 +1,25 @@
+groups:
+  - name: database_connections
+    rules:
+      - alert: HikariCpConnectionsPending
+        expr: hikaricp_connections_pending > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP에 대기 중인 커넥션 요청이 있습니다 ({{ $value }}개)"
+
+      - alert: HikariCpConnectionTimeout
+        expr: rate(hikaricp_connections_timeout_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "HikariCP 커넥션 타임아웃이 발생하고 있습니다"
+
+      - alert: HikariCpFullyUtilized
+        expr: hikaricp_connections_active >= 10
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP 풀이 완전히 사용 중입니다 (10/10)"

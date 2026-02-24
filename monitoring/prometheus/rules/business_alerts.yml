@@ -1,0 +1,10 @@
+groups:
+  - name: business_metrics
+    rules:
+      - alert: AppInstanceDown
+        expr: up{job="llm-ops-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "애플리케이션 인스턴스가 다운되었습니다"

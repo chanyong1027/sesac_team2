@@ -1,0 +1,42 @@
+groups:
+  - name: jvm_resources
+    rules:
+      - alert: JvmHeapHighUtilization
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM 힙 사용률이 85%를 초과했습니다"
+
+      - alert: JvmHeapCritical
+        expr: (jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"}) > 0.95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "JVM 힙이 임계 수준(>95%)입니다. OOM 위험."
+
+      - alert: JvmGcPauseHigh
+        expr: histogram_quantile(0.99, rate(jvm_gc_pause_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GC pause P99가 500ms를 초과했습니다"
+
+      - alert: LogExecutorQueueDepthHigh
+        expr: executor_queued_tasks{name="logExecutor"} > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Log async executor 큐 깊이가 50/100을 초과했습니다"
+
+      - alert: HighApplicationErrorLogRate
+        expr: rate(logback_events_total{level="error"}[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "애플리케이션 ERROR 로그 비율이 1/s를 초과합니다"

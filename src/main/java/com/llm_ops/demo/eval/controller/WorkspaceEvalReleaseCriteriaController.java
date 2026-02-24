@@ -1,9 +1,11 @@
 package com.llm_ops.demo.eval.controller;
 
+import com.llm_ops.demo.eval.dto.EvalReleaseCriteriaAuditResponse;
 import com.llm_ops.demo.eval.dto.EvalReleaseCriteriaResponse;
 import com.llm_ops.demo.eval.dto.EvalReleaseCriteriaUpdateRequest;
 import com.llm_ops.demo.eval.service.EvalReleaseCriteriaService;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +29,14 @@ public class WorkspaceEvalReleaseCriteriaController {
             @AuthenticationPrincipal Long userId
     ) {
         return ResponseEntity.ok(evalReleaseCriteriaService.get(workspaceId, userId));
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<List<EvalReleaseCriteriaAuditResponse>> getHistory(
+            @PathVariable Long workspaceId,
+            @AuthenticationPrincipal Long userId
+    ) {
+        return ResponseEntity.ok(evalReleaseCriteriaService.listHistory(workspaceId, userId));
     }
 
     @PutMapping

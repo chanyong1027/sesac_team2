@@ -9,6 +9,7 @@ public record EvalReleaseCriteriaResponse(
         Double minAvgOverallScore,
         Double maxErrorRate,
         Double minImprovementNoticeDelta,
+        Long updatedBy,
         LocalDateTime updatedAt
 ) {
 
@@ -19,6 +20,7 @@ public record EvalReleaseCriteriaResponse(
                 criteria.getMinAvgOverallScore(),
                 criteria.getMaxErrorRate(),
                 criteria.getMinImprovementNoticeDelta(),
+                criteria.getUpdatedBy(),
                 criteria.getUpdatedAt()
         );
     }
