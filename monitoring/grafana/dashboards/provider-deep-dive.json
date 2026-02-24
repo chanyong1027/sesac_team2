@@ -1,0 +1,151 @@
+{
+  "uid": "provider-deep-dive",
+  "title": "Provider Deep Dive",
+  "tags": ["gateway", "provider"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "provider",
+        "type": "query",
+        "query": "label_values(gateway_llm_call_seconds_count, provider)",
+        "current": { "text": "All", "value": "$__all" },
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Provider Latency P50 / P95 / P99",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(gateway_llm_call_seconds_bucket{provider=~\"$provider\"}[5m])) by (le, provider))",
+          "legendFormat": "{{ provider }} P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_llm_call_seconds_bucket{provider=~\"$provider\"}[5m])) by (le, provider))",
+          "legendFormat": "{{ provider }} P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(gateway_llm_call_seconds_bucket{provider=~\"$provider\"}[5m])) by (le, provider))",
+          "legendFormat": "{{ provider }} P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Token Usage (Input / Output)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_input_tokens_sum{provider=~\"$provider\"}[5m])) by (provider, model)",
+          "legendFormat": "{{ provider }}/{{ model }} input tok/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(gateway_output_tokens_sum{provider=~\"$provider\"}[5m])) by (provider, model)",
+          "legendFormat": "{{ provider }}/{{ model }} output tok/s",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Failover Triggers",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_failover_total{from_provider=~\"$provider\"}[5m])) by (from_provider, to_provider)",
+          "legendFormat": "{{ from_provider }} → {{ to_provider }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Error Classification",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_llm_failure_total{provider=~\"$provider\"}[5m])) by (provider, fail_reason)",
+          "legendFormat": "{{ provider }} - {{ fail_reason }}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "RAG Search Latency",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(gateway_rag_search_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_rag_search_seconds_bucket[5m])) by (le))",
+          "legendFormat": "P95",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "RAG Chunks Distribution",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "gateway_rag_chunks_sum / gateway_rag_chunks_count",
+          "legendFormat": "Avg Chunks",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_rag_chunks_bucket[5m])) by (le))",
+          "legendFormat": "P95 Chunks",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+groups:
+  - name: gateway_alerts
+    rules:
+      - alert: GatewayProviderLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(gateway_llm_call_seconds_bucket[5m])) by (le, provider)) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway LLM 호출 P95 지연 10초 초과 (provider={{ $labels.provider }})"
+
+      - alert: GatewayProviderLatencyCritical
+        expr: histogram_quantile(0.95, sum(rate(gateway_llm_call_seconds_bucket[5m])) by (le, provider)) > 20
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway LLM 호출 P95 지연 20초 초과 (provider={{ $labels.provider }})"
+
+      - alert: GatewayHighErrorRate
+        expr: |
+          sum(rate(gateway_llm_failure_total[5m])) /
+          (sum(rate(gateway_llm_success_total[5m])) + sum(rate(gateway_llm_failure_total[5m]))) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway 에러율 10% 초과"
+
+      - alert: GatewayFailoverSpike
+        expr: sum(rate(gateway_failover_total[1m])) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway failover 빈도 급증 (>0.5/s)"
+
+      - alert: GatewayThreadPoolNearFull
+        expr: gateway_provider_call_threads_active >= 14
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway 스레드풀 거의 가득 참 (active >= 14)"
+
+      - alert: GatewayThreadPoolFull
+        expr: gateway_provider_call_threads_active >= 16
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gateway 스레드풀 포화 (active >= 16)"
+
+      - alert: GatewayQueueBacklog
+        expr: gateway_provider_call_queue_size > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway 큐 백로그 증가 (queue > 10)"

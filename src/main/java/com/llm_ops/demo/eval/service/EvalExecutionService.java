@@ -46,6 +46,7 @@ public class EvalExecutionService {
     private final EvalReleaseCriteriaService evalReleaseCriteriaService;
     private final EvalReleaseDecisionCalculator evalReleaseDecisionCalculator;
     private final ObjectMapper objectMapper;
+    private final EvalMetrics evalMetrics;
 
     public EvalExecutionService(
             EvalRunRepository evalRunRepository,
@@ -58,7 +59,8 @@ public class EvalExecutionService {
             EvalJudgeService evalJudgeService,
             EvalReleaseCriteriaService evalReleaseCriteriaService,
             EvalReleaseDecisionCalculator evalReleaseDecisionCalculator,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            EvalMetrics evalMetrics
     ) {
         this.evalRunRepository = evalRunRepository;
         this.evalCaseResultRepository = evalCaseResultRepository;
@@ -71,6 +73,7 @@ public class EvalExecutionService {
         this.evalReleaseCriteriaService = evalReleaseCriteriaService;
         this.evalReleaseDecisionCalculator = evalReleaseDecisionCalculator;
         this.objectMapper = objectMapper;
+        this.evalMetrics = evalMetrics;
     }
 
     public void processRun(Long runId) {
@@ -106,7 +109,10 @@ public class EvalExecutionService {
                 if (caseResult.status() != EvalCaseStatus.QUEUED) {
                     continue;
                 }
+                long caseStartNanos = System.nanoTime();
                 processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
+                String caseStatus = caseResult.status() != null ? caseResult.status().name() : "unknown";
+                evalMetrics.recordCaseExecution(caseStatus, System.nanoTime() - caseStartNanos);
             }
 
             finishRun(run.getId(), costAccumulator, compareBaselineAvailable);

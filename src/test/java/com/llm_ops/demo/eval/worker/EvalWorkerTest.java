@@ -6,8 +6,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.llm_ops.demo.eval.config.EvalProperties;
+import com.llm_ops.demo.eval.domain.EvalMode;
 import com.llm_ops.demo.eval.domain.EvalRun;
 import com.llm_ops.demo.eval.service.EvalExecutionService;
+import com.llm_ops.demo.eval.service.EvalMetrics;
 import com.llm_ops.demo.eval.service.EvalRunService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -24,14 +26,18 @@ class EvalWorkerTest {
 
         EvalRunService evalRunService = mock(EvalRunService.class);
         EvalExecutionService evalExecutionService = mock(EvalExecutionService.class);
-        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties);
+        EvalMetrics evalMetrics = mock(EvalMetrics.class);
+        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics);
 
         EvalRun firstRun = mock(EvalRun.class);
         EvalRun secondRun = mock(EvalRun.class);
         EvalRun thirdRun = mock(EvalRun.class);
         when(firstRun.getId()).thenReturn(1L);
+        when(firstRun.mode()).thenReturn(EvalMode.CANDIDATE_ONLY);
         when(secondRun.getId()).thenReturn(2L);
+        when(secondRun.mode()).thenReturn(EvalMode.CANDIDATE_ONLY);
         when(thirdRun.getId()).thenReturn(3L);
+        when(thirdRun.mode()).thenReturn(EvalMode.CANDIDATE_ONLY);
         when(evalRunService.pickQueuedRuns(3)).thenReturn(List.of(firstRun, secondRun, thirdRun));
         doThrow(new RuntimeException("boom")).when(evalExecutionService).processRun(2L);
 

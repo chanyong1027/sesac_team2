@@ -108,6 +108,9 @@ class GatewayChatServiceUnitTest {
     @Spy
     private GatewayReliabilityProperties gatewayReliabilityProperties = new GatewayReliabilityProperties();
 
+    @Mock
+    private GatewayMetrics gatewayMetrics;
+
     @InjectMocks
     private GatewayChatService gatewayChatService;
 
