@@ -171,14 +171,13 @@ export function WorkspaceDashboardPage() {
         isError: isRecentLogsError,
         refetch: refetchRecentLogs,
     } = useQuery({
-        queryKey: ['recent-logs', workspaceId, promptKey],
+        queryKey: ['recent-logs', workspaceId],
         queryFn: async () =>
             logsApi.list(workspaceId, {
-                promptKey,
                 page: 0,
                 size: 5,
             }),
-        enabled: isValidWorkspaceId && !!promptKey,
+        enabled: isValidWorkspaceId,
         retry: false,
     });
 
@@ -238,7 +237,7 @@ export function WorkspaceDashboardPage() {
     const gatewayApiKey = apiKeys?.[0]?.keyPrefix ? `${apiKeys[0].keyPrefix}...` : 'YOUR_GATEWAY_API_KEY';
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://api.luminaops.com';
     const safePromptKey = promptKey || 'your-prompt-key';
-    const logsListPath = `${basePath}/logs${promptKey ? `?promptKey=${encodeURIComponent(promptKey)}` : ''}`;
+    const logsListPath = `${basePath}/logs`;
     
     const curlExample = `curl -X POST "${apiBaseUrl}/v1/chat/completions" \\
 	  -H "X-API-Key: ${gatewayApiKey}" \\
@@ -404,7 +403,7 @@ export function WorkspaceDashboardPage() {
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                     </h2>
                                     <p className="text-xs text-gray-500 mt-1">
-                                        Monitoring real-time requests for '{promptKey || workspace.displayName}'
+                                        Monitoring recent workspace requests
                                     </p>
                                 </div>
                                 <div className="flex gap-2">
@@ -419,14 +418,7 @@ export function WorkspaceDashboardPage() {
                                 </div>
                             </div>
 
-                            {!promptKey ? (
-                                <div className="p-4 text-sm text-gray-400">
-                                    아직 프롬프트가 없습니다. 프롬프트를 먼저 생성하세요.
-                                    <Link to={`${basePath}/prompts`} className="ml-2 text-[var(--primary)] font-medium hover:underline">
-                                        프롬프트 설정
-                                    </Link>
-                                </div>
-                            ) : isRecentLogsLoading ? (
+                            {isRecentLogsLoading ? (
                                 <div className="p-4 space-y-3">
                                     {Array.from({ length: 5 }).map((_, idx) => (
                                         <div key={idx} className="h-16 rounded-xl bg-white/[0.03] animate-pulse" />

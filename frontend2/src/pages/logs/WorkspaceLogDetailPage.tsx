@@ -135,10 +135,47 @@ function formatKstDateTimeOrFallback(iso: string | null | undefined, fallback = 
   });
 }
 
+function parseKstLocalDateTime(value: string): Date | null {
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?$/
+  );
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const fraction = match[7] ?? '';
+  const millisecond = fraction.length > 0
+    ? Number(fraction.padEnd(3, '0').slice(0, 3))
+    : 0;
+
+  if ([year, month, day, hour, minute, second, millisecond].some(Number.isNaN)) {
+    return null;
+  }
+
+  // 서버가 타임존 없이 내려주는 LocalDateTime은 KST 시각으로 간주한다.
+  // KST(+09:00) 기준 wall-clock을 절대 시각(UTC)으로 변환한다.
+  return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, second, millisecond));
+}
+
 function parseApiDate(iso: string | null | undefined): Date | null {
   if (!iso) return null;
-  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(iso) ? iso : `${iso}Z`;
-  const d = new Date(normalized);
+
+  if (/(?:Z|[+-]\d{2}:\d{2})$/.test(iso)) {
+    const zoned = new Date(iso);
+    return Number.isNaN(zoned.getTime()) ? null : zoned;
+  }
+
+  const kstLocal = parseKstLocalDateTime(iso);
+  if (kstLocal) {
+    return kstLocal;
+  }
+
+  const fallback = new Date(iso);
+  const d = fallback;
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }

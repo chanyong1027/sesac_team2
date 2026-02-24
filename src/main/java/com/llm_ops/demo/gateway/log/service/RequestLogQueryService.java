@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class RequestLogQueryService {
 
+    private static final String HIDDEN_ERROR_CODE = "GW-REQ-FORBIDDEN";
+
     private final RequestLogRepository requestLogRepository;
 
     /**
@@ -30,6 +32,9 @@ public class RequestLogQueryService {
     public RequestLogResponse findByTraceId(Long workspaceId, String traceId) {
         RequestLog log = requestLogRepository.findByWorkspaceIdAndTraceId(workspaceId, traceId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+        if (HIDDEN_ERROR_CODE.equals(log.getErrorCode())) {
+            throw new BusinessException(ErrorCode.NOT_FOUND);
+        }
         return RequestLogResponse.from(log);
     }
 

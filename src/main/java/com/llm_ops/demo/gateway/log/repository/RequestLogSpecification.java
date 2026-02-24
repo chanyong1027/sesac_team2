@@ -12,6 +12,8 @@ import org.springframework.data.jpa.domain.Specification;
  */
 public class RequestLogSpecification {
 
+    private static final String HIDDEN_ERROR_CODE = "GW-REQ-FORBIDDEN";
+
     private RequestLogSpecification() {
         // Utility class
     }
@@ -22,6 +24,11 @@ public class RequestLogSpecification {
 
             // 필수: workspaceId 필터
             predicates.add(cb.equal(root.get("workspaceId"), workspaceId));
+            // 워크스페이스 로그 화면에서는 권한 거부 이벤트를 기본 숨김 처리합니다.
+            predicates.add(cb.or(
+                    cb.isNull(root.get("errorCode")),
+                    cb.notEqual(root.get("errorCode"), HIDDEN_ERROR_CODE)
+            ));
 
             // 기간 필터
             if (condition.from() != null) {

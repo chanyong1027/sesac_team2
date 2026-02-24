@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import {
   RefreshCw,
   Search,
@@ -93,11 +94,23 @@ export function WorkspaceLogsPage() {
     return params;
   }, [searchQuery, status, provider, model, source, ragEnabled, isFailover, page, pageSize]);
 
-  const { data: list, isLoading, refetch } = useQuery({
+  const { data: list, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['workspace-logs', workspaceId, queryParams],
     queryFn: async () => logsApi.list(workspaceId, queryParams),
     enabled: isActiveWorkspaceIds,
   });
+
+  const queryErrorMessage = useMemo(() => {
+    if (!isError) return null;
+    if (isAxiosError(error)) {
+      const status = error.response?.status;
+      const apiMessage = (error.response?.data as { message?: string } | undefined)?.message;
+      if (status === 401) return '로그인이 필요합니다. 다시 로그인해 주세요.';
+      if (status === 403) return '해당 워크스페이스 로그 조회 권한이 없습니다.';
+      if (apiMessage) return apiMessage;
+    }
+    return '로그 조회 중 오류가 발생했습니다.';
+  }, [isError, error]);
 
   const logs = list?.content ?? [];
   const totalElements = list?.totalElements ?? 0;
@@ -153,10 +166,12 @@ export function WorkspaceLogsPage() {
     return `${ms}ms`;
   };
 
-  const formatCost = (cost: number | undefined) => {
-    if (cost === undefined) return '-';
-    if (cost === 0) return '$0.000';
-    return `$${cost.toFixed(4)}`;
+  const formatCost = (cost: number | string | null | undefined) => {
+    if (cost === null || cost === undefined) return '-';
+    const numeric = typeof cost === 'number' ? cost : Number(cost);
+    if (!Number.isFinite(numeric)) return '-';
+    if (numeric === 0) return '$0.0000';
+    return `$${numeric.toFixed(4)}`;
   };
 
   const truncate = (str: string | null, length: number) => {
@@ -344,6 +359,21 @@ export function WorkspaceLogsPage() {
                     <td className="px-4 py-4"></td>
                   </tr>
                 ))
+              ) : isError ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center">
+                    <div className="inline-flex flex-col items-center gap-3 text-sm">
+                      <span className="text-rose-300">{queryErrorMessage}</span>
+                      <button
+                        type="button"
+                        onClick={() => refetch()}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-gray-200 border border-white/10 hover:bg-white/5"
+                      >
+                        다시 시도
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ) : logs.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="px-6 py-12 text-center text-gray-500 text-sm">
