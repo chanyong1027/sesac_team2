@@ -29,6 +29,18 @@ public class GatewayMetrics {
 
     // ── Timers ──────────────────────────────────────────────────────────────
 
+    public void recordRequest(String provider, String model, boolean isRag, boolean isFailover, String status, long elapsedNanos) {
+        Timer.builder("gateway_request_seconds")
+                .publishPercentileHistogram(true)
+                .tag("provider", safe(provider))
+                .tag("model", safe(model))
+                .tag("is_rag", String.valueOf(isRag))
+                .tag("is_failover", String.valueOf(isFailover))
+                .tag("status", safe(status))
+                .register(registry)
+                .record(elapsedNanos, TimeUnit.NANOSECONDS);
+    }
+
     public void recordLlmCall(String provider, String model, boolean isRag, boolean isFailover, String status, long elapsedNanos) {
         Timer.builder("gateway_llm_call_seconds")
                 .publishPercentileHistogram(true)

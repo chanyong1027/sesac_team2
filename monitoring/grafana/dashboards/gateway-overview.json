@@ -42,17 +42,17 @@
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(gateway_llm_call_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(gateway_request_seconds_bucket[5m])) by (le))",
           "legendFormat": "P50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(gateway_llm_call_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(gateway_request_seconds_bucket[5m])) by (le))",
           "legendFormat": "P95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(gateway_llm_call_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(gateway_request_seconds_bucket[5m])) by (le))",
           "legendFormat": "P99",
           "refId": "C"
         }

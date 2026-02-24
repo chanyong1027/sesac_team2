@@ -179,6 +179,7 @@ public class GatewayChatService {
         java.util.List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
         boolean ragEnabledEffective = request.isRagEnabled();
+        long providerCallStartNanos = 0;
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -329,6 +330,7 @@ public class GatewayChatService {
                 String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                 usedRequestedModel = secondaryModelEffective;
 
+                providerCallStartNanos = System.nanoTime();
                 ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
                         secondaryKey,
                         secondaryModelEffective,
@@ -344,6 +346,7 @@ public class GatewayChatService {
                 }
                 response = secondaryOutcome.response();
             } else {
+                providerCallStartNanos = System.nanoTime();
                 ProviderCallOutcome primaryOutcome = callProviderWithPolicy(
                         primaryKey,
                         requestedModelEffective,
@@ -398,6 +401,7 @@ public class GatewayChatService {
                     String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                     usedRequestedModel = secondaryModelEffective;
 
+                    providerCallStartNanos = System.nanoTime();
                     ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
                             secondaryKey,
                             secondaryModelEffective,
@@ -503,7 +507,8 @@ public class GatewayChatService {
 
             // ── Metrics: success path ──
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", System.nanoTime() - providerCallStartNanos);
             gatewayMetrics.incrementLlmSuccess(providerTag, usedRequestedModel);
             if (inputTokens != null) {
                 gatewayMetrics.recordInputTokens(providerTag, usedRequestedModel, inputTokens);
@@ -521,7 +526,10 @@ public class GatewayChatService {
         } catch (BusinessException e) {
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             String failReason = budgetFailReason != null ? budgetFailReason : e.getErrorCode().name();
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
+            if (providerCallStartNanos > 0) {
+                gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - providerCallStartNanos);
+            }
             gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, failReason);
             GatewayFailureClassifier.GatewayFailure gatewayFailure = classifyBusinessFailure(e, budgetFailReason);
             if (e.getErrorCode() == ErrorCode.BUDGET_EXCEEDED) {
@@ -583,7 +591,10 @@ public class GatewayChatService {
         } catch (Exception e) {
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             String exFailReason = lastProviderFailure != null ? lastProviderFailure.failReason() : e.getClass().getSimpleName();
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
+            if (providerCallStartNanos > 0) {
+                gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - providerCallStartNanos);
+            }
             gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, exFailReason);
             GatewayFailureClassifier.GatewayFailure gatewayFailure;
             if (isRequestDeadlineFailure(lastProviderFailure)) {
