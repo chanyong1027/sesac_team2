@@ -529,8 +529,8 @@ public class GatewayChatService {
             gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
             if (providerCallStartNanos > 0) {
                 gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - providerCallStartNanos);
+                gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, failReason);
             }
-            gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, failReason);
             GatewayFailureClassifier.GatewayFailure gatewayFailure = classifyBusinessFailure(e, budgetFailReason);
             if (e.getErrorCode() == ErrorCode.BUDGET_EXCEEDED) {
                 requestLogWriter.markBlocked(requestId, new RequestLogWriter.BlockUpdate(
@@ -594,8 +594,8 @@ public class GatewayChatService {
             gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
             if (providerCallStartNanos > 0) {
                 gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - providerCallStartNanos);
+                gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, exFailReason);
             }
-            gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, exFailReason);
             GatewayFailureClassifier.GatewayFailure gatewayFailure;
             if (isRequestDeadlineFailure(lastProviderFailure)) {
                 gatewayFailure = lastProviderFailure;
