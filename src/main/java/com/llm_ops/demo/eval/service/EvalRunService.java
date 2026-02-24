@@ -134,9 +134,10 @@ public class EvalRunService {
         long generationCallsPerCase = request.mode() == EvalMode.COMPARE_ACTIVE ? 2L : 1L;
         long judgeCallsPerCaseMin = request.mode() == EvalMode.COMPARE_ACTIVE ? 2L : 1L;
         long judgeCallsPerCaseMax = judgeCallsPerCaseMin * judgeAttemptsMax;
+        long runOverallReviewCalls = 1L;
 
-        long estimatedCallsMin = caseCount * (generationCallsPerCase + judgeCallsPerCaseMin);
-        long estimatedCallsMax = caseCount * (generationCallsPerCase + judgeCallsPerCaseMax);
+        long estimatedCallsMin = caseCount * (generationCallsPerCase + judgeCallsPerCaseMin) + runOverallReviewCalls;
+        long estimatedCallsMax = caseCount * (generationCallsPerCase + judgeCallsPerCaseMax) + runOverallReviewCalls;
 
         int candidateMaxOutputTokens = resolveEstimateMaxOutputTokens(candidateVersion);
         int baselineMaxOutputTokens = baselineVersion != null ? resolveEstimateMaxOutputTokens(baselineVersion) : 0;
@@ -156,6 +157,7 @@ public class EvalRunService {
         long judgeInputTokensBase = testCases.stream()
                 .mapToLong(testCase -> estimateJudgeInputTokens(testCase))
                 .sum();
+        long overallReviewInputTokens = estimateOverallReviewInputTokens(caseCount, request.mode());
 
         long candidateOutputMin = caseCount * Math.max(48, candidateMaxOutputTokens / 4L);
         long candidateOutputMax = caseCount * candidateMaxOutputTokens;
@@ -163,23 +165,47 @@ public class EvalRunService {
         long baselineOutputMax = baselineVersion != null ? caseCount * baselineMaxOutputTokens : 0L;
         long judgeOutputMin = caseCount * judgeCallsPerCaseMin * 120L;
         long judgeOutputMax = caseCount * judgeCallsPerCaseMax * judgeMaxOutputTokens;
+        long overallReviewOutputMin = 160L;
+        long overallReviewOutputMax = 320L;
 
         long estimatedTokensMin = generationInputTokens + baselineInputTokens + (judgeInputTokensBase * judgeCallsPerCaseMin)
-                + candidateOutputMin + baselineOutputMin + judgeOutputMin;
+                + candidateOutputMin + baselineOutputMin + judgeOutputMin
+                + overallReviewInputTokens + overallReviewOutputMin;
         long estimatedTokensMax = generationInputTokens + baselineInputTokens + (judgeInputTokensBase * judgeCallsPerCaseMax)
-                + candidateOutputMax + baselineOutputMax + judgeOutputMax;
+                + candidateOutputMax + baselineOutputMax + judgeOutputMax
+                + overallReviewInputTokens + overallReviewOutputMax;
 
         BigDecimal estimatedCostMin = estimateCost(
                 candidateVersion.getModel(),
                 generationInputTokens,
                 candidateOutputMin
-        ).add(estimateCost(evalProperties.getJudge().getModel(), judgeInputTokensBase * judgeCallsPerCaseMin, judgeOutputMin));
+        )
+                .add(estimateCost(
+                        evalProperties.getJudge().getModel(),
+                        judgeInputTokensBase * judgeCallsPerCaseMin,
+                        judgeOutputMin
+                ))
+                .add(estimateCost(
+                        evalProperties.getJudge().getModel(),
+                        overallReviewInputTokens,
+                        overallReviewOutputMin
+                ));
 
         BigDecimal estimatedCostMax = estimateCost(
                 candidateVersion.getModel(),
                 generationInputTokens,
                 candidateOutputMax
-        ).add(estimateCost(evalProperties.getJudge().getModel(), judgeInputTokensBase * judgeCallsPerCaseMax, judgeOutputMax));
+        )
+                .add(estimateCost(
+                        evalProperties.getJudge().getModel(),
+                        judgeInputTokensBase * judgeCallsPerCaseMax,
+                        judgeOutputMax
+                ))
+                .add(estimateCost(
+                        evalProperties.getJudge().getModel(),
+                        overallReviewInputTokens,
+                        overallReviewOutputMax
+                ));
 
         if (baselineVersion != null) {
             estimatedCostMin = estimatedCostMin.add(estimateCost(baselineVersion.getModel(), baselineInputTokens, baselineOutputMin));
@@ -200,9 +226,13 @@ public class EvalRunService {
         assumptions.put("pricingKnown", pricingKnown);
         assumptions.put("judgeAttemptsMin", judgeAttemptsMin);
         assumptions.put("judgeAttemptsMax", judgeAttemptsMax);
+        assumptions.put("runOverallReviewCalls", runOverallReviewCalls);
         assumptions.put("candidateMaxOutputTokens", candidateMaxOutputTokens);
         assumptions.put("baselineMaxOutputTokens", baselineMaxOutputTokens);
         assumptions.put("judgeMaxOutputTokens", judgeMaxOutputTokens);
+        assumptions.put("overallReviewInputTokens", overallReviewInputTokens);
+        assumptions.put("overallReviewOutputTokensMin", overallReviewOutputMin);
+        assumptions.put("overallReviewOutputTokensMax", overallReviewOutputMax);
         assumptions.put("tokenEstimator", "chars/2 heuristic");
         assumptions.put("durationEstimator", "per-call fixed-range heuristic");
 
@@ -496,6 +526,13 @@ public class EvalRunService {
                 + safeLength(String.valueOf(testCase.getExpectedJson()))
                 + safeLength(String.valueOf(testCase.getConstraintsJson()));
         return Math.max(180L, estimateTokens(baseChars + 300));
+    }
+
+    private long estimateOverallReviewInputTokens(int caseCount, EvalMode mode) {
+        int normalizedCaseCount = Math.max(caseCount, 1);
+        int modeFactor = mode == EvalMode.COMPARE_ACTIVE ? 90 : 60;
+        int chars = 300 + (normalizedCaseCount * modeFactor);
+        return Math.max(220L, estimateTokens(chars));
     }
 
     private long estimateTokens(String text) {

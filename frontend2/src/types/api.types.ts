@@ -599,7 +599,7 @@ export interface EvalReleaseCriteriaResponse {
   minAvgOverallScore: number;
   maxErrorRate: number;
   minImprovementNoticeDelta: number;
-  updatedBy: number | null;
+  updatedBy: number;
   updatedAt: string | null;
 }
 
