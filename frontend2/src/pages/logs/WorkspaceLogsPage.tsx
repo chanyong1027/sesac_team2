@@ -11,7 +11,6 @@ import {
   Clock,
   Database,
   AlertTriangle,
-  FileText,
   CheckCircle2,
   XCircle,
   Ban,
@@ -174,28 +173,10 @@ export function WorkspaceLogsPage() {
     return `$${numeric.toFixed(4)}`;
   };
 
-  const truncate = (str: string | null, length: number) => {
-    if (!str) return '';
-    return str.length > length ? str.substring(0, length) + '...' : str;
-  };
-
-  const getRequestPreview = (requestPayload: string | null) => {
-    if (!requestPayload) return 'No prompt';
-    try {
-      const parsed = JSON.parse(requestPayload);
-      if (parsed && typeof parsed === 'object' && 'messages' in parsed && Array.isArray(parsed.messages)) {
-        const firstMessage = parsed.messages[0];
-        if (firstMessage && typeof firstMessage === 'object' && 'content' in firstMessage) {
-          const content = firstMessage.content;
-          if (typeof content === 'string' && content.trim()) {
-            return content;
-          }
-        }
-      }
-      return requestPayload;
-    } catch {
-      return requestPayload;
-    }
+  const truncateMiddle = (value: string, visible = 12) => {
+    if (!value) return '-';
+    if (value.length <= visible * 2) return value;
+    return `${value.slice(0, visible)}...${value.slice(-visible)}`;
   };
 
   const formatRequestSource = (requestSource: string | null | undefined) => {
@@ -335,7 +316,7 @@ export function WorkspaceLogsPage() {
               <tr className="border-b border-white/5 bg-white/[0.02]">
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32">Status</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-40">Time</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Input Preview</th>
+                <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Request</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32">Model</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-24 text-right">Latency</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-32 text-right">Tokens</th>
@@ -404,18 +385,28 @@ export function WorkspaceLogsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 max-w-md">
-                        <FileText size={14} className="text-gray-500 shrink-0" />
-                        <span className="text-sm text-gray-300 truncate font-mono">
-                          {truncate(getRequestPreview(log.requestPayload), 60)}
-                        </span>
-                      </div>
-                      {log.errorMessage && (
-                        <div className="mt-1 flex items-center gap-1.5 text-xs text-rose-400">
-                          <AlertTriangle size={12} />
-                          <span className="truncate max-w-xs">{log.errorMessage}</span>
+                      <div className="max-w-md space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Prompt</span>
+                          <span className="text-sm text-gray-300 font-mono truncate">
+                            {log.promptKey || '-'}
+                          </span>
                         </div>
-                      )}
+                        <div className="text-[11px] text-gray-500 font-mono" title={log.traceId}>
+                          Trace ID: {truncateMiddle(log.traceId, 10)}
+                        </div>
+                        {log.errorCode && (
+                          <div className="text-[11px] text-rose-300 font-mono">
+                            Error: {log.errorCode}
+                          </div>
+                        )}
+                        {log.errorMessage && (
+                          <div className="flex items-center gap-1.5 text-xs text-rose-400">
+                            <AlertTriangle size={12} />
+                            <span className="truncate max-w-xs">{log.errorMessage}</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2 py-1 rounded-md bg-white/5 text-xs text-gray-300 border border-white/10 font-mono">
