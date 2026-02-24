@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EvalCaseResultResponse, EvalHumanReviewVerdict } from '@/types/api.types';
 import { promptApi } from '@/api/prompt.api';
@@ -14,9 +14,9 @@ interface CaseDetailPanelProps {
     item: EvalCaseResultResponse;
     inputText?: string;
     caseContext?: RunCaseContext;
-    workspaceId?: number;
-    promptId?: number;
-    runId?: number;
+    workspaceId: number;
+    promptId: number;
+    runId: number;
 }
 
 // --- Helpers ---
@@ -103,20 +103,31 @@ export function CaseDetailPanel({
     const [comment, setComment] = useState(item.humanReviewComment || '');
     const [category, setCategory] = useState(item.humanReviewCategory || '');
 
+    useEffect(() => {
+        setVerdict(item.humanReviewVerdict || 'UNREVIEWED');
+        setOverridePass(item.humanOverridePass);
+        setComment(item.humanReviewComment || '');
+        setCategory(item.humanReviewCategory || '');
+    }, [
+        item.id,
+        item.humanReviewVerdict,
+        item.humanOverridePass,
+        item.humanReviewComment,
+        item.humanReviewCategory,
+    ]);
+
     // Fetch review history
     const { data: reviewHistory } = useQuery({
         queryKey: ['humanReviewHistory', workspaceId, promptId, runId, item.id],
         queryFn: async () => {
-            if (!workspaceId || !promptId || !runId) return [];
             return (await promptApi.getHumanReviewHistory(workspaceId, promptId, runId, item.id)).data;
         },
-        enabled: activeTab === 'HUMAN_REVIEW' && !!workspaceId && !!promptId && !!runId,
+        enabled: activeTab === 'HUMAN_REVIEW',
     });
 
     // Submit review mutation
     const submitReview = useMutation({
         mutationFn: async () => {
-            if (!workspaceId || !promptId || !runId) throw new Error('Missing context');
             return promptApi.upsertHumanReview(workspaceId, promptId, runId, item.id, {
                 verdict,
                 overridePass: verdict === 'INCORRECT' && overridePass !== null ? overridePass : undefined,
@@ -135,7 +146,7 @@ export function CaseDetailPanel({
         },
     });
 
-    const canReview = item.status === 'OK' && workspaceId && promptId && runId;
+    const canReview = item.status === 'OK';
 
     return (
         <div className="h-full flex flex-col gap-4">

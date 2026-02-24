@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { PromptEvalDefaultDraftResponse, EvalMode, RubricTemplateCode } from '@/types/api.types';
 import { promptApi } from '@/api/prompt.api';
@@ -10,6 +10,23 @@ interface DefaultsDraftWizardProps {
 }
 
 type DraftStep = 'DATASET' | 'RUBRIC' | 'MODE' | 'AUTOMATION' | 'REVIEW';
+type DraftConfigStep = Exclude<DraftStep, 'REVIEW'>;
+
+const DRAFT_SECTION_KEY: Record<DraftConfigStep, string> = {
+    DATASET: 'dataset',
+    RUBRIC: 'rubric',
+    MODE: 'mode',
+    AUTOMATION: 'automation',
+};
+
+const REQUIRED_SECTION_STEPS: DraftConfigStep[] = ['DATASET', 'RUBRIC', 'MODE', 'AUTOMATION'];
+
+function isDraftSectionCompleted(completedSections: Record<string, boolean>, step: DraftStep): boolean {
+    if (step === 'REVIEW') {
+        return REQUIRED_SECTION_STEPS.every((requiredStep) => completedSections[DRAFT_SECTION_KEY[requiredStep]] === true);
+    }
+    return completedSections[DRAFT_SECTION_KEY[step]] === true;
+}
 
 const RUBRIC_OPTIONS: Array<{
     code: RubricTemplateCode;
@@ -34,6 +51,7 @@ export function DefaultsDraftWizard({ workspaceId, promptId, onComplete }: Defau
     const [selectedRubric, setSelectedRubric] = useState<RubricTemplateCode | undefined>();
     const [selectedMode, setSelectedMode] = useState<EvalMode | undefined>();
     const [autoEvalEnabled, setAutoEvalEnabled] = useState<boolean | undefined>();
+    const [isDraftHydrated, setIsDraftHydrated] = useState(false);
     const queryClient = useQueryClient();
 
     // Fetch draft
@@ -51,6 +69,25 @@ export function DefaultsDraftWizard({ workspaceId, promptId, onComplete }: Defau
             return (await promptApi.getEvalDatasets(workspaceId, promptId)).data;
         },
     });
+
+    useEffect(() => {
+        setIsDraftHydrated(false);
+    }, [workspaceId, promptId]);
+
+    useEffect(() => {
+        if (!draft || isDraftHydrated) {
+            return;
+        }
+        setSelectedDatasetId(draft.datasetId ?? undefined);
+        setSelectedRubric(draft.rubricTemplateCode ?? undefined);
+        setSelectedMode(draft.defaultMode ?? undefined);
+        setAutoEvalEnabled(draft.autoEvalEnabled ?? undefined);
+
+        const completedSections = draft.completedSections ?? {};
+        const nextStep = REQUIRED_SECTION_STEPS.find((step) => !isDraftSectionCompleted(completedSections, step)) ?? 'REVIEW';
+        setCurrentStep(nextStep);
+        setIsDraftHydrated(true);
+    }, [draft, isDraftHydrated]);
 
     // Mutations for each section
     const patchDataset = useMutation({
@@ -100,8 +137,9 @@ export function DefaultsDraftWizard({ workspaceId, promptId, onComplete }: Defau
         return <div className="p-8 text-center text-gray-400">로딩 중...</div>;
     }
 
-    const completedSections = draft?.completedSections || [];
-    const isSectionCompleted = (step: DraftStep) => completedSections.includes(step);
+    const completedSections = draft?.completedSections ?? {};
+    const isSectionCompleted = (step: DraftStep) => isDraftSectionCompleted(completedSections, step);
+    const allRequiredSectionsCompleted = REQUIRED_SECTION_STEPS.every((step) => isSectionCompleted(step));
 
     return (
         <div className="space-y-6">
@@ -329,7 +367,7 @@ export function DefaultsDraftWizard({ workspaceId, promptId, onComplete }: Defau
                             </button>
                             <button
                                 onClick={() => finalize.mutate()}
-                                disabled={finalize.isPending || completedSections.length < 4}
+                                disabled={finalize.isPending || !allRequiredSectionsCompleted}
                                 className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 text-white rounded-lg text-sm font-bold"
                             >
                                 {finalize.isPending ? '저장 중...' : '설정 저장'}

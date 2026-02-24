@@ -1301,6 +1301,8 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
 
                 {activeStep === 'RESULT' && (
                     <ResultDashboard
+                        workspaceId={workspaceId}
+                        promptId={promptId}
                         run={run || null}
                         runs={runs || []}
                         versions={versions || []}
@@ -2164,6 +2166,8 @@ function ConfigSection({
 }
 
 interface ResultDashboardProps {
+    workspaceId: number;
+    promptId: number;
     run: EvalRunResponse | null;
     runs: EvalRunResponse[];
     versions: Array<{ id: number; versionNumber: number; model: string }>;
@@ -2255,6 +2259,8 @@ export function resolveReasonDrivenCaseFilter(
 }
 
 function ResultDashboard({
+    workspaceId,
+    promptId,
     run,
     runs,
     versions: _versions,
@@ -2288,6 +2294,7 @@ function ResultDashboard({
     );
 
     const isRunning = run?.status === 'RUNNING' || run?.status === 'QUEUED';
+    const resolvedRunId = run?.id ?? selectedRunId;
 
     const summary = asRecord(run?.summary);
     const cost = asRecord(run?.cost);
@@ -3005,11 +3012,14 @@ function ResultDashboard({
                 </div>
 
                 <div className="flex-1 glass-card border border-white/10 rounded-xl overflow-hidden bg-black/20 p-4">
-                    {selectedCase ? (
+                    {selectedCase && resolvedRunId ? (
                         <CaseDetailPanel
                             item={selectedCase}
                             inputText={caseInputById[selectedCase.testCaseId]}
                             caseContext={caseContextById[selectedCase.testCaseId]}
+                            workspaceId={workspaceId}
+                            promptId={promptId}
+                            runId={resolvedRunId}
                         />
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-gray-500">

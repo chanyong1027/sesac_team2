@@ -44,6 +44,7 @@ import type {
     EvalJudgeAccuracyRollupResponse,
     PromptEvalDefaultDraftResponse,
     PromptEvalDefaultDraftSectionRequest,
+    EvalMode,
     EvalHumanReviewVerdict,
     EvalCaseStatus,
 } from '@/types/api.types';
@@ -256,7 +257,7 @@ export const promptApi = {
         data
     ),
 
-    patchEvalDefaultsDraftMode: (workspaceId: number, promptId: number, defaultMode?: string) =>
+    patchEvalDefaultsDraftMode: (workspaceId: number, promptId: number, defaultMode?: EvalMode) =>
         api.patch<PromptEvalDefaultDraftResponse>(
             `/workspaces/${workspaceId}/prompts/${promptId}/eval/defaults/draft/sections/mode`,
             { defaultMode }

@@ -670,6 +670,13 @@ export interface EvalCaseResultResponse {
   errorMessage: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  humanReviewVerdict: EvalHumanReviewVerdict;
+  humanOverridePass: boolean | null;
+  humanReviewComment: string | null;
+  humanReviewCategory: string | null;
+  humanReviewedBy: number | null;
+  humanReviewedAt: string | null;
+  effectivePass: boolean | null;
 }
 
 export interface EvalCaseResultListResponse {
@@ -811,33 +818,6 @@ export interface PlaygroundSaveVersionResponse {
 // ========================================
 export type EvalHumanReviewVerdict = 'CORRECT' | 'INCORRECT' | 'UNREVIEWED';
 
-export interface EvalCaseResultResponse {
-  id: number;
-  evalRunId: number;
-  testCaseId: number;
-  status: EvalCaseStatus;
-  candidateOutput: string | null;
-  baselineOutput: string | null;
-  candidateMeta: Record<string, any> | null;
-  baselineMeta: Record<string, any> | null;
-  ruleChecks: Record<string, any> | null;
-  judgeOutput: Record<string, any> | null;
-  overallScore: number | null;
-  pass: boolean | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  // Human review fields
-  humanReviewVerdict: EvalHumanReviewVerdict;
-  humanOverridePass: boolean | null;
-  humanReviewComment: string | null;
-  humanReviewCategory: string | null;
-  humanReviewedBy: number | null;
-  humanReviewedAt: string | null;
-  effectivePass: boolean | null;
-}
-
 export interface EvalCaseHumanReviewUpsertRequest {
   verdict: EvalHumanReviewVerdict;
   overridePass?: boolean;
@@ -919,12 +899,24 @@ export interface EvalJudgeAccuracyMetricsResponse {
 export interface EvalJudgeAccuracyRollupResponse {
   promptId: number;
   promptVersionId: number | null;
+  from: string | null;
+  to: string | null;
   totalCases: number;
   reviewedCount: number;
   correctCount: number;
   incorrectCount: number;
   accuracy: number | null;
   overrideRate: number | null;
+  tp: number;
+  tn: number;
+  fp: number;
+  fn: number;
+  precision: number | null;
+  recall: number | null;
+  f1: number | null;
+  specificity: number | null;
+  balancedAccuracy: number | null;
+  note: string;
 }
 
 export interface PromptEvalDefaultDraftResponse {
@@ -935,7 +927,7 @@ export interface PromptEvalDefaultDraftResponse {
   criteriaAnchors: Record<string, any> | null;
   defaultMode: EvalMode | null;
   autoEvalEnabled: boolean | null;
-  completedSections: string[];
+  completedSections: Record<string, boolean>;
   updatedAt: string;
 }
 

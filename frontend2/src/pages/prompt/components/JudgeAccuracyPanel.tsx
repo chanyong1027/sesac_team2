@@ -32,10 +32,11 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
                 to: to || undefined,
             })).data;
         },
+        enabled: !runId,
     });
 
-    const isLoading = isLoadingRun || isLoadingRollup;
-    const metrics = runMetrics;
+    const isLoading = isLoadingRun || (!runId && isLoadingRollup);
+    const metrics = runMetrics ?? rollupMetrics;
 
     if (isLoading) {
         return (

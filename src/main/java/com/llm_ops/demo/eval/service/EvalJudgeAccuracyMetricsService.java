@@ -2,7 +2,6 @@ package com.llm_ops.demo.eval.service;
 
 import com.llm_ops.demo.eval.domain.EvalHumanReviewVerdict;
 import com.llm_ops.demo.eval.dto.EvalJudgeAccuracyMetricsResponse;
-import com.llm_ops.demo.eval.dto.EvalJudgeAccuracyMetricsResponse.ConfusionMatrix;
 import com.llm_ops.demo.eval.dto.EvalJudgeAccuracyRollupResponse;
 import com.llm_ops.demo.eval.repository.EvalCaseResultRepository;
 import java.time.LocalDateTime;
@@ -42,7 +41,7 @@ public class EvalJudgeAccuracyMetricsService {
                 .map(p -> new Row(p.getPass(), p.getHumanReviewVerdict(), p.getHumanOverridePass()))
                 .toList();
 
-        return compute(rows);
+        return compute(rows, run.getId());
     }
 
     @Transactional(readOnly = true)
@@ -66,16 +65,34 @@ public class EvalJudgeAccuracyMetricsService {
                 .map(p -> new Row(p.getPass(), p.getHumanReviewVerdict(), p.getHumanOverridePass()))
                 .toList();
 
+        EvalJudgeAccuracyMetricsResponse metrics = compute(rows, null);
+
         return new EvalJudgeAccuracyRollupResponse(
                 promptId,
                 promptVersionId,
                 from,
                 to,
-                compute(rows)
+                metrics.totalCases(),
+                metrics.reviewedCount(),
+                metrics.correctCount(),
+                metrics.incorrectCount(),
+                metrics.accuracy(),
+                metrics.overrideRate(),
+                metrics.tp(),
+                metrics.tn(),
+                metrics.fp(),
+                metrics.fn(),
+                metrics.precision(),
+                metrics.recall(),
+                metrics.f1(),
+                metrics.specificity(),
+                metrics.balancedAccuracy(),
+                metrics.note()
         );
     }
 
-    private EvalJudgeAccuracyMetricsResponse compute(List<Row> rows) {
+    private EvalJudgeAccuracyMetricsResponse compute(List<Row> rows, Long runId) {
+        long totalCases = rows.size();
         long reviewedCount = 0L;
         long correctCount = 0L;
         long incorrectCount = 0L;
@@ -115,16 +132,29 @@ public class EvalJudgeAccuracyMetricsService {
             }
         }
 
-        double accuracy = safeDivide(correctCount, reviewedCount);
-        double overrideRate = safeDivide(incorrectCount, reviewedCount);
+        Double accuracy = safeDivideOrNull(correctCount, reviewedCount);
+        Double overrideRate = safeDivideOrNull(incorrectCount, reviewedCount);
 
-        double precision = safeDivide(tp, tp + fp);
-        double recall = safeDivide(tp, tp + fn);
-        double f1 = (precision + recall) == 0.0d ? 0.0d : (2.0d * precision * recall) / (precision + recall);
-        double specificity = safeDivide(tn, tn + fp);
-        double balancedAccuracy = (recall + specificity) / 2.0d;
+        Double precision = safeDivideOrNull(tp, tp + fp);
+        Double recall = safeDivideOrNull(tp, tp + fn);
+        Double f1 = null;
+        if (precision != null && recall != null) {
+            double denominator = precision + recall;
+            f1 = denominator == 0.0d ? 0.0d : (2.0d * precision * recall) / denominator;
+        }
+        Double specificity = safeDivideOrNull(tn, tn + fp);
+        Double balancedAccuracy = (recall != null && specificity != null)
+                ? (recall + specificity) / 2.0d
+                : null;
 
-        ConfusionMatrix confusionMatrix = new ConfusionMatrix(
+        return new EvalJudgeAccuracyMetricsResponse(
+                runId,
+                totalCases,
+                reviewedCount,
+                correctCount,
+                incorrectCount,
+                accuracy,
+                overrideRate,
                 tp,
                 tn,
                 fp,
@@ -132,29 +162,21 @@ public class EvalJudgeAccuracyMetricsService {
                 precision,
                 recall,
                 f1,
-                balancedAccuracy
-        );
-
-        return new EvalJudgeAccuracyMetricsResponse(
-                reviewedCount,
-                correctCount,
-                incorrectCount,
-                accuracy,
-                overrideRate,
-                confusionMatrix,
+                specificity,
+                balancedAccuracy,
                 NOTE_REVIEWED_SUBSET
         );
     }
 
-    private static double safeDivide(long numerator, long denominator) {
+    private static Double safeDivideOrNull(long numerator, long denominator) {
         if (denominator <= 0L) {
-            return 0.0d;
+            return null;
         }
         return (double) numerator / (double) denominator;
     }
 
     private static Boolean resolveTruth(Boolean pass, EvalHumanReviewVerdict verdict, Boolean overridePass) {
-        if (verdict == EvalHumanReviewVerdict.INCORRECT && overridePass != null) {
+        if (verdict == EvalHumanReviewVerdict.INCORRECT) {
             return overridePass;
         }
         return pass;

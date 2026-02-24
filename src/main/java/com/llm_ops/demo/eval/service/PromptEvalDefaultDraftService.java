@@ -123,13 +123,15 @@ public class PromptEvalDefaultDraftService {
     }
 
     private void validateFinalize(PromptEvalDefaultDraft draft) {
-        if (draft.rubricTemplateCode() == null
+        if (draft.getDatasetId() == null
+                || draft.rubricTemplateCode() == null
                 || draft.defaultMode() == null
                 || draft.getAutoEvalEnabled() == null) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        if (!draft.isSectionCompleted("rubric")
+        if (!draft.isSectionCompleted("dataset")
+                || !draft.isSectionCompleted("rubric")
                 || !draft.isSectionCompleted("mode")
                 || !draft.isSectionCompleted("automation")) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);

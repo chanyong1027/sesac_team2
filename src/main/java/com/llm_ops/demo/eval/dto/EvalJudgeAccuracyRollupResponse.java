@@ -7,6 +7,21 @@ public record EvalJudgeAccuracyRollupResponse(
         Long promptVersionId,
         LocalDateTime from,
         LocalDateTime to,
-        EvalJudgeAccuracyMetricsResponse metrics
+        long totalCases,
+        long reviewedCount,
+        long correctCount,
+        long incorrectCount,
+        Double accuracy,
+        Double overrideRate,
+        long tp,
+        long tn,
+        long fp,
+        long fn,
+        Double precision,
+        Double recall,
+        Double f1,
+        Double specificity,
+        Double balancedAccuracy,
+        String note
 ) {
 }

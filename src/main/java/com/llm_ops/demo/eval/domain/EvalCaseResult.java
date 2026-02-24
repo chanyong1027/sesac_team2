@@ -269,6 +269,9 @@ public class EvalCaseResult {
             Long reviewedBy,
             OffsetDateTime reviewedAt
     ) {
+        if (verdict == EvalHumanReviewVerdict.INCORRECT && overridePass == null) {
+            throw new IllegalArgumentException("overridePass is required when verdict is INCORRECT");
+        }
         this.humanReviewVerdict = verdict == null ? EvalHumanReviewVerdict.UNREVIEWED : verdict;
         this.humanOverridePass = overridePass;
         this.humanReviewComment = comment;
