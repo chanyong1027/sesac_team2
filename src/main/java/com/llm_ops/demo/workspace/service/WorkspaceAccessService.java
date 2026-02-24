@@ -5,6 +5,7 @@ import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.workspace.domain.Workspace;
+import com.llm_ops.demo.workspace.domain.WorkspaceMember;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
@@ -29,6 +30,19 @@ public class WorkspaceAccessService {
         boolean isMember = workspaceMemberRepository.existsByWorkspaceAndUser(workspace, user);
         if (!isMember) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 멤버가 아닙니다.");
+        }
+    }
+
+    public void validateWorkspaceOwner(Long workspaceId, Long userId) {
+        validateInput(workspaceId, userId);
+        User user = findUserById(userId);
+        Workspace workspace = findActiveWorkspaceById(workspaceId);
+
+        WorkspaceMember member = workspaceMemberRepository.findByWorkspaceAndUser(workspace, user)
+                .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 멤버가 아닙니다."));
+
+        if (!member.isOwner()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 소유자만 설정을 변경할 수 있습니다.");
         }
     }
 
