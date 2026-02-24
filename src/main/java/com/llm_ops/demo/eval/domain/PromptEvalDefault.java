@@ -11,6 +11,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -44,6 +46,10 @@ public class PromptEvalDefault {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> rubricOverridesJson;
 
+    @Column(name = "criteria_anchors_json", nullable = false)
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> criteriaAnchorsJson;
+
     @Column(name = "default_mode", nullable = false, length = 30)
     private String defaultMode;
 
@@ -62,6 +68,7 @@ public class PromptEvalDefault {
             EvalDataset dataset,
             RubricTemplateCode rubricTemplateCode,
             Map<String, Object> rubricOverridesJson,
+            Map<String, Object> criteriaAnchorsJson,
             EvalMode defaultMode,
             boolean autoEvalEnabled,
             Long updatedBy
@@ -71,6 +78,7 @@ public class PromptEvalDefault {
         value.dataset = dataset;
         value.rubricTemplateCode = rubricTemplateCode.name();
         value.rubricOverridesJson = rubricOverridesJson;
+        value.criteriaAnchorsJson = criteriaAnchorsJson != null ? criteriaAnchorsJson : new HashMap<>();
         value.defaultMode = defaultMode.name();
         value.autoEvalEnabled = autoEvalEnabled;
         value.updatedBy = updatedBy;
@@ -81,6 +89,7 @@ public class PromptEvalDefault {
             EvalDataset dataset,
             RubricTemplateCode rubricTemplateCode,
             Map<String, Object> rubricOverridesJson,
+            Map<String, Object> criteriaAnchorsJson,
             EvalMode defaultMode,
             boolean autoEvalEnabled,
             Long updatedBy
@@ -88,9 +97,47 @@ public class PromptEvalDefault {
         this.dataset = dataset;
         this.rubricTemplateCode = rubricTemplateCode.name();
         this.rubricOverridesJson = rubricOverridesJson;
+        if (criteriaAnchorsJson != null) {
+            this.criteriaAnchorsJson = criteriaAnchorsJson;
+        } else if (this.criteriaAnchorsJson == null) {
+            this.criteriaAnchorsJson = new HashMap<>();
+        }
         this.defaultMode = defaultMode.name();
         this.autoEvalEnabled = autoEvalEnabled;
         this.updatedBy = updatedBy;
+    }
+
+    public Prompt getPrompt() {
+        return prompt;
+    }
+
+    public EvalDataset getDataset() {
+        return dataset;
+    }
+
+    public Map<String, Object> getRubricOverridesJson() {
+        if (criteriaAnchorsJson == null || criteriaAnchorsJson.isEmpty()) {
+            return rubricOverridesJson;
+        }
+        Map<String, Object> merged = rubricOverridesJson != null ? new LinkedHashMap<>(rubricOverridesJson) : new LinkedHashMap<>();
+        merged.putIfAbsent("criteriaAnchors", criteriaAnchorsJson);
+        return merged;
+    }
+
+    public Map<String, Object> getCriteriaAnchorsJson() {
+        return criteriaAnchorsJson;
+    }
+
+    public boolean isAutoEvalEnabled() {
+        return autoEvalEnabled;
+    }
+
+    public Long getUpdatedBy() {
+        return updatedBy;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
     }
 
     public RubricTemplateCode rubricTemplateCode() {

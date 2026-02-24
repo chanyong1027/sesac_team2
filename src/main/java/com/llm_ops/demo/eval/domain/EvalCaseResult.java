@@ -2,6 +2,8 @@ package com.llm_ops.demo.eval.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -10,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -67,6 +70,25 @@ public class EvalCaseResult {
     @Column(name = "pass")
     private Boolean pass;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "human_review_verdict", nullable = false, length = 20)
+    private EvalHumanReviewVerdict humanReviewVerdict = EvalHumanReviewVerdict.UNREVIEWED;
+
+    @Column(name = "human_override_pass")
+    private Boolean humanOverridePass;
+
+    @Column(name = "human_review_comment", columnDefinition = "TEXT")
+    private String humanReviewComment;
+
+    @Column(name = "human_review_category", length = 50)
+    private String humanReviewCategory;
+
+    @Column(name = "human_reviewed_by")
+    private Long humanReviewedBy;
+
+    @Column(name = "human_reviewed_at")
+    private OffsetDateTime humanReviewedAt;
+
     @Column(name = "error_code", length = 120)
     private String errorCode;
 
@@ -82,6 +104,107 @@ public class EvalCaseResult {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Column(name = "eval_run_id", insertable = false, updatable = false)
+    private Long evalRunId;
+
+    @Column(name = "test_case_id", insertable = false, updatable = false)
+    private Long testCaseId;
+
+
+    // Explicit getters for IDE/LSP environments without Lombok support
+    public Long getId() {
+        return id;
+    }
+
+    public Long getEvalRunId() {
+        return evalRunId;
+    }
+
+    public Long getTestCaseId() {
+        return testCaseId;
+    }
+
+
+    public EvalRun getEvalRun() {
+        return evalRun;
+    }
+
+    public EvalTestCase getTestCase() {
+        return testCase;
+    }
+
+    public String getCandidateOutputText() {
+        return candidateOutputText;
+    }
+
+    public String getBaselineOutputText() {
+        return baselineOutputText;
+    }
+
+    public Map<String, Object> getCandidateMetaJson() {
+        return candidateMetaJson;
+    }
+
+    public Map<String, Object> getBaselineMetaJson() {
+        return baselineMetaJson;
+    }
+
+    public Map<String, Object> getRuleChecksJson() {
+        return ruleChecksJson;
+    }
+
+    public Map<String, Object> getJudgeOutputJson() {
+        return judgeOutputJson;
+    }
+
+    public Double getOverallScore() {
+        return overallScore;
+    }
+
+    public Boolean getPass() {
+        return pass;
+    }
+
+    public EvalHumanReviewVerdict getHumanReviewVerdict() {
+        return humanReviewVerdict;
+    }
+
+    public Boolean getHumanOverridePass() {
+        return humanOverridePass;
+    }
+
+    public String getHumanReviewComment() {
+        return humanReviewComment;
+    }
+
+    public String getHumanReviewCategory() {
+        return humanReviewCategory;
+    }
+
+    public Long getHumanReviewedBy() {
+        return humanReviewedBy;
+    }
+
+    public OffsetDateTime getHumanReviewedAt() {
+        return humanReviewedAt;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public LocalDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    public LocalDateTime getCompletedAt() {
+        return completedAt;
+    }
 
     public static EvalCaseResult queue(EvalRun evalRun, EvalTestCase testCase) {
         EvalCaseResult result = new EvalCaseResult();
@@ -129,5 +252,31 @@ public class EvalCaseResult {
         this.errorCode = errorCode;
         this.errorMessage = errorMessage;
         this.completedAt = LocalDateTime.now();
+    }
+
+    public Boolean effectivePass() {
+        if (humanReviewVerdict == EvalHumanReviewVerdict.INCORRECT && humanOverridePass != null) {
+            return humanOverridePass;
+        }
+        return pass;
+    }
+
+    public void applyHumanReviewUpdate(
+            EvalHumanReviewVerdict verdict,
+            Boolean overridePass,
+            String comment,
+            String category,
+            Long reviewedBy,
+            OffsetDateTime reviewedAt
+    ) {
+        if (verdict == EvalHumanReviewVerdict.INCORRECT && overridePass == null) {
+            throw new IllegalArgumentException("overridePass is required when verdict is INCORRECT");
+        }
+        this.humanReviewVerdict = verdict == null ? EvalHumanReviewVerdict.UNREVIEWED : verdict;
+        this.humanOverridePass = overridePass;
+        this.humanReviewComment = comment;
+        this.humanReviewCategory = category;
+        this.humanReviewedBy = reviewedBy;
+        this.humanReviewedAt = reviewedAt;
     }
 }

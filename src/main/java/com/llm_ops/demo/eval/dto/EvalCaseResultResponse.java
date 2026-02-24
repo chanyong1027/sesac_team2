@@ -2,7 +2,9 @@ package com.llm_ops.demo.eval.dto;
 
 import com.llm_ops.demo.eval.domain.EvalCaseResult;
 import com.llm_ops.demo.eval.domain.EvalCaseStatus;
+import com.llm_ops.demo.eval.domain.EvalHumanReviewVerdict;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 public record EvalCaseResultResponse(
@@ -21,13 +23,20 @@ public record EvalCaseResultResponse(
         String errorCode,
         String errorMessage,
         LocalDateTime startedAt,
-        LocalDateTime completedAt
+        LocalDateTime completedAt,
+        EvalHumanReviewVerdict humanReviewVerdict,
+        Boolean humanOverridePass,
+        String humanReviewComment,
+        String humanReviewCategory,
+        Long humanReviewedBy,
+        OffsetDateTime humanReviewedAt,
+        Boolean effectivePass
 ) {
     public static EvalCaseResultResponse from(EvalCaseResult result) {
         return new EvalCaseResultResponse(
                 result.getId(),
-                result.getEvalRun().getId(),
-                result.getTestCase().getId(),
+                result.getEvalRunId(),
+                result.getTestCaseId(),
                 result.status(),
                 result.getCandidateOutputText(),
                 result.getBaselineOutputText(),
@@ -40,7 +49,14 @@ public record EvalCaseResultResponse(
                 result.getErrorCode(),
                 result.getErrorMessage(),
                 result.getStartedAt(),
-                result.getCompletedAt()
+                result.getCompletedAt(),
+                result.getHumanReviewVerdict(),
+                result.getHumanOverridePass(),
+                result.getHumanReviewComment(),
+                result.getHumanReviewCategory(),
+                result.getHumanReviewedBy(),
+                result.getHumanReviewedAt(),
+                result.effectivePass()
         );
     }
 }

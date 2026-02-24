@@ -58,18 +58,21 @@ const RUBRIC_OPTIONS: Array<{
     label: string;
     description: string;
 }> = [
-    { code: 'GENERAL_TEXT', label: '일반 답변', description: '관련성, 완성도, 안전성 중심 평가' },
-    { code: 'SUMMARY', label: '요약', description: '핵심 누락/사실 일치 중심 평가' },
-    { code: 'JSON_EXTRACTION', label: 'JSON 추출', description: 'JSON 형식/필수 키 중심 평가' },
-    { code: 'CLASSIFICATION', label: '분류', description: '라벨 정확도/일관성 중심 평가' },
-    { code: 'CUSTOM', label: '커스텀', description: '저장된 커스텀 루브릭 기반 평가' },
-];
+        { code: 'GENERAL_TEXT', label: '일반 답변', description: '관련성, 완성도, 안전성 중심 평가' },
+        { code: 'SUMMARY', label: '요약', description: '핵심 누락/사실 일치 중심 평가' },
+        { code: 'JSON_EXTRACTION', label: 'JSON 추출', description: 'JSON 형식/필수 키 중심 평가' },
+        { code: 'CLASSIFICATION', label: '분류', description: '라벨 정확도/일관성 중심 평가' },
+        { code: 'CUSTOM', label: '커스텀', description: '저장된 커스텀 루브릭 기반 평가' },
+    ];
 
 interface RubricCriterionDraft {
     id: string;
     key: string;
     description: string;
     weight: string;
+    anchor1?: string;
+    anchor3?: string;
+    anchor5?: string;
 }
 
 interface RubricPreset {
@@ -155,6 +158,9 @@ function createRubricCriterionDraft(
         key,
         description,
         weight,
+        anchor1: '',
+        anchor3: '',
+        anchor5: '',
     };
 }
 
@@ -200,6 +206,9 @@ function buildRubricOverridesPayload(
             key: item.key.trim(),
             description: item.description.trim(),
             weight: parseFiniteNumber(item.weight),
+            anchor1: item.anchor1?.trim(),
+            anchor3: item.anchor3?.trim(),
+            anchor5: item.anchor5?.trim(),
         }))
         .filter((item) => item.key.length > 0 && item.weight !== null);
 
@@ -220,8 +229,16 @@ function buildRubricOverridesPayload(
     }
 
     const definitionLines = normalizedCriteria
-        .filter((item) => item.description.length > 0)
-        .map((item) => `${item.key}: ${item.description}`);
+        .filter((item) => item.description.length > 0 || item.anchor1 || item.anchor3 || item.anchor5)
+        .map((item) => {
+            let desc = `${item.key}: ${item.description}`;
+            if (item.anchor1 || item.anchor3 || item.anchor5) {
+                if (item.anchor1) desc += `\n  - 1점: ${item.anchor1}`;
+                if (item.anchor3) desc += `\n  - 3점: ${item.anchor3}`;
+                if (item.anchor5) desc += `\n  - 5점: ${item.anchor5}`;
+            }
+            return desc;
+        });
     const noteText = note.trim();
     const description = [noteText, ...definitionLines].filter((text) => text.length > 0).join('\n');
 
@@ -1276,6 +1293,7 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
                         activeReleaseVersionLabel={activeReleaseVersionLabel}
                         runEstimate={runEstimate ?? null}
                         isEstimatingRunEstimate={isEstimatingRunEstimate}
+                        onPrev={() => setCurrentStep('DATASET')}
                         onRun={() => startRunMutation.mutate()}
                         isRunning={startRunMutation.isPending}
                     />
@@ -1283,6 +1301,8 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
 
                 {activeStep === 'RESULT' && (
                     <ResultDashboard
+                        workspaceId={workspaceId}
+                        promptId={promptId}
                         run={run || null}
                         runs={runs || []}
                         versions={versions || []}
@@ -1364,11 +1384,10 @@ function DatasetSection({
                                 onSelect(dataset.id);
                                 setCreating(false);
                             }}
-                            className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-all border ${
-                                selectedId === dataset.id
-                                    ? 'bg-[var(--primary)]/10 border-[var(--primary)] text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                                    : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-gray-200'
-                            }`}
+                            className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-all border ${selectedId === dataset.id
+                                ? 'bg-[var(--primary)]/10 border-[var(--primary)] text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                                : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                                }`}
                         >
                             {dataset.name}
                         </button>
@@ -1573,6 +1592,7 @@ interface ConfigSectionProps {
     activeReleaseVersionLabel: string | null;
     runEstimate: EvalRunEstimateResponse | null;
     isEstimatingRunEstimate: boolean;
+    onPrev: () => void;
     onRun: () => void;
     isRunning: boolean;
 }
@@ -1613,6 +1633,7 @@ function ConfigSection({
     activeReleaseVersionLabel,
     runEstimate,
     isEstimatingRunEstimate,
+    onPrev,
     onRun,
     isRunning,
 }: ConfigSectionProps) {
@@ -1672,11 +1693,10 @@ function ConfigSection({
                                         type="button"
                                         key={dataset.id}
                                         onClick={() => onSelectDataset(dataset.id)}
-                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${
-                                            selectedDatasetId === dataset.id
-                                                ? 'bg-fuchsia-500/20 border-fuchsia-500 text-white'
-                                                : 'bg-black/40 border-transparent text-gray-400 hover:bg-white/5'
-                                        }`}
+                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${selectedDatasetId === dataset.id
+                                            ? 'bg-fuchsia-500/20 border-fuchsia-500 text-white'
+                                            : 'bg-black/40 border-transparent text-gray-400 hover:bg-white/5'
+                                            }`}
                                     >
                                         <span className="text-sm truncate">{dataset.name}</span>
                                         <span className="text-xs opacity-60">#{dataset.id}</span>
@@ -1694,11 +1714,10 @@ function ConfigSection({
                                         type="button"
                                         key={version.id}
                                         onClick={() => onSelectVersion(version.id)}
-                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${
-                                            selectedVersionId === version.id
-                                                ? 'bg-purple-500/20 border-purple-500 text-white'
-                                                : 'bg-black/40 border-transparent text-gray-400 hover:bg-white/5'
-                                        }`}
+                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${selectedVersionId === version.id
+                                            ? 'bg-purple-500/20 border-purple-500 text-white'
+                                            : 'bg-black/40 border-transparent text-gray-400 hover:bg-white/5'
+                                            }`}
                                     >
                                         <span className="font-mono text-sm">v{version.versionNumber}</span>
                                         <span className="text-xs opacity-60">{version.model}</span>
@@ -1714,11 +1733,10 @@ function ConfigSection({
                             <button
                                 type="button"
                                 onClick={() => setMode('CANDIDATE_ONLY')}
-                                className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${
-                                    mode === 'CANDIDATE_ONLY'
-                                        ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/50'
-                                        : 'bg-black/20 border-white/10 opacity-60 hover:opacity-100'
-                                }`}
+                                className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${mode === 'CANDIDATE_ONLY'
+                                    ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/50'
+                                    : 'bg-black/20 border-white/10 opacity-60 hover:opacity-100'
+                                    }`}
                             >
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="material-symbols-outlined text-emerald-400">check_circle</span>
@@ -1731,11 +1749,10 @@ function ConfigSection({
                                 type="button"
                                 onClick={() => setMode('COMPARE_ACTIVE')}
                                 disabled={!hasActiveRelease}
-                                className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${
-                                    mode === 'COMPARE_ACTIVE'
-                                        ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50'
-                                        : 'bg-black/20 border-white/10 opacity-60 hover:opacity-100 disabled:opacity-30'
-                                }`}
+                                className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${mode === 'COMPARE_ACTIVE'
+                                    ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50'
+                                    : 'bg-black/20 border-white/10 opacity-60 hover:opacity-100 disabled:opacity-30'
+                                    }`}
                             >
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="material-symbols-outlined text-blue-400">compare_arrows</span>
@@ -1787,11 +1804,10 @@ function ConfigSection({
                         <button
                             type="button"
                             onClick={() => onToggleRubricOverrides(!useRubricOverrides)}
-                            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                                useRubricOverrides
-                                    ? 'bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]'
-                                    : 'bg-black/30 border-white/10 text-gray-300 hover:text-white'
-                            }`}
+                            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${useRubricOverrides
+                                ? 'bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]'
+                                : 'bg-black/30 border-white/10 text-gray-300 hover:text-white'
+                                }`}
                         >
                             {useRubricOverrides ? '커스텀 기준 ON' : '커스텀 기준 OFF'}
                         </button>
@@ -1829,85 +1845,157 @@ function ConfigSection({
                                     >
                                         템플릿 기준 불러오기
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={addCriterionRow}
-                                        className="text-[11px] text-[var(--primary)] px-2.5 py-1 rounded border border-[var(--primary)]/40 hover:border-[var(--primary)]"
-                                    >
-                                        + 기준 추가
-                                    </button>
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {rubricCriteriaRows.map((row) => (
-                                    <div key={row.id} className="grid grid-cols-12 gap-2 items-center">
-                                        <input
-                                            value={row.key}
-                                            onChange={(event) => updateCriterionRow(row.id, 'key', event.target.value)}
-                                            placeholder="criterion key (예: relevance)"
-                                            className="col-span-4 bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
-                                        />
-                                        <input
-                                            value={row.description}
-                                            onChange={(event) => updateCriterionRow(row.id, 'description', event.target.value)}
-                                            placeholder="의미 설명"
-                                            className="col-span-5 bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
-                                        />
-                                        <input
-                                            type="number"
-                                            step="0.1"
-                                            value={row.weight}
-                                            onChange={(event) => updateCriterionRow(row.id, 'weight', event.target.value)}
-                                            placeholder="weight"
-                                            className="col-span-2 bg-black/40 border border-white/10 rounded-lg px-2 py-2 text-xs text-white"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => removeCriterionRow(row.id)}
-                                            disabled={rubricCriteriaRows.length <= 1}
-                                            className="col-span-1 text-gray-500 hover:text-rose-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                                            title={rubricCriteriaRows.length <= 1 ? '최소 1개 기준 필요' : '기준 삭제'}
-                                        >
-                                            <span className="material-symbols-outlined text-sm">delete</span>
-                                        </button>
-                                    </div>
+                                    <details key={row.id} className="bg-black/40 border border-white/10 rounded-lg group transition-all open:bg-black/50 overflow-hidden">
+                                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 list-none">
+                                            <div className="flex items-center gap-3 w-full">
+                                                <span className="material-symbols-outlined text-gray-500 group-open:-rotate-180 transition-transform">expand_more</span>
+                                                <div className="flex-1 flex gap-2 w-full justify-between items-center pr-4">
+                                                    <span className="font-mono text-sm text-[var(--primary)]">{row.key || '새 기준'}</span>
+                                                    <span className="text-xs text-gray-400 truncate max-w-[200px]">{row.description || '내용 설명 없음'}</span>
+                                                    <span className="text-xs bg-[var(--primary)]/20 text-[var(--primary)] px-2 py-0.5 rounded font-bold">비중: {row.weight}</span>
+                                                </div>
+                                            </div>
+                                        </summary>
+
+                                        <div className="p-4 pt-0 space-y-4 border-t border-white/5">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                <div>
+                                                    <label className="text-xs text-gray-400 block mb-1">기준 키워드 (Criterion Key)</label>
+                                                    <input
+                                                        value={row.key}
+                                                        onChange={(event) => updateCriterionRow(row.id, 'key', event.target.value)}
+                                                        placeholder="예: relevance, clarity"
+                                                        className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-gray-400 block mb-1">비중 (Weight)</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={row.weight}
+                                                        onChange={(event) => updateCriterionRow(row.id, 'weight', event.target.value)}
+                                                        className="w-full bg-black/60 border border-[var(--primary)]/30 rounded-lg px-3 py-2 text-xs text-white focus:border-[var(--primary)]"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-gray-400 block mb-1">의미 설명 (Description)</label>
+                                                <input
+                                                    value={row.description}
+                                                    onChange={(event) => updateCriterionRow(row.id, 'description', event.target.value)}
+                                                    placeholder="예: 질문/맥락과의 관련성"
+                                                    className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                                />
+                                            </div>
+
+                                            <div className="pt-3 border-t border-white/5">
+                                                <label className="text-[11px] text-gray-400 font-bold block mb-2 cursor-help" title="입력된 점수 기준은 자동으로 Judge 프롬프트의 description에 추가됩니다.">
+                                                    점수 부여 기준 (선택사항, 프롬프트에 자동 반영됨)
+                                                </label>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] text-rose-400 block">1점 (미흡)</label>
+                                                        <textarea
+                                                            value={row.anchor1 || ''}
+                                                            onChange={(event) => updateCriterionRow(row.id, 'anchor1', event.target.value)}
+                                                            placeholder="1점 기준 설명..."
+                                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-gray-300 focus:border-rose-500/50 outline-none resize-y min-h-[60px]"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] text-amber-400 block">3점 (보통)</label>
+                                                        <textarea
+                                                            value={row.anchor3 || ''}
+                                                            onChange={(event) => updateCriterionRow(row.id, 'anchor3', event.target.value)}
+                                                            placeholder="3점 기준 설명..."
+                                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-gray-300 focus:border-amber-500/50 outline-none resize-y min-h-[60px]"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] text-emerald-400 block">5점 (우수)</label>
+                                                        <textarea
+                                                            value={row.anchor5 || ''}
+                                                            onChange={(event) => updateCriterionRow(row.id, 'anchor5', event.target.value)}
+                                                            placeholder="5점 기준 설명..."
+                                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-gray-300 focus:border-emerald-500/50 outline-none resize-y min-h-[60px]"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-3 flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCriterionRow(row.id)}
+                                                    disabled={rubricCriteriaRows.length <= 1}
+                                                    className="px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-400 text-xs hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+                                                    title={rubricCriteriaRows.length <= 1 ? '최소 1개 기준 필요' : '이 기준 삭제'}
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                    기준 삭제
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </details>
                                 ))}
+
+                                <button
+                                    type="button"
+                                    onClick={addCriterionRow}
+                                    className="w-full py-3 mt-4 rounded-xl border border-dashed border-[var(--primary)]/40 text-[var(--primary)] text-sm hover:bg-[var(--primary)]/10 hover:border-[var(--primary)] flex items-center justify-center gap-2 transition-colors font-bold"
+                                >
+                                    <span className="material-symbols-outlined text-sm">add_circle</span>
+                                    새로운 평가 기준 추가
+                                </button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] text-gray-400">최소 종합 점수 (minOverallScore)</label>
-                                    <input
-                                        type="number"
-                                        value={rubricMinOverallScore}
-                                        onChange={(event) => setRubricMinOverallScore(event.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                    />
+                            <details className="mt-6 bg-black/40 border border-white/10 rounded-lg overflow-hidden group">
+                                <summary className="flex items-center gap-2 p-4 cursor-pointer hover:bg-white/5 list-none font-bold text-sm text-gray-300">
+                                    <span className="material-symbols-outlined text-gray-500 group-open:rotate-90 transition-transform">chevron_right</span>
+                                    고급 루브릭 설정 (최소 점수, JSON, 추가 노트)
+                                </summary>
+                                <div className="p-4 pt-0 border-t border-white/5 space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] text-gray-400">최소 종합 점수 (minOverallScore)</label>
+                                            <input
+                                                type="number"
+                                                value={rubricMinOverallScore}
+                                                onChange={(event) => setRubricMinOverallScore(event.target.value)}
+                                                className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
+                                            />
+                                        </div>
+                                        <label className="flex items-center gap-2 text-xs text-gray-300 mt-5">
+                                            <input
+                                                type="checkbox"
+                                                checked={rubricRequireJsonParsePass}
+                                                onChange={(event) => setRubricRequireJsonParsePass(event.target.checked)}
+                                                className="rounded border-white/20 bg-white/10"
+                                            />
+                                            JSON 파싱 성공 필수 (requireJsonParsePass)
+                                        </label>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[11px] text-gray-400 block mb-1">루브릭 설명/노트</label>
+                                        <textarea
+                                            value={rubricDescriptionNote}
+                                            onChange={(event) => setRubricDescriptionNote(event.target.value)}
+                                            placeholder="평가자의 판단 기준 메모를 입력하세요."
+                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white min-h-[72px] resize-y"
+                                        />
+                                        <p className="text-[10px] text-gray-500 mt-1">
+                                            각 기준 설명은 자동으로 description에 병합되어 Judge 프롬프트에 반영됩니다.
+                                        </p>
+                                    </div>
                                 </div>
-                                <label className="flex items-center gap-2 text-xs text-gray-300 mt-5">
-                                    <input
-                                        type="checkbox"
-                                        checked={rubricRequireJsonParsePass}
-                                        onChange={(event) => setRubricRequireJsonParsePass(event.target.checked)}
-                                        className="rounded border-white/20 bg-white/10"
-                                    />
-                                    JSON 파싱 성공 필수 (requireJsonParsePass)
-                                </label>
-                            </div>
-
-                            <div>
-                                <label className="text-[11px] text-gray-400 block mb-1">루브릭 설명/노트</label>
-                                <textarea
-                                    value={rubricDescriptionNote}
-                                    onChange={(event) => setRubricDescriptionNote(event.target.value)}
-                                    placeholder="평가자의 판단 기준 메모를 입력하세요."
-                                    className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white min-h-[72px] resize-y"
-                                />
-                                <p className="text-[10px] text-gray-500 mt-1">
-                                    각 기준 설명은 자동으로 description에 병합되어 Judge 프롬프트에 반영됩니다.
-                                </p>
-                            </div>
+                            </details>
                         </div>
                     ) : (
                         <p className="text-[11px] text-gray-500">
@@ -1946,11 +2034,10 @@ function ConfigSection({
 
                     {releaseCriteriaNotice && (
                         <div
-                            className={`rounded-lg border px-3 py-2 text-xs ${
-                                releaseCriteriaNotice.type === 'success'
-                                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                                    : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
-                            }`}
+                            className={`rounded-lg border px-3 py-2 text-xs ${releaseCriteriaNotice.type === 'success'
+                                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                                : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
+                                }`}
                         >
                             {releaseCriteriaNotice.message}
                         </div>
@@ -2014,6 +2101,7 @@ function ConfigSection({
                         저장한 기준은 다음 실행부터 판정에 반영됩니다.
                     </p>
 
+
                     <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
                         <p className="text-[11px] text-gray-300">최근 기준 변경 이력</p>
                         {releaseCriteriaHistoryPreview.length === 0 ? (
@@ -2034,52 +2122,52 @@ function ConfigSection({
                         )}
                     </div>
                 </div>
-            </div>
 
-            <div className="text-center space-y-3">
-                <div className="relative inline-flex flex-col items-center group">
+                <div className="sticky bottom-0 pt-4 pb-2 border-t border-white/10 bg-gradient-to-t from-[var(--background-card)] to-transparent flex justify-between items-center z-10 mt-6">
                     <button
                         type="button"
-                        onClick={onRun}
-                        title={estimateTooltip}
-                        disabled={isRunning || !selectedVersionId || !selectedDatasetId}
-                        className="px-10 py-4 bg-white text-black rounded-full font-black text-xl shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:shadow-[0_0_60px_rgba(255,255,255,0.4)] hover:scale-105 transition-all disabled:opacity-50 disabled:transform-none"
+                        onClick={onPrev}
+                        className="px-6 py-3 w-full md:w-auto bg-black/40 text-gray-300 rounded-xl text-sm font-bold border border-white/10 hover:bg-black/60 transition-colors"
                     >
-                        {isRunning ? '실행 중...' : '평가 시작'}
+                        &larr; 이전 단계 (데이터셋)
                     </button>
-                    <div className="pointer-events-none absolute bottom-full mb-2 w-[280px] rounded-lg border border-white/20 bg-black/90 px-3 py-2 text-left text-[11px] text-gray-200 opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0">
-                        <p className="font-semibold text-white mb-1">실행 예상치</p>
-                        <p>비용: {estimateCostRange}</p>
-                        <p>소요: {estimateDurationRange}</p>
-                        {runEstimate && <p>호출: {runEstimate.estimatedCallsMin}~{runEstimate.estimatedCallsMax}회</p>}
-                        {!runEstimate && <p>{isEstimatingRunEstimate ? '예상치 계산 중...' : '예상치를 준비하지 못했습니다.'}</p>}
+                    <div className="relative inline-flex flex-col items-center group">
+                        <button
+                            type="button"
+                            onClick={onRun}
+                            title={estimateTooltip}
+                            disabled={isRunning || !selectedVersionId || !selectedDatasetId}
+                            className="px-8 py-3 bg-[var(--primary)] text-white rounded-xl text-sm font-bold shadow-[0_0_15px_rgba(var(--primary-rgb),0.3)] hover:scale-[1.02] transition-transform disabled:opacity-50 disabled:transform-none"
+                        >
+                            {isRunning ? '실행 중...' : '평가 시작 (결과 확인)'}
+                        </button>
+                        <div className="pointer-events-none absolute bottom-full mb-2 right-0 w-[240px] rounded-lg border border-white/20 bg-black/90 px-3 py-2 text-left text-[11px] text-gray-200 opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0">
+                            <p className="font-semibold text-white mb-1">실행 예상치</p>
+                            <div className="grid grid-cols-2 gap-1 text-[10px]">
+                                <span>호출 횟수:</span>
+                                <span className="text-right">{runEstimate ? `${runEstimate.estimatedCallsMin}~${runEstimate.estimatedCallsMax}회` : '-'}</span>
+                                <span>예상 비용:</span>
+                                <span className="text-right">{estimateCostRange}</span>
+                                <span>예상 시간:</span>
+                                <span className="text-right">{estimateDurationRange}</span>
+                                <span>테스트 케이스:</span>
+                                <span className="text-right">{runEstimate ? `${runEstimate.estimatedCases}건` : '-'}</span>
+                            </div>
+                            {runEstimate?.estimateNotice && (
+                                <p className="mt-2 text-[9px] text-gray-400 border-t border-white/10 pt-2">{runEstimate.estimateNotice}</p>
+                            )}
+                            {runBlockedReason && <p className="mt-1 text-[9px] text-rose-400">{runBlockedReason}</p>}
+                        </div>
                     </div>
                 </div>
-
-                {runEstimate && (
-                    <div className="flex flex-wrap justify-center gap-2 text-[11px] text-gray-300">
-                        <span className="px-2 py-1 rounded border border-white/10 bg-white/5">
-                            예상 비용 {estimateCostRange}
-                        </span>
-                        <span className="px-2 py-1 rounded border border-white/10 bg-white/5">
-                            예상 시간 {estimateDurationRange}
-                        </span>
-                        <span className="px-2 py-1 rounded border border-white/10 bg-white/5">
-                            예상 케이스 {runEstimate.estimatedCases}건
-                        </span>
-                    </div>
-                )}
-
-                {runEstimate?.estimateNotice && (
-                    <p className="text-[11px] text-gray-500">{runEstimate.estimateNotice}</p>
-                )}
-                {runBlockedReason && <p className="text-xs text-rose-400">{runBlockedReason}</p>}
             </div>
         </div>
     );
 }
 
 interface ResultDashboardProps {
+    workspaceId: number;
+    promptId: number;
     run: EvalRunResponse | null;
     runs: EvalRunResponse[];
     versions: Array<{ id: number; versionNumber: number; model: string }>;
@@ -2171,6 +2259,8 @@ export function resolveReasonDrivenCaseFilter(
 }
 
 function ResultDashboard({
+    workspaceId,
+    promptId,
     run,
     runs,
     versions: _versions,
@@ -2204,6 +2294,7 @@ function ResultDashboard({
     );
 
     const isRunning = run?.status === 'RUNNING' || run?.status === 'QUEUED';
+    const resolvedRunId = run?.id ?? selectedRunId;
 
     const summary = asRecord(run?.summary);
     const cost = asRecord(run?.cost);
@@ -2519,11 +2610,11 @@ function ResultDashboard({
         ? `현재 ${completed}/${total} 케이스를 분석 중입니다.`
         : compareMode && compareWinRate != null
             ? `이번 버전 우세 ${compareWinRate.toFixed(1)}% (Win ${betterCases.length} / Loss ${worseCases.length} / Same ${sameCases.length})`
-        : localizedTopIssues[0]
-            ? localizedTopIssues[0]
-            : failures > 0
-                ? `총 ${failures}건의 실패/오류 케이스가 감지되었습니다.`
-                : '전체 케이스가 기준을 충족했습니다.';
+            : localizedTopIssues[0]
+                ? localizedTopIssues[0]
+                : failures > 0
+                    ? `총 ${failures}건의 실패/오류 케이스가 감지되었습니다.`
+                    : '전체 케이스가 기준을 충족했습니다.';
     const gradeDescription = insightGrade === 'S'
         ? '즉시 배포 후보'
         : insightGrade === 'A'
@@ -2818,11 +2909,10 @@ function ResultDashboard({
                                         type="button"
                                         key={runItem.id}
                                         onClick={() => onSelectRun(runItem.id)}
-                                        className={`w-full text-left p-2 rounded-lg border transition ${
-                                            selected
-                                                ? 'bg-white/10 border-white/30'
-                                                : 'bg-black/30 border-white/10 hover:bg-white/5'
-                                        }`}
+                                        className={`w-full text-left p-2 rounded-lg border transition ${selected
+                                            ? 'bg-white/10 border-white/30'
+                                            : 'bg-black/30 border-white/10 hover:bg-white/5'
+                                            }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className="text-[11px] text-gray-200">Run #{runItem.id}</span>
@@ -2848,11 +2938,10 @@ function ResultDashboard({
                                     type="button"
                                     key={option.key}
                                     onClick={() => setCaseFilter(option.key)}
-                                    className={`px-2 py-1 rounded text-[10px] border ${
-                                        caseFilter === option.key
-                                            ? 'bg-white text-black border-white'
-                                            : 'bg-black/30 text-gray-300 border-white/10 hover:border-white/30'
-                                    }`}
+                                    className={`px-2 py-1 rounded text-[10px] border ${caseFilter === option.key
+                                        ? 'bg-white text-black border-white'
+                                        : 'bg-black/30 text-gray-300 border-white/10 hover:border-white/30'
+                                        }`}
                                 >
                                     {option.label}
                                 </button>
@@ -2923,11 +3012,14 @@ function ResultDashboard({
                 </div>
 
                 <div className="flex-1 glass-card border border-white/10 rounded-xl overflow-hidden bg-black/20 p-4">
-                    {selectedCase ? (
+                    {selectedCase && resolvedRunId ? (
                         <CaseDetailPanel
                             item={selectedCase}
                             inputText={caseInputById[selectedCase.testCaseId]}
                             caseContext={caseContextById[selectedCase.testCaseId]}
+                            workspaceId={workspaceId}
+                            promptId={promptId}
+                            runId={resolvedRunId}
                         />
                     ) : (
                         <div className="h-full flex flex-col items-center justify-center text-gray-500">
@@ -3206,13 +3298,12 @@ function StepButton({
         <button
             type="button"
             onClick={onClick}
-            className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${
-                active
-                    ? 'bg-white text-black shadow-lg scale-105'
-                    : done
-                        ? 'text-emerald-400 hover:text-emerald-300'
-                        : 'text-gray-500 hover:text-gray-300'
-            }`}
+            className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${active
+                ? 'bg-white text-black shadow-lg scale-105'
+                : done
+                    ? 'text-emerald-400 hover:text-emerald-300'
+                    : 'text-gray-500 hover:text-gray-300'
+                }`}
         >
             {label} {done && !active && '✓'}
         </button>

@@ -49,7 +49,8 @@ class EvalJudgeServiceTest {
                 "CUSTOM",
                 "test",
                 Map.of("quality", 1.0),
-                Map.of("minOverallScore", 70.0)
+                Map.of("minOverallScore", 70.0),
+                Map.of()
         );
 
         // when
@@ -103,7 +104,8 @@ class EvalJudgeServiceTest {
                 Map.of(
                         "minOverallScore", 50.0,
                         "minCriterionScores", Map.of("accuracy", 3.0)
-                )
+                ),
+                Map.of()
         );
 
         // when
@@ -160,7 +162,8 @@ class EvalJudgeServiceTest {
                 "CUSTOM",
                 "test",
                 Map.of("quality", 1.0),
-                Map.of("minOverallScore", 70.0)
+                Map.of("minOverallScore", 70.0),
+                Map.of()
         );
 
         // when
@@ -210,7 +213,8 @@ class EvalJudgeServiceTest {
                 "CUSTOM",
                 "test",
                 Map.of("quality", 1.0),
-                Map.of("minOverallScore", 70.0)
+                Map.of("minOverallScore", 70.0),
+                Map.of()
         );
 
         // when
@@ -246,7 +250,8 @@ class EvalJudgeServiceTest {
                 "CUSTOM",
                 "test",
                 Map.of("quality", 1.0),
-                Map.of("minOverallScore", 70.0)
+                Map.of("minOverallScore", 70.0),
+                Map.of()
         );
 
         // when // then
