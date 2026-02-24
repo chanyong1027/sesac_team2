@@ -14,6 +14,9 @@ export function AuthInitializer() {
         const initOrganization = async () => {
             // 이미 조직이 선택되어 있거나 로그인이 안 되어 있으면 스킵
             if (!isAuthenticated) return;
+            const isOrgScopedPath = /^\/orgs\/\d+/.test(location.pathname);
+            // /orgs/:orgId 경로에서는 URL의 orgId를 단일 소스로 사용한다.
+            if (isOrgScopedPath) return;
 
             try {
                 const { data: workspaces } = await workspaceApi.getWorkspaces();

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute';
@@ -38,15 +38,32 @@ const queryClient = new QueryClient({
 
 const OrgScopedDashboardLayout = () => {
   const { orgId } = useParams<{ orgId: string }>();
+  const navigate = useNavigate();
   const { currentOrgId, setCurrentOrgId } = useOrganizationStore();
+  const { data: workspaces, isLoading } = useWorkspaces();
 
   useEffect(() => {
-    if (!orgId) return;
+    if (!orgId || isLoading) return;
     const parsedOrgId = Number(orgId);
-    if (!Number.isNaN(parsedOrgId) && parsedOrgId !== currentOrgId) {
+    if (Number.isNaN(parsedOrgId)) return;
+
+    const hasOrgAccess = (workspaces ?? []).some((ws) => ws.organizationId === parsedOrgId);
+    if (!hasOrgAccess) {
+      const fallbackOrgId = workspaces?.[0]?.organizationId;
+      if (fallbackOrgId) {
+        setCurrentOrgId(fallbackOrgId);
+        navigate(`/orgs/${fallbackOrgId}/dashboard`, { replace: true });
+      } else {
+        setCurrentOrgId(null);
+        navigate('/onboarding', { replace: true });
+      }
+      return;
+    }
+
+    if (parsedOrgId !== currentOrgId) {
       setCurrentOrgId(parsedOrgId);
     }
-  }, [orgId, currentOrgId, setCurrentOrgId]);
+  }, [orgId, isLoading, workspaces, currentOrgId, setCurrentOrgId, navigate]);
 
   return (
     <DashboardLayout>
