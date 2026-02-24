@@ -110,9 +110,13 @@ public class EvalExecutionService {
                     continue;
                 }
                 long caseStartNanos = System.nanoTime();
-                processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
-                String caseStatus = caseResult.status() != null ? caseResult.status().name() : "unknown";
-                evalMetrics.recordCaseExecution(caseStatus, System.nanoTime() - caseStartNanos);
+                String caseStatus = "unknown";
+                try {
+                    processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
+                    caseStatus = caseResult.status() != null ? caseResult.status().name() : "unknown";
+                } finally {
+                    evalMetrics.recordCaseExecution(caseStatus, System.nanoTime() - caseStartNanos);
+                }
             }
 
             finishRun(run.getId(), costAccumulator, compareBaselineAvailable);

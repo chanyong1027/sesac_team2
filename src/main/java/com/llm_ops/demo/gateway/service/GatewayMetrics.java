@@ -31,6 +31,7 @@ public class GatewayMetrics {
 
     public void recordLlmCall(String provider, String model, boolean isRag, boolean isFailover, String status, long elapsedNanos) {
         Timer.builder("gateway_llm_call_seconds")
+                .publishPercentileHistogram(true)
                 .tag("provider", safe(provider))
                 .tag("model", safe(model))
                 .tag("is_rag", String.valueOf(isRag))
@@ -42,6 +43,7 @@ public class GatewayMetrics {
 
     public void recordRagSearch(boolean hybridEnabled, long elapsedNanos) {
         Timer.builder("gateway_rag_search_seconds")
+                .publishPercentileHistogram(true)
                 .tag("hybrid_enabled", String.valueOf(hybridEnabled))
                 .register(registry)
                 .record(elapsedNanos, TimeUnit.NANOSECONDS);
@@ -49,6 +51,7 @@ public class GatewayMetrics {
 
     public void recordBudgetEval(String scope, long elapsedNanos) {
         Timer.builder("gateway_budget_eval_seconds")
+                .publishPercentileHistogram(true)
                 .tag("scope", safe(scope))
                 .register(registry)
                 .record(elapsedNanos, TimeUnit.NANOSECONDS);
@@ -115,6 +118,7 @@ public class GatewayMetrics {
 
     public void recordRagChunks(int chunks) {
         DistributionSummary.builder("gateway_rag_chunks")
+                .publishPercentileHistogram(true)
                 .register(registry)
                 .record(chunks);
     }

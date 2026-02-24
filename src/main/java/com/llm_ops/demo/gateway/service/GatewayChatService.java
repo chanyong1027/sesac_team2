@@ -178,6 +178,7 @@ public class GatewayChatService {
         Long promptVersionId = null;
         java.util.List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
+        boolean ragEnabledEffective = request.isRagEnabled();
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -198,7 +199,7 @@ public class GatewayChatService {
             usedRequestedModel = requestedModel;
 
             // Workspace soft-limit 초과 시 Degrade(저가모델 강제 / 토큰캡 / RAG off 등)
-            boolean ragEnabledEffective = request.isRagEnabled();
+            ragEnabledEffective = request.isRagEnabled();
             String modelOverride = null;
             Integer maxOutputTokensOverride = null;
             long wsBudgetStartNanos = System.nanoTime();
@@ -502,7 +503,7 @@ public class GatewayChatService {
 
             // ── Metrics: success path ──
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, request.isRagEnabled(), isFailover, "success", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "success", System.nanoTime() - startedAtNanos);
             gatewayMetrics.incrementLlmSuccess(providerTag, usedRequestedModel);
             if (inputTokens != null) {
                 gatewayMetrics.recordInputTokens(providerTag, usedRequestedModel, inputTokens);
@@ -520,7 +521,7 @@ public class GatewayChatService {
         } catch (BusinessException e) {
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             String failReason = budgetFailReason != null ? budgetFailReason : e.getErrorCode().name();
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, request.isRagEnabled(), isFailover, "error", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
             gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, failReason);
             GatewayFailureClassifier.GatewayFailure gatewayFailure = classifyBusinessFailure(e, budgetFailReason);
             if (e.getErrorCode() == ErrorCode.BUDGET_EXCEEDED) {
@@ -582,7 +583,7 @@ public class GatewayChatService {
         } catch (Exception e) {
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             String exFailReason = lastProviderFailure != null ? lastProviderFailure.failReason() : e.getClass().getSimpleName();
-            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, request.isRagEnabled(), isFailover, "error", System.nanoTime() - startedAtNanos);
+            gatewayMetrics.recordLlmCall(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
             gatewayMetrics.incrementLlmFailure(providerTag, usedRequestedModel, exFailReason);
             GatewayFailureClassifier.GatewayFailure gatewayFailure;
             if (isRequestDeadlineFailure(lastProviderFailure)) {
