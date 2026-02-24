@@ -8,3 +8,19 @@ groups:
           severity: critical
         annotations:
           summary: "애플리케이션 인스턴스가 다운되었습니다"
+
+      - alert: GatewayProviderBudgetExceeded
+        expr: rate(gateway_budget_blocked_total[1m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Provider 예산 한도 초과 차단 발생 (scope_type={{ $labels.scope_type }})"
+
+      - alert: EvalQueueDepthHigh
+        expr: eval_queue_depth > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Eval 큐 깊이 10 초과"
