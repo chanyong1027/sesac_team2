@@ -17,6 +17,7 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -161,8 +162,10 @@ public class PromptVersionService {
         }
     }
 
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{\\s*[^{}\\s]+\\s*\\}\\}");
+
     private boolean containsAnyPlaceholder(String template) {
-        return template.contains("{{") && template.contains("}}");
+        return PLACEHOLDER_PATTERN.matcher(template).find();
     }
 
     private void validateSecondaryModel(PromptVersionCreateRequest request) {

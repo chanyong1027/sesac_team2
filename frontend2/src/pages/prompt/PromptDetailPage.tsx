@@ -536,7 +536,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         if (normalized === 'claude') return 'ANTHROPIC';
         return normalized.toUpperCase();
     };
-    const hasAnyPlaceholder = (template: string) => template.includes('{{') && template.includes('}}');
+    const hasAnyPlaceholder = (template: string) => /\{\{\s*[^{}\s]+\s*\}\}/.test(template);
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
         queryKey: ['provider-credentials', resolvedOrgId],
