@@ -259,8 +259,6 @@ type FailureInsight = {
   failReason: string | null;
   httpStatus: number | null;
   reasonDescription: string;
-  actionItems: string[];
-  payloadSummary: ErrorPayloadSummary | null;
 };
 
 const FAIL_REASON_DESCRIPTION: Record<string, string> = {
@@ -320,49 +318,6 @@ function resolveReasonDescription(
   return '상세 원인을 확인할 수 없습니다.';
 }
 
-function buildActionItems(
-  errorCode: string | null,
-  failReason: string | null
-): string[] {
-  if (errorCode === 'GW-REQ-QUOTA_EXCEEDED' || failReason === 'PROVIDER_BUDGET_EXCEEDED') {
-    return [
-      '예산 정책에서 해당 Provider/Workspace의 limit, enabled 값을 확인하세요.',
-      '월 누적 사용량(budget_monthly_usage)이 limit 이상인지 확인하세요.',
-      '정책 해제 후 동일 요청을 재실행해 정상 복구 여부를 확인하세요.',
-    ];
-  }
-
-  if (errorCode === 'GW-UP-MODEL_NOT_FOUND' || failReason === 'MODEL_404') {
-    return [
-      '활성 프롬프트 버전의 provider/model 조합이 실제 지원 모델인지 확인하세요.',
-      '필요하면 모델명을 유효 값으로 수정 후 재배포(release)하세요.',
-      'failover 모델이 설정되어 있는 경우 보조 모델 유효성도 함께 점검하세요.',
-    ];
-  }
-
-  if (errorCode === 'GW-REQ-INVALID_REQUEST') {
-    return [
-      'promptKey, workspaceId, release 상태(활성 버전 존재)를 우선 확인하세요.',
-      '요청 payload의 필수 필드 누락 여부를 확인하세요.',
-      '동일 입력으로 재호출했을 때 재현되는지 확인해 원인 범위를 좁히세요.',
-    ];
-  }
-
-  if (errorCode === 'GW-UP-TIMEOUT' || errorCode === 'GW-UP-UNAVAILABLE') {
-    return [
-      '업스트림 상태(네트워크/서비스 장애)와 응답 지연을 확인하세요.',
-      '요청 시간대 트래픽 급증 여부와 재시도 시 성공률을 비교하세요.',
-      '필요 시 failover 대상 모델/프로바이더 설정을 점검하세요.',
-    ];
-  }
-
-  return [
-    'Error Code, Fail Reason, Response Payload를 함께 확인하세요.',
-    '동일 입력 재호출 시 재현 여부를 확인하세요.',
-    '재현 시 서버 로그와 연계해 호출 단계별 실패 지점을 확인하세요.',
-  ];
-}
-
 function buildFailureInsight(log: RequestLogResponse | undefined): FailureInsight | null {
   if (!log) return null;
   if (!['FAIL', 'BLOCKED', 'TIMEOUT'].includes(log.status)) return null;
@@ -379,8 +334,6 @@ function buildFailureInsight(log: RequestLogResponse | undefined): FailureInsigh
     failReason,
     httpStatus,
     reasonDescription: resolveReasonDescription(log.status, errorCode, failReason),
-    actionItems: buildActionItems(errorCode, failReason),
-    payloadSummary,
   };
 }
 
@@ -699,29 +652,6 @@ export function WorkspaceLogDetailPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <div className="text-xs text-gray-400 mb-2">점검 포인트</div>
-                <div className="space-y-1.5">
-                  {failureInsight.actionItems.map((item, idx) => (
-                    <div key={`${idx}-${item}`} className="text-xs text-gray-300 leading-relaxed">
-                      {idx + 1}. {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {failureInsight.payloadSummary && (
-                <details className="mt-4 pt-3 border-t border-white/10">
-                  <summary className="text-xs text-gray-400 cursor-pointer select-none">응답 payload 기반 원인 필드</summary>
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-300">
-                    <div>errorCode: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.errorCode ?? '-'}</span></div>
-                    <div>failReason: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.failReason ?? '-'}</span></div>
-                    <div>httpStatus: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.httpStatus ?? '-'}</span></div>
-                    <div>message: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.message ?? '-'}</span></div>
-                  </div>
-                </details>
-              )}
             </div>
           )}
 
