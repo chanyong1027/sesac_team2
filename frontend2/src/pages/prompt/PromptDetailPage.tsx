@@ -1167,12 +1167,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         setTemplateError(null);
                                     }}
                                     rows={5}
-                                    className="w-full rounded-md py-3 px-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none font-mono bg-[var(--input)] border border-[var(--primary)]/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                    className="w-full rounded-md py-3 px-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none font-mono bg-[var(--input)] border border-[var(--primary)]/20 shadow-[inset_0_1px_3px_rgba(15,23,42,0.12)] dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder="예: 사용자 질문: {{question}}"
                                 />
                                 <p className="text-[11px] text-gray-400 flex items-center gap-1.5 pl-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_5px_rgba(168,85,247,0.8)]"></span>
-                                    <code className="bg-[var(--muted)] px-1 py-0.5 rounded text-purple-200 font-mono text-[10px]">{'{{question}}'}</code>
+                                    <code className="bg-[var(--muted)] px-1 py-0.5 rounded text-[var(--primary)] font-mono text-[10px]">{'{{question}}'}</code>
                                     변수가 반드시 포함되어야 합니다.
                                 </p>
                                 {templateError && (
