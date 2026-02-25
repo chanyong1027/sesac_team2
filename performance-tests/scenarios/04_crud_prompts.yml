@@ -78,7 +78,7 @@ scenarios:
             Authorization: "Bearer {{ accessToken }}"
             Content-Type: "application/json"
           json:
-            description: "Updated by Artillery at {{ $timestamp }}"
+            description: "Updated by Artillery {{ $randomString(8) }}"
           expect:
             - statusCode: 200
 
