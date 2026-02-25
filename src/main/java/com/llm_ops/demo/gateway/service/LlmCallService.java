@@ -9,6 +9,8 @@ import com.google.genai.types.ThinkingConfig;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -33,6 +35,7 @@ import java.util.Map;
 public class LlmCallService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final Logger log = LoggerFactory.getLogger(LlmCallService.class);
 
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
@@ -238,7 +241,11 @@ public class LlmCallService {
             return;
         } catch (NoSuchMethodException ignored) {
             // fallthrough
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.debug("Failed to invoke nullable setter {}.{}(Integer)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
             return;
         }
 
@@ -246,7 +253,13 @@ public class LlmCallService {
             var m = target.getClass().getMethod(methodName, int.class);
             // Primitive setter cannot accept null; use 0 as neutral fallback.
             m.invoke(target, 0);
-        } catch (Exception ignored) {
+        } catch (NoSuchMethodException ignored) {
+            // no compatible primitive setter
+        } catch (Exception e) {
+            log.debug("Failed to invoke nullable setter {}.{}(int)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
         }
     }
 
@@ -257,14 +270,24 @@ public class LlmCallService {
             return true;
         } catch (NoSuchMethodException ignored) {
             // fallthrough
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.debug("Failed to invoke setter {}.{}(Integer)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
             return false;
         }
         try {
             var m = target.getClass().getMethod(methodName, int.class);
             m.invoke(target, value.intValue());
             return true;
-        } catch (Exception ignored) {
+        } catch (NoSuchMethodException ignored) {
+            // no compatible primitive setter
+        } catch (Exception e) {
+            log.debug("Failed to invoke setter {}.{}(int)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
         }
         return false;
     }

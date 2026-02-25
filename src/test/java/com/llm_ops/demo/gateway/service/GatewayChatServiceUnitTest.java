@@ -465,7 +465,12 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(response).isNotNull();
             assertThat(response.isFailover()).isTrue();
-            verify(llmCallService, times(1)).callProvider(any(), anyString(), any(), anyString(), any());
+            ArgumentCaptor<ProviderCredentialService.ResolvedProviderApiKey> credentialCaptor =
+                    ArgumentCaptor.forClass(ProviderCredentialService.ResolvedProviderApiKey.class);
+            verify(llmCallService, times(1))
+                    .callProvider(credentialCaptor.capture(), anyString(), any(), anyString(), any());
+            assertThat(credentialCaptor.getValue().providerType()).isEqualTo(ProviderType.ANTHROPIC);
+            assertThat(credentialCaptor.getValue().apiKey()).isEqualTo("provider-key-anthropic");
         }
 
         @Test
