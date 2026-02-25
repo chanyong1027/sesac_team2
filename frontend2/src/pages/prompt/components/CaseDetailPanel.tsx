@@ -57,10 +57,10 @@ function verdictLabel(verdict: EvalHumanReviewVerdict): string {
 
 function verdictColor(verdict: EvalHumanReviewVerdict): string {
     switch (verdict) {
-        case 'CORRECT': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
-        case 'INCORRECT': return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
-        case 'UNREVIEWED': return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
-        default: return 'text-gray-400';
+        case 'CORRECT': return 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/30';
+        case 'INCORRECT': return 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/30';
+        case 'UNREVIEWED': return 'text-[var(--text-secondary)] bg-gray-500/10 border-gray-500/30';
+        default: return 'text-[var(--text-secondary)]';
     }
 }
 
@@ -80,12 +80,12 @@ export function CaseDetailPanel({
     const caseInput = inputText || caseContext?.input || '입력 데이터 없음';
     const compare = extractCompareSummary(item.judgeOutput);
     const failedChecks = extractFailedChecks(item.ruleChecks);
-    
+
     // AI Judge Info
-    const judge = (item.judgeOutput && typeof item.judgeOutput === 'object' && 'candidate' in item.judgeOutput) 
-        ? item.judgeOutput.candidate 
+    const judge = (item.judgeOutput && typeof item.judgeOutput === 'object' && 'candidate' in item.judgeOutput)
+        ? item.judgeOutput.candidate
         : item.judgeOutput;
-    
+
     const judgeScore = judge?.overallScore ?? null;
     const judgeReason = judge?.reason || (Array.isArray(judge?.evidence) ? judge.evidence[0] : null);
 
@@ -93,9 +93,9 @@ export function CaseDetailPanel({
     const isCompareMode = !!item.baselineOutput;
 
     // Status Colors
-    const statusColor = item.pass 
-        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-        : 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+    const statusColor = item.pass
+        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+        : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-300';
 
     // Human Review State
     const [verdict, setVerdict] = useState<EvalHumanReviewVerdict>(item.humanReviewVerdict || 'UNREVIEWED');
@@ -152,21 +152,21 @@ export function CaseDetailPanel({
         <div className="h-full flex flex-col gap-4">
             {/* Tabs */}
             <div className="flex border-b border-[var(--border)]">
-                <button 
+                <button
                     onClick={() => setActiveTab('REPORT')}
                     className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'REPORT' ? 'border-[var(--primary)] text-[var(--foreground)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     📝 통합 리포트
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('HUMAN_REVIEW')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'HUMAN_REVIEW' ? 'border-purple-500 text-purple-400' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'HUMAN_REVIEW' ? 'border-purple-500 text-purple-700 dark:text-purple-300' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     👤 휴먼 리뷰 {item.humanReviewVerdict !== 'UNREVIEWED' && '✓'}
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('DATA')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-400' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-700 dark:text-amber-300' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     💾 원본 데이터
                 </button>
@@ -175,7 +175,7 @@ export function CaseDetailPanel({
             {/* Content: Report Tab */}
             {activeTab === 'REPORT' && (
                 <div className="flex-1 overflow-y-auto space-y-6 pr-2 animate-in fade-in">
-                    
+
                     {/* 1. Q&A Section */}
                     <div className="space-y-4">
                         {/* User Question */}
@@ -194,7 +194,7 @@ export function CaseDetailPanel({
                             <div className="w-8 h-8 rounded-full bg-[var(--primary)]/20 flex items-center justify-center shrink-0">
                                 <span className="material-symbols-outlined text-sm text-[var(--primary)]">smart_toy</span>
                             </div>
-                            
+
                             <div className="flex-1 space-y-2">
                                 {isCompareMode ? (
                                     <div className="grid grid-cols-2 gap-4">
@@ -223,7 +223,7 @@ export function CaseDetailPanel({
                         </div>
                     </div>
 
-                    <div className="h-px bg-white/10" />
+                    <div className="h-px bg-[var(--border)]" />
 
                     {/* 2. Verdict Section (Reason) */}
                     <div className={`rounded-xl border p-4 ${statusColor}`}>
@@ -236,17 +236,17 @@ export function CaseDetailPanel({
                             </h4>
                             {judgeScore != null && <span className="text-xs opacity-80">| AI 점수: {judgeScore}점</span>}
                             {item.effectivePass !== item.pass && (
-                                <span className={`text-xs px-2 py-0.5 rounded ${item.effectivePass ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded ${item.effectivePass ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/20 text-rose-700 dark:text-rose-300'}`}>
                                     최종: {item.effectivePass ? '통과' : '실패'} (수정됨)
                                 </span>
                             )}
                         </div>
-                        
+
                         {/* 2-1. Rule Failures */}
                         {failedChecks.length > 0 && (
                             <div className="mb-3 bg-[var(--muted)] rounded p-2 text-xs">
-                                <p className="font-bold text-rose-300 mb-1">🚫 룰 위반 발견:</p>
-                                <ul className="list-disc pl-4 space-y-0.5 text-rose-200/80">
+                                <p className="font-bold text-rose-700 dark:text-rose-300 mb-1">🚫 룰 위반 발견:</p>
+                                <ul className="list-disc pl-4 space-y-0.5 text-rose-700/80 dark:text-rose-200/80">
                                     {failedChecks.map((check, idx) => (
                                         <li key={idx}>{formatRuleName(check)} 조건 만족 실패</li>
                                     ))}
@@ -298,8 +298,8 @@ export function CaseDetailPanel({
                             <div className={`rounded-xl border p-4 ${verdictColor(item.humanReviewVerdict)}`}>
                                 <div className="flex items-center gap-2">
                                     <span className="material-symbols-outlined text-lg">
-                                        {item.humanReviewVerdict === 'CORRECT' ? 'check_circle' : 
-                                         item.humanReviewVerdict === 'INCORRECT' ? 'warning' : 'help'}
+                                        {item.humanReviewVerdict === 'CORRECT' ? 'check_circle' :
+                                            item.humanReviewVerdict === 'INCORRECT' ? 'warning' : 'help'}
                                     </span>
                                     <div>
                                         <p className="font-bold text-sm">현재 상태: {verdictLabel(item.humanReviewVerdict)}</p>
@@ -321,7 +321,7 @@ export function CaseDetailPanel({
                             {/* Review Form */}
                             <div className="space-y-4 bg-[var(--muted)] rounded-xl p-4 border border-[var(--border)]">
                                 <h4 className="text-sm font-bold text-[var(--foreground)]">✏️ 검토 입력</h4>
-                                
+
                                 {/* Verdict Selection */}
                                 <div className="space-y-2">
                                     <label className="text-xs text-gray-400">AI 판정 검토</label>
@@ -330,11 +330,10 @@ export function CaseDetailPanel({
                                             <button
                                                 key={v}
                                                 onClick={() => setVerdict(v)}
-                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                                                    verdict === v 
-                                                        ? 'bg-purple-500 text-white' 
+                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${verdict === v
+                                                        ? 'bg-purple-500 text-white'
                                                         : 'bg-[var(--muted)] text-[var(--text-secondary)] hover:bg-[var(--accent)]'
-                                                }`}
+                                                    }`}
                                             >
                                                 {verdictLabel(v)}
                                             </button>
@@ -349,21 +348,19 @@ export function CaseDetailPanel({
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setOverridePass(true)}
-                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                                                    overridePass === true
-                                                        ? 'bg-emerald-500 text-white' 
+                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${overridePass === true
+                                                        ? 'bg-emerald-500 text-white'
                                                         : 'bg-[var(--muted)] text-[var(--text-secondary)] hover:bg-[var(--accent)]'
-                                                }`}
+                                                    }`}
                                             >
                                                 ✅ 최종 통과
                                             </button>
                                             <button
                                                 onClick={() => setOverridePass(false)}
-                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                                                    overridePass === false
-                                                        ? 'bg-rose-500 text-white' 
+                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${overridePass === false
+                                                        ? 'bg-rose-500 text-white'
                                                         : 'bg-[var(--muted)] text-[var(--text-secondary)] hover:bg-[var(--accent)]'
-                                                }`}
+                                                    }`}
                                             >
                                                 ❌ 최종 실패
                                             </button>
@@ -464,7 +461,7 @@ function DetailBlock({ title, value }: { title: string; value: string }) {
         <div className="group relative p-3 bg-[var(--muted)] rounded border border-[var(--border)] hover:border-[var(--ring)] transition-colors">
             <div className="flex justify-between items-center mb-2">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">{title}</p>
-                <button 
+                <button
                     onClick={async () => {
                         try {
                             await navigator.clipboard.writeText(value);

@@ -53,16 +53,16 @@ function CreateKeyModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+      <div className="relative w-full max-w-md mx-4 p-6 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
           새 API 키 생성
         </h3>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-[var(--text-secondary)] mb-6">
           외부 서비스에서 LuminaOps API를 사용하기 위한 키를 생성합니다.
         </p>
 
         <div className="mb-6">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
             키 이름
           </label>
           <input
@@ -70,7 +70,7 @@ function CreateKeyModal({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="예: Production API Key"
-            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+            className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[color:rgba(147,51,234,0.35)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-tertiary)]"
             autoFocus
           />
         </div>
@@ -78,7 +78,7 @@ function CreateKeyModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
           >
             취소
           </button>
@@ -119,16 +119,16 @@ function KeyRevealModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-lg mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+      <div className="relative w-full max-w-lg mx-4 p-6 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)]">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 flex items-center justify-center bg-green-100 text-green-600 rounded-full shrink-0">
             <Check size={24} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">
               {title}
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               이 키는 지금 한 번만 표시됩니다. 안전한 곳에 복사하여 저장하세요.
             </p>
           </div>
@@ -140,7 +140,7 @@ function KeyRevealModal({
           </code>
           <button
             onClick={handleCopy}
-            className="absolute top-2 right-2 p-2 text-gray-400 hover:text-white transition-colors"
+            className="absolute top-2 right-2 p-2 text-gray-300 hover:text-white transition-colors"
             title="복사"
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -185,16 +185,16 @@ function RotateConfirmModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
+      <div className="relative w-full max-w-md mx-4 p-6 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)]">
         <div className="flex items-start gap-4 mb-6">
           <div className="w-12 h-12 flex items-center justify-center bg-amber-100 text-amber-600 rounded-full shrink-0">
             <RefreshCw size={24} />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-[var(--foreground)]">
               API 키 재발급
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-[var(--text-secondary)] mt-1">
               <strong>{keyName}</strong> 키를 재발급하시겠습니까?
             </p>
           </div>
@@ -207,7 +207,7 @@ function RotateConfirmModal({
         </div>
 
         <div className="mb-6">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <label className="block text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
             재발급 사유 (선택)
           </label>
           <input
@@ -215,7 +215,7 @@ function RotateConfirmModal({
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="예: 키 노출로 인한 긴급 교체"
-            className="w-full px-4 py-3 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+            className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[color:rgba(147,51,234,0.35)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-tertiary)]"
           />
         </div>
 
@@ -230,7 +230,7 @@ function RotateConfirmModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
           >
             취소
           </button>
@@ -305,10 +305,10 @@ export function SettingsApiKeysPage() {
     <div>
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
             API 키
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
             외부 서비스 연동을 위한 API 키를 관리합니다.
           </p>
         </div>
@@ -333,8 +333,8 @@ export function SettingsApiKeysPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
+        <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-[var(--muted)] border-b border-[var(--border)] text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
           <div className="col-span-3">이름</div>
           <div className="col-span-3">키 접두사</div>
           <div className="col-span-2">상태</div>
@@ -343,24 +343,24 @@ export function SettingsApiKeysPage() {
         </div>
 
         {isLoading ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">
+          <div className="px-6 py-12 text-center text-sm text-[var(--text-secondary)]">
             API 키 목록을 불러오는 중...
           </div>
         ) : apiKeys && apiKeys.length > 0 ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border)]">
             {apiKeys.map((apiKey) => (
               <div
                 key={apiKey.id}
-                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors"
+                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-[var(--accent)] transition-colors"
               >
                 <div className="col-span-3">
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-[var(--foreground)]">
                     {apiKey.name}
                   </p>
                 </div>
 
                 <div className="col-span-3">
-                  <code className="px-2 py-1 text-xs font-mono bg-gray-100 text-gray-600 rounded">
+                  <code className="px-2 py-1 text-xs font-mono bg-[var(--muted)] text-[var(--text-secondary)] rounded">
                     {apiKey.keyPrefix}...
                   </code>
                 </div>
@@ -370,7 +370,7 @@ export function SettingsApiKeysPage() {
                 </div>
 
                 <div className="col-span-2">
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-[var(--text-secondary)]">
                     {apiKey.lastUsedAt
                       ? new Date(apiKey.lastUsedAt).toLocaleDateString('ko-KR', {
                         year: 'numeric',
@@ -395,19 +395,19 @@ export function SettingsApiKeysPage() {
           </div>
         ) : (
           <div className="px-6 py-16 text-center">
-            <div className="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-3">
+            <div className="w-12 h-12 mx-auto bg-[var(--muted)] rounded-full flex items-center justify-center text-[var(--text-secondary)] mb-3">
               <Key size={24} />
             </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">API 키가 없습니다</p>
-            <p className="text-xs text-gray-500">
+            <p className="text-sm font-medium text-[var(--foreground)] mb-1">API 키가 없습니다</p>
+            <p className="text-xs text-[var(--text-secondary)]">
               새 API 키를 생성하여 외부 서비스와 연동하세요.
             </p>
           </div>
         )}
       </div>
 
-      <div className="mt-8 p-6 bg-gray-900 rounded-xl text-gray-300">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+      <div className="mt-8 p-6 bg-gray-900 rounded-xl text-gray-200">
+        <p className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-4">
           사용 예시
         </p>
         <code className="block p-4 bg-black rounded-lg text-sm font-mono overflow-x-auto">

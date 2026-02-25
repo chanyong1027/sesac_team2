@@ -18,7 +18,7 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
 
     if (isLoading) {
         return (
-            <div className="p-8 text-center text-gray-400 text-sm">
+            <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
                 로딩 중...
             </div>
         );
@@ -26,7 +26,7 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
 
     if (!stats) {
         return (
-            <div className="p-8 text-center text-gray-400 text-sm">
+            <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
                 데이터를 불러올 수 없습니다.
             </div>
         );
@@ -63,8 +63,8 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
 
             {/* Pass/Effective Pass */}
             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-black/20 rounded-xl p-4 border border-white/10">
-                    <h4 className="text-sm font-bold text-white mb-3">AI 판정 결과</h4>
+                <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] shadow-sm">
+                    <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">AI 판정 결과</h4>
                     <div className="space-y-2">
                         <PassBar
                             label="통과"
@@ -81,8 +81,8 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
                     </div>
                 </div>
 
-                <div className="bg-black/20 rounded-xl p-4 border border-white/10">
-                    <h4 className="text-sm font-bold text-white mb-3">최종 결과 (재정의 반영)</h4>
+                <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] shadow-sm">
+                    <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">최종 결과 (재정의 반영)</h4>
                     <div className="space-y-2">
                         <PassBar
                             label="통과"
@@ -106,23 +106,23 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
             </div>
 
             {/* Human Review Stats */}
-            <div className="bg-black/20 rounded-xl p-4 border border-white/10">
-                <h4 className="text-sm font-bold text-white mb-3">휴먼 리뷰 현황</h4>
+            <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] shadow-sm">
+                <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">휴먼 리뷰 현황</h4>
                 <div className="grid grid-cols-3 gap-4">
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-emerald-400">{stats.humanCorrectCount}</div>
-                        <div className="text-xs text-gray-400">AI 판정 정확함</div>
+                        <div className="text-2xl font-bold text-emerald-500 dark:text-emerald-400">{stats.humanCorrectCount}</div>
+                        <div className="text-xs text-[var(--text-secondary)] mt-1">AI 판정 정확함</div>
                     </div>
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-amber-400">{stats.humanIncorrectCount}</div>
-                        <div className="text-xs text-gray-400">수정 필요</div>
+                        <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">{stats.humanIncorrectCount}</div>
+                        <div className="text-xs text-[var(--text-secondary)] mt-1">수정 필요</div>
                     </div>
                     <div className="text-center">
-                        <div className="text-2xl font-bold text-gray-400">{stats.humanUnreviewedCount}</div>
-                        <div className="text-xs text-gray-400">미검토</div>
+                        <div className="text-2xl font-bold text-[var(--text-tertiary)]">{stats.humanUnreviewedCount}</div>
+                        <div className="text-xs text-[var(--text-secondary)] mt-1">미검토</div>
                     </div>
                 </div>
-                <div className="mt-3 h-2 bg-black/30 rounded-full overflow-hidden">
+                <div className="mt-3 h-2 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-full overflow-hidden flex">
                     <div
                         className="h-full bg-emerald-500"
                         style={{
@@ -140,18 +140,18 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
 
             {/* Top Labels */}
             {Object.keys(stats.topLabelCounts).length > 0 && (
-                <div className="bg-black/20 rounded-xl p-4 border border-white/10">
-                    <h4 className="text-sm font-bold text-white mb-3">주요 라벨 분포</h4>
+                <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] shadow-sm">
+                    <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">주요 라벨 분포</h4>
                     <div className="space-y-2">
                         {Object.entries(stats.topLabelCounts)
                             .sort(([, a], [, b]) => b - a)
                             .slice(0, 5)
                             .map(([label, count]) => (
                                 <div key={label} className="flex items-center gap-2">
-                                    <span className="px-2 py-0.5 bg-white/10 rounded text-xs text-gray-300">
+                                    <span className="px-2 py-0.5 bg-[var(--surface-subtle)] border border-[var(--border)] rounded text-xs text-[var(--text-secondary)]">
                                         {label}
                                     </span>
-                                    <div className="flex-1 h-2 bg-black/30 rounded-full overflow-hidden">
+                                    <div className="flex-1 h-2 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-full overflow-hidden">
                                         <div
                                             className="h-full bg-purple-500"
                                             style={{
@@ -159,7 +159,7 @@ export function EvalStatsDashboard({ workspaceId, promptId, runId }: EvalStatsDa
                                             }}
                                         />
                                     </div>
-                                    <span className="text-xs text-gray-400 w-10 text-right">
+                                    <span className="text-xs text-[var(--text-secondary)] w-10 text-right">
                                         {count}
                                     </span>
                                 </div>
@@ -186,9 +186,9 @@ function StatCard({
 }) {
     const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
     const colorClasses = {
-        emerald: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
-        blue: 'text-blue-400 bg-blue-500/10 border-blue-500/30',
-        rose: 'text-rose-400 bg-rose-500/10 border-rose-500/30',
+        emerald: 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30',
+        blue: 'text-blue-700 dark:text-blue-400 bg-blue-500/10 border-blue-500/30',
+        rose: 'text-rose-700 dark:text-rose-400 bg-rose-500/10 border-rose-500/30',
     };
 
     return (
@@ -222,12 +222,12 @@ function PassBar({
     return (
         <div className="space-y-1">
             <div className="flex justify-between text-xs">
-                <span className="text-gray-400">{label}</span>
-                <span className="text-gray-300">
+                <span className="text-[var(--text-secondary)]">{label}</span>
+                <span className="text-[var(--foreground)]">
                     {count}개 ({percentage}%)
                 </span>
             </div>
-            <div className="h-2 bg-black/30 rounded-full overflow-hidden">
+            <div className="h-2 bg-[var(--surface-subtle)] border border-[var(--border)] rounded-full overflow-hidden">
                 <div
                     className={`h-full ${colorClass} transition-all duration-500`}
                     style={{ width: `${percentage}%` }}
