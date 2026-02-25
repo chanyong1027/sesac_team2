@@ -1,0 +1,59 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL }}"
+  http:
+    timeout: 30
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "budget-exhaust"
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    expect: {}
+
+# ──────────────────────────────────────────────
+# Budget Block / Failover 시나리오
+#
+# 이 시나리오는 예산 차단(budget block) 및 failover 동작을 검증합니다.
+# 자동화가 어려운 부분이 있으므로 아래 수동 절차를 병행하세요.
+#
+# 사전 준비:
+#   1. provider credential의 monthLimitUsd를 매우 낮은 값으로 설정 (예: $0.01)
+#      ※ workspace softLimitUsd는 DEGRADE(모델 다운그레이드)만 발생, BLOCK 아님
+#   2. 환경 변수 설정 (.env 파일)
+#
+# 실행 절차:
+#   1. artillery run performance-tests/scenarios/06_failover_budget.yml
+#   2. 반복 호출로 예산 소진 후 429 응답 확인 (BUDGET_EXCEEDED = TOO_MANY_REQUESTS)
+#   3. Grafana에서 gateway_budget_blocked_total 카운터 증가 확인
+#   4. Provider 장애 시뮬레이션: Primary provider의 API key를 무효화
+#   5. 재실행 후 failover 동작 확인 (isFailover=true 응답)
+#
+# 관측 포인트:
+#   - gateway_budget_blocked_total 카운터
+#   - gateway_failover_total 카운터
+#   - HTTP 429 응답 비율
+#   - isFailover=true 응답 비율
+# ──────────────────────────────────────────────
+
+scenarios:
+  - name: "Budget exhaustion test"
+    flow:
+      - post:
+          url: "/v1/chat/completions"
+          name: "POST /v1/chat/completions (budget)"
+          headers:
+            X-API-Key: "{{ $processEnvironment.TEST_API_KEY }}"
+            Content-Type: "application/json"
+          json:
+            workspaceId: "{{ $processEnvironment.TEST_WORKSPACE_ID }}"
+            promptKey: "{{ $processEnvironment.TEST_PROMPT_KEY }}"
+            variables:
+              name: "BudgetTest"
+              greeting: "Hello"
+            ragEnabled: false
+          expect:
+            - statusCode:
+                - 200
+                - 429
+                - 504
