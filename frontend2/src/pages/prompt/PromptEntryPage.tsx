@@ -10,10 +10,6 @@ export function PromptEntryPage() {
   const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
   const navigate = useNavigate();
 
-  if (!isValidWorkspaceId) {
-    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
-  }
-
   const workspaceId = parsedWorkspaceId;
   const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
@@ -32,9 +28,13 @@ export function PromptEntryPage() {
   }, [prompts]);
 
   useEffect(() => {
-    if (!orderedPrompts.length) return;
+    if (!isValidWorkspaceId || !orderedPrompts.length) return;
     navigate(`${basePath}/prompts/${orderedPrompts[0].id}`, { replace: true });
-  }, [orderedPrompts, basePath, navigate]);
+  }, [isValidWorkspaceId, orderedPrompts, basePath, navigate]);
+
+  if (!isValidWorkspaceId) {
+    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
+  }
 
   if (isLoading) {
     return <div className="p-8 text-[var(--text-secondary)]">메인 프롬프트를 찾는 중...</div>;

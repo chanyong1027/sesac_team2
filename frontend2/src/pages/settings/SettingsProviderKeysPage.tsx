@@ -322,9 +322,9 @@ function ProviderCard({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {isEnterpriseOnly ? (
-            <div className="flex items-center justify-center h-24">
+          <div className="space-y-3">
+            {isEnterpriseOnly ? (
+            <div className="group flex items-center justify-center h-24">
               <span className="text-sm text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] transition-colors flex items-center gap-2">
                 <span className="material-symbols-outlined text-lg">lock</span>
                 Contact Sales
@@ -437,7 +437,7 @@ function AddProviderModal({
             키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
           {updateError && (
-            <p className="mt-2 text-xs text-rose-300">{updateError}</p>
+            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{updateError}</p>
           )}
         </div>
 
@@ -551,7 +551,7 @@ function UpdateProviderModal({
             키는 서버에 암호화되어 저장되며 클라이언트에 노출되지 않습니다.
           </p>
           {updateError && (
-            <p className="mt-2 text-xs text-rose-300">{updateError}</p>
+            <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{updateError}</p>
           )}
         </div>
 

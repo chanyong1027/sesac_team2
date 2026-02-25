@@ -160,13 +160,13 @@ export function CaseDetailPanel({
                 </button>
                 <button
                     onClick={() => setActiveTab('HUMAN_REVIEW')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'HUMAN_REVIEW' ? 'border-purple-500 text-purple-400' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'HUMAN_REVIEW' ? 'border-purple-500 text-purple-700 dark:text-purple-300' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     👤 휴먼 리뷰 {item.humanReviewVerdict !== 'UNREVIEWED' && '✓'}
                 </button>
                 <button
                     onClick={() => setActiveTab('DATA')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-400' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-700 dark:text-amber-300' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     💾 원본 데이터
                 </button>
