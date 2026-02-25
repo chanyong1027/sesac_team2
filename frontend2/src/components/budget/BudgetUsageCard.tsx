@@ -43,7 +43,7 @@ export function BudgetUsageCard({
               </span>
               {title}
             </h3>
-            <p className="text-[11px] text-gray-500 mt-1">{subtitle}</p>
+            <p className="text-[11px] text-[var(--text-secondary)] mt-1">{subtitle}</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -52,10 +52,10 @@ export function BudgetUsageCard({
                 className={[
                   'px-2 py-0.5 rounded-full text-[10px] font-bold border',
                   isHardExceeded
-                    ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+                    ? 'bg-rose-500/15 border-rose-400/20 text-rose-700 dark:text-rose-200'
                     : isSoftExceeded
-                      ? 'bg-amber-500/15 border-amber-400/20 text-amber-200'
-                      : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-200',
+                      ? 'bg-amber-500/15 border-amber-400/20 text-amber-700 dark:text-amber-200'
+                      : 'bg-emerald-500/15 border-emerald-400/20 text-emerald-700 dark:text-emerald-200',
                 ].join(' ')}
               >
                 {isHardExceeded ? 'BLOCK' : isSoftExceeded ? 'DEGRADE' : 'ON'}
@@ -80,7 +80,7 @@ export function BudgetUsageCard({
           <div className="text-2xl font-bold text-[var(--foreground)] font-mono tracking-tight">
             {formatUsdAmount(used)}
           </div>
-          <div className="text-xs font-mono font-bold text-gray-300">
+          <div className="text-xs font-mono font-bold text-[var(--text-secondary)]">
             {primaryLimit != null ? `${formatUsdAmount(used)} / ${formatUsdAmount(primaryLimit)}` : `${formatUsdAmount(used)} / -`}
           </div>
         </div>
@@ -107,23 +107,23 @@ export function BudgetUsageCard({
 
         <div className="grid grid-cols-2 gap-3 text-[11px]">
           <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
-            <div className="text-gray-500 mb-0.5">요청 수</div>
+            <div className="text-[var(--text-secondary)] mb-0.5">요청 수</div>
             <div className="text-[var(--foreground)] font-mono">{(usage?.requestCount ?? 0).toLocaleString('ko-KR')}</div>
           </div>
           <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
-            <div className="text-gray-500 mb-0.5">토큰</div>
+            <div className="text-[var(--text-secondary)] mb-0.5">토큰</div>
             <div className="text-[var(--foreground)] font-mono">{(usage?.totalTokens ?? 0).toLocaleString('ko-KR')}</div>
           </div>
         </div>
 
         {variant === 'workspace' && enabled && isSoftExceeded ? (
-          <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-[11px] text-amber-100">
+          <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-[11px] text-amber-800 dark:text-amber-100">
             Soft-limit을 초과했습니다. 절약 모드가 적용되어 모델/토큰/RAG 설정이 자동으로 조정될 수 있어요.
           </div>
         ) : null}
 
         {variant === 'provider' && enabled && isHardExceeded ? (
-          <div className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-[11px] text-rose-100">
+          <div className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-[11px] text-rose-800 dark:text-rose-100">
             Hard-limit을 초과했습니다. 이 Provider 키로 나가는 호출이 차단됩니다(가능하면 failover로 대체).
           </div>
         ) : null}

@@ -106,7 +106,7 @@ export function BudgetPolicyModal({
 
     // 빈 값 제거(서버 저장/파싱 단순화)
     degradeMap = Object.fromEntries(
-      Object.entries(degradeMap).filter(([_, v]) => String(v).trim().length > 0)
+      Object.entries(degradeMap).filter(([, v]) => String(v).trim().length > 0)
     );
 
     const payload: BudgetPolicyUpdateRequest = {
@@ -140,7 +140,7 @@ export function BudgetPolicyModal({
                 <span className="w-1.5 h-5 rounded-full bg-[var(--primary)] shadow-[0_0_10px_rgba(168,85,247,0.45)]" />
                 {title}
               </h3>
-              <p className="text-sm text-gray-400">{description}</p>
+              <p className="text-sm text-[var(--text-secondary)]">{description}</p>
             </div>
 
             <button
@@ -159,7 +159,7 @@ export function BudgetPolicyModal({
           <div className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
             <div className="space-y-0.5">
               <div className="text-sm font-semibold text-[var(--foreground)]">예산 가드레일</div>
-              <div className="text-[11px] text-gray-500">
+              <div className="text-[11px] text-[var(--text-secondary)]">
                 {enabled
                   ? '활성화됨: 초과 시 차단/절약 모드가 적용됩니다.'
                   : '비활성화됨: 예산 제한을 적용하지 않습니다.'}
@@ -171,7 +171,7 @@ export function BudgetPolicyModal({
               className={[
                 'h-9 px-3 rounded-lg border text-xs font-bold transition-colors',
                 enabled
-                  ? 'bg-emerald-500/15 border-emerald-400/25 text-emerald-200'
+                  ? 'bg-emerald-500/15 border-emerald-400/25 text-emerald-700 dark:text-emerald-200'
                   : 'bg-[var(--muted)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)]',
               ].join(' ')}
             >
@@ -181,37 +181,37 @@ export function BudgetPolicyModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Hard-limit (USD)</label>
+              <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Hard-limit (USD)</label>
               <input
                 value={monthLimitUsd}
                 onChange={(e) => setMonthLimitUsd(e.target.value)}
                 placeholder="예: 50"
                 inputMode="decimal"
-                className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-gray-500"
+                className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-[var(--text-tertiary)]"
               />
-              <p className="text-[11px] text-gray-500">
+              <p className="text-[11px] text-[var(--text-secondary)]">
                 {previewHard != null ? `현재 입력: ${formatUsd(previewHard)} / 월` : '비우면 제한 없음'}
               </p>
             </div>
 
             {showWorkspaceFields ? (
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Soft-limit (USD)</label>
+                <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Soft-limit (USD)</label>
                 <input
                   value={softLimitUsd}
                   onChange={(e) => setSoftLimitUsd(e.target.value)}
                   placeholder="예: 20"
                   inputMode="decimal"
-                  className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-gray-500"
+                  className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-[var(--text-tertiary)]"
                 />
-                <p className="text-[11px] text-gray-500">
+                <p className="text-[11px] text-[var(--text-secondary)]">
                   {previewSoft != null ? `현재 입력: ${formatUsd(previewSoft)} / 월` : '비우면 절약 모드 미적용'}
                 </p>
               </div>
             ) : (
               <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-4 py-3">
-                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Tip</div>
-                <div className="text-[11px] text-gray-500 leading-relaxed">
+                <div className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-1">Tip</div>
+                <div className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                   Provider 예산은 해당 Provider 키로 나가는 호출만 차단합니다. (다른 Provider로 failover 가능)
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function BudgetPolicyModal({
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-bold text-[var(--foreground)]">절약 모드(Degrade)</div>
-                  <div className="text-[11px] text-gray-500">Soft-limit 초과 시 적용됩니다.</div>
+                  <div className="text-[11px] text-[var(--text-secondary)]">Soft-limit 초과 시 적용됩니다.</div>
                 </div>
                 <button
                   type="button"
@@ -242,32 +242,32 @@ export function BudgetPolicyModal({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Max Output Tokens</label>
+                  <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Max Output Tokens</label>
                   <input
                     value={degradeMaxOutputTokens}
                     onChange={(e) => setDegradeMaxOutputTokens(e.target.value)}
                     placeholder="예: 512"
                     inputMode="numeric"
-                    className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-gray-500"
+                    className="w-full px-4 py-3 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-[var(--text-tertiary)]"
                   />
-                  <p className="text-[11px] text-gray-500">응답 길이를 제한해 비용과 지연을 줄입니다.</p>
+                  <p className="text-[11px] text-[var(--text-secondary)]">응답 길이를 제한해 비용과 지연을 줄입니다.</p>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">RAG Off</label>
+                  <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">RAG Off</label>
                   <button
                     type="button"
                     onClick={() => setDegradeDisableRag((v) => !v)}
                     className={[
                       'w-full h-[46px] rounded-xl border text-sm font-bold transition-colors',
                       degradeDisableRag
-                        ? 'bg-rose-500/15 border-rose-400/20 text-rose-200'
+                        ? 'bg-rose-500/15 border-rose-400/20 text-rose-700 dark:text-rose-200'
                         : 'bg-[var(--muted)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)]',
                     ].join(' ')}
                   >
                     {degradeDisableRag ? 'RAG 비활성화' : 'RAG 유지'}
                   </button>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-[11px] text-[var(--text-secondary)]">
                     RAG가 비용/지연을 올리는 워크스페이스에서만 권장합니다.
                   </p>
                 </div>
@@ -275,7 +275,7 @@ export function BudgetPolicyModal({
 
               {showAdvanced ? (
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Provider → Cheap Model Map (JSON)</label>
+                  <label className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Provider → Cheap Model Map (JSON)</label>
                   <textarea
                     value={providerMapJson}
                     onChange={(e) => {
@@ -283,11 +283,11 @@ export function BudgetPolicyModal({
                       if (jsonError) setJsonError(null);
                     }}
                     rows={6}
-                    className="w-full px-4 py-3 text-xs text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-gray-500"
+                    className="w-full px-4 py-3 text-xs text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.45)] focus:border-[color:rgba(168,85,247,0.35)] outline-none transition-all font-mono placeholder:text-[var(--text-tertiary)]"
                     placeholder='{\n  "openai": "gpt-4o-mini",\n  "gemini": "gemini-2.0-flash"\n}'
                   />
-                  {jsonError ? <p className="text-xs text-rose-300">{jsonError}</p> : null}
-                  <p className="text-[11px] text-gray-500">
+                  {jsonError ? <p className="text-xs text-rose-700 dark:text-rose-300">{jsonError}</p> : null}
+                  <p className="text-[11px] text-[var(--text-secondary)]">
                     키는 provider 식별자(예: openai/gemini), 값은 강제할 모델명입니다.
                   </p>
                 </div>
@@ -295,7 +295,7 @@ export function BudgetPolicyModal({
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {KNOWN_PROVIDERS.map((p) => (
                     <div className="space-y-2" key={p}>
-                      <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      <label className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">
                         {p}
                       </label>
                       <input
@@ -304,7 +304,7 @@ export function BudgetPolicyModal({
                           setProviderModelMap((prev) => ({ ...prev, [p]: e.target.value }))
                         }
                         placeholder="예: gpt-4o-mini"
-                        className="w-full px-3 py-2.5 text-xs text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.35)] focus:border-[color:rgba(168,85,247,0.25)] outline-none transition-all font-mono placeholder:text-gray-500"
+                        className="w-full px-3 py-2.5 text-xs text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl focus:ring-2 focus:ring-[color:rgba(168,85,247,0.35)] focus:border-[color:rgba(168,85,247,0.25)] outline-none transition-all font-mono placeholder:text-[var(--text-tertiary)]"
                       />
                     </div>
                   ))}

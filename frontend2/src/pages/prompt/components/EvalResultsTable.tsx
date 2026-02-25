@@ -19,11 +19,11 @@ const STATUS_LABELS: Record<EvalCaseStatus, string> = {
 };
 
 const STATUS_COLORS: Record<EvalCaseStatus, string> = {
-    QUEUED: 'text-gray-400',
-    RUNNING: 'text-blue-400',
-    OK: 'text-emerald-400',
-    ERROR: 'text-rose-400',
-    SKIPPED: 'text-amber-400',
+    QUEUED: 'text-[var(--text-tertiary)]',
+    RUNNING: 'text-blue-500 dark:text-blue-400',
+    OK: 'text-emerald-500 dark:text-emerald-400',
+    ERROR: 'text-rose-500 dark:text-rose-400',
+    SKIPPED: 'text-amber-500 dark:text-amber-400',
 };
 
 const VERDICT_LABELS: Record<EvalHumanReviewVerdict, string> = {
@@ -33,9 +33,9 @@ const VERDICT_LABELS: Record<EvalHumanReviewVerdict, string> = {
 };
 
 const VERDICT_COLORS: Record<EvalHumanReviewVerdict, string> = {
-    CORRECT: 'text-emerald-400',
-    INCORRECT: 'text-amber-400',
-    UNREVIEWED: 'text-gray-400',
+    CORRECT: 'text-emerald-500 dark:text-emerald-400',
+    INCORRECT: 'text-amber-500 dark:text-amber-400',
+    UNREVIEWED: 'text-[var(--text-secondary)]',
 };
 
 export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: EvalResultsTableProps) {
@@ -76,11 +76,11 @@ export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: E
         options: Array<{ value: string; label: string }>;
     }) => (
         <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">{label}:</span>
+            <span className="text-xs text-[var(--text-secondary)]">{label}:</span>
             <select
                 value={value || ''}
                 onChange={(e) => onChange(e.target.value || undefined)}
-                className="px-2 py-1 bg-black/30 border border-white/10 rounded text-xs text-white focus:outline-none focus:border-purple-500"
+                className="px-2 py-1 bg-[var(--input)] border border-[var(--border)] rounded text-xs text-[var(--foreground)] focus:outline-none focus:border-purple-500"
             >
                 <option value="">전체</option>
                 {options.map((opt) => (
@@ -95,7 +95,7 @@ export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: E
     return (
         <div className="space-y-4">
             {/* Filters */}
-            <div className="flex flex-wrap gap-4 p-3 bg-black/20 rounded-lg border border-white/10">
+            <div className="flex flex-wrap gap-4 p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border)]">
                 <FilterSelect
                     label="상태"
                     value={filters.status}
@@ -138,37 +138,37 @@ export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: E
                 />
                 <button
                     onClick={() => { setFilters({}); setPage(0); }}
-                    className="px-3 py-1 text-xs text-gray-400 hover:text-white transition-colors"
+                    className="px-3 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                 >
                     필터 초기화
                 </button>
             </div>
 
             {/* Table */}
-            <div className="bg-black/20 rounded-lg border border-white/10 overflow-hidden">
+            <div className="bg-[var(--background-card)] rounded-lg border border-[var(--border)] overflow-hidden shadow-sm">
                 <table className="w-full text-xs">
-                    <thead className="bg-black/30">
+                    <thead className="bg-[var(--surface-subtle)]">
                         <tr>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">ID</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">상태</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">점수</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">AI 판정</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">최종</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">휴먼 리뷰</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">라벨</th>
-                            <th className="px-3 py-2 text-left text-gray-400 font-bold">소요시간</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">ID</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">상태</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">점수</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">AI 판정</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">최종</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">휴먼 리뷰</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">라벨</th>
+                            <th className="px-3 py-2 text-left text-[var(--text-secondary)] font-bold">소요시간</th>
                         </tr>
                     </thead>
                     <tbody>
                         {isLoading ? (
                             <tr>
-                                <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
+                                <td colSpan={8} className="px-3 py-8 text-center text-[var(--text-secondary)]">
                                     로딩 중...
                                 </td>
                             </tr>
                         ) : rows.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
+                                <td colSpan={8} className="px-3 py-8 text-center text-[var(--text-secondary)]">
                                     결과가 없습니다.
                                 </td>
                             </tr>
@@ -177,29 +177,29 @@ export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: E
                                 <tr
                                     key={row.id}
                                     onClick={() => onRowClick?.(row)}
-                                    className={`border-t border-white/5 hover:bg-white/5 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+                                    className={`border-t border-[var(--border)] hover:bg-[var(--hover)] transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
                                 >
-                                    <td className="px-3 py-2 text-gray-300">#{row.id}</td>
+                                    <td className="px-3 py-2 text-[var(--foreground)]">#{row.id}</td>
                                     <td className="px-3 py-2">
                                         <span className={STATUS_COLORS[row.status]}>
                                             {STATUS_LABELS[row.status]}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-2 text-gray-300">
+                                    <td className="px-3 py-2 text-[var(--foreground)]">
                                         {row.overallScore?.toFixed(2) || '-'}
                                     </td>
                                     <td className="px-3 py-2">
-                                        <span className={row.pass ? 'text-emerald-400' : 'text-rose-400'}>
+                                        <span className={row.pass ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}>
                                             {row.pass ? '통과' : '실패'}
                                         </span>
                                     </td>
                                     <td className="px-3 py-2">
                                         {row.effectivePass !== row.pass ? (
-                                            <span className={row.effectivePass ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                                            <span className={row.effectivePass ? 'text-emerald-500 dark:text-emerald-400 font-bold' : 'text-rose-500 dark:text-rose-400 font-bold'}>
                                                 {row.effectivePass ? '✓ 통과' : '✗ 실패'}
                                             </span>
                                         ) : (
-                                            <span className="text-gray-500">-</span>
+                                            <span className="text-[var(--text-tertiary)]">-</span>
                                         )}
                                     </td>
                                     <td className="px-3 py-2">
@@ -210,16 +210,16 @@ export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: E
                                     <td className="px-3 py-2">
                                         <div className="flex flex-wrap gap-1">
                                             {row.labels?.slice(0, 3).map((label, i) => (
-                                                <span key={i} className="px-1.5 py-0.5 bg-white/10 rounded text-[10px] text-gray-400">
+                                                <span key={i} className="px-1.5 py-0.5 bg-[var(--input)] border border-[var(--border)] rounded text-[10px] text-[var(--text-secondary)]">
                                                     {label}
                                                 </span>
                                             ))}
                                             {(row.labels?.length || 0) > 3 && (
-                                                <span className="text-[10px] text-gray-500">+{row.labels!.length - 3}</span>
+                                                <span className="text-[10px] text-[var(--text-tertiary)]">+{row.labels!.length - 3}</span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-gray-400">
+                                    <td className="px-3 py-2 text-[var(--text-secondary)]">
                                         {row.startedAt && row.completedAt
                                             ? formatDuration(new Date(row.startedAt), new Date(row.completedAt))
                                             : '-'}
@@ -233,25 +233,25 @@ export function EvalResultsTable({ workspaceId, promptId, runId, onRowClick }: E
 
             {/* Pagination */}
             {totalPages > 1 && (
-                <div className="flex items-center justify-between">
-                    <div className="text-xs text-gray-400">
+                <div className="flex items-center justify-between mt-4">
+                    <div className="text-xs text-[var(--text-secondary)]">
                         총 {totalElements}개 중 {page * pageSize + 1}-{Math.min((page + 1) * pageSize, totalElements)}개
                     </div>
                     <div className="flex gap-1">
                         <button
                             onClick={() => setPage((p) => Math.max(0, p - 1))}
                             disabled={page === 0}
-                            className="px-3 py-1 text-xs bg-black/20 border border-white/10 rounded disabled:opacity-50 hover:bg-white/5"
+                            className="px-3 py-1 text-xs bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] rounded disabled:opacity-50 hover:bg-[var(--hover)]"
                         >
                             이전
                         </button>
-                        <span className="px-3 py-1 text-xs text-gray-400">
+                        <span className="px-3 py-1 flex items-center text-xs text-[var(--text-secondary)]">
                             {page + 1} / {totalPages}
                         </span>
                         <button
                             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                             disabled={page >= totalPages - 1}
-                            className="px-3 py-1 text-xs bg-black/20 border border-white/10 rounded disabled:opacity-50 hover:bg-white/5"
+                            className="px-3 py-1 text-xs bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] rounded disabled:opacity-50 hover:bg-[var(--hover)]"
                         >
                             다음
                         </button>
