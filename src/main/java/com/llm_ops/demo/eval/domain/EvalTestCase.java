@@ -65,6 +65,11 @@ public class EvalTestCase {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    // Explicit getters for IDE/LSP environments without Lombok support
+    public Long getId() {
+        return id;
+    }
+
     public static EvalTestCase create(
             EvalDataset dataset,
             Integer caseOrder,

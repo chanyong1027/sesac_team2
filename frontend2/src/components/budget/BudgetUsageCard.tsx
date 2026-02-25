@@ -1,15 +1,9 @@
 import type { BudgetUsageResponse } from '@/types/api.types';
-
-function formatUsd(n: number) {
-  if (!Number.isFinite(n)) return '-';
-  if (n >= 1) return `$${n.toFixed(2)}`;
-  return `$${n.toFixed(4)}`;
-}
-
-function pct(used: number, limit: number) {
-  if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return 0;
-  return Math.max(0, Math.min(100, (used / limit) * 100));
-}
+import {
+  calculateUsagePercent,
+  formatUsdAmount,
+  resolvePrimaryLimitUsd,
+} from '@/features/budget/utils/budgetUsage';
 
 export function BudgetUsageCard({
   title,
@@ -30,8 +24,8 @@ export function BudgetUsageCard({
   const hard = usage?.hardLimitUsd ?? null;
   const soft = usage?.softLimitUsd ?? null;
 
-  const primaryLimit = hard ?? soft;
-  const progress = primaryLimit != null ? pct(used, primaryLimit) : 0;
+  const primaryLimit = resolvePrimaryLimitUsd(usage);
+  const progress = calculateUsagePercent(used, primaryLimit) ?? 0;
 
   const isHardExceeded = enabled && hard != null && (usage?.remainingHardUsd ?? 1) <= 0;
   const isSoftExceeded = enabled && soft != null && (usage?.remainingSoftUsd ?? 1) <= 0;
@@ -43,7 +37,7 @@ export function BudgetUsageCard({
       <div className="relative z-10 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
               <span className="material-symbols-outlined text-base text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]">
                 monetization_on
               </span>
@@ -67,7 +61,7 @@ export function BudgetUsageCard({
                 {isHardExceeded ? 'BLOCK' : isSoftExceeded ? 'DEGRADE' : 'ON'}
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-white/5 border-white/10 text-gray-300">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold border bg-[var(--muted)] border-[var(--border)] text-[var(--text-secondary)]">
                 OFF
               </span>
             )}
@@ -75,7 +69,7 @@ export function BudgetUsageCard({
             <button
               type="button"
               onClick={onConfigure}
-              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
+              className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[var(--muted)] hover:bg-[var(--accent)] text-[var(--text-secondary)] transition-colors border border-[var(--border)]"
             >
               설정
             </button>
@@ -83,16 +77,16 @@ export function BudgetUsageCard({
         </div>
 
         <div className="flex items-baseline justify-between gap-3">
-          <div className="text-2xl font-bold text-white font-mono tracking-tight">
-            {formatUsd(used)}
+          <div className="text-2xl font-bold text-[var(--foreground)] font-mono tracking-tight">
+            {formatUsdAmount(used)}
           </div>
           <div className="text-xs font-mono font-bold text-gray-300">
-            {primaryLimit != null ? `${formatUsd(used)} / ${formatUsd(primaryLimit)}` : `${formatUsd(used)} / -`}
+            {primaryLimit != null ? `${formatUsdAmount(used)} / ${formatUsdAmount(primaryLimit)}` : `${formatUsdAmount(used)} / -`}
           </div>
         </div>
 
         {primaryLimit != null ? (
-          <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden shadow-inner border border-white/5">
+          <div className="w-full bg-[var(--muted)] rounded-full h-2 overflow-hidden shadow-inner border border-[var(--border)]">
             <div
               className={[
                 'h-2 rounded-full relative',
@@ -106,19 +100,19 @@ export function BudgetUsageCard({
             />
           </div>
         ) : (
-          <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-[11px] text-gray-500">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-4 py-3 text-[11px] text-[var(--text-secondary)]">
             아직 예산 한도가 설정되지 않았습니다. 설정에서 한도를 추가할 수 있어요.
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3 text-[11px]">
-          <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
             <div className="text-gray-500 mb-0.5">요청 수</div>
-            <div className="text-gray-200 font-mono">{(usage?.requestCount ?? 0).toLocaleString('ko-KR')}</div>
+            <div className="text-[var(--foreground)] font-mono">{(usage?.requestCount ?? 0).toLocaleString('ko-KR')}</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-3 py-2">
             <div className="text-gray-500 mb-0.5">토큰</div>
-            <div className="text-gray-200 font-mono">{(usage?.totalTokens ?? 0).toLocaleString('ko-KR')}</div>
+            <div className="text-[var(--foreground)] font-mono">{(usage?.totalTokens ?? 0).toLocaleString('ko-KR')}</div>
           </div>
         </div>
 
@@ -137,4 +131,3 @@ export function BudgetUsageCard({
     </section>
   );
 }
-

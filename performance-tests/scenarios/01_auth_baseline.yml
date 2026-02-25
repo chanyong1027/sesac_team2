@@ -1,0 +1,57 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL }}"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "warm-up"
+    - duration: 120
+      arrivalRate: 20
+      name: "sustained"
+  http:
+    timeout: 5
+  payload:
+    path: "../data/test-variables.csv"
+    fields:
+      - "email"
+      - "password"
+    order: sequence
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+    expect: {}
+  ensure:
+    p99: 300
+    maxErrorRate: 1
+
+scenarios:
+  - name: "JWT Login + Refresh"
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          name: "POST /api/v1/auth/login"
+          json:
+            email: "{{ email }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.data.accessToken"
+              as: "accessToken"
+            - json: "$.data.refreshToken"
+              as: "refreshToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.accessToken"
+            - hasProperty: "data.refreshToken"
+
+      - think: 2
+
+      - post:
+          url: "/api/v1/auth/refresh"
+          name: "POST /api/v1/auth/refresh"
+          json:
+            refreshToken: "{{ refreshToken }}"
+          capture:
+            - json: "$.data.accessToken"
+              as: "newAccessToken"
+          expect:
+            - statusCode: 200
+            - hasProperty: "data.accessToken"

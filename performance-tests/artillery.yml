@@ -1,0 +1,15 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL }}"
+  variables:
+    apiKey: "{{ $processEnvironment.TEST_API_KEY }}"
+    workspaceId: "{{ $processEnvironment.TEST_WORKSPACE_ID }}"
+    promptKey: "{{ $processEnvironment.TEST_PROMPT_KEY }}"
+    userEmail: "{{ $processEnvironment.TEST_USER_EMAIL }}"
+    userPassword: "{{ $processEnvironment.TEST_USER_PASSWORD }}"
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+  phases:
+    - duration: 10
+      arrivalRate: 1
+      name: "default-warm-up"

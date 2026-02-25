@@ -1,6 +1,7 @@
 package com.llm_ops.demo.eval.service;
 
 import com.llm_ops.demo.eval.domain.PromptEvalDefault;
+import com.llm_ops.demo.eval.domain.EvalDataset;
 import com.llm_ops.demo.eval.dto.PromptEvalDefaultResponse;
 import com.llm_ops.demo.eval.dto.PromptEvalDefaultUpsertRequest;
 import com.llm_ops.demo.eval.repository.PromptEvalDefaultRepository;
@@ -38,9 +39,10 @@ public class PromptEvalDefaultService {
     ) {
         EvalAccessService.PromptScope scope = evalAccessService.requirePromptScope(workspaceId, promptId, userId);
 
-        var dataset = request.datasetId() != null
-                ? evalAccessService.requireDataset(scope.workspace().getId(), request.datasetId())
+        EvalDataset dataset = request.datasetId() != null
+                ? evalAccessService.requireDataset(workspaceId, request.datasetId())
                 : null;
+        boolean autoEvalEnabled = request.autoEvalEnabled() != null && request.autoEvalEnabled().booleanValue();
 
         PromptEvalDefault value = promptEvalDefaultRepository.findByPromptId(scope.prompt().getId())
                 .map(existing -> {
@@ -48,8 +50,9 @@ public class PromptEvalDefaultService {
                             dataset,
                             request.rubricTemplateCode(),
                             request.rubricOverrides(),
+                            request.criteriaAnchors(),
                             request.defaultMode(),
-                            request.autoEvalEnabled(),
+                            autoEvalEnabled,
                             scope.user().getId()
                     );
                     return existing;
@@ -59,8 +62,9 @@ public class PromptEvalDefaultService {
                         dataset,
                         request.rubricTemplateCode(),
                         request.rubricOverrides(),
+                        request.criteriaAnchors(),
                         request.defaultMode(),
-                        request.autoEvalEnabled(),
+                        autoEvalEnabled,
                         scope.user().getId()
                 ));
 

@@ -9,6 +9,7 @@ public record PromptEvalDefaultUpsertRequest(
         Long datasetId,
         @NotNull RubricTemplateCode rubricTemplateCode,
         Map<String, Object> rubricOverrides,
+        Map<String, Object> criteriaAnchors,
         @NotNull EvalMode defaultMode,
         @NotNull Boolean autoEvalEnabled
 ) {
