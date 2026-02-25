@@ -41,7 +41,7 @@ scenarios:
             promptKey: "perf-test-{{ $randomNumber(100000, 999999) }}"
             description: "Artillery performance test prompt"
           capture:
-            - json: "$.data.id"
+            - json: "$.id"
               as: "promptId"
           expect:
             - statusCode: 201

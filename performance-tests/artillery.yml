@@ -1,5 +1,5 @@
 config:
-  target: "{{ $processEnvironment.TARGET_URL || 'http://localhost:8080' }}"
+  target: "{{ $processEnvironment.TARGET_URL }}"
   variables:
     apiKey: "{{ $processEnvironment.TEST_API_KEY }}"
     workspaceId: "{{ $processEnvironment.TEST_WORKSPACE_ID }}"

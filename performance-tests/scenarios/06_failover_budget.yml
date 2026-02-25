@@ -18,13 +18,13 @@ config:
 # 자동화가 어려운 부분이 있으므로 아래 수동 절차를 병행하세요.
 #
 # 사전 준비:
-#   1. 테스트 workspace의 budget policy를 매우 낮은 한도로 설정
-#      (예: $0.01 daily limit)
+#   1. provider credential의 monthLimitUsd를 매우 낮은 값으로 설정 (예: $0.01)
+#      ※ workspace softLimitUsd는 DEGRADE(모델 다운그레이드)만 발생, BLOCK 아님
 #   2. 환경 변수 설정 (.env 파일)
 #
 # 실행 절차:
 #   1. artillery run performance-tests/scenarios/06_failover_budget.yml
-#   2. 반복 호출로 예산 소진 후 403 응답 확인
+#   2. 반복 호출로 예산 소진 후 429 응답 확인 (BUDGET_EXCEEDED = TOO_MANY_REQUESTS)
 #   3. Grafana에서 gateway_budget_blocked_total 카운터 증가 확인
 #   4. Provider 장애 시뮬레이션: Primary provider의 API key를 무효화
 #   5. 재실행 후 failover 동작 확인 (isFailover=true 응답)
@@ -55,5 +55,5 @@ scenarios:
           expect:
             - statusCode:
                 - 200
-                - 403
+                - 429
                 - 504

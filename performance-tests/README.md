@@ -119,9 +119,10 @@ artillery run scenarios/02_gateway_chat_baseline.yml
 
 ## 06 Budget/Failover 수동 테스트 절차
 
-1. 테스트 workspace의 budget policy를 매우 낮은 한도로 설정 (예: $0.01 daily limit)
+1. **provider credential**의 `monthLimitUsd`를 매우 낮은 값으로 설정 (예: $0.01)
+   - workspace의 `softLimitUsd`는 DEGRADE(모델 다운그레이드)만 발생하며 BLOCK이 아님
 2. `artillery run scenarios/06_failover_budget.yml` 실행
-3. 반복 호출로 예산 소진 → HTTP 403 응답 확인
+3. 반복 호출로 예산 소진 → HTTP 429 응답 확인 (`BUDGET_EXCEEDED = TOO_MANY_REQUESTS`)
 4. Grafana에서 `gateway_budget_blocked_total` 카운터 증가 확인
 5. (Failover 테스트) Primary provider의 API key를 무효화
 6. 시나리오 재실행 → `isFailover=true` 응답 확인
