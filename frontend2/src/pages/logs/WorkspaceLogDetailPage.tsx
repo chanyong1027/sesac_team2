@@ -11,10 +11,11 @@ import {
   Hash,
   MessageSquare,
   Zap,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import { logsApi } from '@/api/logs.api';
-import type { RequestLogStatus } from '@/types/api.types';
+import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -24,6 +25,17 @@ function readString(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function readNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 function extractMessageContent(content: unknown): string | null {
@@ -234,6 +246,144 @@ function statusBadge(status: RequestLogStatus) {
   }
 }
 
+type ErrorPayloadSummary = {
+  errorCode: string | null;
+  message: string | null;
+  failReason: string | null;
+  httpStatus: number | null;
+};
+
+type FailureInsight = {
+  errorCode: string | null;
+  errorMessage: string | null;
+  failReason: string | null;
+  httpStatus: number | null;
+  reasonDescription: string;
+  actionItems: string[];
+  payloadSummary: ErrorPayloadSummary | null;
+};
+
+const FAIL_REASON_DESCRIPTION: Record<string, string> = {
+  PROVIDER_BUDGET_EXCEEDED: 'Provider 예산 한도에 도달해 호출이 차단되었습니다.',
+  REQUEST_DEADLINE_EXCEEDED: '요청 전체 제한 시간을 초과했습니다.',
+  MODEL_404: '요청한 모델명이 Provider에 존재하지 않습니다.',
+  RESOURCE_EXHAUSTED: '업스트림 쿼터/요청 제한으로 처리되지 않았습니다.',
+  SOCKET_TIMEOUT: '업스트림 소켓 응답이 시간 제한을 초과했습니다.',
+  DEADLINE_EXCEEDED: '업스트림 처리 시간이 제한을 초과했습니다.',
+  UPSTREAM_UNAVAILABLE: '업스트림 서비스가 일시적으로 사용 불가 상태였습니다.',
+  ALL_PROVIDERS_FAILED: '주/보조 경로 모두 실패해 요청을 완료하지 못했습니다.',
+};
+
+const ERROR_CODE_DESCRIPTION: Record<string, string> = {
+  'GW-REQ-QUOTA_EXCEEDED': '요청 자체가 정책(예산/쿼터)에 의해 차단되었습니다.',
+  'GW-REQ-INVALID_REQUEST': '요청 입력/리소스 상태가 유효하지 않습니다.',
+  'GW-REQ-FORBIDDEN': '현재 API Key로 대상 워크스페이스 접근이 허용되지 않습니다.',
+  'GW-UP-MODEL_NOT_FOUND': 'Provider에 등록되지 않은 모델 호출로 실패했습니다.',
+  'GW-UP-TIMEOUT': '업스트림 타임아웃으로 실패했습니다.',
+  'GW-UP-UNAVAILABLE': '업스트림 서비스 장애 또는 연결 실패로 실패했습니다.',
+  'GW-UP-RATE_LIMIT': '업스트림 요청 제한에 걸렸습니다.',
+};
+
+function parseErrorPayload(responsePayload: string | null): ErrorPayloadSummary | null {
+  if (!responsePayload) return null;
+  const raw = responsePayload.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+    return {
+      errorCode: readString(parsed.errorCode) ?? readString(parsed.code),
+      message: readString(parsed.message),
+      failReason: readString(parsed.failReason),
+      httpStatus: readNumber(parsed.httpStatus),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function resolveReasonDescription(
+  status: RequestLogStatus,
+  errorCode: string | null,
+  failReason: string | null
+): string {
+  if (failReason && FAIL_REASON_DESCRIPTION[failReason]) {
+    return FAIL_REASON_DESCRIPTION[failReason];
+  }
+  if (errorCode && ERROR_CODE_DESCRIPTION[errorCode]) {
+    return ERROR_CODE_DESCRIPTION[errorCode];
+  }
+  if (status === 'BLOCKED') return '정책 조건에 의해 요청이 차단되었습니다.';
+  if (status === 'FAIL') return '요청 처리 중 오류가 발생했습니다.';
+  if (status === 'TIMEOUT') return '시간 제한으로 요청이 종료되었습니다.';
+  return '상세 원인을 확인할 수 없습니다.';
+}
+
+function buildActionItems(
+  errorCode: string | null,
+  failReason: string | null
+): string[] {
+  if (errorCode === 'GW-REQ-QUOTA_EXCEEDED' || failReason === 'PROVIDER_BUDGET_EXCEEDED') {
+    return [
+      '예산 정책에서 해당 Provider/Workspace의 limit, enabled 값을 확인하세요.',
+      '월 누적 사용량(budget_monthly_usage)이 limit 이상인지 확인하세요.',
+      '정책 해제 후 동일 요청을 재실행해 정상 복구 여부를 확인하세요.',
+    ];
+  }
+
+  if (errorCode === 'GW-UP-MODEL_NOT_FOUND' || failReason === 'MODEL_404') {
+    return [
+      '활성 프롬프트 버전의 provider/model 조합이 실제 지원 모델인지 확인하세요.',
+      '필요하면 모델명을 유효 값으로 수정 후 재배포(release)하세요.',
+      'failover 모델이 설정되어 있는 경우 보조 모델 유효성도 함께 점검하세요.',
+    ];
+  }
+
+  if (errorCode === 'GW-REQ-INVALID_REQUEST') {
+    return [
+      'promptKey, workspaceId, release 상태(활성 버전 존재)를 우선 확인하세요.',
+      '요청 payload의 필수 필드 누락 여부를 확인하세요.',
+      '동일 입력으로 재호출했을 때 재현되는지 확인해 원인 범위를 좁히세요.',
+    ];
+  }
+
+  if (errorCode === 'GW-UP-TIMEOUT' || errorCode === 'GW-UP-UNAVAILABLE') {
+    return [
+      '업스트림 상태(네트워크/서비스 장애)와 응답 지연을 확인하세요.',
+      '요청 시간대 트래픽 급증 여부와 재시도 시 성공률을 비교하세요.',
+      '필요 시 failover 대상 모델/프로바이더 설정을 점검하세요.',
+    ];
+  }
+
+  return [
+    'Error Code, Fail Reason, Response Payload를 함께 확인하세요.',
+    '동일 입력 재호출 시 재현 여부를 확인하세요.',
+    '재현 시 서버 로그와 연계해 호출 단계별 실패 지점을 확인하세요.',
+  ];
+}
+
+function buildFailureInsight(log: RequestLogResponse | undefined): FailureInsight | null {
+  if (!log) return null;
+  if (!['FAIL', 'BLOCKED', 'TIMEOUT'].includes(log.status)) return null;
+
+  const payloadSummary = parseErrorPayload(log.responsePayload);
+  const errorCode = log.errorCode ?? payloadSummary?.errorCode ?? null;
+  const errorMessage = log.errorMessage ?? payloadSummary?.message ?? null;
+  const failReason = log.failReason ?? payloadSummary?.failReason ?? null;
+  const httpStatus = log.httpStatus ?? payloadSummary?.httpStatus ?? null;
+
+  return {
+    errorCode,
+    errorMessage,
+    failReason,
+    httpStatus,
+    reasonDescription: resolveReasonDescription(log.status, errorCode, failReason),
+    actionItems: buildActionItems(errorCode, failReason),
+    payloadSummary,
+  };
+}
+
 export function WorkspaceLogDetailPage() {
   const { orgId, workspaceId: workspaceIdParam, traceId } = useParams<{
     orgId: string;
@@ -283,6 +433,7 @@ export function WorkspaceLogDetailPage() {
     : log?.ragEnabled
       ? `conic-gradient(from -90deg, rgba(59,130,246,0.95) 0% ${ragRatio}%, rgba(168,85,247,0.95) ${ragRatio}% 100%)`
       : 'conic-gradient(from -90deg, rgba(168,85,247,0.95) 0% 100%)';
+  const failureInsight = buildFailureInsight(log);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
@@ -507,6 +658,72 @@ export function WorkspaceLogDetailPage() {
               </div>
             </div>
           </div>
+
+          {failureInsight && (
+            <div className="glass-card p-5 rounded-xl border border-rose-500/30 bg-rose-500/[0.04]">
+              <div className="flex items-center gap-2 mb-4 text-rose-300 border-l-2 border-rose-400 pl-2">
+                <AlertTriangle size={14} />
+                <h3 className="text-xs font-bold uppercase tracking-wider">실패/차단 원인 분석</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-400">상태</span>
+                    <span className="text-white font-mono">{log.status}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-400">HTTP 상태</span>
+                    <span className="text-white font-mono">{failureInsight.httpStatus ?? '-'}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-400">Error Code</span>
+                    <span className="text-rose-300 font-mono text-xs">{failureInsight.errorCode ?? '-'}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-400">Fail Reason</span>
+                    <span className="text-rose-200 font-mono text-xs">{failureInsight.failReason ?? '-'}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">실패/차단 메시지</div>
+                    <p className="text-sm text-rose-100 leading-relaxed">
+                      {failureInsight.errorMessage ?? '메시지가 저장되지 않았습니다.'}
+                    </p>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 mb-1">해석</div>
+                    <p className="text-sm text-gray-200 leading-relaxed">{failureInsight.reasonDescription}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="text-xs text-gray-400 mb-2">점검 포인트</div>
+                <div className="space-y-1.5">
+                  {failureInsight.actionItems.map((item, idx) => (
+                    <div key={`${idx}-${item}`} className="text-xs text-gray-300 leading-relaxed">
+                      {idx + 1}. {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {failureInsight.payloadSummary && (
+                <details className="mt-4 pt-3 border-t border-white/10">
+                  <summary className="text-xs text-gray-400 cursor-pointer select-none">응답 payload 기반 원인 필드</summary>
+                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-300">
+                    <div>errorCode: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.errorCode ?? '-'}</span></div>
+                    <div>failReason: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.failReason ?? '-'}</span></div>
+                    <div>httpStatus: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.httpStatus ?? '-'}</span></div>
+                    <div>message: <span className="font-mono text-gray-200">{failureInsight.payloadSummary.message ?? '-'}</span></div>
+                  </div>
+                </details>
+              )}
+            </div>
+          )}
 
           {/* Execution Timeline */}
           <div className="glass-card p-6 rounded-2xl border border-white/10">
