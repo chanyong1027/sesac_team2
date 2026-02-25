@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { CreateOrganizationModal } from '@/features/organization/components/CreateOrganizationModal';
+import { ThemeToggle } from '@/features/theme/components/ThemeToggle';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -33,7 +34,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="h-screen overflow-hidden flex bg-[var(--background)] text-[var(--foreground)] relative">
       {/* Background glow (v2 mock) */}
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/30 via-[var(--background)] to-[var(--background)]" />
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sky-200/50 via-[var(--background)] to-[var(--background)] dark:from-indigo-900/30" />
 
       {/* Desktop Sidebar */}
       <Sidebar
@@ -134,18 +135,18 @@ function Sidebar({
     <aside
       className={`
         ${mode === 'desktop' ? 'hidden md:flex' : 'flex'}
-        ${variant === 'workspace' ? 'bg-[#0F0E15] border-r border-white/10' : 'glass-panel'}
+        ${variant === 'workspace' ? 'bg-[var(--sidebar)] border-r border-[var(--sidebar-border)]' : 'glass-panel'}
         flex-col
         ${variant === 'workspace' ? 'w-64' : 'w-72'}
       `}
     >
       {/* Logo */}
-      <div className={`h-16 flex items-center px-6 border-b ${variant === 'workspace' ? 'border-white/10' : 'border-[var(--sidebar-border)]'} gap-3`}>
+      <div className={`h-16 flex items-center px-6 border-b ${variant === 'workspace' ? 'border-[var(--sidebar-border)]' : 'border-[var(--sidebar-border)]'} gap-3`}>
         <Link to={dashboardPath} className="flex items-center gap-3 overflow-hidden">
           {variant === 'workspace' ? (
             <>
               <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[var(--primary)] to-fuchsia-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]" />
-              <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+              <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] to-[var(--text-secondary)]">
                 LuminaOps
               </span>
             </>
@@ -154,7 +155,7 @@ function Sidebar({
               <div className="size-9 bg-[color:rgba(168,85,247,0.20)] border border-[color:rgba(168,85,247,0.50)] rounded-xl flex items-center justify-center text-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.25)]">
                 <span className="text-sm font-extrabold tracking-tight">✦</span>
               </div>
-              <span className="text-lg font-bold tracking-tight text-white">LuminaOps</span>
+              <span className="text-lg font-bold tracking-tight text-[var(--foreground)]">LuminaOps</span>
             </>
           )}
         </Link>
@@ -163,7 +164,7 @@ function Sidebar({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="ml-auto p-2 rounded-lg text-gray-300 hover:bg-[var(--sidebar-accent)] hover:text-white transition-colors"
+            className="ml-auto p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--foreground)] transition-colors"
             aria-label="Close sidebar"
           >
             <X size={18} />
@@ -171,18 +172,18 @@ function Sidebar({
         ) : null}
       </div>
 
-      <div className={`px-6 py-4 border-b ${variant === 'workspace' ? 'border-white/10' : 'border-[var(--sidebar-border)]'}`}>
+      <div className={`px-6 py-4 border-b ${variant === 'workspace' ? 'border-[var(--sidebar-border)]' : 'border-[var(--sidebar-border)]'}`}>
         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">
           Organization
         </p>
         <button
           type="button"
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[color:rgba(255,255,255,0.03)] border border-white/10 hover:border-white/20 transition-all group"
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[var(--muted)] border border-[var(--border)] hover:border-[var(--ring)] transition-all group"
         >
-          <span className="font-medium text-sm text-gray-200 group-hover:text-white truncate">
+          <span className="font-medium text-sm text-[var(--foreground)] truncate">
             {orgDetail?.name ?? '조직 정보 불러오는 중...'}
           </span>
-          <span className="text-xs text-gray-500 group-hover:text-white">▾</span>
+          <span className="text-xs text-[var(--text-secondary)]">▾</span>
         </button>
       </div>
 
@@ -225,8 +226,8 @@ function Sidebar({
               className={`
                 flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors relative
                 ${isActive(`/orgs/${ws.organizationId}/workspaces/${ws.id}`)
-                  ? 'bg-white/5 text-white border border-white/10'
-                  : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-white'}
+                  ? 'bg-[var(--sidebar-accent)] text-[var(--foreground)] border border-[var(--border)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--foreground)]'}
               `}
               title={ws.displayName}
             >
@@ -276,7 +277,7 @@ function SidebarItem({ icon, label, to, active }: { icon: ReactNode, label: stri
       to={to}
       className={`
         group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors border
-        ${active ? 'bg-[color:rgba(168,85,247,0.20)] text-white border-[color:rgba(168,85,247,0.40)] shadow-[0_0_15px_rgba(168,85,247,0.25)]' : 'border-transparent text-gray-300/80 hover:bg-white/5 hover:text-white hover:border-white/10'}
+        ${active ? 'bg-[color:rgba(168,85,247,0.20)] text-[var(--foreground)] border-[color:rgba(168,85,247,0.40)] shadow-[0_0_15px_rgba(168,85,247,0.25)]' : 'border-transparent text-[var(--text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--foreground)] hover:border-[var(--border)]'}
       `}
       title={label}
     >
@@ -301,7 +302,7 @@ function UserProfile() {
           <div className="absolute bottom-0 right-0 size-2.5 bg-green-500 border-2 border-[var(--sidebar)] rounded-full" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-white truncate">{user?.name ?? 'User'}</p>
+          <p className="text-sm font-semibold text-[var(--foreground)] truncate">{user?.name ?? 'User'}</p>
           <p className="text-xs text-gray-400 truncate">{user?.email ?? ''}</p>
         </div>
       </div>
@@ -332,20 +333,20 @@ function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
   }, [location.pathname]);
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 md:px-8 border-b border-white/10 bg-[color:rgba(19,17,28,0.60)] backdrop-blur-xl sticky top-0 z-30">
+    <header className="h-16 flex items-center justify-between px-6 md:px-8 border-b border-[var(--border)] bg-[color:rgba(248,250,252,0.80)] dark:bg-[color:rgba(19,17,28,0.60)] backdrop-blur-xl sticky top-0 z-30">
       <div className="flex items-center gap-3 text-sm">
         <button
           type="button"
           onClick={onOpenMobileSidebar}
-          className="md:hidden p-2 rounded-lg text-gray-300 hover:bg-[var(--sidebar-accent)] hover:text-white transition-colors"
+          className="md:hidden p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--sidebar-accent)] hover:text-[var(--foreground)] transition-colors"
           aria-label="Open sidebar"
         >
           <Menu size={20} />
         </button>
 
-        <span className="text-[var(--text-secondary)] hover:text-white transition-colors cursor-pointer">{breadcrumb.section}</span>
+        <span className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors cursor-pointer">{breadcrumb.section}</span>
         <span className="text-[var(--text-secondary)]/30 text-xs">/</span>
-        <span className="font-semibold tracking-wide text-white">{breadcrumb.page}</span>
+        <span className="font-semibold tracking-wide text-[var(--foreground)]">{breadcrumb.page}</span>
       </div>
 
       <div className="flex items-center gap-3">
@@ -354,23 +355,24 @@ function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
             <input
               type="text"
               placeholder="검색 (Cmd+K)"
-              className="bg-[#0F0E15] border border-white/10 rounded-full py-1.5 pl-4 pr-10 text-sm text-gray-300 focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] placeholder-gray-600 w-64 transition-all"
+              className="bg-[var(--card)] border border-[var(--border)] rounded-full py-1.5 pl-4 pr-10 text-sm text-[var(--foreground)] focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] placeholder-[var(--text-secondary)] w-64 transition-all"
             />
             <span className="material-symbols-outlined absolute right-3 top-1.5 text-gray-600 text-lg">search</span>
           </div>
         ) : null}
         <button
           type="button"
-          className="relative p-2 text-[var(--text-secondary)] hover:text-white transition-colors rounded-lg"
+          className="relative p-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors rounded-lg"
           aria-label="Notifications"
         >
           <Bell size={20} />
           <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-[var(--background)] shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
         </button>
+        <ThemeToggle />
         <div className="h-6 w-px bg-white/10 hidden sm:block" />
         <Link
           to="/guide"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-colors text-xs font-medium backdrop-blur-md"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--muted)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors text-xs font-medium backdrop-blur-md"
         >
           <HelpCircle size={18} />
           <span className="hidden sm:inline">가이드</span>

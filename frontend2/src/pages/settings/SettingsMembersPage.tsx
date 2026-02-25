@@ -43,7 +43,7 @@ function StatusDot({ status }: { status: string }) {
         className="w-2 h-2 rounded-full"
         style={{ background: colors.text }}
       />
-      <span className="text-xs font-medium text-gray-600">
+      <span className="text-xs font-medium text-[var(--text-secondary)]">
         {status}
       </span>
     </span>
@@ -112,27 +112,27 @@ function InviteMemberModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={resetAndClose}
       />
-      <div className="relative w-full max-w-md mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+      <div className="relative w-full max-w-md mx-4 p-6 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
           멤버 초대
         </h3>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-[var(--text-secondary)] mb-6">
           워크스페이스 초대 링크를 생성하여 멤버를 초대합니다.
         </p>
 
         {!invitationLink ? (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
                 워크스페이스 선택
               </label>
               {isWorkspacesLoading ? (
-                <div className="h-10 bg-gray-100 rounded animate-pulse" />
+                <div className="h-10 bg-[var(--muted)] rounded animate-pulse" />
               ) : availableWorkspaces && availableWorkspaces.length > 0 ? (
                 <select
                   value={selectedWorkspaceId || ''}
                   onChange={(e) => setSelectedWorkspaceId(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 text-sm text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[color:rgba(147,51,234,0.35)] focus:border-[color:rgba(147,51,234,0.35)] outline-none"
                 >
                   <option value="" disabled>워크스페이스를 선택하세요</option>
                   {availableWorkspaces.map((ws) => (
@@ -152,7 +152,7 @@ function InviteMemberModal({
             <div className="flex gap-3 pt-2">
               <button
                 onClick={resetAndClose}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors"
               >
                 취소
               </button>
@@ -167,7 +167,7 @@ function InviteMemberModal({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="p-4 bg-green-50 text-green-800 rounded-lg flex items-center gap-2 text-sm">
+            <div className="p-4 bg-emerald-500/10 border border-emerald-400/25 text-emerald-700 dark:text-emerald-200 rounded-lg flex items-center gap-2 text-sm">
               <Check size={16} />
               <span>초대 링크가 생성되었습니다!</span>
             </div>
@@ -177,18 +177,18 @@ function InviteMemberModal({
                 type="text"
                 readOnly
                 value={invitationLink}
-                className="w-full px-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-lg text-gray-600 pr-12 focus:outline-none"
+                className="w-full px-4 py-3 text-sm bg-[var(--muted)] border border-[var(--border)] rounded-lg text-[var(--foreground)] pr-12 focus:outline-none"
               />
               <button
                 onClick={handleCopy}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-indigo-600 transition-colors rounded-md hover:bg-indigo-50"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors rounded-md hover:bg-[var(--accent)]"
                 title="복사"
               >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
 
-            <p className="text-xs text-gray-500 text-center">
+            <p className="text-xs text-[var(--text-secondary)] text-center">
               이 링크를 멤버에게 전달하세요. 7일 동안 유효합니다.
             </p>
 
@@ -232,13 +232,13 @@ function ConfirmModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-sm mx-4 p-6 bg-white rounded-xl shadow-xl border border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+      <div className="relative w-full max-w-sm mx-4 p-6 bg-[var(--card)] rounded-xl shadow-xl border border-[var(--border)]">
+        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
           {title}
         </h3>
-        <p className="text-sm text-gray-500 mb-6">{message}</p>
+        <p className="text-sm text-[var(--text-secondary)] mb-6">{message}</p>
         {error && (
-          <div className="flex items-center gap-2 p-3 mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 p-3 mb-4 text-sm text-rose-700 dark:text-rose-200 bg-rose-500/10 border border-rose-400/25 rounded-lg">
             <AlertCircle size={16} className="shrink-0" />
             <span>{error}</span>
           </div>
@@ -247,7 +247,7 @@ function ConfirmModal({
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--foreground)] bg-[var(--card)] border border-[var(--border)] rounded-lg hover:bg-[var(--accent)] transition-colors disabled:opacity-50"
           >
             취소
           </button>
@@ -326,10 +326,10 @@ export function SettingsMembersPage() {
     <div>
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+          <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
             멤버 관리
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
             조직 멤버를 관리하고 역할을 설정합니다.
           </p>
         </div>
@@ -352,23 +352,23 @@ export function SettingsMembersPage() {
         ].map((stat, i) => (
           <div
             key={i}
-            className="p-5 bg-white border border-gray-200 rounded-xl shadow-sm"
+            className="p-5 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm"
           >
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">
                 {stat.label}
               </p>
-              <stat.icon size={16} className="text-gray-400" />
+              <stat.icon size={16} className="text-[var(--text-tertiary)]" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">
+            <p className="text-2xl font-bold text-[var(--foreground)]">
               {stat.value}
             </p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-sm overflow-hidden">
+        <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-[var(--muted)] border-b border-[var(--border)] text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
           <div className="col-span-4">멤버</div>
           <div className="col-span-2">역할</div>
           <div className="col-span-2">상태</div>
@@ -377,25 +377,25 @@ export function SettingsMembersPage() {
         </div>
 
         {isLoading ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">
+          <div className="px-6 py-12 text-center text-sm text-[var(--text-secondary)]">
             멤버 목록을 불러오는 중...
           </div>
         ) : members && members.length > 0 ? (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y divide-[var(--border)]">
             {members.map((member) => (
               <div
                 key={member.memberId}
-                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors group"
+                className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-[var(--accent)] transition-colors group"
               >
                 <div className="col-span-4 flex items-center gap-3">
-                  <div className="w-9 h-9 flex items-center justify-center text-sm font-bold text-white bg-indigo-500 rounded-full shrink-0 shadow-sm">
+                  <div className="w-9 h-9 flex items-center justify-center text-sm font-bold text-white bg-[var(--primary)] rounded-full shrink-0 shadow-sm">
                     {member.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-[var(--foreground)] truncate">
                       {member.name}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">
+                    <p className="text-xs text-[var(--text-secondary)] truncate">
                       {member.email}
                     </p>
                   </div>
@@ -412,7 +412,7 @@ export function SettingsMembersPage() {
                         })
                       }
                       disabled={updateRoleMutation.isPending}
-                      className="px-2 py-1 text-xs font-medium rounded-full border border-gray-300 bg-white text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="px-2 py-1 text-xs font-medium rounded-full border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[color:rgba(147,51,234,0.35)]"
                     >
                       <option value="ADMIN">ADMIN</option>
                       <option value="MEMBER">MEMBER</option>
@@ -427,7 +427,7 @@ export function SettingsMembersPage() {
                 </div>
 
                 <div className="col-span-3">
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-[var(--text-secondary)]">
                     {new Date(member.joinedAt).toLocaleDateString('ko-KR', {
                       year: 'numeric',
                       month: 'long',
@@ -451,8 +451,8 @@ export function SettingsMembersPage() {
                           disabled={isSelf}
                           className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-all ${
                             isSelf
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                              ? 'text-[var(--text-tertiary)] cursor-not-allowed'
+                              : 'text-[var(--text-secondary)] hover:text-rose-600 dark:hover:text-rose-300 hover:bg-rose-500/10'
                           }`}
                           title={isSelf ? '본인은 퇴출할 수 없습니다' : '퇴출'}
                         >
@@ -467,7 +467,7 @@ export function SettingsMembersPage() {
             ))}
           </div>
         ) : (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">
+          <div className="px-6 py-12 text-center text-sm text-[var(--text-secondary)]">
             멤버가 없습니다.
           </div>
         )}

@@ -478,11 +478,11 @@ function computeInsightGrade(
 }
 
 function gradeToneClass(grade: InsightGrade): string {
-    if (grade === 'S') return 'text-emerald-300';
-    if (grade === 'A') return 'text-sky-300';
-    if (grade === 'B') return 'text-amber-300';
-    if (grade === 'F') return 'text-rose-300';
-    return 'text-gray-300';
+    if (grade === 'S') return 'text-emerald-700 dark:text-emerald-300';
+    if (grade === 'A') return 'text-sky-700 dark:text-sky-300';
+    if (grade === 'B') return 'text-amber-700 dark:text-amber-300';
+    if (grade === 'F') return 'text-rose-700 dark:text-rose-300';
+    return 'text-[var(--text-secondary)]';
 }
 
 type CountDistributionEntry = {
@@ -1194,29 +1194,29 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
 
     return (
         <div className="min-h-[800px] flex flex-col gap-6 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight flex items-center gap-2">
                         <span className="material-symbols-outlined text-purple-400">science</span>
                         프롬프트 스튜디오 (Prompt Studio)
                     </h2>
-                    <p className="text-xs text-gray-400 mt-1">설계하고, 평가하고, 개선하세요.</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">설계하고, 평가하고, 개선하세요.</p>
                 </div>
-                <div className="flex items-center bg-black/30 rounded-full p-1 border border-white/10">
+                <div className="flex items-center bg-[var(--muted)] rounded-full p-1 border border-[var(--border)]">
                     <StepButton
                         label="1. 데이터셋"
                         active={activeStep === 'DATASET'}
                         done={(datasets?.length ?? 0) > 0}
                         onClick={() => setCurrentStep('DATASET')}
                     />
-                    <div className="w-4 h-px bg-white/10" />
+                    <div className="w-4 h-px bg-[var(--border)]" />
                     <StepButton
                         label="2. 설정"
                         active={activeStep === 'CONFIG'}
                         done={!!resolvedVersionId && !!resolvedRunDatasetId}
                         onClick={() => setCurrentStep('CONFIG')}
                     />
-                    <div className="w-4 h-px bg-white/10" />
+                    <div className="w-4 h-px bg-[var(--border)]" />
                     <StepButton
                         label="3. 결과"
                         active={activeStep === 'RESULT'}
@@ -1368,9 +1368,9 @@ function DatasetSection({
 }: DatasetSectionProps) {
     return (
         <div className="grid grid-cols-12 gap-6 h-full">
-            <div className="col-span-3 glass-card border border-white/10 rounded-xl p-4 flex flex-col gap-3">
+            <div className="col-span-3 glass-card border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
                 <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-bold text-white">데이터셋 목록</h4>
+                    <h4 className="text-sm font-bold text-[var(--foreground)]">데이터셋 목록</h4>
                     <button type="button" onClick={() => setCreating(true)} className="text-[var(--primary)] text-xs hover:underline">
                         + 새로 만들기
                     </button>
@@ -1385,8 +1385,8 @@ function DatasetSection({
                                 setCreating(false);
                             }}
                             className={`w-full text-left px-3 py-2.5 rounded-lg text-xs transition-all border ${selectedId === dataset.id
-                                ? 'bg-[var(--primary)]/10 border-[var(--primary)] text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                                : 'bg-white/5 border-transparent text-gray-400 hover:bg-white/10 hover:text-gray-200'
+                                ? 'bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--foreground)] font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+                                : 'bg-[var(--muted)] border-transparent text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]'
                                 }`}
                         >
                             {dataset.name}
@@ -1398,16 +1398,16 @@ function DatasetSection({
                 </div>
             </div>
 
-            <div className="col-span-9 glass-card border border-white/10 rounded-xl p-6 flex flex-col">
+            <div className="col-span-9 glass-card border border-[var(--border)] rounded-xl p-6 flex flex-col">
                 {isCreating ? (
                     <div className="flex-1 flex flex-col gap-4">
-                        <div className="flex justify-between items-center border-b border-white/10 pb-4">
-                            <h4 className="text-lg font-bold text-white">새 데이터셋 생성</h4>
+                        <div className="flex justify-between items-center border-b border-[var(--border)] pb-4">
+                            <h4 className="text-lg font-bold text-[var(--foreground)]">새 데이터셋 생성</h4>
                             <div className="flex gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setCreating(false)}
-                                    className="px-4 py-2 text-xs text-gray-400 hover:text-white"
+                                    className="px-4 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)]"
                                 >
                                     취소
                                 </button>
@@ -1425,7 +1425,7 @@ function DatasetSection({
                             <div>
                                 <label className="block text-xs text-gray-400 mb-1">이름</label>
                                 <input
-                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-sm text-white"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)]"
                                     value={newName}
                                     onChange={(event) => setNewName(event.target.value)}
                                     placeholder="예: v1.0 테스트용"
@@ -1450,7 +1450,7 @@ function DatasetSection({
                                 ))}
                             </div>
                         </div>
-                        <div className="pt-4 mt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                        <div className="pt-4 mt-2 border-t border-[var(--border)] flex flex-wrap items-center justify-between gap-2">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -1458,7 +1458,7 @@ function DatasetSection({
                                     setRows((prev) => [...prev, newRow]);
                                     setExpandedEditorCaseId(newRow.id);
                                 }}
-                                className="px-4 py-2 rounded-lg border border-dashed border-white/20 text-xs text-gray-300 hover:border-white/40 hover:text-white"
+                                className="px-4 py-2 rounded-lg border border-dashed border-[var(--border)] text-xs text-[var(--text-secondary)] hover:border-[var(--ring)] hover:text-[var(--foreground)]"
                             >
                                 + 케이스 추가
                             </button>
@@ -1475,7 +1475,7 @@ function DatasetSection({
                 ) : (
                     <div className="flex-1 flex flex-col">
                         <div className="flex justify-between items-center mb-6">
-                            <h4 className="text-lg font-bold text-white">데이터셋 미리보기</h4>
+                            <h4 className="text-lg font-bold text-[var(--foreground)]">데이터셋 미리보기</h4>
                             <button
                                 type="button"
                                 onClick={onNext}
@@ -1497,11 +1497,11 @@ function DatasetSection({
                                 ].filter((value): value is string => Boolean(value));
 
                                 return (
-                                    <div key={item.id} className="p-4 bg-black/20 border border-white/5 rounded-xl space-y-3">
+                                    <div key={item.id} className="p-4 bg-[var(--muted)] border border-[var(--border)] rounded-xl space-y-3">
                                         <div className="flex items-center justify-between gap-2">
                                             <p className="text-xs font-bold text-gray-500">Q. 질문</p>
                                             {item.externalId && (
-                                                <span className="text-[10px] text-gray-300 bg-white/10 border border-white/20 px-2 py-0.5 rounded-full">
+                                                <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--accent)] border border-[var(--border)] px-2 py-0.5 rounded-full">
                                                     ID: {item.externalId}
                                                 </span>
                                             )}
@@ -1678,456 +1678,489 @@ function ConfigSection({
 
     return (
         <div className="max-w-4xl mx-auto pt-10 animate-in zoom-in-95 duration-300">
-            <h3 className="text-2xl font-bold text-white mb-8 text-center">어떻게 평가하시겠습니까?</h3>
+            <h3 className="text-2xl font-bold text-[var(--foreground)] mb-8 text-center">어떻게 평가하시겠습니까?</h3>
 
             <div className="space-y-6 mb-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-black/20 border border-white/10 rounded-2xl p-6 space-y-4">
-                        <p className="text-xs uppercase tracking-wider text-gray-400 font-bold">실행 선택</p>
-
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-3">실행 데이터셋 (Dataset)</label>
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                                {datasets.map((dataset) => (
-                                    <button
-                                        type="button"
-                                        key={dataset.id}
-                                        onClick={() => onSelectDataset(dataset.id)}
-                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${selectedDatasetId === dataset.id
-                                            ? 'bg-fuchsia-500/20 border-fuchsia-500 text-white'
-                                            : 'bg-black/40 border-transparent text-gray-400 hover:bg-white/5'
-                                            }`}
-                                    >
-                                        <span className="text-sm truncate">{dataset.name}</span>
-                                        <span className="text-xs opacity-60">#{dataset.id}</span>
-                                    </button>
-                                ))}
+                {/* 2. Run Settings Section */}
+                <section className="space-y-4">
+                    <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[var(--primary)] text-xl">play_circle</span>
+                        실행 대상 선택
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="glass-card rounded-xl p-5 border border-[var(--border)]">
+                            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">데이터셋</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedDatasetId ?? ''}
+                                    onChange={(e) => onSelectDataset(Number(e.target.value))}
+                                    className="w-full appearance-none bg-[var(--input)] border border-[var(--border)] rounded-lg py-2.5 pl-4 pr-10 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors"
+                                >
+                                    <option value="" disabled>분석할 데이터셋을 선택하세요</option>
+                                    {datasets.map((dataset) => (
+                                        <option key={dataset.id} value={dataset.id}>{dataset.name}</option>
+                                    ))}
+                                </select>
+                                <span className="material-symbols-outlined absolute right-3 top-2.5 text-[var(--text-secondary)] pointer-events-none">expand_content</span>
                             </div>
                             {datasets.length === 0 && <p className="text-[11px] text-rose-400 mt-2">데이터셋을 먼저 생성하세요.</p>}
                         </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-3">대상 버전 (Target Version)</label>
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                                {versions.map((version) => (
-                                    <button
-                                        type="button"
-                                        key={version.id}
-                                        onClick={() => onSelectVersion(version.id)}
-                                        className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${selectedVersionId === version.id
-                                            ? 'bg-purple-500/20 border-purple-500 text-white'
-                                            : 'bg-black/40 border-transparent text-gray-400 hover:bg-white/5'
-                                            }`}
-                                    >
-                                        <span className="font-mono text-sm">v{version.versionNumber}</span>
-                                        <span className="text-xs opacity-60">{version.model}</span>
-                                    </button>
-                                ))}
+                        <div className="glass-card rounded-xl p-5 border border-[var(--border)]">
+                            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">대상 버전</label>
+                            <div className="relative">
+                                <select
+                                    value={selectedVersionId ?? ''}
+                                    onChange={(e) => onSelectVersion(Number(e.target.value))}
+                                    className="w-full appearance-none bg-[var(--input)] border border-[var(--border)] rounded-lg py-2.5 pl-4 pr-10 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors"
+                                >
+                                    <option value="" disabled>평가할 버전을 선택하세요</option>
+                                    {versions.map((version) => (
+                                        <option key={version.id} value={version.id}>v{version.versionNumber} ({version.model})</option>
+                                    ))}
+                                </select>
+                                <span className="material-symbols-outlined absolute right-3 top-2.5 text-[var(--text-secondary)] pointer-events-none">expand_content</span>
                             </div>
                         </div>
                     </div>
+                </section>
 
-                    <div className="space-y-3">
-                        <div className="bg-black/20 border border-white/10 rounded-2xl p-5 space-y-3">
-                            <label className="block text-xs font-bold text-gray-400 uppercase">평가 모드 (Mode)</label>
+                {/* 3. Evaluation Mode Section */}
+                <section className="space-y-4">
+                    <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[var(--primary)] text-xl">tune</span>
+                        평가 모드
+                    </h3>
+                    <div className="glass-card rounded-xl p-5 border border-[var(--border)] space-y-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <button
                                 type="button"
                                 onClick={() => setMode('CANDIDATE_ONLY')}
-                                className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${mode === 'CANDIDATE_ONLY'
-                                    ? 'bg-emerald-500/10 border-emerald-500 ring-1 ring-emerald-500/50'
-                                    : 'bg-black/20 border-white/10 opacity-60 hover:opacity-100'
+                                className={`flex flex-col items-start p-4 rounded-xl border transition-all text-left ${mode === 'CANDIDATE_ONLY'
+                                    ? 'bg-[color:rgba(168,85,247,0.15)] border-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.2)]'
+                                    : 'bg-[var(--input)] border-[var(--border)] hover:border-[var(--primary)] hover:bg-[color:rgba(168,85,247,0.05)] text-[var(--text-secondary)]'
                                     }`}
                             >
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-emerald-400">check_circle</span>
-                                    <span className="font-bold text-emerald-100">기본 검증 (Single)</span>
+                                <div className="flex items-center justify-between w-full mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[var(--primary)]">check_circle</span>
+                                        <span className={`font-bold ${mode === 'CANDIDATE_ONLY' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}>기본 검증 (Single)</span>
+                                    </div>
+                                    {mode === 'CANDIDATE_ONLY' && <span className="material-symbols-outlined text-[var(--primary)] text-sm">check_circle</span>}
                                 </div>
-                                <p className="text-xs text-gray-400">선택한 버전만 빠르고 독립적으로 검사합니다.</p>
+                                <span className={`text-xs ${mode === 'CANDIDATE_ONLY' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'}`}>선택한 버전만 빠르고 독립적으로 검사합니다.</span>
                             </button>
-
                             <button
                                 type="button"
                                 onClick={() => setMode('COMPARE_ACTIVE')}
                                 disabled={!hasActiveRelease}
-                                className={`w-full p-4 rounded-xl border text-left transition-all hover:scale-[1.02] ${mode === 'COMPARE_ACTIVE'
-                                    ? 'bg-blue-500/10 border-blue-500 ring-1 ring-blue-500/50'
-                                    : 'bg-black/20 border-white/10 opacity-60 hover:opacity-100 disabled:opacity-30'
+                                className={`flex flex-col items-start p-4 rounded-xl border transition-all text-left ${mode === 'COMPARE_ACTIVE'
+                                    ? 'bg-[color:rgba(168,85,247,0.15)] border-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.2)]'
+                                    : 'bg-[var(--input)] border-[var(--border)] hover:border-[var(--primary)] hover:bg-[color:rgba(168,85,247,0.05)] text-[var(--text-secondary)] disabled:opacity-50 disabled:cursor-not-allowed'
                                     }`}
                             >
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="material-symbols-outlined text-blue-400">compare_arrows</span>
-                                    <span className="font-bold text-blue-100">운영 비교 (Compare)</span>
+                                <div className="flex items-center justify-between w-full mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-blue-400">compare_arrows</span>
+                                        <span className={`font-bold ${mode === 'COMPARE_ACTIVE' ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}>운영 비교 (Compare)</span>
+                                    </div>
+                                    {mode === 'COMPARE_ACTIVE' && <span className="material-symbols-outlined text-[var(--primary)] text-sm">check_circle</span>}
                                 </div>
-                                <p className="text-xs text-gray-400">현재 운영중인 버전과 성능/품질을 비교합니다.</p>
+                                <span className={`text-xs ${mode === 'COMPARE_ACTIVE' ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'}`}>현재 운영중인 버전과 성능/품질을 비교합니다.</span>
                                 {!hasActiveRelease && <p className="text-[10px] text-rose-400 mt-1">* 운영 버전 없음</p>}
                             </button>
                         </div>
+                    </div>
+                </section>
 
-                        <div className="bg-black/20 border border-white/10 rounded-2xl p-4 space-y-3">
-                            <p className="text-xs font-bold text-gray-400 uppercase">비교 프리뷰</p>
-                            {singleMode && (
-                                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 animate-in fade-in duration-200">
-                                    <p className="text-[10px] text-emerald-200 mb-1">단일 검증</p>
-                                    <p className="text-sm text-emerald-100 font-semibold">
-                                        내 버전 {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
-                                    </p>
-                                    <p className="text-[11px] text-emerald-200/80 mt-1">선택한 버전만 기준 충족 여부를 검사합니다.</p>
-                                </div>
-                            )}
-
-                            {compareMode && (
-                                <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
-                                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
-                                        <p className="text-[10px] text-blue-200 mb-1">내 버전</p>
-                                        <p className="text-sm text-blue-100 font-semibold">
-                                            {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
-                                        </p>
-                                        <p className="text-[10px] text-blue-200/75 mt-1">{selectedVersion?.model ?? '-'}</p>
-                                    </div>
-                                    <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
-                                        <p className="text-[10px] text-indigo-200 mb-1">운영 버전 (Active)</p>
-                                        <p className="text-sm text-indigo-100 font-semibold">{activeReleaseVersionLabel ?? '(없음)'}</p>
-                                        <p className="text-[10px] text-indigo-200/75 mt-1">현재 배포 상태와 직접 비교합니다.</p>
-                                    </div>
-                                </div>
-                            )}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* 4. AI Evaluation Rubric */}
+                    <section className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[var(--primary)] text-xl">psychology</span>
+                                AI 판단 기준 (루브릭)
+                            </h3>
                         </div>
-                    </div>
-                </div>
-
-                <div className="bg-black/20 border border-white/10 rounded-2xl p-6 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <p className="text-xs uppercase tracking-wider text-gray-400 font-bold">평가 기준 (Rubric)</p>
-                            <p className="text-[11px] text-gray-500 mt-1">템플릿 선택 후 필요하면 세부 기준을 직접 정의하세요.</p>
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => onToggleRubricOverrides(!useRubricOverrides)}
-                            className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${useRubricOverrides
-                                ? 'bg-[var(--primary)]/20 border-[var(--primary)] text-[var(--primary)]'
-                                : 'bg-black/30 border-white/10 text-gray-300 hover:text-white'
-                                }`}
-                        >
-                            {useRubricOverrides ? '커스텀 기준 ON' : '커스텀 기준 OFF'}
-                        </button>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase mb-2">루브릭 템플릿</label>
-                        <select
-                            value={rubricTemplateCode}
-                            onChange={(event) => onChangeRubricTemplate(event.target.value as RubricTemplateCode)}
-                            className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[var(--primary)] outline-none"
-                        >
-                            {RUBRIC_OPTIONS.map((option) => (
-                                <option key={option.code} value={option.code}>
-                                    {option.label}
-                                </option>
-                            ))}
-                        </select>
-                        <p className="text-[11px] text-gray-500 mt-2">
-                            {RUBRIC_OPTIONS.find((option) => option.code === rubricTemplateCode)?.description}
-                        </p>
-                    </div>
-
-                    {useRubricOverrides ? (
-                        <div className="space-y-4 border border-white/10 rounded-xl p-4 bg-black/30">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs text-gray-300">
-                                    현재 {activeCriteriaCount}개 기준이 적용됩니다.
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={onResetRubricPreset}
-                                        className="text-[11px] text-gray-300 px-2.5 py-1 rounded border border-white/15 hover:border-white/30"
+                        <div className="glass-card rounded-xl p-6 border border-[var(--border)] space-y-6">
+                            {/* Rubric Preset Selection */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <label className="text-sm font-semibold text-[var(--foreground)]">평가 템플릿</label>
+                                    <label className="flex items-center gap-2 text-sm cursor-pointer group">
+                                        <div className="relative flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only"
+                                                checked={useRubricOverrides}
+                                                onChange={(e) => onToggleRubricOverrides(e.target.checked)}
+                                            />
+                                            <div className={`w-8 h-4 rounded-full transition-colors ${useRubricOverrides ? 'bg-[var(--primary)]' : 'bg-[var(--input)]'}`} />
+                                            <div className={`absolute left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${useRubricOverrides ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        </div>
+                                        <span className={`transition-colors ${useRubricOverrides ? 'text-[var(--primary)] font-medium' : 'text-[var(--text-secondary)] group-hover:text-[var(--foreground)]'}`}>커스텀 설정</span>
+                                    </label>
+                                </div>
+                                <div className="relative">
+                                    <select
+                                        value={rubricTemplateCode}
+                                        onChange={(event) => onChangeRubricTemplate(event.target.value as RubricTemplateCode)}
+                                        className="w-full appearance-none bg-[var(--input)] border border-[var(--border)] rounded-lg py-2.5 pl-4 pr-10 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] transition-colors"
                                     >
-                                        템플릿 기준 불러오기
-                                    </button>
+                                        {RUBRIC_OPTIONS.map((option) => (
+                                            <option key={option.code} value={option.code}>
+                                                {option.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span className="material-symbols-outlined absolute right-3 top-2.5 text-[var(--text-secondary)] pointer-events-none">expand_content</span>
                                 </div>
+                                <p className="text-[11px] text-[var(--text-tertiary)] mt-2">
+                                    {RUBRIC_OPTIONS.find((option) => option.code === rubricTemplateCode)?.description}
+                                </p>
                             </div>
 
-                            <div className="space-y-3">
-                                {rubricCriteriaRows.map((row) => (
-                                    <details key={row.id} className="bg-black/40 border border-white/10 rounded-lg group transition-all open:bg-black/50 overflow-hidden">
-                                        <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-white/5 list-none">
-                                            <div className="flex items-center gap-3 w-full">
-                                                <span className="material-symbols-outlined text-gray-500 group-open:-rotate-180 transition-transform">expand_more</span>
-                                                <div className="flex-1 flex gap-2 w-full justify-between items-center pr-4">
-                                                    <span className="font-mono text-sm text-[var(--primary)]">{row.key || '새 기준'}</span>
-                                                    <span className="text-xs text-gray-400 truncate max-w-[200px]">{row.description || '내용 설명 없음'}</span>
-                                                    <span className="text-xs bg-[var(--primary)]/20 text-[var(--primary)] px-2 py-0.5 rounded font-bold">비중: {row.weight}</span>
-                                                </div>
-                                            </div>
-                                        </summary>
+                            {useRubricOverrides ? (
+                                <div className="space-y-4 border border-[var(--border)] rounded-xl p-4 bg-[var(--background-card)]">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <p className="text-xs text-[var(--text-secondary)]">
+                                            현재 {activeCriteriaCount}개 기준이 적용됩니다.
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={onResetRubricPreset}
+                                                className="text-[11px] text-[var(--text-secondary)] px-2.5 py-1 rounded border border-[var(--border)] hover:border-[var(--border-hover)]"
+                                            >
+                                                템플릿 기준 불러오기
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                        <div className="p-4 pt-0 space-y-4 border-t border-white/5">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                                <div>
-                                                    <label className="text-xs text-gray-400 block mb-1">기준 키워드 (Criterion Key)</label>
-                                                    <input
-                                                        value={row.key}
-                                                        onChange={(event) => updateCriterionRow(row.id, 'key', event.target.value)}
-                                                        placeholder="예: relevance, clarity"
-                                                        className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                                    />
+                                    <div className="space-y-3">
+                                        {rubricCriteriaRows.map((row) => (
+                                            <details key={row.id} className="bg-[var(--input)] border border-[var(--border)] rounded-lg group transition-all open:bg-[var(--background-card)] overflow-hidden">
+                                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-[var(--hover)] list-none">
+                                                    <div className="flex items-center gap-3 w-full">
+                                                        <span className="material-symbols-outlined text-[var(--text-tertiary)] group-open:-rotate-180 transition-transform">expand_more</span>
+                                                        <div className="flex-1 flex gap-2 w-full justify-between items-center pr-4">
+                                                            <span className="font-mono text-sm text-[var(--primary)]">{row.key || '새 기준'}</span>
+                                                            <span className="text-xs text-[var(--text-secondary)] truncate max-w-[200px]">{row.description || '내용 설명 없음'}</span>
+                                                            <span className="text-xs bg-[var(--primary)]/20 text-[var(--primary)] px-2 py-0.5 rounded font-bold">비중: {row.weight}</span>
+                                                        </div>
+                                                    </div>
+                                                </summary>
+
+                                                <div className="p-4 pt-0 space-y-4 border-t border-[var(--border)]">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                        <div>
+                                                            <label className="text-xs text-[var(--text-secondary)] block mb-1">기준 키워드 (Criterion Key)</label>
+                                                            <input
+                                                                value={row.key}
+                                                                onChange={(event) => updateCriterionRow(row.id, 'key', event.target.value)}
+                                                                placeholder="예: relevance, clarity"
+                                                                className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs text-[var(--text-secondary)] block mb-1">비중 (Weight)</label>
+                                                            <input
+                                                                type="number"
+                                                                step="0.1"
+                                                                value={row.weight}
+                                                                onChange={(event) => updateCriterionRow(row.id, 'weight', event.target.value)}
+                                                                className="w-full bg-[var(--input)] border border-[var(--primary)]/30 rounded-lg px-3 py-2 text-xs text-[var(--foreground)] focus:border-[var(--primary)]"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs text-[var(--text-secondary)] block mb-1">의미 설명 (Description)</label>
+                                                        <input
+                                                            value={row.description}
+                                                            onChange={(event) => updateCriterionRow(row.id, 'description', event.target.value)}
+                                                            placeholder="예: 질문/맥락과의 관련성"
+                                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
+                                                        />
+                                                    </div>
+
+                                                    <div className="pt-3 border-t border-[var(--border)]">
+                                                        <label className="text-[11px] text-[var(--text-secondary)] font-bold block mb-2 cursor-help" title="입력된 점수 기준은 자동으로 Judge 프롬프트의 description에 추가됩니다.">
+                                                            점수 부여 기준 (선택사항, 프롬프트에 자동 반영됨)
+                                                        </label>
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-rose-400 block">1점 (미흡)</label>
+                                                                <textarea
+                                                                    value={row.anchor1 || ''}
+                                                                    onChange={(event) => updateCriterionRow(row.id, 'anchor1', event.target.value)}
+                                                                    placeholder="1점 기준 설명..."
+                                                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-[11px] text-[var(--text-secondary)] focus:border-rose-500/50 outline-none resize-y min-h-[60px]"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-amber-400 block">3점 (보통)</label>
+                                                                <textarea
+                                                                    value={row.anchor3 || ''}
+                                                                    onChange={(event) => updateCriterionRow(row.id, 'anchor3', event.target.value)}
+                                                                    placeholder="3점 기준 설명..."
+                                                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-[11px] text-[var(--text-secondary)] focus:border-amber-500/50 outline-none resize-y min-h-[60px]"
+                                                                />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-emerald-400 block">5점 (우수)</label>
+                                                                <textarea
+                                                                    value={row.anchor5 || ''}
+                                                                    onChange={(event) => updateCriterionRow(row.id, 'anchor5', event.target.value)}
+                                                                    placeholder="5점 기준 설명..."
+                                                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-[11px] text-[var(--text-secondary)] focus:border-emerald-500/50 outline-none resize-y min-h-[60px]"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="pt-3 flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeCriterionRow(row.id)}
+                                                            disabled={rubricCriteriaRows.length <= 1}
+                                                            className="px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-400 text-xs hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
+                                                            title={rubricCriteriaRows.length <= 1 ? '최소 1개 기준 필요' : '이 기준 삭제'}
+                                                        >
+                                                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                            기준 삭제
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="text-xs text-gray-400 block mb-1">비중 (Weight)</label>
+                                            </details>
+                                        ))}
+
+                                        <button
+                                            type="button"
+                                            onClick={addCriterionRow}
+                                            className="w-full py-3 mt-4 rounded-xl border border-dashed border-[var(--primary)]/40 text-[var(--primary)] text-sm hover:bg-[var(--primary)]/10 hover:border-[var(--primary)] flex items-center justify-center gap-2 transition-colors font-bold"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">add_circle</span>
+                                            새로운 평가 기준 추가
+                                        </button>
+                                    </div>
+
+                                    <details className="mt-6 bg-[var(--input)] border border-[var(--border)] rounded-lg overflow-hidden group">
+                                        <summary className="flex items-center gap-2 p-4 cursor-pointer hover:bg-[var(--hover)] list-none font-bold text-sm text-[var(--text-secondary)]">
+                                            <span className="material-symbols-outlined text-[var(--text-tertiary)] group-open:rotate-90 transition-transform">chevron_right</span>
+                                            고급 루브릭 설정 (최소 점수, JSON, 추가 노트)
+                                        </summary>
+                                        <div className="p-4 pt-0 border-t border-[var(--border)] space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                                <div className="space-y-1">
+                                                    <label className="text-[11px] text-[var(--text-secondary)]">최소 종합 점수 (minOverallScore)</label>
                                                     <input
                                                         type="number"
-                                                        step="0.1"
-                                                        value={row.weight}
-                                                        onChange={(event) => updateCriterionRow(row.id, 'weight', event.target.value)}
-                                                        className="w-full bg-black/60 border border-[var(--primary)]/30 rounded-lg px-3 py-2 text-xs text-white focus:border-[var(--primary)]"
+                                                        value={rubricMinOverallScore}
+                                                        onChange={(event) => setRubricMinOverallScore(event.target.value)}
+                                                        className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
                                                     />
                                                 </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-400 block mb-1">의미 설명 (Description)</label>
-                                                <input
-                                                    value={row.description}
-                                                    onChange={(event) => updateCriterionRow(row.id, 'description', event.target.value)}
-                                                    placeholder="예: 질문/맥락과의 관련성"
-                                                    className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                                />
-                                            </div>
-
-                                            <div className="pt-3 border-t border-white/5">
-                                                <label className="text-[11px] text-gray-400 font-bold block mb-2 cursor-help" title="입력된 점수 기준은 자동으로 Judge 프롬프트의 description에 추가됩니다.">
-                                                    점수 부여 기준 (선택사항, 프롬프트에 자동 반영됨)
+                                                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)] mt-5">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={rubricRequireJsonParsePass}
+                                                        onChange={(event) => setRubricRequireJsonParsePass(event.target.checked)}
+                                                        className="rounded border-[var(--border)] bg-[var(--input)]"
+                                                    />
+                                                    JSON 파싱 성공 필수 (requireJsonParsePass)
                                                 </label>
-                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] text-rose-400 block">1점 (미흡)</label>
-                                                        <textarea
-                                                            value={row.anchor1 || ''}
-                                                            onChange={(event) => updateCriterionRow(row.id, 'anchor1', event.target.value)}
-                                                            placeholder="1점 기준 설명..."
-                                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-gray-300 focus:border-rose-500/50 outline-none resize-y min-h-[60px]"
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] text-amber-400 block">3점 (보통)</label>
-                                                        <textarea
-                                                            value={row.anchor3 || ''}
-                                                            onChange={(event) => updateCriterionRow(row.id, 'anchor3', event.target.value)}
-                                                            placeholder="3점 기준 설명..."
-                                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-gray-300 focus:border-amber-500/50 outline-none resize-y min-h-[60px]"
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] text-emerald-400 block">5점 (우수)</label>
-                                                        <textarea
-                                                            value={row.anchor5 || ''}
-                                                            onChange={(event) => updateCriterionRow(row.id, 'anchor5', event.target.value)}
-                                                            placeholder="5점 기준 설명..."
-                                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-[11px] text-gray-300 focus:border-emerald-500/50 outline-none resize-y min-h-[60px]"
-                                                        />
-                                                    </div>
-                                                </div>
                                             </div>
 
-                                            <div className="pt-3 flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeCriterionRow(row.id)}
-                                                    disabled={rubricCriteriaRows.length <= 1}
-                                                    className="px-3 py-1.5 rounded-lg border border-rose-500/30 text-rose-400 text-xs hover:bg-rose-500/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 transition-colors"
-                                                    title={rubricCriteriaRows.length <= 1 ? '최소 1개 기준 필요' : '이 기준 삭제'}
-                                                >
-                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
-                                                    기준 삭제
-                                                </button>
+                                            <div>
+                                                <label className="text-[11px] text-[var(--text-secondary)] block mb-1">루브릭 설명/노트</label>
+                                                <textarea
+                                                    value={rubricDescriptionNote}
+                                                    onChange={(event) => setRubricDescriptionNote(event.target.value)}
+                                                    placeholder="평가자의 판단 기준 메모를 입력하세요."
+                                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] min-h-[72px] resize-y"
+                                                />
+                                                <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                                                    각 기준 설명은 자동으로 description에 병합되어 Judge 프롬프트에 반영됩니다.
+                                                </p>
                                             </div>
                                         </div>
                                     </details>
-                                ))}
+                                </div>
+                            ) : (
+                                <p className="text-[11px] text-[var(--text-tertiary)]">
+                                    기본 템플릿 기준(또는 저장된 defaults override)을 그대로 사용합니다.
+                                </p>
+                            )}
+                        </div>
+                    </section>
 
-                                <button
-                                    type="button"
-                                    onClick={addCriterionRow}
-                                    className="w-full py-3 mt-4 rounded-xl border border-dashed border-[var(--primary)]/40 text-[var(--primary)] text-sm hover:bg-[var(--primary)]/10 hover:border-[var(--primary)] flex items-center justify-center gap-2 transition-colors font-bold"
-                                >
-                                    <span className="material-symbols-outlined text-sm">add_circle</span>
-                                    새로운 평가 기준 추가
-                                </button>
-                            </div>
-
-                            <details className="mt-6 bg-black/40 border border-white/10 rounded-lg overflow-hidden group">
-                                <summary className="flex items-center gap-2 p-4 cursor-pointer hover:bg-white/5 list-none font-bold text-sm text-gray-300">
-                                    <span className="material-symbols-outlined text-gray-500 group-open:rotate-90 transition-transform">chevron_right</span>
-                                    고급 루브릭 설정 (최소 점수, JSON, 추가 노트)
-                                </summary>
-                                <div className="p-4 pt-0 border-t border-white/5 space-y-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[11px] text-gray-400">최소 종합 점수 (minOverallScore)</label>
-                                            <input
-                                                type="number"
-                                                value={rubricMinOverallScore}
-                                                onChange={(event) => setRubricMinOverallScore(event.target.value)}
-                                                className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                                            />
-                                        </div>
-                                        <label className="flex items-center gap-2 text-xs text-gray-300 mt-5">
-                                            <input
-                                                type="checkbox"
-                                                checked={rubricRequireJsonParsePass}
-                                                onChange={(event) => setRubricRequireJsonParsePass(event.target.checked)}
-                                                className="rounded border-white/20 bg-white/10"
-                                            />
-                                            JSON 파싱 성공 필수 (requireJsonParsePass)
-                                        </label>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-[11px] text-gray-400 block mb-1">루브릭 설명/노트</label>
-                                        <textarea
-                                            value={rubricDescriptionNote}
-                                            onChange={(event) => setRubricDescriptionNote(event.target.value)}
-                                            placeholder="평가자의 판단 기준 메모를 입력하세요."
-                                            className="w-full bg-black/60 border border-white/10 rounded-lg px-3 py-2 text-xs text-white min-h-[72px] resize-y"
-                                        />
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            각 기준 설명은 자동으로 description에 병합되어 Judge 프롬프트에 반영됩니다.
+                    <div className="space-y-4">
+                        {/* 5. Compare Preview */}
+                        <section className="space-y-4">
+                            <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[var(--primary)] text-xl">compare_arrows</span>
+                                비교 프리뷰
+                            </h3>
+                            <div className="glass-card rounded-xl p-5 border border-[var(--border)] space-y-3">
+                                {singleMode && (
+                                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 animate-in fade-in duration-200">
+                                        <p className="text-[10px] text-emerald-200 mb-1">단일 검증</p>
+                                        <p className="text-sm text-emerald-100 font-semibold">
+                                            내 버전 {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
                                         </p>
+                                        <p className="text-[11px] text-emerald-200/80 mt-1">선택한 버전만 기준 충족 여부를 검사합니다.</p>
+                                    </div>
+                                )}
+
+                                {compareMode && (
+                                    <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
+                                        <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
+                                            <p className="text-[10px] text-blue-200 mb-1">내 버전</p>
+                                            <p className="text-sm text-blue-100 font-semibold">
+                                                {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
+                                            </p>
+                                            <p className="text-[10px] text-blue-200/75 mt-1">{selectedVersion?.model ?? '-'}</p>
+                                        </div>
+                                        <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
+                                            <p className="text-[10px] text-indigo-200 mb-1">운영 버전 (Active)</p>
+                                            <p className="text-sm text-indigo-100 font-semibold">{activeReleaseVersionLabel ?? '(없음)'}</p>
+                                            <p className="text-[10px] text-indigo-200/75 mt-1">현재 배포 상태와 직접 비교합니다.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {/* 6. Release Criteria */}
+                        <section className="space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <h3 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[var(--primary)] text-xl">verified</span>
+                                    배포 판정 기준
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={onResetReleaseCriteria}
+                                        disabled={releaseCriteriaActionsDisabled}
+                                        className="text-[11px] text-[var(--text-secondary)] px-2.5 py-1 rounded border border-[var(--border)] hover:border-[var(--border-hover)] disabled:opacity-50"
+                                    >
+                                        기준 되돌리기
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onSaveReleaseCriteria}
+                                        disabled={releaseCriteriaActionsDisabled}
+                                        className="text-[11px] text-[var(--primary)] px-2.5 py-1 rounded border border-[var(--primary)]/40 hover:border-[var(--primary)] disabled:opacity-50"
+                                    >
+                                        {isSavingReleaseCriteria ? '저장 중...' : '기준 저장'}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="glass-card rounded-xl p-5 border border-[var(--border)] space-y-4">
+                                <p className="text-sm text-[var(--text-secondary)]">
+                                    실행 결과의 배포 가능/보류는 아래 워크스페이스 기준으로 계산됩니다.
+                                </p>
+
+                                {releaseCriteriaNotice && (
+                                    <div
+                                        className={`rounded-lg border px-3 py-2 text-xs ${releaseCriteriaNotice.type === 'success'
+                                            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
+                                            : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
+                                            }`}
+                                    >
+                                        {releaseCriteriaNotice.message}
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] text-[var(--text-secondary)]">최소 통과율 (%)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step="0.1"
+                                            value={effectiveReleaseCriteriaDraft.minPassRate}
+                                            onChange={(event) => onChangeReleaseCriteriaDraft('minPassRate', event.target.value)}
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] text-[var(--text-secondary)]">최소 평균 점수</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step="0.1"
+                                            value={effectiveReleaseCriteriaDraft.minAvgOverallScore}
+                                            onChange={(event) => onChangeReleaseCriteriaDraft('minAvgOverallScore', event.target.value)}
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] text-[var(--text-secondary)]">최대 오류율 (%)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step="0.1"
+                                            value={effectiveReleaseCriteriaDraft.maxErrorRate}
+                                            onChange={(event) => onChangeReleaseCriteriaDraft('maxErrorRate', event.target.value)}
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] text-[var(--text-secondary)]">개선폭 알림 기준 (비교 모드 Δ점수)</label>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step="0.1"
+                                            value={effectiveReleaseCriteriaDraft.minImprovementNoticeDelta}
+                                            onChange={(event) => onChangeReleaseCriteriaDraft('minImprovementNoticeDelta', event.target.value)}
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)]"
+                                        />
                                     </div>
                                 </div>
-                            </details>
-                        </div>
-                    ) : (
-                        <p className="text-[11px] text-gray-500">
-                            기본 템플릿 기준(또는 저장된 defaults override)을 그대로 사용합니다.
-                        </p>
-                    )}
-                </div>
 
-                <div className="bg-black/20 border border-white/10 rounded-2xl p-6 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <p className="text-xs uppercase tracking-wider text-gray-400 font-bold">배포 판정 기준</p>
-                            <p className="text-[11px] text-gray-500 mt-1">
-                                실행 결과의 배포 가능/보류는 아래 워크스페이스 기준으로 계산됩니다.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={onResetReleaseCriteria}
-                                disabled={releaseCriteriaActionsDisabled}
-                                className="text-[11px] text-gray-300 px-2.5 py-1 rounded border border-white/15 hover:border-white/30 disabled:opacity-50"
-                            >
-                                기준 되돌리기
-                            </button>
-                            <button
-                                type="button"
-                                onClick={onSaveReleaseCriteria}
-                                disabled={releaseCriteriaActionsDisabled}
-                                className="text-[11px] text-[var(--primary)] px-2.5 py-1 rounded border border-[var(--primary)]/40 hover:border-[var(--primary)] disabled:opacity-50"
-                            >
-                                {isSavingReleaseCriteria ? '저장 중...' : '기준 저장'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {releaseCriteriaNotice && (
-                        <div
-                            className={`rounded-lg border px-3 py-2 text-xs ${releaseCriteriaNotice.type === 'success'
-                                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                                : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
-                                }`}
-                        >
-                            {releaseCriteriaNotice.message}
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <label className="text-[11px] text-gray-400">최소 통과율 (%)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.1"
-                                value={effectiveReleaseCriteriaDraft.minPassRate}
-                                onChange={(event) => onChangeReleaseCriteriaDraft('minPassRate', event.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[11px] text-gray-400">최소 평균 점수</label>
-                            <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.1"
-                                value={effectiveReleaseCriteriaDraft.minAvgOverallScore}
-                                onChange={(event) => onChangeReleaseCriteriaDraft('minAvgOverallScore', event.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[11px] text-gray-400">최대 오류율 (%)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.1"
-                                value={effectiveReleaseCriteriaDraft.maxErrorRate}
-                                onChange={(event) => onChangeReleaseCriteriaDraft('maxErrorRate', event.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[11px] text-gray-400">개선폭 알림 기준 (비교 모드 Δ점수)</label>
-                            <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.1"
-                                value={effectiveReleaseCriteriaDraft.minImprovementNoticeDelta}
-                                onChange={(event) => onChangeReleaseCriteriaDraft('minImprovementNoticeDelta', event.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white"
-                            />
-                        </div>
-                    </div>
-
-                    <p className="text-[10px] text-gray-500">
-                        마지막 업데이트: {releaseCriteriaUpdatedAt ? formatTimestamp(releaseCriteriaUpdatedAt) : '-'}
-                        {releaseCriteriaUpdatedBy != null ? ` · 변경자 #${releaseCriteriaUpdatedBy}` : ''}
-                        {' / '}
-                        저장한 기준은 다음 실행부터 판정에 반영됩니다.
-                    </p>
+                                <p className="text-[10px] text-[var(--text-tertiary)]">
+                                    마지막 업데이트: {releaseCriteriaUpdatedAt ? formatTimestamp(releaseCriteriaUpdatedAt) : '-'}
+                                    {releaseCriteriaUpdatedBy != null ? ` · 변경자 #${releaseCriteriaUpdatedBy}` : ''}
+                                    {' / '}
+                                    저장한 기준은 다음 실행부터 판정에 반영됩니다.
+                                </p>
 
 
-                    <div className="rounded-lg border border-white/10 bg-black/30 p-3 space-y-2">
-                        <p className="text-[11px] text-gray-300">최근 기준 변경 이력</p>
-                        {releaseCriteriaHistoryPreview.length === 0 ? (
-                            <p className="text-[11px] text-gray-500">아직 이력이 없습니다.</p>
-                        ) : (
-                            <div className="space-y-1.5">
-                                {releaseCriteriaHistoryPreview.map((historyItem) => (
-                                    <div key={historyItem.id} className="text-[11px] text-gray-300 flex flex-wrap items-center gap-2">
-                                        <span className="text-gray-500">{formatTimestamp(historyItem.changedAt)}</span>
-                                        <span className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10">변경자 #{historyItem.changedBy ?? '-'}</span>
-                                        <span>Pass ≥ {historyItem.minPassRate.toFixed(1)}%</span>
-                                        <span>Score ≥ {historyItem.minAvgOverallScore.toFixed(1)}</span>
-                                        <span>Error ≤ {historyItem.maxErrorRate.toFixed(1)}%</span>
-                                        <span>Δ ≥ {historyItem.minImprovementNoticeDelta.toFixed(1)}</span>
-                                    </div>
-                                ))}
+                                <div className="rounded-lg border border-[var(--border)] bg-[var(--input)] p-3 space-y-2">
+                                    <p className="text-[11px] text-[var(--text-secondary)]">최근 기준 변경 이력</p>
+                                    {releaseCriteriaHistoryPreview.length === 0 ? (
+                                        <p className="text-[11px] text-[var(--text-tertiary)]">아직 이력이 없습니다.</p>
+                                    ) : (
+                                        <div className="space-y-1.5">
+                                            {releaseCriteriaHistoryPreview.map((historyItem) => (
+                                                <div key={historyItem.id} className="text-[11px] text-[var(--text-secondary)] flex flex-wrap items-center gap-2">
+                                                    <span className="text-[var(--text-tertiary)]">{formatTimestamp(historyItem.changedAt)}</span>
+                                                    <span className="px-1.5 py-0.5 rounded bg-[var(--hover)] border border-[var(--border)]">변경자 #{historyItem.changedBy ?? '-'}</span>
+                                                    <span>Pass ≥ {historyItem.minPassRate.toFixed(1)}%</span>
+                                                    <span>Score ≥ {historyItem.minAvgOverallScore.toFixed(1)}</span>
+                                                    <span>Error ≤ {historyItem.maxErrorRate.toFixed(1)}%</span>
+                                                    <span>Δ ≥ {historyItem.minImprovementNoticeDelta.toFixed(1)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
+                        </section>
                     </div>
                 </div>
 
-                <div className="sticky bottom-0 pt-4 pb-2 border-t border-white/10 bg-gradient-to-t from-[var(--background-card)] to-transparent flex justify-between items-center z-10 mt-6">
+                <div className="sticky bottom-0 pt-4 pb-2 border-t border-[var(--border)] bg-gradient-to-t from-[var(--background-card)] to-transparent flex justify-between items-center z-10 mt-6">
                     <button
                         type="button"
                         onClick={onPrev}
-                        className="px-6 py-3 w-full md:w-auto bg-black/40 text-gray-300 rounded-xl text-sm font-bold border border-white/10 hover:bg-black/60 transition-colors"
+                        className="px-6 py-3 w-full md:w-auto bg-[var(--input)] text-[var(--text-secondary)] rounded-xl text-sm font-bold border border-[var(--border)] hover:bg-[var(--hover)] transition-colors"
                     >
                         &larr; 이전 단계 (데이터셋)
                     </button>
@@ -2141,8 +2174,8 @@ function ConfigSection({
                         >
                             {isRunning ? '실행 중...' : '평가 시작 (결과 확인)'}
                         </button>
-                        <div className="pointer-events-none absolute bottom-full mb-2 right-0 w-[240px] rounded-lg border border-white/20 bg-black/90 px-3 py-2 text-left text-[11px] text-gray-200 opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0">
-                            <p className="font-semibold text-white mb-1">실행 예상치</p>
+                        <div className="pointer-events-none absolute bottom-full mb-2 right-0 w-[240px] rounded-lg border border-[var(--border)] bg-[var(--input)] px-3 py-2 text-left text-[11px] text-[var(--foreground)] opacity-0 translate-y-1 transition-all group-hover:opacity-100 group-hover:translate-y-0">
+                            <p className="font-semibold text-[var(--foreground)] mb-1">실행 예상치</p>
                             <div className="grid grid-cols-2 gap-1 text-[10px]">
                                 <span>호출 횟수:</span>
                                 <span className="text-right">{runEstimate ? `${runEstimate.estimatedCallsMin}~${runEstimate.estimatedCallsMax}회` : '-'}</span>
@@ -2154,7 +2187,7 @@ function ConfigSection({
                                 <span className="text-right">{runEstimate ? `${runEstimate.estimatedCases}건` : '-'}</span>
                             </div>
                             {runEstimate?.estimateNotice && (
-                                <p className="mt-2 text-[9px] text-gray-400 border-t border-white/10 pt-2">{runEstimate.estimateNotice}</p>
+                                <p className="mt-2 text-[9px] text-[var(--text-secondary)] border-t border-[var(--border)] pt-2">{runEstimate.estimateNotice}</p>
                             )}
                             {runBlockedReason && <p className="mt-1 text-[9px] text-rose-400">{runBlockedReason}</p>}
                         </div>
@@ -2583,10 +2616,10 @@ function ResultDashboard({
                 ? '배포 보류'
                 : '-';
     const decisionBadgeClass = releaseDecision === 'PASS'
-        ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+        ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
         : releaseDecision === 'HOLD'
-            ? 'border-rose-400/40 bg-rose-500/15 text-rose-200'
-            : 'border-white/20 bg-white/5 text-gray-200';
+            ? 'border-rose-400/40 bg-rose-500/15 text-rose-700 dark:text-rose-200'
+            : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]';
     const hasDecisionGateData = decisionGateItems.length > 0 || localizedDecisionReasons.length > 0;
     const failurePreviewCases = cases
         .filter((item) => item.pass === false || item.status === 'ERROR')
@@ -2627,56 +2660,56 @@ function ResultDashboard({
 
     return (
         <div className="h-full flex flex-col gap-4">
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-5 shrink-0">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-card)] p-5 shrink-0">
                 <div className="flex flex-col lg:flex-row lg:items-start gap-5">
                     <div className="min-w-[160px]">
-                        <p className="text-[11px] uppercase tracking-wider text-gray-400">종합 등급</p>
+                        <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">종합 등급</p>
                         <p className={`text-6xl font-black leading-none mt-1 ${gradeToneClass(insightGrade)}`}>
                             {insightGrade}
                         </p>
-                        <p className="text-[11px] text-gray-400 mt-1">{gradeDescription}</p>
+                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">{gradeDescription}</p>
                         <span className={`inline-flex mt-3 px-2.5 py-1 rounded-full text-[11px] border ${decisionBadgeClass}`}>
                             판정 {decisionLabel}
                         </span>
                     </div>
                     <div className="flex-1 space-y-3">
-                        <p className="text-xs text-gray-400 mb-1">핵심 요약</p>
-                        <p className="text-base font-semibold text-white">{insightText}</p>
-                        <div className="flex flex-wrap gap-2 text-[11px] text-gray-300">
-                            <span className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                        <p className="text-xs text-[var(--text-secondary)] mb-1">핵심 요약</p>
+                        <p className="text-base font-semibold text-[var(--foreground)]">{insightText}</p>
+                        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--text-secondary)]">
+                            <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                 PassRate {formatPercent(passRate)}
                             </span>
-                            <span className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                            <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                 평균점수 {formatNumber(avgOverallScore)}
                             </span>
                             {compareMode && compareWinRate != null && (
-                                <span className="px-2 py-1 rounded bg-white/5 border border-white/10 text-gray-200">
+                                <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                     승률 {compareWinRate.toFixed(1)}% (W {betterCases.length} / L {worseCases.length} / S {sameCases.length})
                                 </span>
                             )}
                         </div>
                     </div>
                     {compareMode && (
-                        <div className="lg:w-[340px] shrink-0 rounded-xl border border-white/10 bg-black/25 p-3 space-y-3">
-                            <p className="text-[11px] uppercase tracking-wider text-gray-400">비교 스냅샷</p>
-                            <p className="text-xs text-gray-300">{compareTradeoffSummary}</p>
+                        <div className="lg:w-[340px] shrink-0 rounded-xl border border-[var(--border)] bg-[var(--input)] p-3 space-y-3">
+                            <p className="text-[11px] uppercase tracking-wider text-[var(--text-tertiary)]">비교 스냅샷</p>
+                            <p className="text-xs text-[var(--text-secondary)]">{compareTradeoffSummary}</p>
                             <div className="flex flex-wrap gap-2">
                                 {compareTradeoffChips.map((chip) => (
-                                    <span key={chip.key} className="text-[11px] px-2 py-1 rounded border border-white/15 bg-white/[0.06] text-gray-200">
+                                    <span key={chip.key} className="text-[11px] px-2 py-1 rounded border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]">
                                         {chip.label} {chip.value}
                                     </span>
                                 ))}
                             </div>
                             {battleReasons.length > 0 && (
                                 <div className="space-y-1.5">
-                                    <p className="text-[11px] text-gray-400">기준/주의 사유</p>
+                                    <p className="text-[11px] text-[var(--text-secondary)]">기준/주의 사유</p>
                                     <div className="flex flex-wrap gap-2">
                                         {battleReasons.slice(0, 2).map((reason, index) => (
                                             <button
                                                 type="button"
                                                 key={`${reason}-${index}`}
                                                 onClick={() => handleReasonFilter(reason)}
-                                                className="text-[11px] px-2 py-1 rounded border border-white/15 bg-white/[0.06] text-gray-200 hover:bg-white/10"
+                                                className="text-[11px] px-2 py-1 rounded border border-[var(--border)] bg-[var(--background-card)] text-[var(--foreground)] hover:bg-[var(--hover)] transition-colors"
                                             >
                                                 {reason}
                                             </button>
@@ -2714,10 +2747,10 @@ function ResultDashboard({
             </div>
 
             {failurePreviewCases.length > 0 && (
-                <div className="glass-card border border-white/10 rounded-xl p-4 shrink-0 bg-black/20">
+                <div className="glass-card border border-[var(--border)] rounded-xl p-4 shrink-0 bg-[var(--background-card)]">
                     <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-semibold text-white">문제아 리스트 (실패/오류 Top {failurePreviewCases.length})</p>
-                        <span className="text-[11px] text-gray-400">클릭 시 상세 케이스로 이동</span>
+                        <p className="text-xs font-semibold text-[var(--foreground)]">문제아 리스트 (실패/오류 Top {failurePreviewCases.length})</p>
+                        <span className="text-[11px] text-[var(--text-secondary)]">클릭 시 상세 케이스로 이동</span>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-3">
                         {failurePreviewCases.map((item) => {
@@ -2733,13 +2766,13 @@ function ResultDashboard({
                                         setCaseFilter('ALL');
                                         setSelectedCaseId(item.id);
                                     }}
-                                    className="text-left rounded-lg border border-white/10 bg-black/30 px-3 py-2 hover:bg-white/5"
+                                    className="text-left rounded-lg border border-[var(--border)] bg-[var(--input)] px-3 py-2 hover:bg-[var(--hover)] transition-colors"
                                 >
-                                    <p className="text-[11px] text-gray-400">#{item.testCaseId}</p>
-                                    <p className="text-xs text-gray-100 truncate mt-1">
+                                    <p className="text-[11px] text-[var(--text-tertiary)]">#{item.testCaseId}</p>
+                                    <p className="text-xs text-[var(--foreground)] truncate mt-1">
                                         {caseInputById[item.testCaseId] || `Case #${item.testCaseId}`}
                                     </p>
-                                    <p className="text-[11px] text-gray-300 mt-2 truncate">{reason}</p>
+                                    <p className="text-[11px] text-[var(--text-secondary)] mt-2 truncate">{reason}</p>
                                 </button>
                             );
                         })}
@@ -2747,17 +2780,17 @@ function ResultDashboard({
                 </div>
             )}
 
-            <details className="glass-card border border-white/10 rounded-xl p-4 shrink-0 bg-black/20">
+            <details className="glass-card border border-[var(--border)] rounded-xl p-4 shrink-0 bg-[var(--background-card)]">
                 <summary className="cursor-pointer list-none flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-white">상세 분석 보기</span>
-                    <span className="text-[11px] text-gray-400">LLM 평가 · 판정 근거 · 분포</span>
+                    <span className="text-xs font-semibold text-[var(--foreground)]">상세 분석 보기</span>
+                    <span className="text-[11px] text-[var(--text-secondary)]">LLM 평가 · 판정 근거 · 분포</span>
                 </summary>
                 <div className="mt-3 space-y-4">
                     {llmOverallComment && (
                         <div className="rounded-xl border border-blue-400/20 p-4 bg-blue-500/5 space-y-3">
                             <div>
                                 <p className="text-[11px] uppercase tracking-wider text-blue-300/90">LLM 종합평가</p>
-                                <p className="text-sm md:text-base font-semibold text-white mt-1">{llmOverallComment}</p>
+                                <p className="text-sm md:text-base font-semibold text-[var(--foreground)] mt-1">{llmOverallComment}</p>
                                 {llmVerdictReason && (
                                     <p className="text-xs text-blue-100/80 mt-1">{llmVerdictReason}</p>
                                 )}
@@ -2786,8 +2819,8 @@ function ResultDashboard({
                     )}
 
                     {hasDecisionGateData && (
-                        <div className="rounded-xl border border-white/10 p-4 bg-black/20">
-                            <p className="text-xs font-semibold text-white mb-3">판정 근거표</p>
+                        <div className="rounded-xl border border-[var(--border)] p-4 bg-[var(--background-card)]">
+                            <p className="text-xs font-semibold text-[var(--foreground)] mb-3">판정 근거표</p>
                             <DecisionGatePanel
                                 items={decisionGateItems}
                                 decisionReasons={localizedDecisionReasons}
@@ -2795,11 +2828,11 @@ function ResultDashboard({
                         </div>
                     )}
 
-                    <div className="rounded-xl border border-white/10 p-4 space-y-3 bg-black/20">
+                    <div className="rounded-xl border border-[var(--border)] p-4 space-y-3 bg-[var(--background-card)]">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                                <p className="text-sm font-semibold text-white">{plainSummary || '요약 정보가 없습니다.'}</p>
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="text-sm font-semibold text-[var(--foreground)]">{plainSummary || '요약 정보가 없습니다.'}</p>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1">
                                     상태: {run?.status ? toKoreanRunStatus(run.status) : '-'} / 모드: {statusLabel} / 소요 시간: {formatDurationMs(run?.startedAt, run?.completedAt)}
                                 </p>
                             </div>
@@ -2809,58 +2842,58 @@ function ResultDashboard({
                                         type="button"
                                         onClick={onCancelRun}
                                         disabled={isCancelling}
-                                        className="px-3 py-1.5 text-xs rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+                                        className="px-3 py-1.5 text-xs rounded-lg border border-rose-500/40 text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
                                     >
                                         {isCancelling ? '취소 요청 중...' : '실행 취소'}
                                     </button>
                                 )}
-                                <span className="text-[11px] text-gray-500">
+                                <span className="text-[11px] text-[var(--text-tertiary)]">
                                     생성 {formatTimestamp(run?.createdAt)}
                                 </span>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 text-[11px] text-gray-300">
-                            <span className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--text-secondary)]">
+                            <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                 진행 {completed}/{total}
                             </span>
-                            <span className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                            <span className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
                                 통과 {passed}
                             </span>
-                            <span className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                            <span className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300">
                                 실패/오류 {failures}
                             </span>
-                            <span className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                            <span className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300">
                                 경고 {warnings}
                             </span>
                             {avgScoreDeltaEffective != null && (
-                                <span className="px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
+                                <span className="px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300">
                                     비교 Δ {formatSigned(avgScoreDeltaEffective)}
                                 </span>
                             )}
                             {compareCoverageRate != null && (
-                                <span className="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300">
+                                <span className="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300">
                                     비교 커버리지 {formatPercent(compareCoverageRate)}
                                 </span>
                             )}
                             {riskLevel && (
-                                <span className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                                <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                     위험도 {toKoreanRiskLevel(riskLevel)}
                                 </span>
                             )}
                             {totalTokens != null && (
-                                <span className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                                <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                     총 토큰 {Math.round(totalTokens).toLocaleString('ko-KR')}
                                 </span>
                             )}
                         </div>
 
                         {localizedTopIssues.length > 0 && (
-                            <div className="text-xs text-gray-300">
-                                <p className="text-[11px] text-gray-400 mb-1">주요 이슈</p>
+                            <div className="text-xs text-[var(--text-secondary)]">
+                                <p className="text-[11px] text-[var(--text-tertiary)] mb-1">주요 이슈</p>
                                 <div className="flex flex-wrap gap-2">
                                     {localizedTopIssues.map((issue, index) => (
-                                        <span key={`${issue}-${index}`} className="px-2 py-1 rounded bg-white/5 border border-white/10">
+                                        <span key={`${issue}-${index}`} className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                             {issue}
                                         </span>
                                     ))}
@@ -2896,9 +2929,9 @@ function ResultDashboard({
             </details>
 
             <div className="flex-1 flex gap-4 overflow-hidden">
-                <div className="w-[330px] glass-card border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                    <div className="p-3 border-b border-white/10 bg-black/20">
-                        <p className="font-bold text-xs text-gray-300 mb-2">실행 히스토리</p>
+                <div className="w-[330px] glass-card border border-[var(--border)] rounded-xl flex flex-col overflow-hidden">
+                    <div className="p-3 border-b border-[var(--border)] bg-[var(--background-card)]">
+                        <p className="font-bold text-xs text-[var(--foreground)] mb-2">실행 히스토리</p>
                         <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
                             {runs.map((runItem) => {
                                 const runSummary = asRecord(runItem.summary);
@@ -2910,15 +2943,15 @@ function ResultDashboard({
                                         key={runItem.id}
                                         onClick={() => onSelectRun(runItem.id)}
                                         className={`w-full text-left p-2 rounded-lg border transition ${selected
-                                            ? 'bg-white/10 border-white/30'
-                                            : 'bg-black/30 border-white/10 hover:bg-white/5'
+                                            ? 'bg-[var(--hover)] border-[var(--primary)]'
+                                            : 'bg-[var(--input)] border-[var(--border)] hover:bg-[var(--hover)]'
                                             }`}
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[11px] text-gray-200">Run #{runItem.id}</span>
-                                            <span className="text-[10px] text-gray-400">{toKoreanRunStatus(runItem.status)}</span>
+                                            <span className="text-[11px] text-[var(--text-secondary)]">Run #{runItem.id}</span>
+                                            <span className="text-[10px] text-[var(--text-tertiary)]">{toKoreanRunStatus(runItem.status)}</span>
                                         </div>
-                                        <div className="text-[10px] text-gray-500 mt-1 flex justify-between">
+                                        <div className="text-[10px] text-[var(--text-tertiary)] mt-1 flex justify-between">
                                             <span>{formatTimestamp(runItem.createdAt)}</span>
                                             <span>{runPassRate != null ? `${runPassRate.toFixed(1)}%` : '-'}</span>
                                         </div>
@@ -2928,8 +2961,8 @@ function ResultDashboard({
                         </div>
                     </div>
 
-                    <div className="p-3 border-b border-white/10 bg-black/20">
-                        <p className="font-bold text-xs text-gray-300 mb-2">
+                    <div className="p-3 border-b border-[var(--border)] bg-[var(--background-card)]">
+                        <p className="font-bold text-xs text-[var(--foreground)] mb-2">
                             테스트 케이스 ({filteredCases.length}/{loadedCount}/{total})
                         </p>
                         <div className="flex flex-wrap gap-1">
@@ -2938,9 +2971,9 @@ function ResultDashboard({
                                     type="button"
                                     key={option.key}
                                     onClick={() => setCaseFilter(option.key)}
-                                    className={`px-2 py-1 rounded text-[10px] border ${caseFilter === option.key
-                                        ? 'bg-white text-black border-white'
-                                        : 'bg-black/30 text-gray-300 border-white/10 hover:border-white/30'
+                                    className={`px-2 py-1 rounded text-[10px] border transition-colors ${caseFilter === option.key
+                                        ? 'bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]'
+                                        : 'bg-[var(--input)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--text-tertiary)]'
                                         }`}
                                 >
                                     {option.label}
@@ -2963,29 +2996,29 @@ function ResultDashboard({
                                             ? 'bg-rose-500/20 border-l-2 border-l-rose-300'
                                             : diffTone === 'SAME'
                                                 ? 'bg-slate-500/20 border-l-2 border-l-slate-300'
-                                                : 'bg-white/10 border-l-2 border-l-white'
+                                                : 'bg-[var(--hover)] border-l-2 border-l-[var(--border-hover)]'
                                     : diffTone === 'BETTER'
                                         ? 'bg-blue-500/[0.08] border-l-2 border-l-blue-500/60 hover:bg-blue-500/[0.14]'
                                         : diffTone === 'WORSE'
                                             ? 'bg-rose-500/[0.08] border-l-2 border-l-rose-500/60 hover:bg-rose-500/[0.14]'
                                             : diffTone === 'SAME'
                                                 ? 'bg-slate-500/[0.08] border-l-2 border-l-slate-500/60 hover:bg-slate-500/[0.14]'
-                                                : 'hover:bg-white/5'
+                                                : 'hover:bg-[var(--hover)]'
                                 : selected
                                     ? isFailureCase
                                         ? 'bg-rose-500/20 border-l-2 border-l-rose-300'
-                                        : 'bg-white/10 border-l-2 border-l-white'
+                                        : 'bg-[var(--hover)] border-l-2 border-l-[var(--border-hover)]'
                                     : isFailureCase
                                         ? 'bg-rose-500/[0.08] border-l-2 border-l-rose-500/60 hover:bg-rose-500/[0.14]'
-                                        : 'hover:bg-white/5';
+                                        : 'hover:bg-[var(--hover)]';
                             return (
                                 <div
                                     key={item.id}
                                     onClick={() => setSelectedCaseId(item.id)}
-                                    className={`p-3 border-b border-white/5 cursor-pointer transition-colors ${compareRowClass}`}
+                                    className={`p-3 border-b border-[var(--border)] cursor-pointer transition-colors ${compareRowClass}`}
                                 >
                                     <div className="flex justify-between mb-1">
-                                        <span className="font-mono text-[10px] text-gray-500">#{item.testCaseId}</span>
+                                        <span className="font-mono text-[10px] text-[var(--text-tertiary)]">#{item.testCaseId}</span>
                                         <div className="flex items-center gap-1">
                                             {compareMode && (
                                                 <CompareDiffBadge
@@ -2996,7 +3029,7 @@ function ResultDashboard({
                                             <CaseStatusBadge item={item} />
                                         </div>
                                     </div>
-                                    <div className="text-xs text-gray-300 truncate">
+                                    <div className="text-xs text-[var(--text-secondary)] truncate">
                                         {caseInputById[item.testCaseId] || `Case #${item.testCaseId}`}
                                     </div>
                                     {compareMode && compareDelta && (
@@ -3006,12 +3039,12 @@ function ResultDashboard({
                             );
                         })}
                         {filteredCases.length === 0 && (
-                            <div className="text-center text-xs text-gray-500 py-8">조건에 맞는 케이스가 없습니다.</div>
+                            <div className="text-center text-xs text-[var(--text-secondary)] py-8">조건에 맞는 케이스가 없습니다.</div>
                         )}
                     </div>
                 </div>
 
-                <div className="flex-1 glass-card border border-white/10 rounded-xl overflow-hidden bg-black/20 p-4">
+                <div className="flex-1 glass-card border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--background-card)] p-4">
                     {selectedCase && resolvedRunId ? (
                         <CaseDetailPanel
                             item={selectedCase}
@@ -3022,10 +3055,10 @@ function ResultDashboard({
                             runId={resolvedRunId}
                         />
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                        <div className="h-full flex flex-col items-center justify-center text-[var(--text-secondary)]">
                             {isRunning ? (
                                 <>
-                                    <span className="material-symbols-outlined animate-spin text-3xl mb-2">sync</span>
+                                    <span className="material-symbols-outlined animate-spin text-3xl mb-2 text-[var(--primary)]">sync</span>
                                     <p>실시간 분석 중...</p>
                                 </>
                             ) : (
@@ -3051,15 +3084,15 @@ function DecisionGatePanel({
     }
 
     const levelMeta: Record<DecisionGateLevel, { label: string; className: string }> = {
-        PASS: { label: '통과', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-200' },
-        FAIL: { label: '실패', className: 'bg-rose-500/15 border-rose-500/30 text-rose-200' },
-        WARN: { label: '주의', className: 'bg-amber-500/15 border-amber-500/30 text-amber-200' },
-        NA: { label: '미판정', className: 'bg-white/5 border-white/15 text-gray-300' },
+        PASS: { label: '통과', className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-500 dark:text-emerald-200' },
+        FAIL: { label: '실패', className: 'bg-rose-500/15 border-rose-500/30 text-rose-500 dark:text-rose-200' },
+        WARN: { label: '주의', className: 'bg-amber-500/15 border-amber-500/30 text-amber-500 dark:text-amber-200' },
+        NA: { label: '미판정', className: 'bg-[var(--input)] border-[var(--border)] text-[var(--text-secondary)]' },
     };
 
     return (
         <div className="space-y-3">
-            <p className="text-[10px] text-gray-500">현재 실행에 적용된 기준과 실제값 비교</p>
+            <p className="text-[10px] text-[var(--text-tertiary)]">현재 실행에 적용된 기준과 실제값 비교</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
                 {items.map((item) => {
@@ -3084,10 +3117,10 @@ function DecisionGatePanel({
 
             {decisionReasons.length > 0 && (
                 <div className="space-y-1">
-                    <p className="text-[11px] text-gray-400">차단/주의 사유</p>
+                    <p className="text-[11px] text-[var(--text-tertiary)]">차단/주의 사유</p>
                     <div className="flex flex-wrap gap-2">
                         {decisionReasons.map((reason, index) => (
-                            <span key={`${reason}-${index}`} className="px-2 py-1 rounded bg-white/5 border border-white/10 text-[11px] text-gray-200">
+                            <span key={`${reason}-${index}`} className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[11px] text-[var(--text-secondary)]">
                                 {reason}
                             </span>
                         ))}
@@ -3120,25 +3153,25 @@ function CountDistributionPanel({
     const total = entries.reduce((sum, entry) => sum + entry.count, 0);
 
     return (
-        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--background-card)] p-3">
             <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-gray-200">{title}</p>
-                <span className="text-[10px] text-gray-500">{total}건</span>
+                <p className="text-xs font-semibold text-[var(--foreground)]">{title}</p>
+                <span className="text-[10px] text-[var(--text-tertiary)]">{total}건</span>
             </div>
 
             {entries.length === 0 ? (
-                <p className="text-xs text-gray-500 py-4 text-center">{emptyText}</p>
+                <p className="text-xs text-[var(--text-secondary)] py-4 text-center">{emptyText}</p>
             ) : (
                 <div className="space-y-2">
                     {entries.map((entry) => (
                         <div key={entry.key} className="space-y-1">
                             <div className="flex items-center justify-between gap-2">
-                                <p className="text-[11px] text-gray-300 truncate">{labelMapper ? labelMapper(entry.key) : entry.key}</p>
-                                <p className="text-[10px] text-gray-500 shrink-0">
+                                <p className="text-[11px] text-[var(--text-secondary)] truncate">{labelMapper ? labelMapper(entry.key) : entry.key}</p>
+                                <p className="text-[10px] text-[var(--text-tertiary)] shrink-0">
                                     {entry.count} ({entry.pct.toFixed(1)}%)
                                 </p>
                             </div>
-                            <div className="h-1.5 w-full bg-white/5 rounded">
+                            <div className="h-1.5 w-full bg-[var(--input)] rounded">
                                 <div
                                     className={`h-full rounded border ${toneClass}`}
                                     style={{ width: `${Math.max(6, Math.min(100, entry.pct))}%` }}
@@ -3171,13 +3204,13 @@ function InsightListPanel({
 
     return (
         <div className={`rounded-lg border p-3 ${toneClass}`}>
-            <p className="text-[11px] text-white/90 font-semibold mb-2">{title}</p>
+            <p className="text-[11px] text-[var(--foreground)] font-semibold mb-2">{title}</p>
             {entries.length === 0 ? (
-                <p className="text-[11px] text-gray-400">{emptyText}</p>
+                <p className="text-[11px] text-[var(--text-secondary)]">{emptyText}</p>
             ) : (
                 <div className="space-y-1.5">
                     {entries.map((entry, index) => (
-                        <p key={`${title}-${index}`} className="text-[11px] text-gray-100 leading-relaxed">
+                        <p key={`${title}-${index}`} className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
                             • {entry}
                         </p>
                     ))}
@@ -3194,16 +3227,16 @@ function CaseStatusBadge({ item }: { item: EvalCaseResultResponse }) {
     const hasWarning = item.pass === true && extractJudgeLabels(item.judgeOutput).length > 0;
 
     const style = isPending
-        ? 'bg-gray-700 text-gray-300'
+        ? 'bg-gray-700 text-gray-300 dark:bg-gray-800 dark:text-gray-400'
         : isError
-            ? 'bg-rose-500/20 text-rose-300'
+            ? 'bg-rose-500/20 text-rose-500 dark:text-rose-300'
             : isSkipped
-                ? 'bg-slate-600/30 text-slate-300'
+                ? 'bg-slate-600/30 text-slate-500 dark:text-slate-300'
                 : item.pass === false
-                    ? 'bg-rose-500/20 text-rose-300'
+                    ? 'bg-rose-500/20 text-rose-500 dark:text-rose-300'
                     : hasWarning
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-emerald-500/20 text-emerald-300';
+                        ? 'bg-amber-500/20 text-amber-500 dark:text-amber-300'
+                        : 'bg-emerald-500/20 text-emerald-500 dark:text-emerald-300';
 
     const text = isPending
         ? toKoreanCaseStatus(item.status)
@@ -3229,7 +3262,7 @@ function CompareDiffBadge({
 }) {
     if (tone === 'UNKNOWN') {
         return (
-            <span className="text-[10px] px-1.5 rounded bg-white/10 text-gray-400">
+            <span className="text-[10px] px-1.5 rounded bg-[var(--input)] text-[var(--text-tertiary)]">
                 비교 없음
             </span>
         );
@@ -3240,10 +3273,10 @@ function CompareDiffBadge({
         : ` ${scoreDelta > 0 ? '+' : ''}${scoreDelta.toFixed(2)}`;
 
     const map = {
-        BETTER: { label: `🔵 Better${deltaText}`, className: 'bg-blue-500/20 text-blue-200' },
-        WORSE: { label: `🔴 Worse${deltaText}`, className: 'bg-rose-500/20 text-rose-200' },
-        SAME: { label: '⚪ Same', className: 'bg-slate-500/20 text-slate-200' },
-        UNKNOWN: { label: '비교 없음', className: 'bg-white/10 text-gray-400' },
+        BETTER: { label: `🔵 Better${deltaText}`, className: 'bg-blue-500/20 text-blue-500 dark:text-blue-200' },
+        WORSE: { label: `🔴 Worse${deltaText}`, className: 'bg-rose-500/20 text-rose-500 dark:text-rose-200' },
+        SAME: { label: '⚪ Same', className: 'bg-slate-500/20 text-slate-500 dark:text-slate-200' },
+        UNKNOWN: { label: '비교 없음', className: 'bg-[var(--input)] text-[var(--text-tertiary)]' },
     } as const;
 
     const selected = map[tone];
@@ -3270,14 +3303,14 @@ function CaseCompareDeltaLine({ delta }: { delta: CompareCaseDelta }) {
 
     if (chips.length === 0) {
         return (
-            <p className="mt-1 text-[10px] text-gray-500">
+            <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">
                 비교 지표 없음
             </p>
         );
     }
 
     return (
-        <p className="mt-1 text-[10px] text-gray-400 truncate">
+        <p className="mt-1 text-[10px] text-[var(--text-secondary)] truncate">
             {chips.join(' · ')}
         </p>
     );
@@ -3299,10 +3332,10 @@ function StepButton({
             type="button"
             onClick={onClick}
             className={`px-4 py-1 rounded-full text-xs font-medium transition-all ${active
-                ? 'bg-white text-black shadow-lg scale-105'
+                ? 'bg-[var(--foreground)] text-[var(--background)] shadow-[0_0_15px_rgba(var(--foreground-rgb),0.2)] scale-105'
                 : done
-                    ? 'text-emerald-400 hover:text-emerald-300'
-                    : 'text-gray-500 hover:text-gray-300'
+                    ? 'text-[var(--primary)] hover:text-[var(--primary-hover)]'
+                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
                 }`}
         >
             {label} {done && !active && '✓'}
@@ -3320,11 +3353,11 @@ function StatusCard({
     tone: 'good' | 'warn' | 'danger' | 'info' | 'neutral';
 }) {
     const colors = {
-        good: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
-        warn: 'bg-amber-500/10 border-amber-500/30 text-amber-400',
-        danger: 'bg-rose-500/10 border-rose-500/30 text-rose-400',
-        info: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
-        neutral: 'bg-white/5 border-white/10 text-gray-400',
+        good: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 dark:text-emerald-400',
+        warn: 'bg-amber-500/10 border-amber-500/30 text-amber-500 dark:text-amber-400',
+        danger: 'bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400',
+        info: 'bg-blue-500/10 border-blue-500/30 text-blue-500 dark:text-blue-400',
+        neutral: 'bg-[var(--input)] border-[var(--border)] text-[var(--text-secondary)]',
     };
 
     return (
