@@ -200,9 +200,13 @@ public class LlmCallService {
         if (chatOptions == null || config == null) return;
 
         if (config.maxTokens() != null && config.maxTokens() > 0) {
-            tryInvokeSetter(chatOptions, "setMaxTokens", config.maxTokens());
-            tryInvokeSetter(chatOptions, "setMaxOutputTokens", config.maxTokens());
-            tryInvokeSetter(chatOptions, "setMaxCompletionTokens", config.maxTokens());
+            // Only invoke the first available setter to avoid sending conflicting
+            // fields (e.g. max_tokens + max_completion_tokens) in the same request.
+            if (!tryInvokeSetter(chatOptions, "setMaxTokens", config.maxTokens())) {
+                if (!tryInvokeSetter(chatOptions, "setMaxOutputTokens", config.maxTokens())) {
+                    tryInvokeSetter(chatOptions, "setMaxCompletionTokens", config.maxTokens());
+                }
+            }
         }
         if (config.temperature() != null) {
             tryInvokeDoubleSetter(chatOptions, "setTemperature", config.temperature());
@@ -215,21 +219,23 @@ public class LlmCallService {
         }
     }
 
-    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
+    private static boolean tryInvokeSetter(Object target, String methodName, Integer value) {
         try {
             var m = target.getClass().getMethod(methodName, Integer.class);
             m.invoke(target, value);
-            return;
+            return true;
         } catch (NoSuchMethodException ignored) {
             // fallthrough
         } catch (Exception ignored) {
-            return;
+            return false;
         }
         try {
             var m = target.getClass().getMethod(methodName, int.class);
             m.invoke(target, value.intValue());
+            return true;
         } catch (Exception ignored) {
         }
+        return false;
     }
 
     private static void tryInvokeDoubleSetter(Object target, String methodName, Double value) {

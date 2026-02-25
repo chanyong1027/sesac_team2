@@ -156,13 +156,13 @@ public class PromptVersionService {
         if (userTemplate == null || userTemplate.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate는 필수입니다.");
         }
-        if (!containsQuestionPlaceholder(userTemplate)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate에 {{question}} 변수가 필요합니다.");
+        if (!containsAnyPlaceholder(userTemplate)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate에 {{변수명}} 형식의 변수가 1개 이상 필요합니다.");
         }
     }
 
-    private boolean containsQuestionPlaceholder(String template) {
-        return template.contains("{{question}}");
+    private boolean containsAnyPlaceholder(String template) {
+        return template.contains("{{") && template.contains("}}");
     }
 
     private void validateSecondaryModel(PromptVersionCreateRequest request) {

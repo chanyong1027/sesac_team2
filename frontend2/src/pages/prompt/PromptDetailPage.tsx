@@ -536,7 +536,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         if (normalized === 'claude') return 'ANTHROPIC';
         return normalized.toUpperCase();
     };
-    const hasQuestionPlaceholder = (template: string) => template.includes('{{question}}');
+    const hasAnyPlaceholder = (template: string) => template.includes('{{') && template.includes('}}');
 
     const { data: credentials, isLoading: isCredsLoading } = useQuery({
         queryKey: ['provider-credentials', resolvedOrgId],
@@ -709,8 +709,8 @@ function VersionsTab({ promptId }: { promptId: number }) {
                 setTemplateError('userTemplate는 필수입니다.');
                 throw new Error('userTemplate required');
             }
-            if (!hasQuestionPlaceholder(trimmedTemplate)) {
-                setTemplateError('userTemplate에 {{question}} 변수가 필요합니다.');
+            if (!hasAnyPlaceholder(trimmedTemplate)) {
+                setTemplateError('userTemplate에 {{변수명}} 형식의 변수가 1개 이상 필요합니다.');
                 throw new Error('userTemplate missing placeholder');
             }
 
@@ -1168,12 +1168,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     }}
                                     rows={5}
                                     className="w-full rounded-md py-3 px-4 text-sm text-gray-300 placeholder-gray-600 resize-none font-mono bg-[#050507] border border-[var(--primary)]/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
-                                    placeholder="예: 사용자 질문: {{question}}"
+                                    placeholder="예: {{question}} 에 대해 답변해주세요. 또는 {{productName}} 상품 설명을 작성해주세요."
                                 />
                                 <p className="text-[11px] text-gray-400 flex items-center gap-1.5 pl-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_5px_rgba(168,85,247,0.8)]"></span>
-                                    <code className="bg-gray-800 px-1 py-0.5 rounded text-purple-200 font-mono text-[10px]">{'{{question}}'}</code>
-                                    변수가 반드시 포함되어야 합니다.
+                                    <code className="bg-gray-800 px-1 py-0.5 rounded text-purple-200 font-mono text-[10px]">{'{{변수명}}'}</code>
+                                    형식의 변수가 1개 이상 포함되어야 합니다.
                                 </p>
                                 {templateError && (
                                     <p className="mt-1 text-xs text-rose-300">{templateError}</p>
