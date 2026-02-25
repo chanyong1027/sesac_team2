@@ -32,7 +32,7 @@ config:
 # 관측 포인트:
 #   - gateway_budget_blocked_total 카운터
 #   - gateway_failover_total 카운터
-#   - HTTP 403 응답 비율
+#   - HTTP 429 응답 비율
 #   - isFailover=true 응답 비율
 # ──────────────────────────────────────────────
 
