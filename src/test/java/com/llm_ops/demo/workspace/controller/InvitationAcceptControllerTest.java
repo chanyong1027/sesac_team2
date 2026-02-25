@@ -14,6 +14,7 @@ import com.llm_ops.demo.workspace.domain.WorkspaceRole;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteAcceptRequest;
 import com.llm_ops.demo.workspace.dto.WorkspaceInviteAcceptResponse;
 import com.llm_ops.demo.workspace.service.WorkspaceInvitationAcceptService;
+import com.llm_ops.demo.workspace.service.WorkspaceInvitationPreviewService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class InvitationAcceptControllerTest {
 
     @MockitoBean
     private WorkspaceInvitationAcceptService invitationAcceptService;
+
+    @MockitoBean
+    private WorkspaceInvitationPreviewService invitationPreviewService;
 
     @Nested
     @DisplayName("초대 수락 API 성공")

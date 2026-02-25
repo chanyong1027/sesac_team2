@@ -19,10 +19,22 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+      base-path: /actuator
   endpoint:
     health:
-      show-details: never
+      show-details: when-authorized
+    prometheus:
+      enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        jvm.gc.pause: true
+      percentiles:
+        http.server.requests: [0.5, 0.9, 0.95, 0.99]
+    tags:
+      application: ${spring.application.name}
 
 server:
   port: 8080
@@ -126,3 +138,16 @@ gateway:
     retry-backoff-ms: 200
     min-retry-budget-ms: 1200
     min-failover-budget-ms: 1200
+
+eval:
+  judge:
+    provider: OPENAI
+    model: gpt-4.1-mini
+    temperature: 0.0
+    rejudge-on-fail: true
+    max-attempts: 2
+  worker:
+    poll-interval-ms: 3000
+    batch-size: 3
+  runner:
+    request-timeout-ms: 20000

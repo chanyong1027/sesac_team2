@@ -19,6 +19,9 @@ public class ModelPricing {
         // OpenAI
         PRICING_TABLE.put("gpt-4o", new PriceInfo("0.005", "0.015"));
         PRICING_TABLE.put("gpt-4o-mini", new PriceInfo("0.00015", "0.0006"));
+        PRICING_TABLE.put("gpt-4.1", new PriceInfo("0.002", "0.008"));
+        PRICING_TABLE.put("gpt-4.1-mini", new PriceInfo("0.0004", "0.0016"));
+        PRICING_TABLE.put("gpt-4.1-nano", new PriceInfo("0.0001", "0.0004"));
         PRICING_TABLE.put("gpt-4", new PriceInfo("0.03", "0.06"));
         PRICING_TABLE.put("gpt-3.5-turbo", new PriceInfo("0.0005", "0.0015"));
 
@@ -104,6 +107,20 @@ public class ModelPricing {
      */
     public static String getPricingVersion() {
         return VERSION;
+    }
+
+    /**
+     * 가격표에 등록된(지원되는) 모델인지 여부
+     *
+     * NOTE: 알 수 없는 모델을 0원으로 표시하면 운영/UX에서 오해가 생기므로,
+     * 호출자에서 "비용 미정"으로 처리할 수 있도록 별도 플래그를 제공합니다.
+     */
+    public static boolean isKnownModel(String modelName) {
+        if (modelName == null || modelName.isBlank()) {
+            return false;
+        }
+        String normalized = normalizeModelName(modelName);
+        return PRICING_TABLE.containsKey(normalized);
     }
 
     /**

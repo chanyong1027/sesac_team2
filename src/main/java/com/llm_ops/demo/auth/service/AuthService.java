@@ -5,6 +5,7 @@ import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.dto.request.LoginRequest;
 import com.llm_ops.demo.auth.dto.request.SignUpRequest;
 import com.llm_ops.demo.auth.dto.request.TokenRefreshRequest;
+import com.llm_ops.demo.auth.dto.response.EmailAvailabilityResponse;
 import com.llm_ops.demo.auth.dto.response.LoginResponse;
 import com.llm_ops.demo.auth.dto.response.SignUpResponse;
 import com.llm_ops.demo.auth.dto.response.TokenRefreshResponse;
@@ -49,6 +50,13 @@ public class AuthService {
                 savedUser.getEmail(),
                 savedUser.getName(),
                 "회원가입이 완료되었습니다.");
+    }
+
+    @Transactional(readOnly = true)
+    public EmailAvailabilityResponse checkEmailAvailability(String email) {
+        boolean available = !userRepository.existsByEmail(email);
+        String message = available ? "사용 가능한 이메일입니다." : "이미 사용 중인 이메일입니다.";
+        return new EmailAvailabilityResponse(available, message);
     }
 
     @Transactional

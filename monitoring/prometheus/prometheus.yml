@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # Spring Boot 앱 메트릭
+  - job_name: "llm-ops-app"
+    metrics_path: "/actuator/prometheus"
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["172.31.44.82:9091"]
+        labels:
+          application: "llm-ops"
+          environment: "prod"
+
+  # App EC2 호스트 OS 메트릭
+  - job_name: "node-app"
+    static_configs:
+      - targets: ["172.31.44.82:9100"]
+        labels:
+          instance: "app-ec2"
+
+  # Monitoring EC2 호스트 OS 메트릭
+  - job_name: "node-monitoring"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels:
+          instance: "monitoring-ec2"

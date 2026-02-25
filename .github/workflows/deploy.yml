@@ -114,18 +114,18 @@ jobs:
             docker compose up -d --remove-orphans
 
             echo "Waiting for application to be healthy..."
-            for i in {1..30}; do
-              if curl -f http://localhost:8080/actuator/health > /dev/null 2>&1; then
+            for i in {1..60}; do
+              if docker exec $(docker compose ps -q sesac-app) wget -qO- http://localhost:9091/actuator/health > /dev/null 2>&1; then
                 echo "✅ Application is healthy!"
                 docker compose ps
                 docker compose logs --tail=50
                 docker image prune -af
                 exit 0
               fi
-              echo "Retry $i/30..."
+              echo "Retry $i/60..."
               sleep 1
             done
-            
+
             echo "❌ Health check failed!"
             docker compose logs --tail=100
             exit 1

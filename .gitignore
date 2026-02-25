@@ -59,3 +59,8 @@ frontend2/node_modules/
 
 # local study notes
 study/
+
+### Performance Tests ###
+performance-tests/.env
+performance-tests/reports/*.json
+performance-tests/reports/*.html

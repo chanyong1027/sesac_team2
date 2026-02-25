@@ -36,8 +36,8 @@ function downloadCsv(filename: string, rows: Array<Record<string, string | numbe
 function RoleBadge({ role }: { role: string }) {
   const base = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border';
   if (role === 'OWNER') return <span className={`${base} bg-[color:rgba(146,19,236,0.12)] text-[var(--primary)] border-[color:rgba(146,19,236,0.25)]`}>소유자</span>;
-  if (role === 'ADMIN') return <span className={`${base} bg-[color:rgba(59,130,246,0.12)] text-blue-200 border-[color:rgba(59,130,246,0.25)]`}>관리자</span>;
-  return <span className={`${base} bg-[color:rgba(255,255,255,0.06)] text-gray-200 border-[color:rgba(255,255,255,0.10)]`}>멤버</span>;
+  if (role === 'ADMIN') return <span className={`${base} bg-[color:rgba(59,130,246,0.12)] text-blue-700 dark:text-blue-200 border-[color:rgba(59,130,246,0.25)]`}>관리자</span>;
+  return <span className={`${base} bg-[var(--muted)] text-[var(--foreground)] border-[var(--border)]`}>멤버</span>;
 }
 
 function StatusDot({ status }: { status: string }) {
@@ -47,7 +47,7 @@ function StatusDot({ status }: { status: string }) {
   return (
     <span className="flex items-center gap-2">
       <span className={`size-2 rounded-full ${color}`} />
-      <span className="text-sm text-gray-300">{label}</span>
+      <span className="text-sm text-[var(--text-secondary)]">{label}</span>
     </span>
   );
 }
@@ -91,14 +91,14 @@ function InviteMemberModal({
                 <UserPlus size={18} />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">멤버 초대</h3>
-                <p className="text-sm text-gray-400">워크스페이스 초대 링크를 생성합니다.</p>
+                <h3 className="text-lg font-semibold text-[var(--foreground)]">멤버 초대</h3>
+                <p className="text-sm text-[var(--text-secondary)]">워크스페이스 초대 링크를 생성합니다.</p>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-2 rounded-lg text-gray-300 hover:bg-[color:rgba(255,255,255,0.06)]"
+              className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--accent)]"
             >
               ✕
             </button>
@@ -109,26 +109,26 @@ function InviteMemberModal({
           {!invitationLink ? (
             <>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-2">
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2">
                   워크스페이스 선택
                 </label>
                 {isLoading ? (
-                  <div className="h-10 rounded-lg bg-[color:rgba(255,255,255,0.06)] animate-pulse" />
+                  <div className="h-10 rounded-lg bg-[var(--muted)] animate-pulse" />
                 ) : (
                   <select
                     value={selectedWorkspaceId ?? ''}
                     onChange={(e) => setSelectedWorkspaceId(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full h-10 px-3 rounded-lg bg-[color:rgba(255,255,255,0.04)] border border-[color:rgba(255,255,255,0.10)] text-sm text-white focus:outline-none focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)]"
+                    className="w-full h-10 px-3 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)]"
                   >
-                    <option value="" className="bg-[#1a1a2e] text-gray-300">선택하세요</option>
+                    <option value="" className="bg-[var(--card)] text-[var(--text-secondary)]">선택하세요</option>
                     {available.map((ws) => (
-                      <option key={ws.id} value={ws.id} className="bg-[#1a1a2e] text-white">
+                      <option key={ws.id} value={ws.id} className="bg-[var(--card)] text-[var(--foreground)]">
                         {ws.displayName}
                       </option>
                     ))}
                   </select>
                 )}
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-[var(--text-tertiary)]">
                   초대 링크는 선택한 워크스페이스의 멤버 권한으로 발급됩니다.
                 </p>
               </div>
@@ -150,10 +150,10 @@ function InviteMemberModal({
             </>
           ) : (
             <>
-              <div className="text-sm text-gray-300">
+              <div className="text-sm text-[var(--text-secondary)]">
                 아래 링크를 공유하세요. (만료/정책은 서버 설정에 따릅니다)
               </div>
-              <div className="relative rounded-lg border border-[var(--border)] bg-[color:rgba(0,0,0,0.25)] p-3">
+              <div className="relative rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3">
                 <code className="text-xs text-green-300 break-all block pr-10">{invitationLink}</code>
                 <button
                   type="button"
@@ -162,7 +162,7 @@ function InviteMemberModal({
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1500);
                   }}
-                  className="absolute top-2 right-2 p-2 rounded-lg text-gray-300 hover:bg-[color:rgba(255,255,255,0.06)]"
+                  className="absolute top-2 right-2 p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--accent)]"
                   title="Copy"
                 >
                   {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -171,7 +171,7 @@ function InviteMemberModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full h-10 rounded-lg bg-[color:rgba(255,255,255,0.06)] hover:bg-[color:rgba(255,255,255,0.10)] border border-[color:rgba(255,255,255,0.10)] text-white text-sm font-medium"
+                className="w-full h-10 rounded-lg bg-[var(--muted)] hover:bg-[var(--accent)] border border-[var(--border)] text-[var(--foreground)] text-sm font-medium"
               >
                 닫기
               </button>
@@ -191,7 +191,7 @@ function ApiKeyRow({
   onRotate: (id: number, name: string) => void;
 }) {
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg bg-[color:rgba(255,255,255,0.04)] border border-[color:rgba(146,19,236,0.25)] relative overflow-hidden">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg bg-[var(--muted)] border border-[color:rgba(146,19,236,0.25)] relative overflow-hidden">
       <div className="absolute inset-y-0 left-0 w-1 bg-[var(--primary)]" />
       <div className="flex items-center gap-4">
         <div className="p-2 rounded-lg bg-[color:rgba(146,19,236,0.12)] text-[var(--primary)]">
@@ -199,15 +199,15 @@ function ApiKeyRow({
         </div>
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-medium text-white truncate">{apiKey.name}</span>
+            <span className="font-medium text-[var(--foreground)] truncate">{apiKey.name}</span>
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-500/20 text-green-300 border border-green-500/20">
               {apiKey.status}
             </span>
           </div>
-          <div className="font-mono text-sm text-gray-400 tracking-wider truncate">
+          <div className="font-mono text-sm text-[var(--text-secondary)] tracking-wider truncate">
             {apiKey.keyPrefix}...
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-[var(--text-tertiary)]">
             lastUsed: {apiKey.lastUsedAt ? formatRelativeKorean(apiKey.lastUsedAt) : '-'}
           </div>
         </div>
@@ -216,7 +216,7 @@ function ApiKeyRow({
         <button
           type="button"
           onClick={() => onRotate(apiKey.id, apiKey.name)}
-          className="px-3 py-2 rounded-lg bg-[color:rgba(255,255,255,0.06)] hover:bg-[color:rgba(255,255,255,0.10)] border border-[color:rgba(255,255,255,0.10)] text-white text-sm font-medium"
+          className="px-3 py-2 rounded-lg bg-[var(--muted)] hover:bg-[var(--accent)] border border-[var(--border)] text-[var(--foreground)] text-sm font-medium"
           title="Rotate"
         >
           <RefreshCw size={16} />
@@ -331,7 +331,7 @@ export function OrganizationSecurityPage() {
   }, [members, search, roleFilter]);
 
   if (!orgId || Number.isNaN(orgId)) {
-    return <div className="text-sm text-gray-300">조직을 선택할 수 없습니다.</div>;
+    return <div className="text-sm text-[var(--text-secondary)]">조직을 선택할 수 없습니다.</div>;
   }
 
   return (
@@ -339,8 +339,8 @@ export function OrganizationSecurityPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-white">조직 및 보안</h2>
-          <p className="mt-2 text-gray-400">
+          <h2 className="text-3xl font-bold tracking-tight text-[var(--foreground)]">조직 및 보안</h2>
+          <p className="mt-2 text-[var(--text-secondary)]">
             사용자 권한 관리 및 Tenant Isolation API 보안 설정을 관리합니다.
           </p>
         </div>
@@ -359,7 +359,7 @@ export function OrganizationSecurityPage() {
               }));
               downloadCsv(`org_${orgId}_members.csv`, rows);
             }}
-            className="flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-[color:rgba(255,255,255,0.06)] border border-[var(--border)] text-white text-sm font-medium hover:bg-[color:rgba(255,255,255,0.10)] transition-colors"
+            className="flex items-center justify-center gap-2 h-10 px-4 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] text-sm font-medium hover:bg-[var(--accent)] transition-colors"
           >
             <Download size={18} />
             CSV 내보내기
@@ -379,23 +379,23 @@ export function OrganizationSecurityPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--card)] flex flex-col gap-1 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-400">총 멤버</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">총 멤버</span>
             <span className="p-1.5 rounded-md bg-[color:rgba(146,19,236,0.12)] text-[var(--primary)]">
               <Shield size={18} />
             </span>
           </div>
-          <span className="text-3xl font-bold text-white">{stats.total}</span>
-          <span className="text-xs text-gray-500">활성 사용자 포함</span>
+          <span className="text-3xl font-bold text-[var(--foreground)]">{stats.total}</span>
+          <span className="text-xs text-[var(--text-tertiary)]">활성 사용자 포함</span>
         </div>
         <div className="p-6 rounded-xl border border-[var(--border)] bg-[var(--card)] flex flex-col gap-1 shadow-sm">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-400">관리자</span>
+            <span className="text-sm font-medium text-[var(--text-secondary)]">관리자</span>
             <span className="p-1.5 rounded-md bg-blue-500/10 text-blue-300">
               <Shield size={18} />
             </span>
           </div>
-          <span className="text-3xl font-bold text-white">{stats.adminCount}</span>
-          <span className="text-xs text-gray-500">전체 권한 보유</span>
+          <span className="text-3xl font-bold text-[var(--foreground)]">{stats.adminCount}</span>
+          <span className="text-xs text-[var(--text-tertiary)]">전체 권한 보유</span>
         </div>
       </div>
 
@@ -403,9 +403,9 @@ export function OrganizationSecurityPage() {
       <div className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--card)] overflow-hidden shadow-sm">
         <div className="p-4 border-b border-[var(--border)] flex flex-wrap items-center justify-between gap-4">
           <div className="relative max-w-sm w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" size={16} />
             <input
-              className="w-full h-10 pl-10 pr-4 rounded-lg bg-[color:rgba(0,0,0,0.18)] border border-[color:rgba(255,255,255,0.10)] text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)] outline-none"
+              className="w-full h-10 pl-10 pr-4 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)] focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)] outline-none"
               placeholder="이름 또는 이메일 검색..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -416,12 +416,12 @@ export function OrganizationSecurityPage() {
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as typeof roleFilter)}
-              className="h-10 pl-3 pr-8 rounded-lg bg-[color:rgba(0,0,0,0.18)] border border-[color:rgba(255,255,255,0.10)] text-sm text-gray-200 focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)] cursor-pointer"
+              className="h-10 pl-3 pr-8 rounded-lg bg-[var(--muted)] border border-[var(--border)] text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)] cursor-pointer"
             >
-              <option value="ALL" className="bg-[#1a1a2e] text-gray-300">모든 역할</option>
-              <option value="OWNER" className="bg-[#1a1a2e] text-white">소유자</option>
-              <option value="ADMIN" className="bg-[#1a1a2e] text-white">관리자</option>
-              <option value="MEMBER" className="bg-[#1a1a2e] text-white">멤버</option>
+              <option value="ALL" className="bg-[var(--card)] text-[var(--text-secondary)]">모든 역할</option>
+              <option value="OWNER" className="bg-[var(--card)] text-[var(--foreground)]">소유자</option>
+              <option value="ADMIN" className="bg-[var(--card)] text-[var(--foreground)]">관리자</option>
+              <option value="MEMBER" className="bg-[var(--card)] text-[var(--foreground)]">멤버</option>
             </select>
           </div>
         </div>
@@ -429,20 +429,20 @@ export function OrganizationSecurityPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[color:rgba(0,0,0,0.18)] border-b border-[var(--border)]">
-                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">사용자</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">역할</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">상태</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">가입일</th>
-                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">작업</th>
+              <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">사용자</th>
+                <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">역할</th>
+                <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">상태</th>
+                <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">가입일</th>
+                <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-right">작업</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[color:rgba(255,255,255,0.08)]">
+            <tbody className="divide-y divide-[var(--border)]">
               {isMembersLoading ? (
                 Array.from({ length: 5 }).map((_, idx) => (
                   <tr key={idx}>
                     <td colSpan={5} className="px-6 py-4">
-                      <div className="h-10 rounded-lg bg-[color:rgba(255,255,255,0.06)] animate-pulse" />
+                      <div className="h-10 rounded-lg bg-[var(--muted)] animate-pulse" />
                     </td>
                   </tr>
                 ))
@@ -457,21 +457,21 @@ export function OrganizationSecurityPage() {
                 </tr>
               ) : filteredMembers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-sm text-gray-400">
+                  <td colSpan={5} className="px-6 py-8 text-sm text-[var(--text-secondary)]">
                     결과가 없습니다.
                   </td>
                 </tr>
               ) : (
                 filteredMembers.map((m: OrganizationMemberResponse) => (
-                  <tr key={m.memberId} className="hover:bg-[color:rgba(0,0,0,0.12)] transition-colors group">
+                  <tr key={m.memberId} className="hover:bg-[var(--accent)] transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <div className="size-10 rounded-full bg-[color:rgba(146,19,236,0.18)] flex items-center justify-center text-white text-sm font-bold">
                           {m.name?.slice(0, 2) || 'U'}
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-white">{m.name}</div>
-                          <div className="text-xs text-gray-400">{m.email}</div>
+                          <div className="text-sm font-medium text-[var(--foreground)]">{m.name}</div>
+                          <div className="text-xs text-[var(--text-secondary)]">{m.email}</div>
                         </div>
                       </div>
                     </td>
@@ -486,10 +486,10 @@ export function OrganizationSecurityPage() {
                             })
                           }
                           disabled={updateRoleMutation.isPending}
-                          className="px-2 py-1 text-xs font-medium rounded-full border border-[color:rgba(255,255,255,0.15)] bg-[color:rgba(255,255,255,0.06)] text-gray-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)]"
+                          className="px-2 py-1 text-xs font-medium rounded-full border border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)] cursor-pointer focus:outline-none focus:ring-2 focus:ring-[color:rgba(146,19,236,0.35)]"
                         >
-                          <option value="ADMIN" className="bg-[#1a1a2e] text-white">관리자</option>
-                          <option value="MEMBER" className="bg-[#1a1a2e] text-white">멤버</option>
+                          <option value="ADMIN" className="bg-[var(--card)] text-[var(--foreground)]">관리자</option>
+                          <option value="MEMBER" className="bg-[var(--card)] text-[var(--foreground)]">멤버</option>
                         </select>
                       ) : (
                         <RoleBadge role={m.role} />
@@ -498,7 +498,7 @@ export function OrganizationSecurityPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusDot status={m.status} />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-secondary)]">
                       {formatRelativeKorean(m.joinedAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -516,8 +516,8 @@ export function OrganizationSecurityPage() {
                             }}
                             className={`transition-colors opacity-0 group-hover:opacity-100 ${
                               isSelf
-                                ? 'text-gray-600 cursor-not-allowed'
-                                : 'text-gray-400 hover:text-rose-200'
+                                ? 'text-[var(--text-tertiary)] cursor-not-allowed'
+                                : 'text-[var(--text-secondary)] hover:text-rose-300'
                             }`}
                             title={isSelf ? '본인은 퇴출할 수 없습니다' : '퇴출'}
                           >
@@ -537,8 +537,8 @@ export function OrganizationSecurityPage() {
       {/* API Key Management */}
       <div className="flex flex-col gap-6 pt-2">
         <div className="flex flex-col gap-1">
-          <h3 className="text-xl font-bold text-white">API 키 관리</h3>
-          <p className="text-sm text-gray-400">
+          <h3 className="text-xl font-bold text-[var(--foreground)]">API 키 관리</h3>
+          <p className="text-sm text-[var(--text-secondary)]">
             조직 전용 API 키입니다. 모든 키는 <span className="text-[var(--primary)] font-medium">Tenant Isolation</span> 정책에 따라 저장됩니다.
           </p>
         </div>
@@ -546,9 +546,9 @@ export function OrganizationSecurityPage() {
         <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-6 shadow-sm">
           <div className="flex flex-col gap-4">
             {isApiKeysLoading ? (
-              <div className="h-16 rounded-lg bg-[color:rgba(255,255,255,0.06)] animate-pulse" />
+              <div className="h-16 rounded-lg bg-[var(--muted)] animate-pulse" />
             ) : (apiKeys?.length ?? 0) === 0 ? (
-              <div className="text-sm text-gray-400">아직 API 키가 없습니다.</div>
+              <div className="text-sm text-[var(--text-secondary)]">아직 API 키가 없습니다.</div>
             ) : (
               apiKeys!.map((k: OrganizationApiKeySummaryResponse) => (
                 <ApiKeyRow
@@ -567,7 +567,7 @@ export function OrganizationSecurityPage() {
                 setCreatingKey(true);
                 createKeyMutation.mutate(name.trim());
               }}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-dashed border-[color:rgba(255,255,255,0.20)] text-gray-300 hover:bg-[color:rgba(255,255,255,0.06)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"
               disabled={creatingKey}
             >
               <Plus size={18} />
@@ -595,8 +595,8 @@ export function OrganizationSecurityPage() {
             aria-label="Close modal overlay"
           />
           <div className="relative w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-2">멤버 퇴출</h3>
-            <p className="text-sm text-gray-400 mb-6">
+            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">멤버 퇴출</h3>
+            <p className="text-sm text-[var(--text-secondary)] mb-6">
               {memberToRemove.name}님을 조직에서 퇴출하시겠습니까? 이 작업은 되돌릴 수 없습니다.
             </p>
             {removeError && (
@@ -610,7 +610,7 @@ export function OrganizationSecurityPage() {
                 type="button"
                 onClick={() => { setMemberToRemove(null); setRemoveError(null); }}
                 disabled={removeMemberMutation.isPending}
-                className="flex-1 h-10 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium disabled:opacity-50"
+                className="flex-1 h-10 rounded-lg bg-[var(--muted)] hover:bg-[var(--accent)] border border-[var(--border)] text-[var(--foreground)] text-sm font-medium disabled:opacity-50"
               >
                 취소
               </button>
@@ -640,20 +640,20 @@ export function OrganizationSecurityPage() {
           />
           <div className="relative w-full max-w-lg rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl">
             <div className="p-6 border-b border-[var(--border)]">
-              <h3 className="text-lg font-semibold text-white">API 키</h3>
-              <p className="text-sm text-gray-400 mt-1">
+              <h3 className="text-lg font-semibold text-[var(--foreground)]">API 키</h3>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
                 이 키는 지금 한 번만 표시됩니다. 안전한 곳에 저장하세요.
               </p>
             </div>
             <div className="p-6 space-y-4">
-              <div className="bg-black/30 rounded-lg p-4 border border-[color:rgba(255,255,255,0.10)] relative">
+              <div className="bg-[var(--muted)] rounded-lg p-4 border border-[var(--border)] relative">
                 <code className="text-sm font-mono text-green-300 break-all block pr-10">
                   {newKeyValue || rotatedKeyValue}
                 </code>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard.writeText((newKeyValue || rotatedKeyValue) ?? '')}
-                  className="absolute top-2 right-2 p-2 text-gray-300 hover:text-white rounded-lg hover:bg-white/5"
+                  className="absolute top-2 right-2 p-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--accent)]"
                   title="복사"
                 >
                   <Copy size={16} />
@@ -689,9 +689,9 @@ export function OrganizationSecurityPage() {
                   <RefreshCw size={18} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">API 키 재발급</h3>
-                  <p className="text-sm text-gray-400 mt-1">
-                    <strong className="text-white">{rotateTarget.name}</strong> 키를 재발급합니다.
+                  <h3 className="text-lg font-semibold text-[var(--foreground)]">API 키 재발급</h3>
+                  <p className="text-sm text-[var(--text-secondary)] mt-1">
+                    <strong className="text-[var(--foreground)]">{rotateTarget.name}</strong> 키를 재발급합니다.
                   </p>
                 </div>
               </div>
@@ -709,7 +709,7 @@ export function OrganizationSecurityPage() {
                 <button
                   type="button"
                   onClick={() => setRotateTarget(null)}
-                  className="flex-1 h-10 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium"
+                  className="flex-1 h-10 rounded-lg bg-[var(--muted)] hover:bg-[var(--accent)] border border-[var(--border)] text-[var(--foreground)] text-sm font-medium"
                 >
                   취소
                 </button>
