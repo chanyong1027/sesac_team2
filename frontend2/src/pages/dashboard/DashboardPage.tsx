@@ -121,8 +121,8 @@ export default function DashboardPage() {
             <div className="flex items-center justify-center h-64">
                 <div className="text-center glass-card rounded-2xl border border-[var(--border)] px-8 py-7">
                     <AlertCircle className="w-12 h-12 text-rose-300 mx-auto mb-4" />
-                    <p className="text-gray-200 font-medium">통계 데이터를 불러오는데 실패했습니다.</p>
-                    <p className="text-sm text-gray-400 mt-2">잠시 후 다시 시도해주세요.</p>
+                    <p className="text-[var(--foreground)] font-medium">통계 데이터를 불러오는데 실패했습니다.</p>
+                    <p className="text-sm text-[var(--text-secondary)] mt-2">잠시 후 다시 시도해주세요.</p>
                 </div>
             </div>
         );

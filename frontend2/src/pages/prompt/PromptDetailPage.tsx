@@ -1400,7 +1400,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
                                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">User Template</label>
-                                                <div className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl p-4 font-mono text-sm text-purple-200 shadow-inner min-h-[72px] whitespace-pre-wrap">
+                                                <div className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl p-4 font-mono text-sm text-[var(--foreground)] shadow-inner min-h-[72px] whitespace-pre-wrap">
                                                     {versionDetail.userTemplate || '(empty)'}
                                                 </div>
                                             </div>

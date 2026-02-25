@@ -118,7 +118,7 @@ describe('SignupPage pending invitation', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/login');
-    }, { timeout: 3000 });
+    }, { timeout: 2000 });
     expect(sessionStorage.getItem('pendingInvitation')).toBe('invite-token');
   });
 });

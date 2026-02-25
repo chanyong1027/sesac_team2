@@ -63,9 +63,6 @@ export function DocumentListPage() {
   const [selectedPreset, setSelectedPreset] = useState<RagPreset | null>(null);
 
   const isValidWorkspaceId = Number.isInteger(workspaceId) && workspaceId > 0;
-  if (!isValidWorkspaceId) {
-    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
-  }
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ['documents', workspaceId],
@@ -73,7 +70,7 @@ export function DocumentListPage() {
       const response = await documentApi.getDocuments(workspaceId);
       return response.data;
     },
-    enabled: !!workspaceId,
+    enabled: isValidWorkspaceId,
   });
 
   const { data: ragSettings, isLoading: isSettingsLoading } = useQuery({
@@ -82,7 +79,7 @@ export function DocumentListPage() {
       const response = await ragApi.getSettings(workspaceId);
       return response.data;
     },
-    enabled: !!workspaceId,
+    enabled: isValidWorkspaceId,
   });
 
   useEffect(() => {
@@ -115,7 +112,7 @@ export function DocumentListPage() {
       });
       return response.data;
     },
-    enabled: !!workspaceId && !!selectedDocumentId && isPreviewOpen,
+    enabled: isValidWorkspaceId && !!selectedDocumentId && isPreviewOpen,
     retry: false,
   });
 
@@ -307,6 +304,10 @@ export function DocumentListPage() {
 
   const filteredDocs =
     documents?.filter((doc) => doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())) || [];
+
+  if (!isValidWorkspaceId) {
+    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
+  }
 
   if (isLoading) return <div className="p-8 text-[var(--text-secondary)]">로딩 중...</div>;
 

@@ -63,6 +63,8 @@
 
   /* Text helpers */
   --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --hover: #e2e8f0;
 
   --surface-elevated: rgba(255, 255, 255, 0.88);
   --surface-subtle: rgba(15, 23, 42, 0.04);
@@ -114,6 +116,8 @@
 
   /* Text helpers */
   --text-secondary: #94a3b8;
+  --text-tertiary: rgba(255, 255, 255, 0.40);
+  --hover: rgba(255, 255, 255, 0.08);
 
   --surface-elevated: rgba(20, 22, 30, 0.70);
   --surface-subtle: rgba(255, 255, 255, 0.04);
