@@ -39,7 +39,7 @@ function activityStatusBadgeClass(status: RequestLogStatus) {
         case 'SUCCESS':
             return `${base} bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]`;
         case 'FAIL':
-            return `${base} bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]`;
+            return `${base} bg-red-500 text-[var(--foreground)] shadow-[0_0_10px_rgba(239,68,68,0.4)]`;
         case 'BLOCKED':
             return `${base} bg-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.35)]`;
         case 'IN_PROGRESS':
@@ -276,7 +276,7 @@ export function WorkspaceDashboardPage() {
                 {/* Workspace Header */}
                 <div className="flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-bold mb-1 text-white neon-text tracking-tight">{workspace.displayName}</h1>
+                        <h1 className="text-3xl font-bold mb-1 text-[var(--foreground)] dark:neon-text tracking-tight">{workspace.displayName}</h1>
                         <p className="text-gray-400 text-sm">LLMOps workspace settings &amp; overview</p>
                     </div>
                     <div className="flex gap-2">
@@ -297,13 +297,13 @@ export function WorkspaceDashboardPage() {
                                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-purple-900/40 text-[var(--primary)] border border-[var(--primary)]/20 shadow-[0_0_15px_rgba(168,85,247,0.15)]">
                                     <span className="material-symbols-outlined text-xl">chat</span>
                                 </div>
-                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/5">
+                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-[var(--muted)] text-[var(--text-secondary)] border border-[var(--border)]">
                                     버전 중심 관리
                                 </span>
                             </div>
                             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">프롬프트 설정</h3>
                             <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold text-white tracking-tight">{prompts?.length ?? 0}</p>
+                                <p className="text-4xl font-bold text-[var(--foreground)] tracking-tight">{prompts?.length ?? 0}</p>
                                 {release?.activeVersionNo ? (
                                     <span className="text-xs font-medium text-[var(--primary)] px-1.5 py-0.5 rounded bg-[var(--primary)]/10 border border-[var(--primary)]/20">
                                         v{release.activeVersionNo} active
@@ -322,7 +322,7 @@ export function WorkspaceDashboardPage() {
                                 <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-900/40 text-blue-400 border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)]">
                                     <span className="material-symbols-outlined text-xl">description</span>
                                 </div>
-                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-white/5 text-gray-300 border border-white/5">
+                                <span className="px-2 py-1 rounded text-[10px] font-semibold bg-[var(--muted)] text-[var(--text-secondary)] border border-[var(--border)]">
                                     {documents == null
                                         ? 'Checking..'
                                         : documents.length === 0
@@ -334,7 +334,7 @@ export function WorkspaceDashboardPage() {
                             </div>
                             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">RAG 문서</h3>
                             <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold text-white tracking-tight">{documents?.length ?? 0}</p>
+                                <p className="text-4xl font-bold text-[var(--foreground)] tracking-tight">{documents?.length ?? 0}</p>
                                 <span className="text-xs text-gray-500">Documents</span>
                             </div>
                         </div>
@@ -355,7 +355,7 @@ export function WorkspaceDashboardPage() {
                             </div>
                             <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">API Reliability</h3>
                             <div className="flex items-baseline gap-2">
-                                <p className="text-4xl font-bold text-white tracking-tight">
+                                <p className="text-4xl font-bold text-[var(--foreground)] tracking-tight">
                                     {overview ? `${Math.round(overview.successRate ?? 0)}%` : '-'}
                                 </p>
                                 <span className="text-xs text-gray-500">Success</span>
@@ -404,9 +404,9 @@ export function WorkspaceDashboardPage() {
 
                         {/* Recent Activity */}
                         <section className="glass-card rounded-2xl overflow-hidden">
-                            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+                            <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/40">
                                 <div>
-                                    <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                    <h2 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
                                         Recent Activity
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                     </h2>
@@ -418,14 +418,14 @@ export function WorkspaceDashboardPage() {
                                     <button
                                         type="button"
                                         onClick={() => refetchRecentLogs()}
-                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                                        className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)] transition-colors"
                                         aria-label="refresh recent logs"
                                     >
                                         <RefreshCw size={18} />
                                     </button>
                                     <Link
                                         to={`${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`}
-                                        className="p-1.5 text-gray-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                                        className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)] transition-colors"
                                         aria-label="open logs page"
                                     >
                                         <ExternalLink size={18} />
@@ -447,7 +447,7 @@ export function WorkspaceDashboardPage() {
                                     ))}
                                 </div>
                             ) : isRecentLogsError ? (
-                                <div className="p-4 text-sm text-gray-200">
+                                <div className="p-4 text-sm text-[var(--foreground)]">
                                     로그를 불러오지 못했습니다.
                                     <button
                                         type="button"
@@ -500,7 +500,7 @@ export function WorkspaceDashboardPage() {
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(log.traceId);
                                                             }}
-                                                            className="text-gray-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                                            className="text-gray-600 hover:text-[var(--foreground)] transition-colors opacity-0 group-hover:opacity-100"
                                                             aria-label="copy trace id"
                                                         >
                                                             <Copy size={14} />
@@ -541,7 +541,7 @@ export function WorkspaceDashboardPage() {
                         />
 
                         <section className="glass-card rounded-2xl p-6">
-                            <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4 border-b border-white/5 pb-2">
+                            <h2 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--border)] pb-2">
                                 Quick Setup
                             </h2>
                             <div className="relative space-y-4">
@@ -596,14 +596,14 @@ export function WorkspaceDashboardPage() {
 
                         <section className="glass-card rounded-2xl p-6 flex flex-col h-auto border border-[var(--primary)]/20 shadow-[0_0_20px_rgba(0,0,0,0.3)]">
                             <div className="flex justify-between items-center mb-3">
-                                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                                <h2 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
                                     Unified API Endpoint
                                 </h2>
                                 <button
                                     type="button"
                                     onClick={() => handleCopyToClipboard(curlExample)}
-                                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/5"
+                                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-[var(--muted)] hover:bg-[var(--accent)] text-[var(--text-secondary)] transition-colors border border-[var(--border)]"
                                 >
                                     {copiedCurl ? (
                                         <>
@@ -619,7 +619,7 @@ export function WorkspaceDashboardPage() {
                                 </button>
                             </div>
 
-                            <div className="bg-[#0B0A10] rounded-xl p-4 font-mono text-[11px] text-gray-300 overflow-x-auto border border-gray-800 shadow-inner relative">
+                            <div className="bg-[var(--muted)] rounded-xl p-4 font-mono text-[11px] text-[var(--foreground)] overflow-x-auto border border-[var(--border)] shadow-inner relative">
                                 <div className="absolute top-2 right-2 text-[10px] text-gray-600 font-bold uppercase select-none">BASH</div>
                                 <pre><code>{curlExample}</code></pre>
                             </div>
@@ -630,7 +630,7 @@ export function WorkspaceDashboardPage() {
                                         <span className="text-[10px] font-bold text-blue-300">Tip</span>
                                     </div>
                                     <p className="text-[10px] text-blue-200/70 leading-relaxed">
-                                        Set <code className="bg-blue-900/50 px-1 rounded text-blue-200">ragEnabled</code> to <span className="text-white">true</span> to use your indexed documents context.
+                                        Set <code className="bg-blue-900/30 dark:bg-blue-900/50 px-1 rounded text-blue-700 dark:text-blue-200">ragEnabled</code> to <span className="text-[var(--foreground)]">true</span> to use your indexed documents context.
                                     </p>
                                 </div>
                             </div>
@@ -686,12 +686,12 @@ function QuickActionCard({
     return (
         <Link
             to={to}
-            className={`glass-card p-4 rounded-xl text-left hover:bg-white/5 transition-all group border border-white/5 ${hoverBorderClass}`}
+            className={`glass-card p-4 rounded-xl text-left hover:bg-[var(--muted)] transition-all group border border-[var(--border)] ${hoverBorderClass}`}
         >
             <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${iconBoxClass} flex items-center justify-center mb-3 transition-all`}>
                 <span className="material-symbols-outlined">{icon}</span>
             </div>
-            <div className="font-medium text-sm text-gray-200">{title}</div>
+            <div className="font-medium text-sm text-[var(--foreground)]">{title}</div>
             <div className="text-[11px] text-gray-500 mt-1">{subtitle}</div>
         </Link>
     );
@@ -728,7 +728,7 @@ function SetupStep({
 
             <div className="flex-1">
                 <div className="flex items-center justify-between gap-3">
-                    <div className={`text-sm font-medium ${checked ? 'text-gray-200' : 'text-white'}`}>
+                <div className={`text-sm font-medium ${checked ? 'text-[var(--text-secondary)]' : 'text-[var(--foreground)]'}`}>
                         {title}
                     </div>
                     {action}

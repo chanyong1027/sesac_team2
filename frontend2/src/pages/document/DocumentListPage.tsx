@@ -64,7 +64,7 @@ export function DocumentListPage() {
 
   const isValidWorkspaceId = Number.isInteger(workspaceId) && workspaceId > 0;
   if (!isValidWorkspaceId) {
-    return <div className="p-8 text-gray-300">유효하지 않은 워크스페이스입니다.</div>;
+    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
   }
 
   const { data: documents, isLoading } = useQuery({
@@ -308,21 +308,21 @@ export function DocumentListPage() {
   const filteredDocs =
     documents?.filter((doc) => doc.fileName.toLowerCase().includes(searchQuery.toLowerCase())) || [];
 
-  if (isLoading) return <div className="p-8 text-gray-300">로딩 중...</div>;
+  if (isLoading) return <div className="p-8 text-[var(--text-secondary)]">로딩 중...</div>;
 
   const presetButtonClass = (preset: RagPreset) =>
     `px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
       selectedPreset === preset
         ? 'border-[var(--primary)] text-purple-200 bg-[var(--primary)]/10'
-        : 'border-white/10 text-gray-300 hover:bg-white/10 hover:text-white'
+        : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
     }`;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">RAG 문서 (지식 베이스)</h1>
-          <p className="text-sm text-gray-400">LLM이 답변 생성 시 참조할 문서를 업로드하고 관리하세요.</p>
+          <h1 className="text-2xl font-bold text-[var(--foreground)] mb-1">RAG 문서 (지식 베이스)</h1>
+          <p className="text-sm text-[var(--text-secondary)]">LLM이 답변 생성 시 참조할 문서를 업로드하고 관리하세요.</p>
         </div>
         <div>
           <input
@@ -351,10 +351,10 @@ export function DocumentListPage() {
         <div className="lg:col-span-7 glass-card rounded-2xl p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
                 <SlidersHorizontal size={18} className="text-[var(--primary)]" /> RAG 설정
               </h2>
-              <p className="text-xs text-gray-400 mt-1">검색 정확도와 컨텍스트 길이를 조정할 수 있습니다.</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-1">검색 정확도와 컨텍스트 길이를 조정할 수 있습니다.</p>
             </div>
             <button
               type="button"
@@ -368,18 +368,18 @@ export function DocumentListPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-gray-300">Top K</span>
+              <span className="text-xs font-medium text-[var(--text-secondary)]">Top K</span>
               <input
                 type="number"
                 min={1}
                 max={50}
                 value={settingsForm.topK}
                 onChange={(e) => setForm({ topK: Number(e.target.value) })}
-                className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
+                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
               />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-gray-300">유사도 임계값</span>
+              <span className="text-xs font-medium text-[var(--text-secondary)]">유사도 임계값</span>
               <input
                 type="number"
                 min={0}
@@ -387,22 +387,22 @@ export function DocumentListPage() {
                 step={0.05}
                 value={settingsForm.similarityThreshold}
                 onChange={(e) => setForm({ similarityThreshold: Number(e.target.value) })}
-                className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
+                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
               />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-gray-300">컨텍스트 청크 수</span>
+              <span className="text-xs font-medium text-[var(--text-secondary)]">컨텍스트 청크 수</span>
               <input
                 type="number"
                 min={1}
                 max={20}
                 value={settingsForm.maxChunks}
                 onChange={(e) => setForm({ maxChunks: Number(e.target.value) })}
-                className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
+                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
               />
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-gray-300">최대 컨텍스트 문자</span>
+              <span className="text-xs font-medium text-[var(--text-secondary)]">최대 컨텍스트 문자</span>
               <input
                 type="number"
                 min={500}
@@ -410,7 +410,7 @@ export function DocumentListPage() {
                 step={100}
                 value={settingsForm.maxContextChars}
                 onChange={(e) => setForm({ maxContextChars: Number(e.target.value) })}
-                className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
+                className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
               />
             </label>
           </div>
@@ -419,7 +419,7 @@ export function DocumentListPage() {
             <button
               type="button"
               onClick={() => setShowAdvancedSettings((prev) => !prev)}
-              className="text-xs font-medium text-white/90 hover:text-purple-200"
+              className="text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)]"
             >
               {showAdvancedSettings ? '고급 설정 숨기기' : '고급 설정 보기'}
             </button>
@@ -427,7 +427,7 @@ export function DocumentListPage() {
           </div>
 
           {showAdvancedSettings && (
-            <div className="space-y-4 rounded-xl border border-white/10 bg-black/20 p-4">
+            <div className="space-y-4 rounded-xl border border-[var(--border)] bg-[var(--muted)] p-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <label className="flex items-center gap-2">
                   <input
@@ -436,7 +436,7 @@ export function DocumentListPage() {
                     onChange={(e) => setForm({ hybridEnabled: e.target.checked })}
                     className="accent-[var(--primary)]"
                   />
-                  <span className="text-gray-200">하이브리드 검색 사용</span>
+                  <span className="text-[var(--foreground)]">하이브리드 검색 사용</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -445,13 +445,13 @@ export function DocumentListPage() {
                     onChange={(e) => setForm({ rerankEnabled: e.target.checked })}
                     className="accent-[var(--primary)]"
                   />
-                  <span className="text-gray-200">리랭크 사용</span>
+                  <span className="text-[var(--foreground)]">리랭크 사용</span>
                 </label>
               </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <label className="space-y-1">
-                  <span className="text-xs font-medium text-gray-300">리랭크 Top N</span>
+                  <span className="text-xs font-medium text-[var(--text-secondary)]">리랭크 Top N</span>
                   <input
                     type="number"
                     min={1}
@@ -459,7 +459,7 @@ export function DocumentListPage() {
                     value={settingsForm.rerankTopN}
                     disabled={!settingsForm.rerankEnabled}
                     onChange={(e) => setForm({ rerankTopN: Number(e.target.value) })}
-                    className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all disabled:opacity-40"
+                    className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all disabled:opacity-40"
                   />
                 </label>
                 <div className="text-xs text-gray-500 flex items-center">
@@ -469,7 +469,7 @@ export function DocumentListPage() {
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <label className="space-y-1">
-                  <span className="text-xs font-medium text-gray-300">청크 크기(토큰)</span>
+                  <span className="text-xs font-medium text-[var(--text-secondary)]">청크 크기(토큰)</span>
                   <input
                     type="number"
                     min={100}
@@ -477,11 +477,11 @@ export function DocumentListPage() {
                     step={50}
                     value={settingsForm.chunkSize}
                     onChange={(e) => setForm({ chunkSize: Number(e.target.value) })}
-                    className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
+                    className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
                   />
                 </label>
                 <label className="space-y-1">
-                  <span className="text-xs font-medium text-gray-300">오버랩(토큰)</span>
+                  <span className="text-xs font-medium text-[var(--text-secondary)]">오버랩(토큰)</span>
                   <input
                     type="number"
                     min={0}
@@ -489,13 +489,13 @@ export function DocumentListPage() {
                     step={10}
                     value={settingsForm.chunkOverlapTokens}
                     onChange={(e) => setForm({ chunkOverlapTokens: Number(e.target.value) })}
-                    className="w-full bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
+                    className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all"
                   />
                 </label>
               </div>
 
               <div className="text-xs text-gray-500">
-                청킹 설정(청크 크기/오버랩)은 <span className="font-medium text-gray-300">새로 업로드/재인게스트</span>되는 문서부터 적용됩니다.
+                청킹 설정(청크 크기/오버랩)은 <span className="font-medium text-[var(--foreground)]">새로 업로드/재인게스트</span>되는 문서부터 적용됩니다.
                 이미 업로드된 문서에는 적용되지 않으니 변경 후 문서를 재업로드하세요.
               </div>
             </div>
@@ -516,22 +516,22 @@ export function DocumentListPage() {
             </button>
           </div>
 
-          <div className="bg-[#151725]/50 rounded-xl p-4 border border-white/10">
-            <p className="text-[11px] text-gray-400 leading-relaxed">
-              <strong className="text-gray-200">설정이 의미하는 것</strong>
+          <div className="bg-[var(--muted)] rounded-xl p-4 border border-[var(--border)]">
+            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed">
+              <strong className="text-[var(--foreground)]">설정이 의미하는 것</strong>
             </p>
-            <div className="mt-2 text-[11px] text-gray-400 leading-relaxed space-y-2">
+            <div className="mt-2 text-[11px] text-[var(--text-secondary)] leading-relaxed space-y-2">
               <p>
-                <span className="font-medium text-gray-200">Top K</span>: 검색 후보로 가져올 청크 개수입니다. 높일수록 더 많은 후보를 찾지만 노이즈와
-                검색 시간이 늘 수 있습니다. <span className="text-gray-500">(추천 시작값: 5)</span>
+                <span className="font-medium text-[var(--foreground)]">Top K</span>: 검색 후보로 가져올 청크 개수입니다. 높일수록 더 많은 후보를 찾지만 노이즈와
+                검색 시간이 늘 수 있습니다. <span className="text-[var(--text-secondary)]">(추천 시작값: 5)</span>
               </p>
               <p>
-                <span className="font-medium text-gray-200">유사도 임계값</span>: 벡터 검색에서 이 값보다 덜 비슷한 청크는 제외합니다. 높이면 더
-                엄격해지지만 <span className="font-medium text-gray-200">결과가 비는 경우</span>가 늘어납니다.{' '}
-                <span className="text-gray-500">(추천 시작값: 0.0~0.2)</span>
+                <span className="font-medium text-[var(--foreground)]">유사도 임계값</span>: 벡터 검색에서 이 값보다 덜 비슷한 청크는 제외합니다. 높이면 더
+                엄격해지지만 <span className="font-medium text-[var(--foreground)]">결과가 비는 경우</span>가 늘어납니다.{' '}
+                <span className="text-[var(--text-secondary)]">(추천 시작값: 0.0~0.2)</span>
               </p>
               <p className="opacity-80">
-                팁: 결과가 비면 먼저 <span className="font-medium text-gray-200">유사도 임계값</span>을 0.0으로 낮춰보세요.
+                팁: 결과가 비면 먼저 <span className="font-medium text-[var(--foreground)]">유사도 임계값</span>을 0.0으로 낮춰보세요.
               </p>
             </div>
           </div>
@@ -545,8 +545,8 @@ export function DocumentListPage() {
 
         <div className="lg:col-span-5 glass-card rounded-2xl p-6 flex flex-col">
           <div className="mb-2">
-            <h2 className="text-lg font-semibold text-white">RAG 미리 검색</h2>
-            <p className="text-xs text-gray-400 mt-1">질문을 넣고 어떤 청크가 찾아지는지 확인하세요.</p>
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">RAG 미리 검색</h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">질문을 넣고 어떤 청크가 찾아지는지 확인하세요.</p>
           </div>
 
           <div className="flex gap-2 mb-4">
@@ -558,7 +558,7 @@ export function DocumentListPage() {
                 setPreviewError(null);
               }}
               placeholder="질문을 입력하세요..."
-              className="flex-1 bg-[#151725] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all placeholder:text-gray-500"
+              className="flex-1 bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all placeholder:text-[var(--text-secondary)]"
             />
             <button
               type="button"
@@ -574,26 +574,26 @@ export function DocumentListPage() {
 
           <div className="flex-1 min-h-[320px]">
             {searchMutation.isPending ? (
-              <div className="h-full border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center p-8 text-center bg-black/20">
+              <div className="h-full border-2 border-dashed border-[var(--border)] rounded-xl flex flex-col items-center justify-center p-8 text-center bg-[var(--muted)]">
                 <Loader2 className="animate-spin text-gray-400 mb-3" />
-                <p className="text-sm text-gray-300">검색 중...</p>
+                <p className="text-sm text-[var(--text-secondary)]">검색 중...</p>
               </div>
             ) : previewResults.length > 0 ? (
               <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
                 {previewResults.map((chunk, index) => (
                   <div
                     key={`${chunk.documentId ?? 'doc'}-${index}`}
-                    className="p-4 rounded-xl border border-white/10 bg-black/20"
+                    className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]"
                   >
                     <div className="text-xs text-gray-400 mb-2">
                       {chunk.documentName || `문서 ${chunk.documentId ?? '-'}`} · score {chunk.score?.toFixed(3) ?? '-'}
                     </div>
-                    <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{chunk.content}</p>
+                    <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{chunk.content}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="h-full border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center p-8 text-center bg-black/20">
+              <div className="h-full border-2 border-dashed border-[var(--border)] rounded-xl flex flex-col items-center justify-center p-8 text-center bg-[var(--muted)]">
                 <Search className="text-gray-600 mb-3" size={44} />
                 <p className="text-sm text-gray-400">검색 결과가 아직 없습니다.</p>
                 <p className="text-xs text-gray-600 mt-1">좌측 설정을 조정하거나 문서를 추가하세요.</p>
@@ -603,7 +603,7 @@ export function DocumentListPage() {
         </div>
       </div>
 
-      <div className="relative w-full glass-card rounded-xl border border-white/10">
+      <div className="relative w-full glass-card rounded-xl border border-[var(--border)]">
         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
           <Search size={18} />
         </span>
@@ -612,24 +612,24 @@ export function DocumentListPage() {
           placeholder="파일명으로 검색..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-transparent border-none rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder:text-gray-500 focus:ring-0"
+          className="w-full bg-transparent border-none rounded-xl py-3 pl-10 pr-4 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)] focus:ring-0"
         />
       </div>
 
-      <div className="glass-card rounded-2xl overflow-hidden border border-white/10">
+      <div className="glass-card rounded-2xl overflow-hidden border border-[var(--border)]">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#151725] border-b border-white/10">
+            <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
               <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/2">파일명</th>
               <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">상태</th>
               <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">업로드 일시</th>
               <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">관리</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
+          <tbody className="divide-y divide-[var(--border)]">
             {filteredDocs.length > 0 ? (
               filteredDocs.map((doc) => (
-                <tr key={doc.id} className="group hover:bg-white/5 transition-colors">
+                <tr key={doc.id} className="group hover:bg-[var(--muted)] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-9 w-9 bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-300 border border-blue-500/20">
@@ -641,7 +641,7 @@ export function DocumentListPage() {
                           setSelectedDocumentId(doc.id);
                           setIsPreviewOpen(true);
                         }}
-                        className="ml-4 text-sm font-medium text-white hover:text-purple-200 text-left truncate"
+                        className="ml-4 text-sm font-medium text-[var(--foreground)] hover:text-[var(--primary)] text-left truncate"
                       >
                         {doc.fileName}
                       </button>
@@ -659,7 +659,7 @@ export function DocumentListPage() {
                           setSelectedDocumentId(doc.id);
                           setIsPreviewOpen(true);
                         }}
-                        className="hover:text-purple-200 p-2 rounded-lg hover:bg-white/5 transition-colors"
+                        className="hover:text-[var(--primary)] p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
                         title="상세 보기"
                       >
                         <Eye size={18} />
@@ -667,7 +667,7 @@ export function DocumentListPage() {
                       <button
                         type="button"
                         onClick={() => handleDelete(doc.id)}
-                        className="hover:text-red-400 p-2 rounded-lg hover:bg-white/5 transition-colors"
+                        className="hover:text-red-400 p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
                         title="문서 삭제"
                       >
                         <Trash2 size={18} />
@@ -680,10 +680,10 @@ export function DocumentListPage() {
               <tr>
                 <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center justify-center">
-                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3 border border-white/10">
+                    <div className="w-12 h-12 bg-[var(--muted)] rounded-full flex items-center justify-center mb-3 border border-[var(--border)]">
                       <File size={24} className="text-gray-500" />
                     </div>
-                    <p className="text-sm font-medium text-white">등록된 문서가 없습니다.</p>
+                    <p className="text-sm font-medium text-[var(--foreground)]">등록된 문서가 없습니다.</p>
                     <p className="text-xs text-gray-500 mt-1">새 문서를 업로드하여 지식 베이스를 구축하세요.</p>
                   </div>
                 </td>
@@ -696,16 +696,16 @@ export function DocumentListPage() {
       {isPreviewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsPreviewOpen(false)} />
-          <div className="relative w-full max-w-3xl mx-4 glass-card rounded-2xl border border-white/10 text-white max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-white/10 flex items-center justify-between">
+          <div className="relative w-full max-w-3xl mx-4 glass-card rounded-2xl border border-[var(--border)] text-[var(--foreground)] max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-white">문서 상세 보기</h3>
+                <h3 className="text-lg font-semibold text-[var(--foreground)]">문서 상세 보기</h3>
                 <p className="text-xs text-gray-400 mt-1">추출된 내용과 청크 예시를 확인합니다.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPreviewOpen(false)}
-                className="px-3 py-1.5 text-sm font-medium text-gray-200 bg-white/5 rounded-lg hover:bg-white/10 border border-white/10"
+                className="px-3 py-1.5 text-sm font-medium text-[var(--foreground)] bg-[var(--muted)] rounded-lg hover:bg-[var(--accent)] border border-[var(--border)]"
               >
                 닫기
               </button>
@@ -716,36 +716,36 @@ export function DocumentListPage() {
               {!isPreviewLoading && !isPreviewError && documentPreview && (
                 <>
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="p-4 rounded-xl bg-black/20 border border-white/10">
+                    <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
                       <p className="text-xs text-gray-500">파일명</p>
-                      <p className="text-white font-medium mt-1">{documentPreview.document.fileName}</p>
+                      <p className="text-[var(--foreground)] font-medium mt-1">{documentPreview.document.fileName}</p>
                     </div>
-                    <div className="p-4 rounded-xl bg-black/20 border border-white/10">
+                    <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
                       <p className="text-xs text-gray-500">상태</p>
-                      <p className="text-white mt-1">{documentPreview.document.status}</p>
+                      <p className="text-[var(--foreground)] mt-1">{documentPreview.document.status}</p>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-semibold text-white mb-2">추출된 내용 미리보기</h4>
-                    <pre className="whitespace-pre-wrap text-xs text-gray-200 bg-black/30 border border-white/10 rounded-xl p-4 max-h-64 overflow-y-auto">
+                    <h4 className="text-sm font-semibold text-[var(--foreground)] mb-2">추출된 내용 미리보기</h4>
+                    <pre className="whitespace-pre-wrap text-xs text-[var(--foreground)] bg-[var(--muted)] border border-[var(--border)] rounded-xl p-4 max-h-64 overflow-y-auto">
                       {documentPreview.extractedPreview || '추출된 텍스트가 없습니다.'}
                     </pre>
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-white">청크 예시</h4>
+                      <h4 className="text-sm font-semibold text-[var(--foreground)]">청크 예시</h4>
                       <span className="text-xs text-gray-400">총 {documentPreview.totalChunks}개</span>
                     </div>
                     <div className="space-y-3">
                       {documentPreview.chunkSamples.length ? (
                         documentPreview.chunkSamples.map((chunk, index) => (
-                          <div key={`${chunk.chunkIndex ?? index}`} className="p-4 rounded-xl border border-white/10 bg-black/20">
+                          <div key={`${chunk.chunkIndex ?? index}`} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]">
                             <div className="text-xs text-gray-400 mb-2">
                               청크 {chunk.chunkIndex ?? index + 1}/{chunk.chunkTotal ?? documentPreview.totalChunks}
                             </div>
-                            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{chunk.content}</p>
+                            <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{chunk.content}</p>
                           </div>
                         ))
                       ) : (
@@ -771,14 +771,14 @@ export function DocumentListPage() {
               setIsDragOver(false);
             }}
           />
-          <div className="relative w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-2xl border border-white/10 overflow-hidden">
-            <div className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-white/[0.02]">
+          <div className="relative w-full max-w-2xl mx-4 glass-card rounded-2xl shadow-2xl border border-[var(--border)] overflow-hidden">
+            <div className="flex items-center justify-between px-8 py-6 border-b border-[var(--border)] bg-[var(--muted)]/40">
               <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
                   <Upload className="text-[var(--primary)]" size={20} />
                   문서 업로드 파이프라인
                 </h2>
-                <p className="text-sm text-gray-400 mt-1">No-Code RAG ETL 처리를 위한 파일을 업로드하세요.</p>
+                <p className="text-sm text-[var(--text-secondary)] mt-1">No-Code RAG ETL 처리를 위한 파일을 업로드하세요.</p>
               </div>
               <button
                 type="button"
@@ -788,7 +788,7 @@ export function DocumentListPage() {
                   setUploadError(null);
                   setIsDragOver(false);
                 }}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                 aria-label="close upload modal"
                 title="닫기"
               >
@@ -824,32 +824,32 @@ export function DocumentListPage() {
               >
                 <div className="absolute inset-0 bg-gradient-to-tr from-[var(--primary)]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="relative z-10 flex flex-col items-center text-center p-6">
-                  <div className="w-16 h-16 bg-black/20 rounded-full shadow-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-white/10">
+                  <div className="w-16 h-16 bg-[var(--muted)] rounded-full shadow-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 border border-[var(--border)]">
                     <FileText className="text-[var(--primary)]" size={30} />
                   </div>
-                  <h3 className="text-lg font-semibold text-white mb-1">
+                  <h3 className="text-lg font-semibold text-[var(--foreground)] mb-1">
                     파일을 드래그하거나{' '}
                     <span className="text-[var(--primary)] underline decoration-[var(--primary)] decoration-2 underline-offset-2">
                       클릭하여 선택
                     </span>
                   </h3>
-                  <p className="text-sm text-gray-400 max-w-xs">
+                    <p className="text-sm text-[var(--text-secondary)] max-w-xs">
                     PDF, DOCX, TXT, MD 파일을 지원합니다. (최대 {MAX_UPLOAD_MB}MB)
                   </p>
                   {uploadFile && (
-                    <div className="mt-4 flex items-center gap-3 px-4 py-2 rounded-xl bg-black/20 border border-white/10">
-                      <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-[var(--primary)]">
+                    <div className="mt-4 flex items-center gap-3 px-4 py-2 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
+                      <div className="w-9 h-9 rounded-lg bg-[var(--card)] border border-[var(--border)] flex items-center justify-center text-[var(--primary)]">
                         <FileText size={18} />
                       </div>
                       <div className="text-left min-w-0">
-                        <div className="text-sm font-medium text-white truncate">{uploadFile.name}</div>
+                        <div className="text-sm font-medium text-[var(--foreground)] truncate">{uploadFile.name}</div>
                         <div className="text-xs text-gray-400">
                           {(uploadFile.size / (1024 * 1024)).toFixed(1)} MB
                         </div>
                       </div>
                       <button
                         type="button"
-                        className="ml-auto text-xs text-gray-300 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors"
+                        className="ml-auto text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] px-2 py-1 rounded-lg hover:bg-[var(--muted)] border border-transparent hover:border-[var(--border)] transition-colors"
                         onClick={(e) => {
                           e.stopPropagation();
                           setUploadFile(null);
@@ -907,7 +907,7 @@ export function DocumentListPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-white/10 bg-black/20">
+            <div className="flex items-center justify-end gap-3 px-8 py-5 border-t border-[var(--border)] bg-[var(--muted)]/50">
               <button
                 type="button"
                 onClick={() => {
@@ -916,7 +916,7 @@ export function DocumentListPage() {
                   setUploadError(null);
                   setIsDragOver(false);
                 }}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors border border-transparent hover:border-white/10 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)] disabled:opacity-50"
                 disabled={uploadMutation.isPending}
               >
                 취소
@@ -999,7 +999,7 @@ function PipelineConnector({ active }: { active: boolean }) {
     <div
       className={[
         'flex-1 h-[2px] mt-5 rounded-full',
-        active ? 'bg-[var(--primary)]' : 'bg-white/10',
+        active ? 'bg-[var(--primary)]' : 'bg-[var(--border)]',
       ].join(' ')}
     />
   );
@@ -1016,14 +1016,14 @@ function PipelineStep({
   icon: React.ReactNode;
   label: string;
 }) {
-  const ring = active ? 'border-[var(--primary)] text-[var(--primary)] shadow-[0_0_14px_rgba(168,85,247,0.25)]' : 'border-white/10 text-gray-400';
+  const ring = active ? 'border-[var(--primary)] text-[var(--primary)] shadow-[0_0_14px_rgba(168,85,247,0.25)]' : 'border-[var(--border)] text-[var(--text-secondary)]';
   const opacity = muted ? 'opacity-60' : 'opacity-100';
   return (
     <div className={`flex flex-col items-center relative z-10 ${opacity} min-w-[72px]`}>
-      <div className={`w-10 h-10 rounded-full bg-black/20 border-2 flex items-center justify-center ${ring}`}>
+      <div className={`w-10 h-10 rounded-full bg-[var(--muted)] border-2 flex items-center justify-center ${ring}`}>
         {icon}
       </div>
-      <span className={`mt-2 text-xs font-medium ${active ? 'text-white' : 'text-gray-400'}`}>{label}</span>
+      <span className={`mt-2 text-xs font-medium ${active ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)]'}`}>{label}</span>
     </div>
   );
 }

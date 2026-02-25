@@ -71,19 +71,19 @@ export function CaseEditorRow({
         <div
             className={`rounded-xl border transition-all duration-200 ${
                 isExpanded
-                    ? 'bg-black/40 border-[var(--primary)]/50 shadow-lg'
-                    : 'bg-black/20 border-white/10 hover:border-white/20'
+                    ? 'bg-[var(--muted)] border-[var(--primary)]/50 shadow-lg'
+                    : 'bg-[var(--muted)] border-[var(--border)] hover:border-[var(--ring)]'
             }`}
         >
             <div
                 className="flex items-start gap-3 p-3 cursor-pointer"
                 onClick={() => setExpandedEditorCaseId(isExpanded ? null : row.id)}
             >
-                <div className="mt-1 w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-[10px] text-gray-400 shrink-0 font-mono">
+                <div className="mt-1 w-6 h-6 rounded-full bg-[var(--muted)] flex items-center justify-center text-[10px] text-[var(--text-secondary)] shrink-0 font-mono">
                     {idx + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <p className={`text-sm ${row.input ? 'text-white' : 'text-gray-500 italic'}`}>{summaryInput}</p>
+                    <p className={`text-sm ${row.input ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)] italic'}`}>{summaryInput}</p>
                     {!isExpanded && (
                         <div className="flex gap-2 mt-1.5 flex-wrap">
                             {mustCover.length > 0 && (
@@ -102,7 +102,7 @@ export function CaseEditorRow({
                                 </span>
                             )}
                             {(maxChars || maxLines) && (
-                                <span className="text-[10px] text-gray-400 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">
+                                <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--muted)] px-1.5 py-0.5 rounded border border-[var(--border)]">
                                     길이체크
                                 </span>
                             )}
@@ -112,7 +112,7 @@ export function CaseEditorRow({
                                 </span>
                             )}
                             {hasExternalId && (
-                                <span className="text-[10px] text-gray-300 bg-white/10 px-1.5 py-0.5 rounded border border-white/20">
+                                <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--accent)] px-1.5 py-0.5 rounded border border-[var(--border)]">
                                     ID: {row.externalId.trim()}
                                 </span>
                             )}
@@ -143,12 +143,12 @@ export function CaseEditorRow({
             {isExpanded && (
                 <div className="px-4 pb-4 space-y-6 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
+                        <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm text-[var(--primary)]">chat_bubble</span>
                             질문 (핵심 입력)
                         </label>
                         <textarea
-                            className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-4 text-base text-white focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/40 outline-none resize-y min-h-[140px] shadow-inner"
+                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-4 text-base text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/40 outline-none resize-y min-h-[140px] shadow-inner"
                             placeholder="모델에게 던질 질문을 입력하세요. (예: 환불 규정 알려줘)"
                             value={row.input}
                             onChange={(event) => updateCaseRow(row.id, 'input', event.target.value)}
@@ -159,26 +159,26 @@ export function CaseEditorRow({
                         </p>
                     </div>
 
-                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-5">
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 p-4 space-y-5">
                         <div className="flex items-center justify-between">
-                            <p className="text-[11px] font-semibold text-gray-300 uppercase tracking-wider">보조 설정</p>
+                            <p className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider">보조 설정</p>
                             <span className="text-[10px] text-gray-500">AI 기준 · 룰 · 컨텍스트</span>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-300">외부 식별자 (External ID)</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)]">외부 식별자 (External ID)</label>
                                 <input
-                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 outline-none"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 outline-none"
                                     placeholder="예: refund-case-01"
                                     value={row.externalId}
                                     onChange={(event) => updateCaseRow(row.id, 'externalId', event.target.value)}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-gray-300">추가 Context (JSON)</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)]">추가 Context (JSON)</label>
                                 <textarea
-                                    className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 outline-none resize-y min-h-[74px] font-mono"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 outline-none resize-y min-h-[74px] font-mono"
                                     placeholder='예: {"locale":"ko-KR","product":"premium"}'
                                     value={row.contextJsonText}
                                     onChange={(event) => updateCaseRow(row.id, 'contextJsonText', event.target.value)}
@@ -191,7 +191,7 @@ export function CaseEditorRow({
 
                         <div className="space-y-2">
                         <div className="flex justify-between items-end">
-                            <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
+                            <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                                 <span className="material-symbols-outlined text-sm text-emerald-400">psychology</span>
                                 AI 정답 가이드 (Expected)
                             </label>
@@ -208,7 +208,7 @@ export function CaseEditorRow({
                     </div>
 
                         <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-300 flex items-center gap-1">
+                        <label className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1">
                             <span className="material-symbols-outlined text-sm text-sky-400">rule</span>
                             정밀 룰 체크 (Rules)
                         </label>
@@ -241,14 +241,14 @@ export function CaseEditorRow({
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                            <div className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-3">
-                                <p className="text-[10px] text-gray-300 font-semibold">길이 및 형식 제한</p>
+                            <div className="bg-[var(--muted)] border border-[var(--border)] rounded-lg p-3 space-y-3">
+                                <p className="text-[10px] text-[var(--text-secondary)] font-semibold">길이 및 형식 제한</p>
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-gray-400">최대 글자</span>
                                         <input
                                             type="number"
-                                            className="w-16 bg-black/30 border border-white/10 rounded px-2 py-1 text-xs text-white"
+                                            className="w-16 bg-[var(--input)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)]"
                                             placeholder="∞"
                                             value={maxChars}
                                             onChange={(event) =>
@@ -262,7 +262,7 @@ export function CaseEditorRow({
                                         <span className="text-xs text-gray-400">최대 줄수</span>
                                         <input
                                             type="number"
-                                            className="w-16 bg-black/30 border border-white/10 rounded px-2 py-1 text-xs text-white"
+                                            className="w-16 bg-[var(--input)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)]"
                                             placeholder="∞"
                                             value={maxLines}
                                             onChange={(event) =>
@@ -288,7 +288,7 @@ export function CaseEditorRow({
                                                 return next;
                                             })
                                         }
-                                        className="rounded border-white/20 bg-white/10"
+                                        className="rounded border-[var(--border)] bg-[var(--accent)]"
                                     />
                                     <span className="text-xs text-gray-400">유연한 비교 (대소문자/공백 무시)</span>
                                 </label>
@@ -296,13 +296,13 @@ export function CaseEditorRow({
 
                             <div
                                 className={`border rounded-lg p-3 space-y-2 transition-colors ${
-                                    jsonOnly ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/5 border-white/10'
+                                    jsonOnly ? 'bg-amber-500/10 border-amber-500/30' : 'bg-[var(--muted)] border-[var(--border)]'
                                 }`}
                             >
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <div
                                         className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-                                            jsonOnly ? 'bg-amber-500 border-amber-500' : 'border-white/30'
+                                            jsonOnly ? 'bg-amber-500 border-amber-500' : 'border-[var(--border)]'
                                         }`}
                                     >
                                         {jsonOnly && <span className="material-symbols-outlined text-[10px] text-black font-bold">check</span>}
@@ -346,7 +346,7 @@ function TagListEditor({ values, placeholder, onChange, tone = 'neutral' }: TagL
         emerald: 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
         sky: 'bg-sky-500/20 text-sky-200 border-sky-500/30',
         rose: 'bg-rose-500/20 text-rose-200 border-rose-500/30',
-        neutral: 'bg-white/10 text-gray-300 border-white/20',
+        neutral: 'bg-[var(--accent)] text-[var(--text-secondary)] border-[var(--border)]',
     };
 
     const add = () => {
@@ -369,14 +369,14 @@ function TagListEditor({ values, placeholder, onChange, tone = 'neutral' }: TagL
                         <button
                             type="button"
                             onClick={() => onChange(values.filter((_, currentIndex) => currentIndex !== index))}
-                            className="hover:text-white opacity-60 hover:opacity-100"
+                            className="hover:text-[var(--foreground)] opacity-60 hover:opacity-100"
                         >
                             ×
                         </button>
                     </span>
                 ))}
                 <input
-                    className="bg-transparent text-xs text-white outline-none min-w-[120px] placeholder-gray-500"
+                    className="bg-transparent text-xs text-[var(--foreground)] outline-none min-w-[120px] placeholder-[var(--text-secondary)]"
                     placeholder={values.length === 0 ? placeholder : '추가...'}
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}

@@ -119,7 +119,7 @@ export default function DashboardPage() {
     if (overviewError) {
         return (
             <div className="flex items-center justify-center h-64">
-                <div className="text-center glass-card rounded-2xl border border-white/10 px-8 py-7">
+                <div className="text-center glass-card rounded-2xl border border-[var(--border)] px-8 py-7">
                     <AlertCircle className="w-12 h-12 text-rose-300 mx-auto mb-4" />
                     <p className="text-gray-200 font-medium">통계 데이터를 불러오는데 실패했습니다.</p>
                     <p className="text-sm text-gray-400 mt-2">잠시 후 다시 시도해주세요.</p>
@@ -133,19 +133,19 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">Dashboard</h1>
                     <p className="text-sm text-gray-400 mt-1">API 사용량 및 성능 현황을 한눈에 확인하세요</p>
                 </div>
 
                 {/* Filters */}
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center bg-white/[0.03] rounded-lg p-1 border border-white/5">
+                    <div className="flex items-center bg-[var(--muted)] rounded-lg p-1 border border-[var(--border)]">
                         {/* Workspace Filter Dropdown (left slot, like "전체 조직") */}
                         <div className="relative">
                             <button
                                 type="button"
                                 onClick={() => setIsWorkspaceDropdownOpen((v) => !v)}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium text-white bg-white/10 hover:bg-white/15 transition-colors shadow-sm"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium text-[var(--foreground)] bg-[var(--accent)] hover:bg-[var(--muted)] transition-colors shadow-sm"
                                 aria-haspopup="menu"
                                 aria-expanded={isWorkspaceDropdownOpen}
                                 title="워크스페이스 범위"
@@ -174,7 +174,7 @@ export default function DashboardPage() {
                                         onClick={() => setIsWorkspaceDropdownOpen(false)}
                                         aria-label="close workspace dropdown overlay"
                                     />
-                                    <div className="absolute right-0 mt-2 w-64 bg-[#141522]/95 border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl">
+                                    <div className="absolute right-0 mt-2 w-64 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-2xl z-20 overflow-hidden backdrop-blur-xl">
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -182,8 +182,8 @@ export default function DashboardPage() {
                                                 setIsWorkspaceDropdownOpen(false);
                                             }}
                                             className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${!selectedWorkspaceId
-                                                ? 'bg-[var(--primary)]/10 text-white'
-                                                : 'text-gray-200 hover:bg-white/5'
+                                                ? 'bg-[var(--primary)]/10 text-[var(--foreground)]'
+                                                : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
                                                 }`}
                                         >
                                             <Building2 size={16} className={!selectedWorkspaceId ? 'text-[var(--primary)]' : 'text-gray-400'} />
@@ -199,8 +199,8 @@ export default function DashboardPage() {
                                                     setIsWorkspaceDropdownOpen(false);
                                                 }}
                                                 className={`w-full flex items-center gap-3 px-4 py-3 text-sm text-left transition-colors ${selectedWorkspaceId === ws.id
-                                                    ? 'bg-[var(--primary)]/10 text-white'
-                                                    : 'text-gray-200 hover:bg-white/5'
+                                                    ? 'bg-[var(--primary)]/10 text-[var(--foreground)]'
+                                                    : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
                                                     }`}
                                             >
                                                 <Layers size={16} className={selectedWorkspaceId === ws.id ? 'text-[var(--primary)]' : 'text-gray-400'} />
@@ -221,8 +221,8 @@ export default function DashboardPage() {
                                 type="button"
                                 onClick={() => setPeriod(p)}
                                 className={`px-3 py-1.5 text-xs font-medium rounded transition-all ${period === p
-                                    ? 'bg-white/10 text-white shadow-sm'
-                                    : 'text-gray-400 hover:text-white'
+                                    ? 'bg-[var(--accent)] text-[var(--foreground)] shadow-sm'
+                                    : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'
                                     }`}
                             >
                                 {p === 'daily' ? '일간' : p === 'weekly' ? '주간' : '월간'}
@@ -282,10 +282,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Time Series Chart */}
-            <div className="glass-card rounded-xl border border-white/5 p-6">
+            <div className="glass-card rounded-xl border border-[var(--border)] p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h2 className="text-lg font-bold text-white">사용량 추이</h2>
+                        <h2 className="text-lg font-bold text-[var(--foreground)]">사용량 추이</h2>
                         <p className="text-xs text-gray-500 mt-1">일별 요청 수 및 토큰 사용량</p>
                     </div>
                     <div className="flex items-center gap-4 text-xs">
@@ -389,10 +389,10 @@ export default function DashboardPage() {
             {/* Bottom Grid: Model Breakdown + Prompt Usage */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Model Breakdown */}
-                <div className="glass-card rounded-xl border border-white/5 p-6 h-full">
+                <div className="glass-card rounded-xl border border-[var(--border)] p-6 h-full">
                     <div className="flex items-center gap-2 mb-6">
                         <BarChart3 size={18} className="text-gray-400" />
-                        <h2 className="font-bold text-white text-base">모델별 사용량</h2>
+                        <h2 className="font-bold text-[var(--foreground)] text-base">모델별 사용량</h2>
                     </div>
 
                     {models.length > 0 ? (
@@ -401,8 +401,8 @@ export default function DashboardPage() {
                                 <div key={i} className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-semibold text-white">{model.modelName}</span>
-                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 border border-white/5">
+                                            <span className="text-sm font-semibold text-[var(--foreground)]">{model.modelName}</span>
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--text-secondary)] border border-[var(--border)]">
                                                 {model.provider}
                                             </span>
                                         </div>
@@ -411,7 +411,7 @@ export default function DashboardPage() {
                                             <span className="text-gray-200 font-mono">{formatCurrency(model.cost)}</span>
                                         </div>
                                     </div>
-                                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                    <div className="h-1.5 bg-[var(--muted)] rounded-full overflow-hidden border border-[var(--border)]">
                                         <div
                                             className="h-full bg-gradient-to-r from-[var(--primary)] to-purple-400 rounded-full transition-all shadow-[0_0_10px_rgba(168,85,247,0.4)]"
                                             style={{ width: `${model.percentage}%` }}
@@ -431,10 +431,10 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Prompt Usage */}
-                <div className="glass-card rounded-xl border border-white/5 p-6 h-full flex flex-col">
+                <div className="glass-card rounded-xl border border-[var(--border)] p-6 h-full flex flex-col">
                     <div className="flex items-center gap-2 mb-6">
                         <FileText size={18} className="text-gray-400" />
-                        <h2 className="font-bold text-white text-base">프롬프트별 사용량</h2>
+                        <h2 className="font-bold text-[var(--foreground)] text-base">프롬프트별 사용량</h2>
                     </div>
 
                     {prompts.length > 0 ? (
@@ -449,11 +449,11 @@ export default function DashboardPage() {
                                 {prompts.map((prompt) => (
                                     <div
                                         key={prompt.promptId ?? prompt.promptKey}
-                                        className="grid grid-cols-12 gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-white/5 transition-colors items-center group cursor-default"
+                                        className="grid grid-cols-12 gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-[var(--muted)] transition-colors items-center group cursor-default"
                                     >
                                         <div className="col-span-5 flex items-center gap-2 overflow-hidden">
                                             <span className="text-xs text-gray-500 font-mono">ID:</span>
-                                            <span className="text-xs text-gray-300 truncate group-hover:text-white transition-colors">
+                                            <span className="text-xs text-[var(--text-secondary)] truncate group-hover:text-[var(--foreground)] transition-colors">
                                                 {prompt.promptKey}
                                             </span>
                                         </div>
@@ -463,7 +463,7 @@ export default function DashboardPage() {
                                         <div className="col-span-2 text-right text-sm text-gray-300 font-mono">
                                             {formatNumber(prompt.tokens)}
                                         </div>
-                                        <div className="col-span-3 text-right text-sm text-white font-mono">
+                                        <div className="col-span-3 text-right text-sm text-[var(--foreground)] font-mono">
                                             {formatCurrency(prompt.cost)}
                                         </div>
                                     </div>
@@ -479,7 +479,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Footer Note */}
-            <div className="mt-2 text-center pb-4 border-t border-white/5 pt-6">
+            <div className="mt-2 text-center pb-4 border-t border-[var(--border)] pt-6">
                 <p className="text-[10px] text-gray-500">데이터는 실시간으로 업데이트됩니다</p>
             </div>
         </div>
@@ -509,9 +509,9 @@ function KPICard({
     const isPositive = invertChange ? change < 0 : change > 0;
 
     return (
-        <div className="glass-card p-5 rounded-xl hover:border-white/10 transition-all duration-300 relative overflow-hidden">
+        <div className="glass-card p-5 rounded-xl hover:border-[var(--border)] transition-all duration-300 relative overflow-hidden">
             <div className="flex items-start justify-between">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconWrapClassName ?? 'bg-white/5 border border-white/5'}`}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${iconWrapClassName ?? 'bg-[var(--muted)] border border-[var(--border)]'}`}>
                     {icon}
                 </div>
                 {isLoading ? (
@@ -531,9 +531,9 @@ function KPICard({
 
             <div className="mt-4">
                 {isLoading ? (
-                    <div className="h-9 w-24 bg-white/5 rounded animate-pulse" />
+                    <div className="h-9 w-24 bg-[var(--muted)] rounded animate-pulse" />
                 ) : (
-                    <div className="text-3xl font-bold text-white mb-1 tracking-tight">{value}</div>
+                    <div className="text-3xl font-bold text-[var(--foreground)] mb-1 tracking-tight">{value}</div>
                 )}
                 <div className="flex flex-col">
                     <p className="text-xs text-gray-400 font-medium mb-0.5">{title}</p>

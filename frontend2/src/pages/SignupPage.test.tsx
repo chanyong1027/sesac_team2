@@ -17,6 +17,7 @@ vi.mock('@/features/auth/store', () => ({
 
 vi.mock('@/api/auth.api', () => ({
   authApi: {
+    checkEmailAvailability: vi.fn(),
     signup: vi.fn(),
   },
 }));
@@ -77,6 +78,15 @@ describe('SignupPage pending invitation', () => {
         })
       )
     );
+
+    mockedAuthApi.checkEmailAvailability.mockResolvedValue(
+      mockAxiosResponse(
+        createApiResponse({
+          available: true,
+          message: '사용 가능한 이메일입니다.',
+        })
+      )
+    );
   });
 
   it('회원가입 성공 후 로그인으로 이동하고 pendingInvitation은 유지한다', async () => {
@@ -89,6 +99,11 @@ describe('SignupPage pending invitation', () => {
     });
     fireEvent.change(screen.getByPlaceholderText('email@company.com'), {
       target: { value: 'new-user@lumina.ai' },
+    });
+    fireEvent.blur(screen.getByPlaceholderText('email@company.com'));
+
+    await waitFor(() => {
+      expect(mockedAuthApi.checkEmailAvailability).toHaveBeenCalled();
     });
 
     const passwordInputs = screen.getAllByPlaceholderText('••••••••');
@@ -103,7 +118,7 @@ describe('SignupPage pending invitation', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent('/login');
-    });
+    }, { timeout: 3000 });
     expect(sessionStorage.getItem('pendingInvitation')).toBe('invite-token');
   });
 });

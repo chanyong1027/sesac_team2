@@ -151,22 +151,22 @@ export function CaseDetailPanel({
     return (
         <div className="h-full flex flex-col gap-4">
             {/* Tabs */}
-            <div className="flex border-b border-white/10">
+            <div className="flex border-b border-[var(--border)]">
                 <button 
                     onClick={() => setActiveTab('REPORT')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'REPORT' ? 'border-[var(--primary)] text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'REPORT' ? 'border-[var(--primary)] text-[var(--foreground)]' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     📝 통합 리포트
                 </button>
                 <button 
                     onClick={() => setActiveTab('HUMAN_REVIEW')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'HUMAN_REVIEW' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'HUMAN_REVIEW' ? 'border-purple-500 text-purple-400' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     👤 휴먼 리뷰 {item.humanReviewVerdict !== 'UNREVIEWED' && '✓'}
                 </button>
                 <button 
                     onClick={() => setActiveTab('DATA')}
-                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                    className={`px-6 py-3 text-xs font-bold transition-all border-b-2 ${activeTab === 'DATA' ? 'border-amber-500 text-amber-400' : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
                 >
                     💾 원본 데이터
                 </button>
@@ -180,12 +180,12 @@ export function CaseDetailPanel({
                     <div className="space-y-4">
                         {/* User Question */}
                         <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                                <span className="material-symbols-outlined text-sm text-gray-300">person</span>
+                            <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-sm text-[var(--text-secondary)]">person</span>
                             </div>
-                            <div className="bg-white/5 rounded-2xl rounded-tl-none p-4 max-w-[80%] border border-white/10">
+                            <div className="bg-[var(--muted)] rounded-2xl rounded-tl-none p-4 max-w-[80%] border border-[var(--border)]">
                                 <p className="text-xs font-bold text-gray-400 mb-1">사용자 질문 (Input)</p>
-                                <p className="text-sm text-white whitespace-pre-wrap leading-relaxed">{caseInput}</p>
+                                <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{caseInput}</p>
                             </div>
                         </div>
 
@@ -198,25 +198,25 @@ export function CaseDetailPanel({
                             <div className="flex-1 space-y-2">
                                 {isCompareMode ? (
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className={`p-4 rounded-2xl rounded-tl-none border ${compare?.winner === 'CANDIDATE' ? 'bg-[var(--primary)]/10 border-[var(--primary)]/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'bg-black/20 border-white/10'}`}>
+                                        <div className={`p-4 rounded-2xl rounded-tl-none border ${compare?.winner === 'CANDIDATE' ? 'bg-[var(--primary)]/10 border-[var(--primary)]/50 shadow-[0_0_15px_rgba(168,85,247,0.15)]' : 'bg-[var(--muted)] border-[var(--border)]'}`}>
                                             <div className="flex justify-between mb-2">
                                                 <span className="text-xs font-bold text-[var(--primary)]">이번 버전 (Candidate)</span>
                                                 {compare?.winner === 'CANDIDATE' && <span className="text-[10px] bg-[var(--primary)] text-black px-1.5 rounded font-bold">WIN 👑</span>}
                                             </div>
-                                            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{item.candidateOutput}</p>
+                                            <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{item.candidateOutput}</p>
                                         </div>
-                                        <div className={`p-4 rounded-2xl border ${compare?.winner === 'BASELINE' ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black/20 border-white/10 opacity-70'}`}>
+                                        <div className={`p-4 rounded-2xl border ${compare?.winner === 'BASELINE' ? 'bg-blue-500/10 border-blue-500/50' : 'bg-[var(--muted)] border-[var(--border)] opacity-70'}`}>
                                             <div className="flex justify-between mb-2">
                                                 <span className="text-xs font-bold text-blue-400">운영 버전 (Baseline)</span>
                                                 {compare?.winner === 'BASELINE' && <span className="text-[10px] bg-blue-500 text-black px-1.5 rounded font-bold">WIN 🛡️</span>}
                                             </div>
-                                            <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{item.baselineOutput}</p>
+                                            <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{item.baselineOutput}</p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="p-4 rounded-2xl rounded-tl-none bg-black/20 border border-white/10">
+                                    <div className="p-4 rounded-2xl rounded-tl-none bg-[var(--muted)] border border-[var(--border)]">
                                         <p className="text-xs font-bold text-gray-400 mb-1">AI 답변</p>
-                                        <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{item.candidateOutput}</p>
+                                        <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{item.candidateOutput}</p>
                                     </div>
                                 )}
                             </div>
@@ -244,7 +244,7 @@ export function CaseDetailPanel({
                         
                         {/* 2-1. Rule Failures */}
                         {failedChecks.length > 0 && (
-                            <div className="mb-3 bg-black/20 rounded p-2 text-xs">
+                            <div className="mb-3 bg-[var(--muted)] rounded p-2 text-xs">
                                 <p className="font-bold text-rose-300 mb-1">🚫 룰 위반 발견:</p>
                                 <ul className="list-disc pl-4 space-y-0.5 text-rose-200/80">
                                     {failedChecks.map((check, idx) => (
@@ -263,20 +263,20 @@ export function CaseDetailPanel({
                     </div>
 
                     {/* 3. Collapsible Details (Advanced Info) */}
-                    <details className="group rounded-xl border border-white/10 bg-black/20">
-                        <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors">
+                    <details className="group rounded-xl border border-[var(--border)] bg-[var(--muted)]">
+                        <summary className="flex items-center justify-between p-3 cursor-pointer hover:bg-[var(--accent)] transition-colors">
                             <span className="text-xs font-bold text-gray-400">🔍 상세 평가 근거 보기 (룰/AI 심사)</span>
                             <span className="material-symbols-outlined text-gray-500 text-sm group-open:rotate-180 transition-transform">expand_more</span>
                         </summary>
-                        <div className="p-4 border-t border-white/10 space-y-4">
+                        <div className="p-4 border-t border-[var(--border)] space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Rule Check Detail</p>
-                                    <pre className="text-[10px] text-gray-400 bg-black/30 p-2 rounded overflow-auto max-h-40">{prettyJson(item.ruleChecks)}</pre>
+                                    <pre className="text-[10px] text-[var(--text-secondary)] bg-[var(--input)] p-2 rounded overflow-auto max-h-40">{prettyJson(item.ruleChecks)}</pre>
                                 </div>
                                 <div>
                                     <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">AI Judge Detail</p>
-                                    <pre className="text-[10px] text-gray-400 bg-black/30 p-2 rounded overflow-auto max-h-40">{prettyJson(item.judgeOutput)}</pre>
+                                    <pre className="text-[10px] text-[var(--text-secondary)] bg-[var(--input)] p-2 rounded overflow-auto max-h-40">{prettyJson(item.judgeOutput)}</pre>
                                 </div>
                             </div>
                         </div>
@@ -319,8 +319,8 @@ export function CaseDetailPanel({
                             </div>
 
                             {/* Review Form */}
-                            <div className="space-y-4 bg-black/20 rounded-xl p-4 border border-white/10">
-                                <h4 className="text-sm font-bold text-white">✏️ 검토 입력</h4>
+                            <div className="space-y-4 bg-[var(--muted)] rounded-xl p-4 border border-[var(--border)]">
+                                <h4 className="text-sm font-bold text-[var(--foreground)]">✏️ 검토 입력</h4>
                                 
                                 {/* Verdict Selection */}
                                 <div className="space-y-2">
@@ -333,7 +333,7 @@ export function CaseDetailPanel({
                                                 className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
                                                     verdict === v 
                                                         ? 'bg-purple-500 text-white' 
-                                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                                        : 'bg-[var(--muted)] text-[var(--text-secondary)] hover:bg-[var(--accent)]'
                                                 }`}
                                             >
                                                 {verdictLabel(v)}
@@ -352,7 +352,7 @@ export function CaseDetailPanel({
                                                 className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
                                                     overridePass === true
                                                         ? 'bg-emerald-500 text-white' 
-                                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                                        : 'bg-[var(--muted)] text-[var(--text-secondary)] hover:bg-[var(--accent)]'
                                                 }`}
                                             >
                                                 ✅ 최종 통과
@@ -362,7 +362,7 @@ export function CaseDetailPanel({
                                                 className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${
                                                     overridePass === false
                                                         ? 'bg-rose-500 text-white' 
-                                                        : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                                                        : 'bg-[var(--muted)] text-[var(--text-secondary)] hover:bg-[var(--accent)]'
                                                 }`}
                                             >
                                                 ❌ 최종 실패
@@ -382,7 +382,7 @@ export function CaseDetailPanel({
                                         value={category}
                                         onChange={(e) => setCategory(e.target.value)}
                                         placeholder="예: safety, format, hallucination"
-                                        className="w-full px-3 py-2 bg-black/30 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500"
+                                        className="w-full px-3 py-2 bg-[var(--input)] border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-purple-500"
                                     />
                                 </div>
 
@@ -394,7 +394,7 @@ export function CaseDetailPanel({
                                         onChange={(e) => setComment(e.target.value)}
                                         placeholder="검토 의견을 입력하세요..."
                                         rows={3}
-                                        className="w-full px-3 py-2 bg-black/30 border border-white/10 rounded-lg text-xs text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 resize-none"
+                                        className="w-full px-3 py-2 bg-[var(--input)] border border-[var(--border)] rounded-lg text-xs text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-purple-500 resize-none"
                                     />
                                 </div>
 
@@ -411,10 +411,10 @@ export function CaseDetailPanel({
                             {/* Review History */}
                             {reviewHistory && reviewHistory.length > 0 && (
                                 <div className="space-y-3">
-                                    <h4 className="text-sm font-bold text-white">📜 검토 이력</h4>
+                                    <h4 className="text-sm font-bold text-[var(--foreground)]">📜 검토 이력</h4>
                                     <div className="space-y-2">
                                         {reviewHistory.map((history) => (
-                                            <div key={history.id} className="p-3 bg-black/20 rounded-lg border border-white/5 text-xs">
+                                            <div key={history.id} className="p-3 bg-[var(--muted)] rounded-lg border border-[var(--border)] text-xs">
                                                 <div className="flex justify-between items-start">
                                                     <span className={`font-bold ${verdictColor(history.verdict)} px-2 py-0.5 rounded`}>
                                                         {verdictLabel(history.verdict)}
@@ -427,7 +427,7 @@ export function CaseDetailPanel({
                                                     <p className="mt-1 text-gray-400">🏷️ {history.category}</p>
                                                 )}
                                                 {history.comment && (
-                                                    <p className="mt-1 text-gray-300">💬 {history.comment}</p>
+                                                    <p className="mt-1 text-[var(--foreground)]">💬 {history.comment}</p>
                                                 )}
                                             </div>
                                         ))}
@@ -461,7 +461,7 @@ export function CaseDetailPanel({
 function DetailBlock({ title, value }: { title: string; value: string }) {
     const [copied, setCopied] = useState(false);
     return (
-        <div className="group relative p-3 bg-black/40 rounded border border-white/5 hover:border-white/10 transition-colors">
+        <div className="group relative p-3 bg-[var(--muted)] rounded border border-[var(--border)] hover:border-[var(--ring)] transition-colors">
             <div className="flex justify-between items-center mb-2">
                 <p className="text-[10px] font-bold text-gray-500 uppercase">{title}</p>
                 <button 
@@ -474,7 +474,7 @@ function DetailBlock({ title, value }: { title: string; value: string }) {
                             // Clipboard API unavailable
                         }
                     }}
-                    className="text-[10px] text-gray-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-[10px] text-gray-500 hover:text-[var(--foreground)] opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                     {copied ? 'Copied!' : 'Copy'}
                 </button>
