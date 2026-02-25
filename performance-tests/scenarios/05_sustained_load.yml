@@ -10,6 +10,8 @@ config:
     - duration: 300
       arrivalRate: 2
       name: "cool-down (5m)"
+  http:
+    timeout: 25
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true

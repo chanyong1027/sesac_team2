@@ -7,6 +7,8 @@ config:
     - duration: 120
       arrivalRate: 20
       name: "sustained"
+  http:
+    timeout: 5
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true
