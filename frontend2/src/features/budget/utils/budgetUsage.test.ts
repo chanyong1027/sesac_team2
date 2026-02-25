@@ -25,6 +25,7 @@ describe('budgetUsage utils', () => {
     expect(formatUsdAmount(0)).toBe('$0.00');
     expect(formatUsdAmount(0.0003)).toBe('$0.000300');
     expect(formatUsdAmount(0.3)).toBe('$0.3000');
+    expect(formatUsdAmount(-0.3)).toBe('-$0.3000');
     expect(formatUsdAmount(12.345)).toBe('$12.35');
     expect(formatUsdAmount(null)).toBe('-');
   });

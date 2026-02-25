@@ -6,10 +6,11 @@ export function formatUsdAmount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '-';
 
   const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
   if (abs === 0) return '$0.00';
-  if (abs < 0.01) return `$${value.toFixed(6)}`;
-  if (abs < 1) return `$${value.toFixed(4)}`;
-  return `$${value.toFixed(2)}`;
+  if (abs < 0.01) return `${sign}$${abs.toFixed(6)}`;
+  if (abs < 1) return `${sign}$${abs.toFixed(4)}`;
+  return `${sign}$${abs.toFixed(2)}`;
 }
 
 export function resolvePrimaryLimitUsd(
