@@ -10,6 +10,7 @@ import { statisticsApi } from '@/api/statistics.api';
 import { budgetApi } from '@/api/budget.api';
 import { BudgetPolicyModal } from '@/components/budget/BudgetPolicyModal';
 import { BudgetUsageCard } from '@/components/budget/BudgetUsageCard';
+import { formatUsageMonth } from '@/features/budget/utils/budgetUsage';
 import {
     Copy,
     Check,
@@ -533,7 +534,7 @@ export function WorkspaceDashboardPage() {
                     <div className="space-y-6">
                         <BudgetUsageCard
                             title="Monthly Budget"
-                            subtitle={`이번 달 사용량 (UTC ${workspaceBudgetUsage?.month ?? '-'})`}
+                            subtitle={`이번 달 사용량 (UTC ${formatUsageMonth(workspaceBudgetUsage?.month)})`}
                             usage={workspaceBudgetUsage ?? null}
                             enabled={!!workspaceBudgetPolicy?.enabled}
                             onConfigure={() => setIsBudgetModalOpen(true)}

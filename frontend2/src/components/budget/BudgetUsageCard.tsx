@@ -1,15 +1,9 @@
 import type { BudgetUsageResponse } from '@/types/api.types';
-
-function formatUsd(n: number) {
-  if (!Number.isFinite(n)) return '-';
-  if (n >= 1) return `$${n.toFixed(2)}`;
-  return `$${n.toFixed(4)}`;
-}
-
-function pct(used: number, limit: number) {
-  if (!Number.isFinite(used) || !Number.isFinite(limit) || limit <= 0) return 0;
-  return Math.max(0, Math.min(100, (used / limit) * 100));
-}
+import {
+  calculateUsagePercent,
+  formatUsdAmount,
+  resolvePrimaryLimitUsd,
+} from '@/features/budget/utils/budgetUsage';
 
 export function BudgetUsageCard({
   title,
@@ -30,8 +24,8 @@ export function BudgetUsageCard({
   const hard = usage?.hardLimitUsd ?? null;
   const soft = usage?.softLimitUsd ?? null;
 
-  const primaryLimit = hard ?? soft;
-  const progress = primaryLimit != null ? pct(used, primaryLimit) : 0;
+  const primaryLimit = resolvePrimaryLimitUsd(usage);
+  const progress = calculateUsagePercent(used, primaryLimit) ?? 0;
 
   const isHardExceeded = enabled && hard != null && (usage?.remainingHardUsd ?? 1) <= 0;
   const isSoftExceeded = enabled && soft != null && (usage?.remainingSoftUsd ?? 1) <= 0;
@@ -84,10 +78,10 @@ export function BudgetUsageCard({
 
         <div className="flex items-baseline justify-between gap-3">
           <div className="text-2xl font-bold text-[var(--foreground)] font-mono tracking-tight">
-            {formatUsd(used)}
+            {formatUsdAmount(used)}
           </div>
           <div className="text-xs font-mono font-bold text-gray-300">
-            {primaryLimit != null ? `${formatUsd(used)} / ${formatUsd(primaryLimit)}` : `${formatUsd(used)} / -`}
+            {primaryLimit != null ? `${formatUsdAmount(used)} / ${formatUsdAmount(primaryLimit)}` : `${formatUsdAmount(used)} / -`}
           </div>
         </div>
 
