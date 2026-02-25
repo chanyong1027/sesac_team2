@@ -10,50 +10,50 @@ export function PromptEntryPage() {
   const isValidWorkspaceId = Number.isInteger(parsedWorkspaceId) && parsedWorkspaceId > 0;
   const navigate = useNavigate();
 
-  if (!isValidWorkspaceId) {
-    return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
-  }
-
   const workspaceId = parsedWorkspaceId;
   const basePath = orgId ? `/orgs/${orgId}/workspaces/${workspaceId}` : `/workspaces/${workspaceId}`;
 
   const { data: prompts, isLoading } = useQuery({
-        queryKey: ['prompts', workspaceId],
-        queryFn: async () => {
-            const response = await promptApi.getPrompts(workspaceId);
-            return response.data;
-        },
-        enabled: isValidWorkspaceId,
-    });
+    queryKey: ['prompts', workspaceId],
+    queryFn: async () => {
+      const response = await promptApi.getPrompts(workspaceId);
+      return response.data;
+    },
+    enabled: isValidWorkspaceId,
+  });
 
-    const orderedPrompts = useMemo(() => {
-        if (!prompts) return [];
-        return [...prompts].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    }, [prompts]);
+  const orderedPrompts = useMemo(() => {
+    if (!prompts) return [];
+    return [...prompts].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }, [prompts]);
 
   useEffect(() => {
-    if (!orderedPrompts.length) return;
+    if (!isValidWorkspaceId || !orderedPrompts.length) return;
     navigate(`${basePath}/prompts/${orderedPrompts[0].id}`, { replace: true });
-  }, [orderedPrompts, basePath, navigate]);
+  }, [isValidWorkspaceId, orderedPrompts, basePath, navigate]);
+
+  if (!isValidWorkspaceId) {
+    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
+  }
 
   if (isLoading) {
-    return <div className="p-8 text-gray-400">메인 프롬프트를 찾는 중...</div>;
+    return <div className="p-8 text-[var(--text-secondary)]">메인 프롬프트를 찾는 중...</div>;
   }
 
   if (!prompts || prompts.length === 0) {
     return (
       <div className="glass-card p-8 rounded-2xl text-center space-y-4 max-w-2xl mx-auto">
-        <h1 className="text-xl font-semibold text-white">프롬프트가 없습니다</h1>
-        <p className="text-sm text-gray-400">
+        <h1 className="text-xl font-semibold text-[var(--foreground)]">프롬프트가 없습니다</h1>
+        <p className="text-sm text-[var(--text-secondary)]">
           워크스페이스에 메인 프롬프트를 만들고 릴리즈 버전을 설정하세요.
         </p>
-                <Link
-                    to={`${basePath}/prompts/new`}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-xl hover:bg-[var(--primary-hover)] transition-colors text-sm font-semibold shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-white/10"
-                >
-                    새 프롬프트 만들기
-                    <ArrowRight size={16} />
-                </Link>
+        <Link
+          to={`${basePath}/prompts/new`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-xl hover:bg-[var(--primary-hover)] transition-colors text-sm font-semibold shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-[var(--primary-hover)]"
+        >
+          새 프롬프트 만들기
+          <ArrowRight size={16} />
+        </Link>
       </div>
     );
   }

@@ -17,6 +17,7 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.repository.WorkspaceMemberRepository;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -156,13 +157,15 @@ public class PromptVersionService {
         if (userTemplate == null || userTemplate.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate는 필수입니다.");
         }
-        if (!containsQuestionPlaceholder(userTemplate)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate에 {{question}} 변수가 필요합니다.");
+        if (!containsAnyPlaceholder(userTemplate)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "userTemplate에 {{변수명}} 형식의 변수가 1개 이상 필요합니다.");
         }
     }
 
-    private boolean containsQuestionPlaceholder(String template) {
-        return template.contains("{{question}}");
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{\\s*[^{}\\s]+\\s*\\}\\}");
+
+    private boolean containsAnyPlaceholder(String template) {
+        return PLACEHOLDER_PATTERN.matcher(template).find();
     }
 
     private void validateSecondaryModel(PromptVersionCreateRequest request) {

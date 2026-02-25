@@ -40,7 +40,7 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
 
     if (isLoading) {
         return (
-            <div className="p-8 text-center text-gray-400 text-sm">
+            <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
                 로딩 중...
             </div>
         );
@@ -48,7 +48,7 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
 
     if (!metrics && !rollupMetrics) {
         return (
-            <div className="p-8 text-center text-gray-400 text-sm">
+            <div className="p-8 text-center text-[var(--text-secondary)] text-sm">
                 데이터를 불러올 수 없습니다.
             </div>
         );
@@ -65,28 +65,28 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
         <div className="space-y-4">
             {/* Date Range Filter for Rollup */}
             {!runId && (
-                <div className="flex gap-4 p-3 bg-black/20 rounded-lg border border-white/10">
+                <div className="flex gap-4 p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border)]">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">시작일:</span>
+                        <span className="text-xs text-[var(--text-secondary)]">시작일:</span>
                         <input
                             type="datetime-local"
                             value={from}
                             onChange={(e) => setFrom(e.target.value)}
-                            className="px-2 py-1 bg-black/30 border border-white/10 rounded text-xs text-white"
+                            className="px-2 py-1 bg-[var(--input)] border border-[var(--border)] rounded text-xs text-[var(--foreground)] outline-none focus:border-purple-500"
                         />
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400">종료일:</span>
+                        <span className="text-xs text-[var(--text-secondary)]">종료일:</span>
                         <input
                             type="datetime-local"
                             value={to}
                             onChange={(e) => setTo(e.target.value)}
-                            className="px-2 py-1 bg-black/30 border border-white/10 rounded text-xs text-white"
+                            className="px-2 py-1 bg-[var(--input)] border border-[var(--border)] rounded text-xs text-[var(--foreground)] outline-none focus:border-purple-500"
                         />
                     </div>
                     <button
                         onClick={() => { setFrom(''); setTo(''); }}
-                        className="px-3 py-1 text-xs text-gray-400 hover:text-white"
+                        className="px-3 py-1 text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                     >
                         초기화
                     </button>
@@ -127,16 +127,16 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
 
             {/* Confusion Matrix */}
             {metrics && (
-                <div className="bg-black/20 rounded-xl p-4 border border-white/10">
-                    <h4 className="text-sm font-bold text-white mb-3">혼동 행렬 (Confusion Matrix)</h4>
+                <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)]">
+                    <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">혼동 행렬 (Confusion Matrix)</h4>
                     <div className="grid grid-cols-2 gap-4">
                         {confusionMatrix.map(([label, value, desc]) => (
-                            <div key={label} className="bg-black/30 rounded-lg p-3">
+                            <div key={label} className="bg-[var(--surface-subtle)] border border-[var(--border)] rounded-lg p-3">
                                 <div className="flex justify-between items-start">
-                                    <span className="text-xs font-bold text-gray-300">{label}</span>
-                                    <span className="text-2xl font-bold text-white">{value}</span>
+                                    <span className="text-xs font-bold text-[var(--text-secondary)]">{label}</span>
+                                    <span className="text-2xl font-bold text-[var(--foreground)]">{value}</span>
                                 </div>
-                                <p className="mt-1 text-[10px] text-gray-500">{desc}</p>
+                                <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{desc}</p>
                             </div>
                         ))}
                     </div>                </div>
@@ -145,20 +145,20 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
             {/* Additional Metrics */}
             {metrics && (
                 <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-black/20 rounded-xl p-4 border border-white/10 text-center">
-                        <div className="text-3xl font-bold text-white">{formatPercent(metrics.f1)}</div>
-                        <div className="text-xs text-gray-400">F1 Score</div>
-                        <p className="mt-1 text-[10px] text-gray-500">Precision과 Recall의 조화 평균</p>
+                    <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] text-center shadow-sm">
+                        <div className="text-3xl font-bold text-[var(--foreground)]">{formatPercent(metrics.f1)}</div>
+                        <div className="text-xs text-[var(--text-secondary)] mt-1">F1 Score</div>
+                        <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Precision과 Recall의 조화 평균</p>
                     </div>
-                    <div className="bg-black/20 rounded-xl p-4 border border-white/10 text-center">
-                        <div className="text-3xl font-bold text-white">{formatPercent(metrics.specificity)}</div>
-                        <div className="text-xs text-gray-400">Specificity</div>
-                        <p className="mt-1 text-[10px] text-gray-500">실제 실패 중 AI가 실패로 예측한 비율</p>
+                    <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] text-center shadow-sm">
+                        <div className="text-3xl font-bold text-[var(--foreground)]">{formatPercent(metrics.specificity)}</div>
+                        <div className="text-xs text-[var(--text-secondary)] mt-1">Specificity</div>
+                        <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">실제 실패 중 AI가 실패로 예측한 비율</p>
                     </div>
-                    <div className="bg-black/20 rounded-xl p-4 border border-white/10 text-center">
-                        <div className="text-3xl font-bold text-white">{formatPercent(metrics.balancedAccuracy)}</div>
-                        <div className="text-xs text-gray-400">Balanced Accuracy</div>
-                        <p className="mt-1 text-[10px] text-gray-500">Recall과 Specificity의 평균</p>
+                    <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] text-center shadow-sm">
+                        <div className="text-3xl font-bold text-[var(--foreground)]">{formatPercent(metrics.balancedAccuracy)}</div>
+                        <div className="text-xs text-[var(--text-secondary)] mt-1">Balanced Accuracy</div>
+                        <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">Recall과 Specificity의 평균</p>
                     </div>
                 </div>
             )}
@@ -172,7 +172,7 @@ export function JudgeAccuracyPanel({ workspaceId, promptId, runId }: JudgeAccura
 
             {/* Reviewed Subset Info */}
             {metrics && (
-                <div className="text-xs text-gray-400 text-center">
+                <div className="text-xs text-[var(--text-secondary)] text-center py-2">
                     검토된 케이스: {metrics.reviewedCount}개 / 전체: {metrics.totalCases}개
                     {metrics.reviewedCount > 0 && (
                         <span className="ml-2">
@@ -206,12 +206,12 @@ function MetricCard({
     };
 
     return (
-        <div className="bg-black/20 rounded-xl p-4 border border-white/10">
+        <div className="bg-[var(--background-card)] rounded-xl p-4 border border-[var(--border)] shadow-sm">
             <div className={`text-3xl font-bold ${colorClasses[color]}`}>
                 {value != null ? `${value.toFixed(1)}${suffix}` : '-'}
             </div>
-            <div className="text-sm font-bold text-white mt-1">{title}</div>
-            <p className="text-[10px] text-gray-500 mt-1">{description}</p>
+            <div className="text-sm font-bold text-[var(--foreground)] mt-1">{title}</div>
+            <p className="text-[10px] text-[var(--text-tertiary)] mt-1">{description}</p>
         </div>
     );
 }

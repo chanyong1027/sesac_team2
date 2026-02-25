@@ -478,11 +478,11 @@ function computeInsightGrade(
 }
 
 function gradeToneClass(grade: InsightGrade): string {
-    if (grade === 'S') return 'text-emerald-300';
-    if (grade === 'A') return 'text-sky-300';
-    if (grade === 'B') return 'text-amber-300';
-    if (grade === 'F') return 'text-rose-300';
-    return 'text-gray-300';
+    if (grade === 'S') return 'text-emerald-700 dark:text-emerald-300';
+    if (grade === 'A') return 'text-sky-700 dark:text-sky-300';
+    if (grade === 'B') return 'text-amber-700 dark:text-amber-300';
+    if (grade === 'F') return 'text-rose-700 dark:text-rose-300';
+    return 'text-[var(--text-secondary)]';
 }
 
 type CountDistributionEntry = {
@@ -2616,9 +2616,9 @@ function ResultDashboard({
                 ? '배포 보류'
                 : '-';
     const decisionBadgeClass = releaseDecision === 'PASS'
-        ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-200'
+        ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-700 dark:text-emerald-200'
         : releaseDecision === 'HOLD'
-            ? 'border-rose-400/40 bg-rose-500/15 text-rose-200'
+            ? 'border-rose-400/40 bg-rose-500/15 text-rose-700 dark:text-rose-200'
             : 'border-[var(--border)] bg-[var(--muted)] text-[var(--foreground)]';
     const hasDecisionGateData = decisionGateItems.length > 0 || localizedDecisionReasons.length > 0;
     const failurePreviewCases = cases
@@ -2663,11 +2663,11 @@ function ResultDashboard({
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--background-card)] p-5 shrink-0">
                 <div className="flex flex-col lg:flex-row lg:items-start gap-5">
                     <div className="min-w-[160px]">
-                        <p className="text-[11px] uppercase tracking-wider text-gray-400">종합 등급</p>
+                        <p className="text-[11px] uppercase tracking-wider text-[var(--text-secondary)]">종합 등급</p>
                         <p className={`text-6xl font-black leading-none mt-1 ${gradeToneClass(insightGrade)}`}>
                             {insightGrade}
                         </p>
-                        <p className="text-[11px] text-gray-400 mt-1">{gradeDescription}</p>
+                        <p className="text-[11px] text-[var(--text-secondary)] mt-1">{gradeDescription}</p>
                         <span className={`inline-flex mt-3 px-2.5 py-1 rounded-full text-[11px] border ${decisionBadgeClass}`}>
                             판정 {decisionLabel}
                         </span>
@@ -2702,7 +2702,7 @@ function ResultDashboard({
                             </div>
                             {battleReasons.length > 0 && (
                                 <div className="space-y-1.5">
-                                    <p className="text-[11px] text-gray-400">기준/주의 사유</p>
+                                    <p className="text-[11px] text-[var(--text-secondary)]">기준/주의 사유</p>
                                     <div className="flex flex-wrap gap-2">
                                         {battleReasons.slice(0, 2).map((reason, index) => (
                                             <button
@@ -2842,7 +2842,7 @@ function ResultDashboard({
                                         type="button"
                                         onClick={onCancelRun}
                                         disabled={isCancelling}
-                                        className="px-3 py-1.5 text-xs rounded-lg border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
+                                        className="px-3 py-1.5 text-xs rounded-lg border border-rose-500/40 text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 disabled:opacity-50"
                                     >
                                         {isCancelling ? '취소 요청 중...' : '실행 취소'}
                                     </button>
@@ -2857,22 +2857,22 @@ function ResultDashboard({
                             <span className="px-2 py-1 rounded bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)]">
                                 진행 {completed}/{total}
                             </span>
-                            <span className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                            <span className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
                                 통과 {passed}
                             </span>
-                            <span className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300">
+                            <span className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300">
                                 실패/오류 {failures}
                             </span>
-                            <span className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                            <span className="px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300">
                                 경고 {warnings}
                             </span>
                             {avgScoreDeltaEffective != null && (
-                                <span className="px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-300">
+                                <span className="px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300">
                                     비교 Δ {formatSigned(avgScoreDeltaEffective)}
                                 </span>
                             )}
                             {compareCoverageRate != null && (
-                                <span className="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300">
+                                <span className="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300">
                                     비교 커버리지 {formatPercent(compareCoverageRate)}
                                 </span>
                             )}
