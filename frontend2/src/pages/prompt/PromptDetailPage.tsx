@@ -578,7 +578,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         return modelAllowlist[form.secondaryProvider as ProviderType] ?? [];
     }, [modelAllowlist, form.secondaryProvider]);
 
-    const isTemplateValid = form.userTemplate.trim().length > 0 && hasQuestionPlaceholder(form.userTemplate);
+    const isTemplateValid = form.userTemplate.trim().length > 0 && hasAnyPlaceholder(form.userTemplate);
 
     useEffect(() => {
         if (!availableProviders.length) return;
