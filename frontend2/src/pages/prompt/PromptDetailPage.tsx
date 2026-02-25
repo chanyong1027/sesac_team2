@@ -66,8 +66,8 @@ export function PromptDetailPage() {
         retry: false,
     });
 
-    if (isPromptLoading) return <div className="p-8 text-gray-500">로딩 중...</div>;
-    if (!prompt) return <div className="p-8 text-gray-500">프롬프트를 찾을 수 없습니다.</div>;
+    if (isPromptLoading) return <div className="p-8 text-[var(--text-secondary)]">로딩 중...</div>;
+    if (!prompt) return <div className="p-8 text-[var(--text-secondary)]">프롬프트를 찾을 수 없습니다.</div>;
 
     return (
         <div className="max-w-7xl mx-auto space-y-8">
@@ -80,29 +80,29 @@ export function PromptDetailPage() {
                     <span className="material-symbols-outlined text-gray-500 text-sm group-hover:text-[var(--primary)] transition-colors">
                         arrow_back
                     </span>
-                    <span className="text-xs text-gray-500 group-hover:text-gray-300 transition-colors">
+                    <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--foreground)] transition-colors">
                         워크스페이스로 돌아가기
                     </span>
                 </Link>
 
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-2xl text-white">chat_bubble</span>
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--muted)] to-[var(--card)] border border-[var(--border)] flex items-center justify-center">
+                        <span className="material-symbols-outlined text-2xl text-[var(--foreground)]">chat_bubble</span>
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-white tracking-tight truncate">{prompt.promptKey}</h1>
+                            <h1 className="text-3xl font-bold text-[var(--foreground)] tracking-tight truncate">{prompt.promptKey}</h1>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]">
                                 {prompt.status}
                             </span>
                         </div>
-                        <p className="text-gray-400 text-sm mt-1">Prompt Configuration &amp; Version Control</p>
+                        <p className="text-[var(--text-secondary)] text-sm mt-1">Prompt Configuration &amp; Version Control</p>
                     </div>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-white/10 flex items-center gap-8 text-sm font-medium">
+            <div className="border-b border-[var(--border)] flex items-center gap-8 text-sm font-medium">
                 <nav className="flex items-center gap-8">
                     <TabButton
                         active={activeTab === 'overview'}
@@ -154,7 +154,7 @@ export function PromptDetailPage() {
                 {activeTab === 'release' && <ReleaseTab promptId={promptId} />}
                 {activeTab === 'playground' && <PlaygroundTab promptId={promptId} />}
                 {activeTab === 'evaluate' ? (
-                    <Suspense fallback={<div className="p-8 text-gray-500">로딩 중...</div>}>
+                    <Suspense fallback={<div className="p-8 text-[var(--text-secondary)]">로딩 중...</div>}>
                         <PromptEvaluateTab workspaceId={workspaceId} promptId={promptId} />
                     </Suspense>
                 ) : null}
@@ -179,10 +179,10 @@ function TabButton({
     return (
         <button
             onClick={onClick}
-            className={`relative py-3 flex items-center gap-2 transition-colors ${kind === 'playground' ? 'ml-4' : ''} ${active ? 'text-[var(--primary)]' : 'text-gray-400 hover:text-gray-200'} group`}
+            className={`relative py-3 flex items-center gap-2 transition-colors ${kind === 'playground' ? 'ml-4' : ''} ${active ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'} group`}
         >
             <span
-                className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-white' : 'text-gray-500 group-hover:text-gray-300')} transition-colors`}
+                className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-[var(--foreground)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--foreground)]')} transition-colors`}
                 aria-hidden="true"
             >
                 {iconName}
@@ -281,7 +281,7 @@ function OverviewTab({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="glass-card rounded-2xl p-8 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">기본 정보</h2>
+                    <h2 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">기본 정보</h2>
                     <div className="flex items-center gap-2">
                         {isEditing ? (
                             <>
@@ -291,7 +291,7 @@ function OverviewTab({
                                         setDraftDescription(prompt.description ?? '');
                                         setIsEditing(false);
                                     }}
-                                    className="text-xs text-gray-300 hover:text-white transition-colors border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white/5"
+                                    className="text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors border border-[var(--border)] px-3 py-1.5 rounded-lg hover:bg-[var(--muted)]"
                                 >
                                     취소
                                 </button>
@@ -299,7 +299,7 @@ function OverviewTab({
                                     type="button"
                                     disabled={saveMutation.isPending}
                                     onClick={() => saveMutation.mutate()}
-                                    className="text-xs text-[var(--primary)] hover:text-white transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20 disabled:opacity-50 inline-flex items-center gap-1"
+                                    className="text-xs text-[var(--primary)] hover:text-[var(--foreground)] transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20 disabled:opacity-50 inline-flex items-center gap-1"
                                 >
                                     <Save size={14} />
                                     저장
@@ -309,7 +309,7 @@ function OverviewTab({
                             <button
                                 type="button"
                                 onClick={() => setIsEditing(true)}
-                                className="text-xs text-[var(--primary)] hover:text-white transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20"
+                                className="text-xs text-[var(--primary)] hover:text-[var(--foreground)] transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20"
                             >
                                 수정하기
                             </button>
@@ -322,14 +322,14 @@ function OverviewTab({
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Prompt Key</label>
                         <div className="relative group">
                             <input
-                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all font-mono tracking-wide"
+                                className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all font-mono tracking-wide"
                                 readOnly
                                 value={prompt.promptKey}
                             />
                             <button
                                 type="button"
                                 onClick={async () => { try { await navigator.clipboard.writeText(prompt.promptKey); } catch { /* ignore */ } }}
-                                className="absolute right-3 top-3 text-gray-500 hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                                className="absolute right-3 top-3 text-gray-500 hover:text-[var(--foreground)] transition-colors opacity-0 group-hover:opacity-100"
                                 aria-label="copy prompt key"
                             >
                                 <Copy size={16} />
@@ -342,8 +342,8 @@ function OverviewTab({
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Description</label>
                         <textarea
                             className={`w-full border rounded-xl px-4 py-3 text-sm h-24 resize-none transition-all ${isEditing
-                                ? 'bg-black/40 border-white/10 text-white focus:ring-1 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)]'
-                                : 'bg-black/20 border-white/5 text-gray-300'
+                                ? 'bg-[var(--input)] border-[var(--border)] text-[var(--foreground)] focus:ring-1 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)]'
+                                : 'bg-[var(--muted)] border-[var(--border)] text-[var(--text-secondary)]'
                                 }`}
                             readOnly={!isEditing}
                             value={draftDescription}
@@ -351,10 +351,10 @@ function OverviewTab({
                         />
                     </div>
 
-                    <div className="pt-4 mt-auto border-t border-white/5">
+                    <div className="pt-4 mt-auto border-t border-[var(--border)]">
                         <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500">Created At</span>
-                            <span className="text-gray-300 font-mono">{new Date(prompt.createdAt).toLocaleString('ko-KR')}</span>
+                            <span className="text-[var(--text-secondary)] font-mono">{new Date(prompt.createdAt).toLocaleString('ko-KR')}</span>
                         </div>
                     </div>
                 </div>
@@ -364,7 +364,7 @@ function OverviewTab({
                 <div className="absolute -right-20 -top-20 w-64 h-64 bg-green-500/5 rounded-full blur-[80px] pointer-events-none" />
 
                 <div className="flex items-center justify-between mb-8 relative z-10">
-                    <h2 className="text-lg font-bold text-white">최신 배포 상태</h2>
+                    <h2 className="text-lg font-bold text-[var(--foreground)]">최신 배포 상태</h2>
                     <div className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${release ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${release ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
                         <span className={`text-[10px] font-bold tracking-wide ${release ? 'text-green-400' : 'text-amber-300'}`}>
@@ -389,28 +389,28 @@ function OverviewTab({
                         </div>
                         <div>
                             <p className="text-sm text-gray-400 font-medium mb-1">현재 서비스 중인 버전</p>
-                            <div className="text-6xl font-bold text-white tracking-tighter flex items-baseline gap-1">
+                            <div className="text-6xl font-bold text-[var(--foreground)] tracking-tighter flex items-baseline gap-1">
                                 {isReleaseLoading ? (
-                                    <span className="text-2xl text-gray-300">Loading...</span>
+                                    <span className="text-2xl text-[var(--text-secondary)]">Loading...</span>
                                 ) : release ? (
                                     <>
                                         v{release.activeVersionNo}
                                         <span className="text-lg font-medium text-gray-500 tracking-normal">latest</span>
                                     </>
                                 ) : (
-                                    <span className="text-2xl text-gray-300">-</span>
+                                    <span className="text-2xl text-[var(--text-secondary)]">-</span>
                                 )}
                             </div>
                         </div>
                     </div>
 
-                    <div className="space-y-4 border-t border-white/5 pt-6">
+                    <div className="space-y-4 border-t border-[var(--border)] pt-6">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2 text-gray-400 text-sm">
                                 <span className="material-symbols-outlined text-sm">schedule</span>
                                 <span>Last Deployed</span>
                             </div>
-                            <span className="text-white font-mono text-sm">
+                            <span className="text-[var(--foreground)] font-mono text-sm">
                                 {release ? new Date(release.releasedAt).toLocaleString('ko-KR') : '-'}
                             </span>
                         </div>
@@ -420,7 +420,7 @@ function OverviewTab({
                                 <span className="material-symbols-outlined text-sm">person</span>
                                 <span>Deployed By</span>
                             </div>
-                            <span className="text-white text-sm">
+                            <span className="text-[var(--foreground)] text-sm">
                                 {latestReleaseEvent?.changedByName ?? '-'}
                             </span>
                         </div>
@@ -440,7 +440,7 @@ function OverviewTab({
                         <button
                             type="button"
                             onClick={onGoRelease}
-                            className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium text-gray-300 hover:text-white transition-all flex items-center justify-center gap-2 group"
+                            className="w-full py-3 rounded-xl bg-[var(--muted)] hover:bg-[var(--accent)] border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all flex items-center justify-center gap-2 group"
                         >
                             <span className="material-symbols-outlined group-hover:-translate-y-0.5 transition-transform">history</span>
                             배포 이력 보기
@@ -803,12 +803,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
         });
     };
 
-    if (isLoading) return <div className="text-gray-400">버전 정보를 불러오는 중...</div>;
+    if (isLoading) return <div className="text-[var(--text-secondary)]">버전 정보를 불러오는 중...</div>;
 
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-lg font-bold text-white">버전 히스토리</h2>
+                <h2 className="text-lg font-bold text-[var(--foreground)]">버전 히스토리</h2>
                 <button
                     type="button"
                     onClick={() => setIsCreateOpen(true)}
@@ -826,16 +826,16 @@ function VersionsTab({ promptId }: { promptId: number }) {
                         return (
                             <div
                                 key={ver.id}
-                                className={`glass-card rounded-xl p-0 overflow-hidden transition-all group ${isCurrent ? 'hover:border-[var(--primary)]/40' : 'opacity-80 hover:opacity-100 hover:border-white/20'}`}
+                                className={`glass-card rounded-xl p-0 overflow-hidden transition-all group ${isCurrent ? 'hover:border-[var(--primary)]/40' : 'opacity-80 hover:opacity-100 hover:border-[var(--ring)]'}`}
                             >
                                 <div className="p-5 flex items-center justify-between gap-6">
                                     <div className="flex items-center gap-6 min-w-0">
-                                        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center text-sm font-bold ${isCurrent ? 'bg-gray-800 border-gray-700 text-gray-300' : 'bg-gray-800/50 border-gray-700/50 text-gray-500'}`}>
+                                        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center text-sm font-bold ${isCurrent ? 'bg-[var(--input)] border-[var(--border)] text-[var(--text-secondary)]' : 'bg-[var(--muted)] border-[var(--border)] text-[var(--text-secondary)]'}`}>
                                             v{ver.versionNumber}
                                         </div>
                                         <div className="space-y-1 min-w-0">
                                             <div className="flex items-center gap-3 flex-wrap">
-                                                <span className={`text-base font-bold ${isCurrent ? 'text-white' : 'text-gray-300'} truncate`}>
+                                                <span className={`text-base font-bold ${isCurrent ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)]'} truncate`}>
                                                     {ver.title || '(untitled)'}
                                                 </span>
                                                 {isCurrent ? (
@@ -844,15 +844,15 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                     </span>
                                                 ) : null}
                                             </div>
-                                            <div className={`flex items-center gap-2 text-xs ${isCurrent ? 'text-gray-400' : 'text-gray-500'} flex-wrap`}>
-                                                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
+                                            <div className={`flex items-center gap-2 text-xs ${isCurrent ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'} flex-wrap`}>
+                                                <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)]">
                                                     <span className={`w-1.5 h-1.5 rounded-full ${providerDotClass(ver.provider)}`} />
                                                     {prettyModel(ver.model)}
                                                 </span>
                                                 {ver.secondaryProvider && ver.secondaryModel ? (
                                                     <>
                                                         <span className="text-gray-600">/</span>
-                                                        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/5 border border-white/5">
+                                                        <span className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)]">
                                                             <span className={`w-1.5 h-1.5 rounded-full ${providerDotClass(ver.secondaryProvider)}`} />
                                                             {prettyModel(ver.secondaryModel)}
                                                         </span>
@@ -865,7 +865,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     <div className="flex items-center gap-8 flex-shrink-0">
                                         <div className="text-right">
                                             <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>Last Updated</div>
-                                            <div className={`text-sm text-gray-300 font-mono ${isCurrent ? '' : 'opacity-80'}`}>
+                                            <div className={`text-sm text-[var(--text-secondary)] font-mono ${isCurrent ? '' : 'opacity-80'}`}>
                                                 {formatKoDateTime(ver.createdAt)}
                                             </div>
                                         </div>
@@ -876,14 +876,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] text-white ${isCurrent ? 'bg-gradient-to-br from-purple-600 to-indigo-700' : 'bg-gray-700 text-gray-300'}`}>
                                                     {(ver.createdByName || '?').slice(0, 1)}
                                                 </div>
-                                                <span className={`text-sm ${isCurrent ? 'text-gray-300' : 'text-gray-400'}`}>{ver.createdByName || '-'}</span>
+                                                <span className={`text-sm ${isCurrent ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'}`}>{ver.createdByName || '-'}</span>
                                             </div>
                                         </div>
 
                                         <button
                                             type="button"
                                             onClick={() => setDetailVersionId(ver.id)}
-                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${isCurrent ? 'text-gray-300 hover:text-white border-gray-700 hover:border-gray-500' : 'text-gray-500 hover:text-white border-gray-800 hover:border-gray-600'}`}
+                                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors border ${isCurrent ? 'text-[var(--text-secondary)] hover:text-[var(--foreground)] border-[var(--border)] hover:border-[var(--ring)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] border-[var(--border)] hover:border-[var(--ring)]'}`}
                                         >
                                             상세 보기
                                         </button>
@@ -902,14 +902,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
             {isCreateOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div
-                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
                         onClick={() => setIsCreateOpen(false)}
                     />
-                    <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden border border-[var(--primary)]/30 shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(168,85,247,0.15),0_25px_50px_-12px_rgba(0,0,0,0.80)] bg-[radial-gradient(140%_140%_at_50%_0%,rgba(22,25,35,0.95)_0%,rgba(10,10,12,0.98)_100%)] backdrop-blur-2xl">
-                        <div className="px-8 py-6 border-b border-white/5 flex flex-col gap-2 shrink-0 bg-white/[0.02]">
+                    <div className="relative z-10 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden border border-[var(--primary)]/30 shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(168,85,247,0.15),0_25px_50px_-12px_rgba(0,0,0,0.80)] bg-[var(--card)] backdrop-blur-2xl">
+                        <div className="px-8 py-6 border-b border-[var(--border)] flex flex-col gap-2 shrink-0 bg-[var(--muted)]/40">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h4 className="text-xl font-semibold text-white tracking-tight flex items-center gap-2">
+                                    <h4 className="text-xl font-semibold text-[var(--foreground)] tracking-tight flex items-center gap-2">
                                         <span className="w-1.5 h-6 rounded-full bg-[var(--primary)] shadow-[0_0_10px_rgba(168,85,247,0.50)]" />
                                         새 버전 생성
                                     </h4>
@@ -920,7 +920,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 <button
                                     type="button"
                                     onClick={() => setIsCreateOpen(false)}
-                                    className="text-gray-400 hover:text-white transition-colors"
+                                    className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                                     aria-label="close create version modal"
                                     title="닫기"
                                 >
@@ -946,9 +946,9 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                 });
                                                 setConfigError(null);
                                             }}
-                                            className="px-3 py-1.5 rounded-full border border-gray-800 bg-gray-900/50 hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/10 text-xs text-gray-300 transition-all duration-300 flex items-center gap-1.5 group"
+                                            className="px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--muted)] hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/10 text-xs text-[var(--text-secondary)] transition-all duration-300 flex items-center gap-1.5 group"
                                         >
-                                            <span className="material-symbols-outlined text-[14px] text-gray-400 group-hover:text-purple-300 transition-colors">
+                                            <span className="material-symbols-outlined text-[14px] text-[var(--text-secondary)] group-hover:text-purple-300 transition-colors">
                                                 {icon}
                                             </span>
                                             예시 적용: {preset.label}
@@ -977,14 +977,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </div>
                                 </div>
                             )}
-                            <div className="bg-gray-900/60 border border-gray-800/80 rounded-xl p-5 backdrop-blur-sm">
+                            <div className="bg-[var(--muted)] border border-[var(--border)] rounded-xl p-5 backdrop-blur-sm">
                                 <div className="flex flex-col sm:flex-row items-end gap-3">
                                     <div className="flex-1">
-                                        <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">기존 버전 불러오기</label>
+                                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-2 uppercase tracking-wider">기존 버전 불러오기</label>
                                         <select
                                             value={baseVersionId ?? ''}
                                             onChange={(e) => setBaseVersionId(Number(e.target.value) || null)}
-                                            className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-md py-2.5 px-3 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                             disabled={!versions?.length}
                                         >
                                             <option value="">
@@ -1001,7 +1001,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         type="button"
                                         onClick={() => applyBaseVersion(baseVersionDetail ?? null)}
                                         disabled={!baseVersionDetail || isBaseVersionLoading}
-                                        className="px-4 py-2 bg-gray-800/80 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 rounded-md text-xs font-medium text-gray-300 transition-colors shrink-0 shadow-lg disabled:opacity-50"
+                                        className="px-4 py-2 bg-[var(--input)] hover:bg-[var(--accent)] border border-[var(--border)] hover:border-[var(--ring)] rounded-md text-xs font-medium text-[var(--text-secondary)] transition-colors shrink-0 shadow-lg disabled:opacity-50"
                                     >
                                         {isBaseVersionLoading ? '불러오는 중...' : '내용 불러오기'}
                                     </button>
@@ -1012,24 +1012,24 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 </p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-300">제목</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)]">제목</label>
                                 <input
                                     type="text"
                                     value={form.title}
                                     onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm text-gray-100 placeholder-gray-600 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-md py-2.5 px-3 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder="예: 2026-02-01 실험용"
                                 />
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-gray-300 mb-1">Provider</label>
+                                    <label htmlFor="prompt-provider" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Provider</label>
                                     <div className="relative group">
                                         <select
                                             id="prompt-provider"
                                             value={form.provider}
                                             onChange={(e) => setForm({ ...form, provider: e.target.value as typeof form.provider })}
-                                            className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm appearance-none pr-10 cursor-pointer text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all disabled:opacity-50"
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-md py-2.5 px-3 text-sm appearance-none pr-10 cursor-pointer text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all disabled:opacity-50"
                                             disabled={availableProviders.length === 0}
                                         >
                                             {availableProviders.length === 0 && (
@@ -1047,13 +1047,13 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-gray-300 mb-1">Model</label>
+                                    <label htmlFor="prompt-model" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Model</label>
                                     <div className="relative group">
                                         <select
                                             id="prompt-model"
                                             value={form.model}
                                             onChange={(e) => setForm({ ...form, model: e.target.value })}
-                                            className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-md py-2.5 px-3 text-sm appearance-none pr-10 cursor-pointer text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all disabled:opacity-50"
+                                            className="w-full bg-[var(--input)] border border-[var(--border)] rounded-md py-2.5 px-3 text-sm appearance-none pr-10 cursor-pointer text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all disabled:opacity-50"
                                             disabled={isAllowlistLoading || isAllowlistError || providerModels.length === 0}
                                         >
                                             {isAllowlistLoading && <option value="">모델 목록 불러오는 중...</option>}
@@ -1090,7 +1090,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                     secondaryProvider: e.target.value as ProviderType | '',
                                                     secondaryModel: '',
                                                 })}
-                                            className="w-full rounded-md py-2.5 px-3 text-sm text-gray-300 appearance-none pr-10 border border-gray-800 bg-gray-900/30 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all disabled:opacity-50 cursor-pointer"
+                                            className="w-full rounded-md py-2.5 px-3 text-sm text-[var(--text-secondary)] appearance-none pr-10 border border-[var(--border)] bg-[var(--muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all disabled:opacity-50 cursor-pointer"
                                             disabled={availableProviders.length === 0}
                                         >
                                             <option value="">예비 모델 없음</option>
@@ -1114,7 +1114,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             id="secondary-model"
                                             value={form.secondaryModel}
                                             onChange={(e) => setForm({ ...form, secondaryModel: e.target.value })}
-                                            className="w-full rounded-md py-2.5 px-3 text-sm text-gray-300 appearance-none pr-10 border border-gray-800 bg-gray-900/30 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all disabled:opacity-50 cursor-pointer"
+                                            className="w-full rounded-md py-2.5 px-3 text-sm text-[var(--text-secondary)] appearance-none pr-10 border border-[var(--border)] bg-[var(--muted)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20 outline-none transition-all disabled:opacity-50 cursor-pointer"
                                             disabled={!form.secondaryProvider || isAllowlistLoading || isAllowlistError || secondaryProviderModels.length === 0}
                                         >
                                             {!form.secondaryProvider && <option value="">예비 Provider를 먼저 선택하세요</option>}
@@ -1137,7 +1137,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300 flex items-center gap-2">
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                                     <span className="material-symbols-outlined text-sm text-purple-300">terminal</span>
                                     System Prompt
                                 </label>
@@ -1146,7 +1146,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         value={form.systemPrompt}
                                         onChange={(e) => setForm({ ...form, systemPrompt: e.target.value })}
                                         rows={5}
-                                        className="w-full rounded-md py-3 px-4 text-sm text-gray-300 placeholder-gray-600 resize-none shadow-inner font-mono bg-[#050507] border border-[#1f2937] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                        className="w-full rounded-md py-3 px-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none shadow-inner font-mono bg-[var(--input)] border border-[var(--border)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                         placeholder="// 시스템 프롬프트를 입력하세요."
                                     />
                                     <div className="absolute bottom-2 right-3 text-[10px] text-gray-600 font-mono">markdown supported</div>
@@ -1154,7 +1154,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="block text-sm font-medium text-gray-300 flex items-center justify-between">
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] flex items-center justify-between">
                                     <span className="flex items-center gap-2">
                                         <span className="material-symbols-outlined text-sm text-purple-300">code</span>
                                         User Template <span className="text-purple-300 text-xs ml-1">(필수)</span>
@@ -1167,12 +1167,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         setTemplateError(null);
                                     }}
                                     rows={5}
-                                    className="w-full rounded-md py-3 px-4 text-sm text-gray-300 placeholder-gray-600 resize-none font-mono bg-[#050507] border border-[var(--primary)]/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                    className="w-full rounded-md py-3 px-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none font-mono bg-[var(--input)] border border-[var(--primary)]/20 shadow-[inset_0_1px_3px_rgba(15,23,42,0.12)] dark:shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder="예: 사용자 질문: {{question}}"
                                 />
                                 <p className="text-[11px] text-gray-400 flex items-center gap-1.5 pl-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_5px_rgba(168,85,247,0.8)]"></span>
-                                    <code className="bg-gray-800 px-1 py-0.5 rounded text-purple-200 font-mono text-[10px]">{'{{question}}'}</code>
+                                    <code className="bg-[var(--muted)] px-1 py-0.5 rounded text-[var(--primary)] font-mono text-[10px]">{'{{question}}'}</code>
                                     변수가 반드시 포함되어야 합니다.
                                 </p>
                                 {templateError && (
@@ -1180,10 +1180,10 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 )}
                             </div>
 
-                            <div className="h-px bg-white/5 my-2"></div>
+                            <div className="h-px bg-[var(--border)] my-2"></div>
 
                             <div className="space-y-1.5">
-                                <label className="block text-sm font-medium text-gray-300">
+                                <label className="block text-sm font-medium text-[var(--text-secondary)]">
                                     관련 링크 <span className="text-gray-500 text-xs font-normal">(선택)</span>
                                 </label>
                                 <div className="relative">
@@ -1191,7 +1191,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                     <input
                                         value={form.contextUrl}
                                         onChange={(e) => setForm({ ...form, contextUrl: e.target.value })}
-                                        className="w-full rounded-md py-2.5 pl-9 pr-3 text-sm placeholder-gray-600 bg-[#0c0c0e] border border-[#27272a] text-gray-100 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                        className="w-full rounded-md py-2.5 pl-9 pr-3 text-sm placeholder-[var(--text-secondary)] bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                         placeholder="Jira/Notion 링크를 입력하세요"
                                         type="text"
                                     />
@@ -1200,12 +1200,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="block text-sm font-medium text-gray-300 font-mono text-xs">Model Config (JSON)</label>
+                                <label className="block text-sm font-medium text-[var(--text-secondary)] font-mono text-xs">Model Config (JSON)</label>
                                 <textarea
                                     value={form.modelConfig}
                                     onChange={(e) => setForm({ ...form, modelConfig: e.target.value })}
                                     rows={2}
-                                    className="w-full rounded-md py-3 px-4 text-xs text-gray-300 placeholder-gray-600 resize-none font-mono bg-[#050507] border border-[#1f2937] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                    className="w-full rounded-md py-3 px-4 text-xs text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none font-mono bg-[var(--input)] border border-[var(--border)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder='예: {"temperature":0.2, "topP":0.9}'
                                 />
                                 <p className="text-[11px] text-gray-500 pl-1">JSON 형식으로 입력하세요. 비워두면 기본값이 사용됩니다.</p>
@@ -1217,11 +1217,11 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 )}
                             </div>
                         </div>
-                        <div className="px-8 py-5 border-t border-white/5 bg-[#0a0a0c]/80 flex justify-end gap-3 shrink-0 backdrop-blur-md">
+                        <div className="px-8 py-5 border-t border-[var(--border)] bg-[var(--muted)]/80 flex justify-end gap-3 shrink-0 backdrop-blur-md">
                             <button
                                 type="button"
                                 onClick={() => setIsCreateOpen(false)}
-                                className="px-6 py-2.5 rounded-lg border border-white/10 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white hover:border-white/20 transition-all duration-200"
+                                className="px-6 py-2.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] hover:border-[var(--ring)] transition-all duration-200"
                             >
                                 취소
                             </button>
@@ -1252,14 +1252,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
             {detailVersionId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div
-                        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
                         onClick={() => setDetailVersionId(null)}
                     />
-                    <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col glass-card rounded-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.50),0_0_0_1px_rgba(255,255,255,0.10)_inset] overflow-hidden border border-white/10">
-                        <div className="px-8 py-5 border-b border-white/5 flex items-start justify-between bg-white/[0.01]">
+                    <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col glass-card rounded-2xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.50),0_0_0_1px_rgba(255,255,255,0.10)_inset] overflow-hidden border border-[var(--border)]">
+                        <div className="px-8 py-5 border-b border-[var(--border)] flex items-start justify-between bg-[var(--muted)]/30">
                             <div>
                                 <div className="flex items-center gap-3">
-                                    <h4 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                                    <h4 className="text-xl font-bold text-[var(--foreground)] tracking-tight flex items-center gap-2">
                                         <span className="material-symbols-outlined text-[var(--primary)] text-2xl">settings_suggest</span>
                                         버전 상세
                                     </h4>
@@ -1269,12 +1269,12 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         </span>
                                     ) : null}
                                 </div>
-                                <p className="text-sm text-gray-400 mt-1 pl-9">버전의 설정과 템플릿을 확인하고 관리합니다.</p>
+                                <p className="text-sm text-[var(--text-secondary)] mt-1 pl-9">버전의 설정과 템플릿을 확인하고 관리합니다.</p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setDetailVersionId(null)}
-                                className="group text-gray-500 hover:text-white transition-all p-2 rounded-full hover:bg-white/5 border border-transparent hover:border-white/10"
+                                className="group text-gray-500 hover:text-[var(--foreground)] transition-all p-2 rounded-full hover:bg-[var(--muted)] border border-transparent hover:border-[var(--border)]"
                                 aria-label="close version detail modal"
                                 title="닫기"
                             >
@@ -1282,16 +1282,16 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gradient-to-b from-transparent to-black/20">
+                        <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-gradient-to-b from-transparent to-[var(--muted)]/40">
                             {isDetailLoading || !versionDetail ? (
-                                <div className="text-sm text-gray-400">버전 정보를 불러오는 중...</div>
+                                <div className="text-sm text-[var(--text-secondary)]">버전 정보를 불러오는 중...</div>
                             ) : (
                                 <>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
                                             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Version ID</div>
                                             <div className="flex items-center gap-2">
-                                                <span className="font-mono text-lg font-bold text-white tracking-tight">v{versionDetail.versionNumber}</span>
+                                                <span className="font-mono text-lg font-bold text-[var(--foreground)] tracking-tight">v{versionDetail.versionNumber}</span>
                                                 <span
                                                     className="material-symbols-outlined text-green-500 text-sm"
                                                     style={{ fontVariationSettings: "'FILL' 1" }}
@@ -1301,35 +1301,35 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
                                             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Primary Model</div>
-                                            <div className="flex items-center text-sm font-medium text-white">
+                                            <div className="flex items-center text-sm font-medium text-[var(--foreground)]">
                                                 <span className="px-2 py-1 rounded bg-purple-500/10 text-[10px] font-bold text-purple-300 mr-2 border border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.10)]">
                                                     {versionDetail.provider}
                                                 </span>
-                                                <span className="font-mono text-gray-200">{versionDetail.model}</span>
+                                                <span className="font-mono text-[var(--foreground)]">{versionDetail.model}</span>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
                                             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</div>
-                                            <div className="text-sm font-medium text-gray-200 truncate">{versionDetail.title || '-'}</div>
+                                            <div className="text-sm font-medium text-[var(--foreground)] truncate">{versionDetail.title || '-'}</div>
                                         </div>
 
-                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
                                             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Created At</div>
                                             <div className="font-mono text-sm text-gray-400">{formatKoDateTime(versionDetail.createdAt)}</div>
                                         </div>
 
-                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
                                             <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Fallback Model</div>
-                                            <div className="flex items-center text-sm font-medium text-white">
+                                            <div className="flex items-center text-sm font-medium text-[var(--foreground)]">
                                                 {versionDetail.secondaryProvider && versionDetail.secondaryModel ? (
                                                     <>
                                                         <span className="px-2 py-1 rounded bg-emerald-500/10 text-[10px] font-bold text-emerald-300 mr-2 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.10)]">
                                                             {versionDetail.secondaryProvider}
                                                         </span>
-                                                        <span className="font-mono text-gray-200">{versionDetail.secondaryModel}</span>
+                                                        <span className="font-mono text-[var(--foreground)]">{versionDetail.secondaryModel}</span>
                                                     </>
                                                 ) : (
                                                     <span className="text-gray-500">-</span>
@@ -1337,7 +1337,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                             </div>
                                         </div>
 
-                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-white/[0.02] transition-colors border border-transparent hover:border-white/5 opacity-60">
+                                        <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)] opacity-60">
                                             <div className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Tokens</div>
                                             <div className="font-mono text-sm text-gray-500">
                                                 {(() => {
@@ -1349,21 +1349,21 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         </div>
                                     </div>
 
-                                    <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent w-full"></div>
+                                    <div className="h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent w-full"></div>
 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center">
+                                            <label className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center">
                                                 <span className="material-symbols-outlined text-sm mr-2 text-[var(--primary)]">terminal</span>
                                                 System Prompt
                                             </label>
-                                            <span className="text-[10px] text-gray-600 font-mono bg-white/5 px-2 py-0.5 rounded border border-white/5">READ ONLY</span>
+                                            <span className="text-[10px] text-gray-600 font-mono bg-[var(--muted)] px-2 py-0.5 rounded border border-[var(--border)]">READ ONLY</span>
                                         </div>
 
                                         <div className="relative group">
                                             <div className="absolute -inset-0.5 bg-gradient-to-r from-[var(--primary)]/30 to-blue-600/30 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
-                                            <div className="relative w-full rounded-xl p-0 font-mono text-sm leading-relaxed text-gray-300 h-80 overflow-hidden flex flex-col bg-black/30 border border-white/10 shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
-                                                <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
+                                            <div className="relative w-full rounded-xl p-0 font-mono text-sm leading-relaxed text-[var(--foreground)] h-80 overflow-hidden flex flex-col bg-[var(--input)] border border-[var(--border)] shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]">
+                                                <div className="flex items-center justify-between px-4 py-2 bg-[var(--muted)] border-b border-[var(--border)]">
                                                     <div className="flex space-x-1.5">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50"></div>
                                                         <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50"></div>
@@ -1387,7 +1387,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                         // ignore
                                                     }
                                                 }}
-                                                className="absolute top-12 right-4 p-2 rounded-lg bg-white/5 hover:bg-[var(--primary)]/20 text-gray-400 hover:text-white border border-white/5 hover:border-[var(--primary)]/30 opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-md"
+                                                className="absolute top-12 right-4 p-2 rounded-lg bg-[var(--muted)] hover:bg-[var(--primary)]/20 text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:border-[var(--primary)]/30 opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-md"
                                                 aria-label="copy system prompt"
                                                 title="copy"
                                             >
@@ -1400,13 +1400,13 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-3">
                                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">User Template</label>
-                                                <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl p-4 font-mono text-sm text-purple-200 shadow-inner min-h-[72px] whitespace-pre-wrap">
+                                                <div className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl p-4 font-mono text-sm text-[var(--foreground)] shadow-inner min-h-[72px] whitespace-pre-wrap">
                                                     {versionDetail.userTemplate || '(empty)'}
                                                 </div>
                                             </div>
                                             <div className="space-y-3">
                                                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Model Config</label>
-                                                <div className="w-full bg-[#0a0a0c] border border-white/10 rounded-xl p-4 font-mono text-xs text-gray-400 shadow-inner min-h-[72px] whitespace-pre-wrap">
+                                                <div className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl p-4 font-mono text-xs text-[var(--text-secondary)] shadow-inner min-h-[72px] whitespace-pre-wrap">
                                                     {versionDetail.modelConfig && Object.keys(versionDetail.modelConfig).length
                                                         ? JSON.stringify(versionDetail.modelConfig, null, 2)
                                                         : 'No overrides configured'}
@@ -1434,11 +1434,11 @@ function VersionsTab({ promptId }: { promptId: number }) {
                             )}
                         </div>
 
-                        <div className="px-8 py-5 border-t border-white/5 bg-[#0a0a0c]/50 flex justify-end items-center shrink-0 backdrop-blur-md">
+                        <div className="px-8 py-5 border-t border-[var(--border)] bg-[var(--muted)]/50 flex justify-end items-center shrink-0 backdrop-blur-md">
                             <button
                                 type="button"
                                 onClick={() => setDetailVersionId(null)}
-                                className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 shadow-lg"
+                                className="px-6 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] bg-[var(--muted)] hover:bg-[var(--accent)] border border-[var(--border)] hover:border-[var(--ring)] transition-all focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/50 shadow-lg"
                             >
                                 닫기
                             </button>
@@ -1526,14 +1526,14 @@ function ReleaseTab({ promptId }: { promptId: number }) {
 
     return (
         <div className="space-y-6">
-            <div className="glass-card rounded-2xl p-8 relative overflow-hidden group border border-white/10">
+            <div className="glass-card rounded-2xl p-8 relative overflow-hidden group border border-[var(--border)]">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--primary)]/5 rounded-full blur-[80px] -mr-16 -mt-16 pointer-events-none" />
 
-                <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                <h3 className="text-xl font-bold text-[var(--foreground)] mb-2 flex items-center gap-2">
                     Manual Release
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
                 </h3>
-                <p className="text-gray-400 text-sm mb-8 leading-relaxed max-w-2xl">
+                <p className="text-[var(--text-secondary)] text-sm mb-8 leading-relaxed max-w-2xl">
                     특정 버전을 선택하여 운영 환경(Production)에 배포합니다. 배포 즉시 API 응답에 반영됩니다.
                 </p>
 
@@ -1545,7 +1545,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                             </label>
                             <div className="relative">
                                 <select
-                                    className="block w-full rounded-xl border border-white/10 bg-[#0F0E15]/80 text-gray-200 py-3 px-4 text-sm focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all cursor-pointer hover:border-white/20 appearance-none"
+                                    className="block w-full rounded-xl border border-[var(--border)] bg-[var(--input)] text-[var(--foreground)] py-3 px-4 text-sm focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all cursor-pointer hover:border-[var(--ring)] appearance-none"
                                     value={selectedVersionId ?? ''}
                                     onChange={(e) => setSelectedVersionId(e.target.value ? Number(e.target.value) : null)}
                                     disabled={isVersionsLoading || !versions?.length}
@@ -1564,7 +1564,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                     ))}
                                 </select>
                                 <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none">
-                                    <span className="material-symbols-outlined text-gray-500">expand_more</span>
+                                    <span className="material-symbols-outlined text-[var(--text-secondary)]">expand_more</span>
                                 </div>
                             </div>
                             <p className="mt-2 text-[11px] text-gray-500">
@@ -1584,7 +1584,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                             <input
                                 value={releaseReason}
                                 onChange={(e) => setReleaseReason(e.target.value)}
-                                className="block w-full rounded-xl border border-white/10 bg-[#0F0E15]/80 text-gray-200 py-3 px-4 text-sm placeholder:text-gray-600 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all hover:border-white/20"
+                                className="block w-full rounded-xl border border-[var(--border)] bg-[var(--input)] text-[var(--foreground)] py-3 px-4 text-sm placeholder:text-[var(--text-secondary)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all hover:border-[var(--ring)]"
                                 placeholder="예: 최신 FAQ 반영"
                                 type="text"
                             />
@@ -1616,16 +1616,16 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                 </div>
             </div>
 
-            <div className="glass-card rounded-2xl p-8 min-h-[400px] border border-white/10">
-                <div className="flex items-center justify-between mb-8 border-b border-white/5 pb-4">
+            <div className="glass-card rounded-2xl p-8 min-h-[400px] border border-[var(--border)]">
+                <div className="flex items-center justify-between mb-8 border-b border-[var(--border)] pb-4">
                     <div>
-                        <h3 className="text-lg font-bold text-white mb-1">배포 이력</h3>
+                        <h3 className="text-lg font-bold text-[var(--foreground)] mb-1">배포 이력</h3>
                         <p className="text-gray-500 text-xs">운영 환경 배포 히스토리를 확인합니다.</p>
                     </div>
                     <button
                         type="button"
                         onClick={() => refetchReleaseHistory()}
-                        className="p-2 text-gray-500 hover:text-white transition-colors rounded-lg hover:bg-white/5"
+                        className="p-2 text-gray-500 hover:text-[var(--foreground)] transition-colors rounded-lg hover:bg-[var(--muted)]"
                         aria-label="refresh release history"
                     >
                         <span className="material-symbols-outlined text-xl">refresh</span>
@@ -1656,11 +1656,11 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                         <div className="absolute left-[12px] top-1 w-2 h-2 rounded-full bg-gray-600 border border-[var(--background)] z-10" />
                                     )}
 
-                                    <div className="flex-1 frosted-entry p-5 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-[var(--primary)]/30 transition-all cursor-default">
+                                    <div className="flex-1 frosted-entry p-5 rounded-xl border border-[var(--border)] bg-[var(--muted)]/40 hover:bg-[var(--muted)] hover:border-[var(--primary)]/30 transition-all cursor-default">
                                         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                             <div>
                                                 <div className="flex items-center gap-3 mb-2">
-                                                    <h4 className={`font-bold ${isLatest ? 'text-white' : 'text-gray-300'} text-base`}>
+                                                    <h4 className={`font-bold ${isLatest ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)]'} text-base`}>
                                                         v{history.toVersionNo} Release
                                                     </h4>
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.className}`}>
@@ -1675,11 +1675,11 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                                 <span className={`text-xs font-mono ${isLatest ? 'text-gray-500' : 'text-gray-600'} mb-1`}>
                                                     {formatTimelineDate(history.createdAt)}
                                                 </span>
-                                                <div className="flex items-center gap-2 px-2 py-1 rounded bg-white/5 border border-white/5">
+                                                <div className="flex items-center gap-2 px-2 py-1 rounded bg-[var(--muted)] border border-[var(--border)]">
                                                     <div className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-600 to-indigo-700 text-[8px] flex items-center justify-center font-bold text-white">
                                                         {(history.changedByName || 'S').slice(0, 1)}
                                                     </div>
-                                                    <span className={`text-xs ${isLatest ? 'text-gray-300' : 'text-gray-400'}`}>
+                                                    <span className={`text-xs ${isLatest ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'}`}>
                                                         {history.changedByName || 'System'}
                                                     </span>
                                                 </div>
@@ -1937,14 +1937,14 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
         <div className="space-y-6">
             {/* Top bar: version loader */}
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <h2 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
                     <span className="material-symbols-outlined text-[var(--primary)]">play_circle</span>
                     Playground
                 </h2>
                 <div className="flex items-center gap-3">
                     {versions && versions.length > 0 && (
                         <select
-                            className="bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-300 px-3 py-1.5 focus:outline-none focus:border-[var(--primary)]"
+                            className="bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] px-3 py-1.5 focus:outline-none focus:border-[var(--primary)]"
                             value={selectedVersionId}
                             onChange={(e) => {
                                 const val = e.target.value;
@@ -1965,7 +1965,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                         type="button"
                         onClick={() => { setSaveError(null); setSaveOpen(true); }}
                         disabled={!canRun}
-                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium border border-[#27272a] text-gray-300 hover:text-white hover:border-gray-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-medium border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:border-[var(--ring)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                         <Save size={14} /> 버전 저장
                     </button>
@@ -1988,7 +1988,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                     <div className="glass-card rounded-xl p-5 space-y-4">
                         <div className="flex items-center gap-2 mb-1">
                             <span className="material-symbols-outlined text-base text-gray-400">tune</span>
-                            <span className="text-sm font-semibold text-gray-300">모델 설정</span>
+                            <span className="text-sm font-semibold text-[var(--text-secondary)]">모델 설정</span>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1996,7 +1996,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 <select
                                     value={provider}
                                     onChange={(e) => setProvider(e.target.value as ProviderType)}
-                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)]"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] px-3 py-2 focus:outline-none focus:border-[var(--primary)]"
                                 >
                                     {availableProviders.map((p) => (
                                         <option key={p} value={p}>{providerLabel[p]}</option>
@@ -2008,7 +2008,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 <select
                                     value={model}
                                     onChange={(e) => setModel(e.target.value)}
-                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)]"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] px-3 py-2 focus:outline-none focus:border-[var(--primary)]"
                                 >
                                     {providerModels.map((m) => (
                                         <option key={m} value={m}>{m}</option>
@@ -2031,7 +2031,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
 
                     {/* System Prompt */}
                     <div className="glass-card rounded-xl p-5 flex-1 flex flex-col">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)] mb-2">
                             <span className="material-symbols-outlined text-base text-gray-400">psychology</span>
                             System Prompt
                         </label>
@@ -2039,14 +2039,14 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                             value={systemPrompt}
                             onChange={(e) => setSystemPrompt(e.target.value)}
                             placeholder="시스템 프롬프트를 입력하세요..."
-                            className="flex-1 w-full p-3 bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 font-mono focus:outline-none focus:border-[var(--primary)] resize-none placeholder-gray-600"
+                            className="flex-1 w-full p-3 bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] font-mono focus:outline-none focus:border-[var(--primary)] resize-none placeholder-[var(--text-secondary)]"
                             rows={4}
                         />
                     </div>
 
                     {/* User Template */}
                     <div className="glass-card rounded-xl p-5 flex flex-col">
-                        <label className="flex items-center gap-2 text-sm font-semibold text-gray-300 mb-2">
+                        <label className="flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)] mb-2">
                             <span className="material-symbols-outlined text-base text-gray-400">chat</span>
                             User Template
                         </label>
@@ -2054,7 +2054,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                             value={userTemplate}
                             onChange={(e) => setUserTemplate(e.target.value)}
                             placeholder="사용자 템플릿을 입력하세요. 예: {{question}}에 대해 답변해주세요."
-                            className="w-full p-3 bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 font-mono focus:outline-none focus:border-[var(--primary)] resize-none placeholder-gray-600"
+                            className="w-full p-3 bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] font-mono focus:outline-none focus:border-[var(--primary)] resize-none placeholder-[var(--text-secondary)]"
                             rows={3}
                         />
                     </div>
@@ -2064,7 +2064,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                         <div className="glass-card rounded-xl p-5 space-y-3">
                             <div className="flex items-center gap-2">
                                 <span className="material-symbols-outlined text-base text-gray-400">data_object</span>
-                                <span className="text-sm font-semibold text-gray-300">Variables</span>
+                                <span className="text-sm font-semibold text-[var(--text-secondary)]">Variables</span>
                             </div>
                             {variables.map((v, i) => (
                                 <div key={v.key} className="flex items-center gap-3">
@@ -2079,7 +2079,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                             setVariables(next);
                                         }}
                                         placeholder={`${v.key} 값 입력`}
-                                        className="flex-1 bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)] placeholder-gray-600"
+                                        className="flex-1 bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] px-3 py-2 focus:outline-none focus:border-[var(--primary)] placeholder-[var(--text-secondary)]"
                                     />
                                 </div>
                             ))}
@@ -2090,7 +2090,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                     <div className="glass-card rounded-xl p-5 space-y-5">
                         <div className="flex items-center gap-2">
                             <span className="material-symbols-outlined text-base text-gray-400">tune</span>
-                            <span className="text-sm font-semibold text-gray-300">Parameters</span>
+                            <span className="text-sm font-semibold text-[var(--text-secondary)]">Parameters</span>
                         </div>
 
                         {/* Temperature */}
@@ -2104,7 +2104,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                     step={0.1}
                                     min={0}
                                     max={2}
-                                    className="w-16 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-16 bg-[var(--input)] border border-[var(--border)] rounded-md text-xs text-[var(--foreground)] px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
                             <input
@@ -2114,7 +2114,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 min={0}
                                 max={2}
                                 step={0.1}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[var(--border)] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
                             />
                         </div>
 
@@ -2129,7 +2129,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                     step={100}
                                     min={100}
                                     max={16384}
-                                    className="w-20 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-20 bg-[var(--input)] border border-[var(--border)] rounded-md text-xs text-[var(--foreground)] px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
                             <input
@@ -2139,7 +2139,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 min={100}
                                 max={16384}
                                 step={100}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[var(--border)] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
                             />
                         </div>
 
@@ -2154,7 +2154,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                     step={0.05}
                                     min={0}
                                     max={1}
-                                    className="w-16 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-16 bg-[var(--input)] border border-[var(--border)] rounded-md text-xs text-[var(--foreground)] px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
                             <input
@@ -2164,7 +2164,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 min={0}
                                 max={1}
                                 step={0.05}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[var(--border)] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
                             />
                         </div>
 
@@ -2179,7 +2179,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                     step={0.1}
                                     min={0}
                                     max={2}
-                                    className="w-16 bg-[#0c0c0e] border border-[#27272a] rounded-md text-xs text-gray-200 px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    className="w-16 bg-[var(--input)] border border-[var(--border)] rounded-md text-xs text-[var(--foreground)] px-2 py-1 text-center focus:outline-none focus:border-[var(--primary)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
                             <input
@@ -2189,7 +2189,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 min={0}
                                 max={2}
                                 step={0.1}
-                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[#27272a] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
+                                className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-[var(--border)] accent-[var(--primary)] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-[0_0_8px_rgba(168,85,247,0.5)]"
                             />
                         </div>
                     </div>
@@ -2224,8 +2224,8 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
 
                     {/* Output */}
                     <div className="glass-card rounded-xl flex-1 flex flex-col overflow-hidden">
-                        <div className="px-5 py-3 border-b border-white/5 flex items-center justify-between">
-                            <span className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+                        <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+                            <span className="text-sm font-semibold text-[var(--text-secondary)] flex items-center gap-2">
                                 <span className="material-symbols-outlined text-base text-gray-400">output</span>
                                 Output
                             </span>
@@ -2239,7 +2239,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                             setTimeout(() => setOutputCopied(false), 2000);
                                         } catch { /* ignore */ }
                                     }}
-                                    className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
+                                    className="text-xs text-gray-500 hover:text-[var(--foreground)] flex items-center gap-1 transition-colors"
                                 >
                                     <Copy size={12} />
                                     {outputCopied ? '복사됨' : '복사'}
@@ -2253,7 +2253,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 </div>
                             )}
                             {result ? (
-                                <pre className="text-sm text-gray-200 whitespace-pre-wrap font-sans leading-relaxed">
+                                <pre className="text-sm text-[var(--foreground)] whitespace-pre-wrap font-sans leading-relaxed">
                                     {result.answer ?? '(응답 없음)'}
                                 </pre>
                             ) : (
@@ -2264,7 +2264,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                             )}
                         </div>
                         {result && (
-                            <div className="px-5 py-3 border-t border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                            <div className="px-5 py-3 border-t border-[var(--border)] flex flex-wrap items-center gap-4 text-xs text-gray-500">
                                 <span className="flex items-center gap-1.5">
                                     <span className="material-symbols-outlined text-sm">timer</span>
                                     {result.latencyMs != null ? `${(result.latencyMs / 1000).toFixed(2)}s` : '-'}
@@ -2292,28 +2292,28 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
             {/* Save as version modal */}
             {saveOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSaveOpen(false)} />
-                    <div className="relative z-10 w-full max-w-md rounded-2xl overflow-hidden border border-[var(--primary)]/30 shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(168,85,247,0.15),0_25px_50px_-12px_rgba(0,0,0,0.80)] bg-[radial-gradient(140%_140%_at_50%_0%,rgba(22,25,35,0.95)_0%,rgba(10,10,12,0.98)_100%)] backdrop-blur-2xl">
-                        <div className="px-6 py-5 border-b border-white/5">
-                            <h4 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setSaveOpen(false)} />
+                    <div className="relative z-10 w-full max-w-md rounded-2xl overflow-hidden border border-[var(--primary)]/30 shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(168,85,247,0.15),0_25px_50px_-12px_rgba(0,0,0,0.80)] bg-[var(--card)] backdrop-blur-2xl">
+                        <div className="px-6 py-5 border-b border-[var(--border)]">
+                            <h4 className="text-lg font-semibold text-[var(--foreground)] flex items-center gap-2">
                                 <span className="w-1.5 h-5 rounded-full bg-[var(--primary)] shadow-[0_0_10px_rgba(168,85,247,0.50)]" />
                                 새 버전으로 저장
                             </h4>
-                            <p className="text-xs text-gray-400 mt-1 pl-3.5">현재 플레이그라운드 설정을 새 프롬프트 버전으로 저장합니다</p>
+                            <p className="text-xs text-[var(--text-secondary)] mt-1 pl-3.5">현재 플레이그라운드 설정을 새 프롬프트 버전으로 저장합니다</p>
                         </div>
                         <div className="p-6 space-y-4">
                             <div>
-                                <label className="block text-xs text-gray-400 mb-1.5">버전 제목 (선택)</label>
+                                <label className="block text-xs text-[var(--text-secondary)] mb-1.5">버전 제목 (선택)</label>
                                 <input
                                     value={saveTitle}
                                     onChange={(e) => setSaveTitle(e.target.value)}
                                     placeholder="예: GPT-4o 튜닝 v3"
-                                    className="w-full bg-[#0c0c0e] border border-[#27272a] rounded-lg text-sm text-gray-200 px-3 py-2 focus:outline-none focus:border-[var(--primary)] placeholder-gray-600"
+                                    className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] px-3 py-2 focus:outline-none focus:border-[var(--primary)] placeholder-[var(--text-secondary)]"
                                 />
                             </div>
                             <div className="glass-card rounded-lg p-3 flex items-center justify-between">
                                 <div>
-                                    <div className="text-sm text-gray-300 font-medium">저장 후 즉시 배포</div>
+                                    <div className="text-sm text-[var(--text-secondary)] font-medium">저장 후 즉시 배포</div>
                                     <div className="text-xs text-gray-500 mt-0.5">새 버전을 바로 활성 릴리즈로 설정합니다</div>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
@@ -2332,11 +2332,11 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
                                 </div>
                             )}
                         </div>
-                        <div className="px-6 py-4 border-t border-white/5 flex justify-end gap-3">
+                        <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={() => setSaveOpen(false)}
-                                className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white border border-[#27272a] hover:border-gray-500 transition-colors"
+                                className="px-4 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] border border-[var(--border)] hover:border-[var(--ring)] transition-colors"
                             >
                                 취소
                             </button>

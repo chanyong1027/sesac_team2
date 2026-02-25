@@ -29,6 +29,7 @@ import DashboardPage from '@/pages/dashboard/DashboardPage';
 import { WorkspaceGuard } from '@/components/common/WorkspaceGuard';
 import { AccessDenied } from '@/components/common/AccessDenied';
 import { GuidePage } from '@/pages/GuidePage';
+import { ThemeProvider } from '@/features/theme/context/ThemeProvider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,48 +118,50 @@ function LegacyWorkspaceRedirect() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthInitializer />
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<LandingPage_v3 />} />
-          <Route path="/landing-v2" element={<LandingPage_v2 />} />
-          <Route path="/landing-v1" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-          <Route path="/invitations/accept" element={<InvitationAcceptPage />} />
-          <Route path="/guide" element={<GuidePage />} />
-          <Route path="/guide/category/:categoryId" element={<GuidePage />} />
-          <Route path="/guide/article/:articleId" element={<GuidePage />} />
+    <ThemeProvider defaultTheme="system" storageKey="app-theme">
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthInitializer />
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage_v3 />} />
+            <Route path="/landing-v2" element={<LandingPage_v2 />} />
+            <Route path="/landing-v1" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
+            <Route path="/invitations/accept" element={<InvitationAcceptPage />} />
+            <Route path="/guide" element={<GuidePage />} />
+            <Route path="/guide/category/:categoryId" element={<GuidePage />} />
+            <Route path="/guide/article/:articleId" element={<GuidePage />} />
 
-          {/* Protected Routes */}
-          <Route element={<ProtectedRoute />}>
-            <Route path="/onboarding" element={<OnboardingPage />} />
-            <Route path="/dashboard" element={<NavigateToOrgDashboard />} />
-            <Route path="/workspaces/:workspaceId/*" element={<LegacyWorkspaceRedirect />} />
-            <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
-              <Route path="dashboard" element={<OrganizationDashboardPage />} />
-              <Route path="workspaces/:workspaceId" element={<WorkspaceGuard><WorkspaceDashboardPage /></WorkspaceGuard>} />
-              <Route path="workspaces/:workspaceId/prompts" element={<WorkspaceGuard><PromptEntryPage /></WorkspaceGuard>} />
-              <Route path="workspaces/:workspaceId/prompts/new" element={<WorkspaceGuard><PromptCreatePage /></WorkspaceGuard>} />
-              <Route path="workspaces/:workspaceId/prompts/:promptId" element={<WorkspaceGuard><PromptDetailPage /></WorkspaceGuard>} />
-              <Route path="workspaces/:workspaceId/documents" element={<WorkspaceGuard><DocumentListPage /></WorkspaceGuard>} />
-              <Route path="workspaces/:workspaceId/logs" element={<WorkspaceGuard><WorkspaceLogsPage /></WorkspaceGuard>} />
-              <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceGuard><WorkspaceLogDetailPage /></WorkspaceGuard>} />
+            {/* Protected Routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/dashboard" element={<NavigateToOrgDashboard />} />
+              <Route path="/workspaces/:workspaceId/*" element={<LegacyWorkspaceRedirect />} />
+              <Route path="/orgs/:orgId" element={<OrgScopedDashboardLayout />}>
+                <Route path="dashboard" element={<OrganizationDashboardPage />} />
+                <Route path="workspaces/:workspaceId" element={<WorkspaceGuard><WorkspaceDashboardPage /></WorkspaceGuard>} />
+                <Route path="workspaces/:workspaceId/prompts" element={<WorkspaceGuard><PromptEntryPage /></WorkspaceGuard>} />
+                <Route path="workspaces/:workspaceId/prompts/new" element={<WorkspaceGuard><PromptCreatePage /></WorkspaceGuard>} />
+                <Route path="workspaces/:workspaceId/prompts/:promptId" element={<WorkspaceGuard><PromptDetailPage /></WorkspaceGuard>} />
+                <Route path="workspaces/:workspaceId/documents" element={<WorkspaceGuard><DocumentListPage /></WorkspaceGuard>} />
+                <Route path="workspaces/:workspaceId/logs" element={<WorkspaceGuard><WorkspaceLogsPage /></WorkspaceGuard>} />
+                <Route path="workspaces/:workspaceId/logs/:traceId" element={<WorkspaceGuard><WorkspaceLogDetailPage /></WorkspaceGuard>} />
 
-              {/* Settings Routes (Integrated) */}
-              <Route path="settings/security" element={<OrganizationSecurityPage />} />
-              <Route path="settings/members" element={<SettingsMembersPage />} />
-              <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
-              <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
-              {/* Statistics Dashboard */}
-              <Route path="stats" element={<DashboardPage />} />
+                {/* Settings Routes (Integrated) */}
+                <Route path="settings/security" element={<OrganizationSecurityPage />} />
+                <Route path="settings/members" element={<SettingsMembersPage />} />
+                <Route path="settings/api-keys" element={<SettingsApiKeysPage />} />
+                <Route path="settings/provider-keys" element={<SettingsProviderKeysPage />} />
+                {/* Statistics Dashboard */}
+                <Route path="stats" element={<DashboardPage />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </QueryClientProvider>
+          </Routes>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
