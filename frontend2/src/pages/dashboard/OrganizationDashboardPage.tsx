@@ -4,10 +4,16 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import { organizationApi } from '@/api/organization.api';
-import { statisticsApi } from '@/api/statistics.api';
 import { documentApi } from '@/api/document.api';
+import { budgetApi } from '@/api/budget.api';
 import { CreateOrganizationModal } from '@/features/organization/components/CreateOrganizationModal';
-import type { WorkspaceSummaryResponse } from '@/types/api.types';
+import type { BudgetUsageResponse, WorkspaceSummaryResponse } from '@/types/api.types';
+import {
+    calculateUsagePercent,
+    formatUsageMonth,
+    formatUsdAmount,
+    resolvePrimaryLimitUsd,
+} from '@/features/budget/utils/budgetUsage';
 import {
     Plus,
     ArrowRight,
@@ -53,28 +59,18 @@ export function OrganizationDashboardPage() {
         enabled: !!currentOrgId,
     });
 
-    // Org-wide usage (for relative "usage share" bars)
-    const { data: orgOverviewData } = useQuery({
-        queryKey: ['stats-overview', currentOrgId, 'monthly', 'org'],
-        queryFn: async () => {
-            if (!currentOrgId) return null;
-            const response = await statisticsApi.getOverview(currentOrgId, { period: 'monthly' });
-            return response.data;
-        },
-        enabled: !!currentOrgId,
-        retry: false,
-    });
-    const orgTotalCost = orgOverviewData?.totalCost ?? 0;
-
-    const workspaceOverviews = useQueries({
+    const workspaceBudgetUsages = useQueries({
         queries: sortedWorkspaces.map((ws) => ({
-            queryKey: ['stats-overview', currentOrgId, 'monthly', ws.id],
+            queryKey: ['budget-usage', 'workspace', ws.id],
             queryFn: async () => {
-                if (!currentOrgId) return null;
-                const response = await statisticsApi.getOverview(currentOrgId, { period: 'monthly', workspaceId: ws.id });
-                return response.data;
+                try {
+                    const response = await budgetApi.getWorkspaceUsage(ws.id);
+                    return response.data;
+                } catch {
+                    return null;
+                }
             },
-            enabled: !!currentOrgId,
+            enabled: !!ws?.id,
             retry: false,
             staleTime: 1000 * 60, // 1m
         })),
@@ -146,8 +142,7 @@ export function OrganizationDashboardPage() {
                         <WorkspaceCard
                             key={workspace.id}
                             workspace={workspace}
-                            overview={workspaceOverviews[idx]?.data ?? null}
-                            orgTotalCost={orgTotalCost}
+                            budgetUsage={workspaceBudgetUsages[idx]?.data ?? null}
                             documents={workspaceDocuments[idx]?.data ?? null}
                             docsLoading={Boolean(
                                 workspaceDocuments[idx]?.isLoading
@@ -200,25 +195,28 @@ function StatCard({ label, value, icon, subtext }: { label: string, value: strin
 
 function WorkspaceCard({
     workspace,
-    overview,
-    orgTotalCost,
+    budgetUsage,
     documents,
     docsLoading,
 }: {
     workspace: WorkspaceSummaryResponse;
-    overview: { totalCost: number; totalRequests: number } | null;
-    orgTotalCost: number;
+    budgetUsage: BudgetUsageResponse | null;
     documents: Array<{ status: string }> | null;
     docsLoading: boolean;
 }) {
     const rag = getRagStatus(documents, docsLoading);
-    const workspaceCost = overview?.totalCost ?? 0;
-    const usagePercent = orgTotalCost > 0 ? Math.min(100, Math.round((workspaceCost / orgTotalCost) * 100)) : 0;
-
-    const usageBarClass = usagePercent >= 90
+    const monthLabel = formatUsageMonth(budgetUsage?.month);
+    const usedUsd = budgetUsage?.usedUsd ?? 0;
+    const primaryLimit = resolvePrimaryLimitUsd(budgetUsage);
+    const usagePercentRaw = calculateUsagePercent(usedUsd, primaryLimit);
+    const usagePercentRounded = usagePercentRaw == null ? null : Math.round(usagePercentRaw);
+    const hasUsageValue = budgetUsage != null;
+    const requestCountText = hasUsageValue ? budgetUsage.requestCount.toLocaleString('ko-KR') : '-';
+    const costText = hasUsageValue ? formatUsdAmount(usedUsd) : '-';
+    const usageBarClass = usagePercentRounded != null && usagePercentRounded >= 90
         ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
         : 'bg-gradient-to-r from-[var(--primary)] to-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]';
-    const usageTextClass = usagePercent >= 90 ? 'text-red-400' : 'text-[var(--foreground)]';
+    const usageTextClass = usagePercentRounded != null && usagePercentRounded >= 90 ? 'text-red-400' : 'text-[var(--foreground)]';
 
     return (
         <div className="glass-card glass-card-hover rounded-2xl p-0 flex flex-col group h-full">
@@ -247,20 +245,23 @@ function WorkspaceCard({
 
                     <div className="space-y-2">
                         <div className="flex justify-between items-end">
-                            <span className="text-[var(--text-secondary)] text-xs font-medium">Budget Usage</span>
+                            <div className="flex flex-col">
+                                <span className="text-[var(--text-secondary)] text-xs font-medium">Budget Usage</span>
+                                <span className="text-[10px] text-[var(--text-secondary)]">UTC {monthLabel}</span>
+                            </div>
                             <span className={`${usageTextClass} text-xs font-bold`}>
-                                {orgTotalCost > 0 ? `${usagePercent}%` : '-'}
+                                {usagePercentRounded != null ? `${usagePercentRounded}%` : '-'}
                             </span>
                         </div>
                         <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden border border-[var(--border)]">
                             <div
                                 className={`h-full ${usageBarClass} rounded-full`}
-                                style={{ width: `${orgTotalCost > 0 ? usagePercent : 0}%` }}
+                                style={{ width: `${usagePercentRaw ?? 0}%` }}
                             />
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-medium">
-                            <span>Reqs: {overview?.totalRequests ?? '-'}</span>
-                            <span>Cost: {formatUsd(workspaceCost)}</span>
+                            <span>Reqs: {requestCountText}</span>
+                            <span>Cost: {costText}</span>
                         </div>
                     </div>
                 </div>
@@ -373,14 +374,6 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
         pillClass: 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10 shadow-[0_0_10px_rgba(16,185,129,0.15)]',
         icon: <CheckCircle2 size={14} />,
     };
-}
-
-function formatUsd(num: number) {
-    if (!Number.isFinite(num)) return '-';
-    if (num === 0) return '$0.00';
-    if (Math.abs(num) < 0.01) return `$${num.toFixed(6)}`;
-    if (Math.abs(num) < 1) return `$${num.toFixed(4)}`;
-    return `$${num.toFixed(2)}`;
 }
 
 function formatRelativeTime(iso: string) {
