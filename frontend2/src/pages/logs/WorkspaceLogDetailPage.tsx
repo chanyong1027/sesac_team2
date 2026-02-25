@@ -6,7 +6,6 @@ import {
   Copy,
   RefreshCw,
   ArrowLeft,
-  Database,
   Activity,
   Hash,
   MessageSquare,
@@ -409,7 +408,18 @@ export function WorkspaceLogDetailPage() {
             <div>
               <h1 className="text-2xl font-bold text-white flex items-center gap-3">
                 Log Details
-                {log && <span className={statusBadge(log.status)}>{log.status}</span>}
+                {log && (
+                  <>
+                    {log.status === 'SUCCESS' && log.isFailover ? (
+                      <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold tracking-wide border bg-amber-500/15 text-amber-300 border-amber-500/30 shadow-[0_0_12px_rgba(251,191,36,0.18)]">
+                        <Zap size={11} />
+                        FAILOVER
+                      </span>
+                    ) : (
+                      <span className={statusBadge(log.status)}>{log.status}</span>
+                    )}
+                  </>
+                )}
               </h1>
               <div className="flex items-center gap-3 mt-1 text-sm text-gray-400 font-mono">
                 <Hash size={14} />
@@ -599,15 +609,12 @@ export function WorkspaceLogDetailPage() {
                   <span className="text-gray-500">생성 시각</span>
                   <span className="text-gray-400 text-[10px] font-mono">{formatKstDateTimeOrFallback(log.createdAt)}</span>
                 </div>
-                <details className="pt-1 border-t border-white/5">
-                  <summary className="text-xs text-gray-500 cursor-pointer select-none">개발 정보</summary>
-                  <div className="mt-2 space-y-1">
-                    <span className="text-xs text-gray-500">요청 경로</span>
-                    <div className="text-xs text-gray-300 font-mono break-all leading-tight">
-                      {log.requestPath || '/v1/models/chat'}
-                    </div>
+                <div className="pt-2 border-t border-white/5 space-y-1">
+                  <span className="text-xs text-gray-500">요청 경로</span>
+                  <div className="text-xs text-gray-300 font-mono break-all leading-tight">
+                    {log.requestPath || '/v1/models/chat'}
                   </div>
-                </details>
+                </div>
               </div>
             </div>
           </div>
@@ -728,118 +735,53 @@ export function WorkspaceLogDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Content (Payloads) */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Request Payload */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
-                <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                  <div className="flex items-center gap-2 text-blue-300">
-                    <MessageSquare size={16} />
-                    <h3 className="text-sm font-bold">User Input</h3>
-                  </div>
-                  <span className="text-xs text-gray-500 font-mono">
-                    {formatFullDateTime(log.createdAt)}
-                  </span>
+          <div className="space-y-6">
+            {/* Request Payload */}
+            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center gap-2 text-blue-300">
+                  <MessageSquare size={16} />
+                  <h3 className="text-sm font-bold">User Input</h3>
                 </div>
-                {extractedUserQuestions.length > 0 && (
-                  <div className="px-6 py-4 border-b border-white/5 bg-blue-500/5">
-                    <div className="text-xs text-gray-400 mb-2">사용자 질문</div>
-                    <div className="space-y-2">
-                      {extractedUserQuestions.map((question, idx) => (
-                        <p key={`${idx}-${question}`} className="text-sm text-white leading-relaxed">
-                          {extractedUserQuestions.length > 1 ? `${idx + 1}. ${question}` : question}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {extractedUserQuestions.length === 0 && (
-                  <div className="px-6 py-6 text-sm text-gray-500">
-                    표시할 사용자 질문이 없습니다. 필요하면 Raw JSON 탭에서 원본 payload를 확인하세요.
-                  </div>
-                )}
+                <span className="text-xs text-gray-500 font-mono">
+                  {formatFullDateTime(log.createdAt)}
+                </span>
               </div>
-
-              {/* Response Payload */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
-                <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                  <div className="flex items-center gap-2 text-emerald-300">
-                    <MessageSquare size={16} />
-                    <h3 className="text-sm font-bold">Response Payload</h3>
+              {extractedUserQuestions.length > 0 && (
+                <div className="px-6 py-4 border-b border-white/5 bg-blue-500/5">
+                  <div className="text-xs text-gray-400 mb-2">사용자 질문</div>
+                  <div className="space-y-2">
+                    {extractedUserQuestions.map((question, idx) => (
+                      <p key={`${idx}-${question}`} className="text-sm text-white leading-relaxed">
+                        {extractedUserQuestions.length > 1 ? `${idx + 1}. ${question}` : question}
+                      </p>
+                    ))}
                   </div>
-                  <span className="text-xs text-gray-500 font-mono">
-                    {responsePayloadTimestamp ? formatFullDateTime(responsePayloadTimestamp) : '-'}
-                  </span>
                 </div>
-                <div className="p-0">
-                  <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
-                    {log.responsePayload || <span className="text-gray-600 italic">No response payload available</span>}
-                  </pre>
+              )}
+              {extractedUserQuestions.length === 0 && (
+                <div className="px-6 py-6 text-sm text-gray-500">
+                  표시할 사용자 질문이 없습니다. 필요하면 Raw JSON 탭에서 원본 payload를 확인하세요.
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Sidebar (RAG & Meta) */}
-            <div className="space-y-6">
-              {/* RAG Context */}
-              <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
-                <div className="px-6 py-4 border-b border-white/5 flex items-center gap-2 bg-white/[0.02] text-orange-300">
-                  <Database size={16} />
-                  <h3 className="text-sm font-bold">RAG 컨텍스트</h3>
+            {/* Response Payload */}
+            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
+              <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                <div className="flex items-center gap-2 text-emerald-300">
+                  <MessageSquare size={16} />
+                  <h3 className="text-sm font-bold">Response Payload</h3>
                 </div>
-                <div className="p-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-4 pb-4 border-b border-white/5">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Status</div>
-                      <div className={`text-sm font-bold ${log.ragEnabled ? 'text-emerald-400' : 'text-gray-400'}`}>
-                        {log.ragEnabled ? 'Enabled' : 'Disabled'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Latency</div>
-                      <div className="text-sm font-mono text-white">{log.ragLatencyMs ? `${log.ragLatencyMs}ms` : '-'}</div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs text-gray-500">Retrieved Documents</span>
-                      <span className="text-xs font-mono text-gray-400 bg-white/5 px-2 py-0.5 rounded">{log.ragChunksCount || 0} chunks</span>
-                    </div>
-                    <div className="space-y-3">
-                      {log.retrievedDocuments?.map((doc, idx) => {
-                        const score = typeof doc.score === 'number' ? doc.score : null;
-                        const scoreClass = score === null
-                          ? 'text-gray-400'
-                          : score > 0.8
-                            ? 'text-emerald-400'
-                            : score > 0.5
-                              ? 'text-yellow-400'
-                              : 'text-rose-400';
-                        const scoreLabel = score === null ? 'N/A' : score.toFixed(2);
-
-                        return (
-                          <div key={idx} className="bg-white/5 rounded-lg p-3 border border-white/5 hover:border-white/10 transition-colors">
-                            <div className="flex justify-between items-start mb-2">
-                              <span className="text-[10px] bg-white/10 text-gray-300 px-1.5 py-0.5 rounded font-mono truncate max-w-[120px]" title={doc.documentName || undefined}>
-                                {doc.documentName || `Doc #${doc.documentId ?? 'N/A'}`}
-                              </span>
-                              <span className={`text-[10px] font-bold ${scoreClass}`}>
-                                {scoreLabel}
-                              </span>
-                            </div>
-                            <p className="text-xs text-gray-400 line-clamp-3 leading-relaxed">
-                              {doc.content}
-                            </p>
-                          </div>
-                        );
-                      }) || <div className="text-center py-6 text-gray-600 text-xs italic">No documents retrieved</div>}
-                    </div>
-                  </div>
-                </div>
+                <span className="text-xs text-gray-500 font-mono">
+                  {responsePayloadTimestamp ? formatFullDateTime(responsePayloadTimestamp) : '-'}
+                </span>
               </div>
-
+              <div className="p-0">
+                <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
+                  {log.responsePayload || <span className="text-gray-600 italic">No response payload available</span>}
+                </pre>
+              </div>
             </div>
           </div>
         </div>

@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   XCircle,
   Ban,
-  Activity
+  Activity,
+  Zap
 } from 'lucide-react';
 import { logsApi } from '@/api/logs.api';
 import type { LogsListParams } from '@/api/logs.api';
@@ -139,7 +140,10 @@ export function WorkspaceLogsPage() {
   };
 
   // Helper Functions
-  const getStatusColor = (status: RequestLogStatus) => {
+  const getStatusColor = (status: RequestLogStatus, isFailover?: boolean) => {
+    if (status === 'SUCCESS' && isFailover) {
+      return 'text-amber-300 bg-amber-500/10 border-amber-500/30';
+    }
     switch (status) {
       case 'SUCCESS': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
       case 'FAIL': return 'text-rose-400 bg-rose-400/10 border-rose-400/20';
@@ -149,7 +153,8 @@ export function WorkspaceLogsPage() {
     }
   };
 
-  const getStatusIcon = (status: RequestLogStatus) => {
+  const getStatusIcon = (status: RequestLogStatus, isFailover?: boolean) => {
+    if (status === 'SUCCESS' && isFailover) return <Zap size={12} />;
     switch (status) {
       case 'SUCCESS': return <CheckCircle2 size={12} />;
       case 'FAIL': return <XCircle size={12} />;
@@ -157,6 +162,11 @@ export function WorkspaceLogsPage() {
       case 'BLOCKED': return <Ban size={12} />;
       default: return <Activity size={12} />;
     }
+  };
+
+  const getStatusLabel = (status: RequestLogStatus, isFailover?: boolean) => {
+    if (status === 'SUCCESS' && isFailover) return 'FAILOVER';
+    return status;
   };
 
   const formatLatency = (ms: number | null) => {
@@ -369,9 +379,9 @@ export function WorkspaceLogsPage() {
                     className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
                   >
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(log.status)}`}>
-                        {getStatusIcon(log.status)}
-                        {log.status}
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(log.status, log.isFailover)}`}>
+                        {getStatusIcon(log.status, log.isFailover)}
+                        {getStatusLabel(log.status, log.isFailover)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
