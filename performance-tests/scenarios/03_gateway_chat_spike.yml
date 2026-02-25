@@ -1,0 +1,38 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL || 'http://localhost:8080' }}"
+  phases:
+    - duration: 30
+      arrivalRate: 1
+      rampTo: 20
+      name: "ramp-up"
+    - duration: 120
+      arrivalRate: 20
+      name: "sustained-spike"
+    - duration: 60
+      arrivalRate: 1
+      name: "recovery"
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "Gateway Chat Spike (thread pool saturation)"
+    flow:
+      - post:
+          url: "/v1/chat/completions"
+          name: "POST /v1/chat/completions (spike)"
+          headers:
+            X-API-Key: "{{ $processEnvironment.TEST_API_KEY }}"
+            Content-Type: "application/json"
+          timeout: 25
+          json:
+            workspaceId: "{{ $processEnvironment.TEST_WORKSPACE_ID }}"
+            promptKey: "{{ $processEnvironment.TEST_PROMPT_KEY }}"
+            variables:
+              name: "SpikeTest"
+              greeting: "Hello"
+            ragEnabled: false
+          expect:
+            - statusCode:
+                - 200
+                - 504

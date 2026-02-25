@@ -1,0 +1,39 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL || 'http://localhost:8080' }}"
+  phases:
+    - duration: 60
+      arrivalRate: 1
+      name: "warm-up"
+    - duration: 300
+      arrivalRate: 5
+      name: "baseline"
+    - duration: 300
+      arrivalRate: 10
+      name: "moderate"
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+  ensure:
+    p99: 18000
+    maxErrorRate: 5
+
+scenarios:
+  - name: "Gateway Chat (no RAG)"
+    flow:
+      - post:
+          url: "/v1/chat/completions"
+          name: "POST /v1/chat/completions"
+          headers:
+            X-API-Key: "{{ $processEnvironment.TEST_API_KEY }}"
+            Content-Type: "application/json"
+          json:
+            workspaceId: "{{ $processEnvironment.TEST_WORKSPACE_ID }}"
+            promptKey: "{{ $processEnvironment.TEST_PROMPT_KEY }}"
+            variables:
+              name: "Artillery"
+              greeting: "Hello"
+            ragEnabled: false
+          expect:
+            - statusCode: 200
+            - hasProperty: "answer"
+            - hasProperty: "usage"

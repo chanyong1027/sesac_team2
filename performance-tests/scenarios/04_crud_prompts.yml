@@ -1,0 +1,93 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL || 'http://localhost:8080' }}"
+  phases:
+    - duration: 180
+      arrivalRate: 10
+      name: "sustained"
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+  ensure:
+    p99: 500
+    maxErrorRate: 1
+
+scenarios:
+  - name: "Prompt CRUD lifecycle"
+    flow:
+      # Step 1: Login to obtain JWT
+      - post:
+          url: "/api/v1/auth/login"
+          name: "POST /api/v1/auth/login"
+          json:
+            email: "{{ $processEnvironment.TEST_USER_EMAIL }}"
+            password: "{{ $processEnvironment.TEST_USER_PASSWORD }}"
+          capture:
+            - json: "$.data.accessToken"
+              as: "accessToken"
+          expect:
+            - statusCode: 200
+
+      - think: 1
+
+      # Step 2: Create a prompt
+      - post:
+          url: "/api/v1/workspaces/{{ $processEnvironment.TEST_WORKSPACE_ID }}/prompts"
+          name: "POST /prompts (create)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            Content-Type: "application/json"
+          json:
+            promptKey: "perf-test-{{ $randomNumber(100000, 999999) }}"
+            description: "Artillery performance test prompt"
+          capture:
+            - json: "$.data.id"
+              as: "promptId"
+          expect:
+            - statusCode: 201
+
+      - think: 1
+
+      # Step 3: List prompts
+      - get:
+          url: "/api/v1/workspaces/{{ $processEnvironment.TEST_WORKSPACE_ID }}/prompts"
+          name: "GET /prompts (list)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 200
+
+      - think: 1
+
+      # Step 4: Get prompt detail
+      - get:
+          url: "/api/v1/workspaces/{{ $processEnvironment.TEST_WORKSPACE_ID }}/prompts/{{ promptId }}"
+          name: "GET /prompts/:id (detail)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 200
+
+      - think: 1
+
+      # Step 5: Update prompt
+      - patch:
+          url: "/api/v1/workspaces/{{ $processEnvironment.TEST_WORKSPACE_ID }}/prompts/{{ promptId }}"
+          name: "PATCH /prompts/:id (update)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+            Content-Type: "application/json"
+          json:
+            description: "Updated by Artillery at {{ $timestamp }}"
+          expect:
+            - statusCode: 200
+
+      - think: 1
+
+      # Step 6: Delete prompt
+      - delete:
+          url: "/api/v1/workspaces/{{ $processEnvironment.TEST_WORKSPACE_ID }}/prompts/{{ promptId }}"
+          name: "DELETE /prompts/:id (delete)"
+          headers:
+            Authorization: "Bearer {{ accessToken }}"
+          expect:
+            - statusCode: 204

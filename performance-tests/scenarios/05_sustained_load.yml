@@ -1,0 +1,63 @@
+config:
+  target: "{{ $processEnvironment.TARGET_URL || 'http://localhost:8080' }}"
+  phases:
+    - duration: 300
+      arrivalRate: 2
+      name: "warm-up (5m)"
+    - duration: 1500
+      arrivalRate: 8
+      name: "sustained (25m)"
+    - duration: 300
+      arrivalRate: 2
+      name: "cool-down (5m)"
+  plugins:
+    metrics-by-endpoint:
+      useOnlyRequestNames: true
+
+scenarios:
+  - name: "Mixed sustained load"
+    weight: 70
+    flow:
+      # Gateway chat call
+      - post:
+          url: "/v1/chat/completions"
+          name: "POST /v1/chat/completions (sustained)"
+          headers:
+            X-API-Key: "{{ $processEnvironment.TEST_API_KEY }}"
+            Content-Type: "application/json"
+          json:
+            workspaceId: "{{ $processEnvironment.TEST_WORKSPACE_ID }}"
+            promptKey: "{{ $processEnvironment.TEST_PROMPT_KEY }}"
+            variables:
+              name: "SustainedTest"
+              greeting: "Hello"
+            ragEnabled: false
+          expect:
+            - statusCode:
+                - 200
+                - 504
+
+  - name: "Auth refresh loop"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/v1/auth/login"
+          name: "POST /api/v1/auth/login (sustained)"
+          json:
+            email: "{{ $processEnvironment.TEST_USER_EMAIL }}"
+            password: "{{ $processEnvironment.TEST_USER_PASSWORD }}"
+          capture:
+            - json: "$.data.refreshToken"
+              as: "refreshToken"
+          expect:
+            - statusCode: 200
+
+      - think: 5
+
+      - post:
+          url: "/api/v1/auth/refresh"
+          name: "POST /api/v1/auth/refresh (sustained)"
+          json:
+            refreshToken: "{{ refreshToken }}"
+          expect:
+            - statusCode: 200
