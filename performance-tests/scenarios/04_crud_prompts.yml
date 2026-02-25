@@ -38,7 +38,7 @@ scenarios:
             Authorization: "Bearer {{ accessToken }}"
             Content-Type: "application/json"
           json:
-            promptKey: "perf-test-{{ $randomNumber(100000, 999999) }}"
+            promptKey: "perf-{{ $randomString(16) }}"
             description: "Artillery performance test prompt"
           capture:
             - json: "$.id"

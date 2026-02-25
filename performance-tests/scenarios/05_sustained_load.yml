@@ -12,6 +12,12 @@ config:
       name: "cool-down (5m)"
   http:
     timeout: 25
+  payload:
+    path: "../data/test-variables.csv"
+    fields:
+      - "email"
+      - "password"
+    order: sequence
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true
@@ -47,8 +53,8 @@ scenarios:
           url: "/api/v1/auth/login"
           name: "POST /api/v1/auth/login (sustained)"
           json:
-            email: "{{ $processEnvironment.TEST_USER_EMAIL }}"
-            password: "{{ $processEnvironment.TEST_USER_PASSWORD }}"
+            email: "{{ email }}"
+            password: "{{ password }}"
           capture:
             - json: "$.data.refreshToken"
               as: "refreshToken"

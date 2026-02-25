@@ -18,9 +18,12 @@ cp .env.example .env
 ```
 
 3. **테스트 데이터** 준비
-   - 테스트용 사용자 계정이 존재해야 합니다 (`TEST_USER_EMAIL` / `TEST_USER_PASSWORD`)
+   - `data/test-variables.csv`에 있는 10개 계정(`perf-user-01` ~ `perf-user-10`)을 DB에 미리 생성하세요.
+     Auth 시나리오는 단일 계정 동시 사용 시 단일 세션 정책으로 토큰이 충돌하므로 사용자 풀이 필수입니다.
    - 테스트 workspace에 유효한 API key가 발급되어 있어야 합니다 (`TEST_API_KEY`)
    - Gateway 시나리오용 프롬프트가 생성 및 릴리즈 되어 있어야 합니다 (`TEST_PROMPT_KEY`)
+   - **Stub 모드(전략 A) 사용 시**: 테스트 프롬프트의 provider가 반드시 **OpenAI**여야 합니다.
+     Anthropic/Gemini provider는 stub 대상이 아니라 실제 외부 API를 호출합니다.
 
 4. **앱 서버 접근** — `TARGET_URL`에 설정한 서버가 로컬에서 접근 가능해야 합니다 (보안 그룹 확인)
 
@@ -43,8 +46,11 @@ cp .env.example .env
 
 ### 개별 시나리오 실행
 
+> **참고**: 각 시나리오 파일은 독립적으로 실행됩니다. `artillery.yml`은 설정 참조용이며,
+> `artillery run`은 지정한 시나리오 파일의 `config`만 적용합니다.
+
 ```bash
-# .env 로드 후 실행
+# .env 로드 후 실행 (Linux/macOS)
 set -a && source .env && set +a
 
 # Auth 기준선
@@ -82,6 +88,7 @@ artillery run scenarios/02_gateway_chat_baseline.yml
 - Gateway 자체의 라우팅, 인증, 로깅, 예산 체크 오버헤드를 순수하게 측정
 - `gateway_llm_call_seconds` 메트릭이 ~200ms로 안정적
 - **용도**: Gateway 인프라 성능 기준선 확립
+- **주의**: `openAiChatModel` bean만 stub으로 교체됩니다. 테스트 프롬프트의 provider가 **OpenAI**인 경우에만 순수 stub 측정이 가능합니다. Anthropic/Gemini provider 프롬프트는 실제 외부 API를 호출합니다.
 
 ### 전략 B: 실제 LLM 호출
 
@@ -134,7 +141,7 @@ artillery run scenarios/02_gateway_chat_baseline.yml
 
 ```text
 performance-tests/
-├── artillery.yml              # 공통 config (target, env vars, plugins)
+├── artillery.yml              # 참조용 공통 설정 (현재 각 시나리오가 독립 실행 구조)
 ├── scenarios/
 │   ├── 01_auth_baseline.yml
 │   ├── 02_gateway_chat_baseline.yml
