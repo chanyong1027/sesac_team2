@@ -1,5 +1,5 @@
 config:
-  target: "{{ $processEnvironment.TARGET_URL || 'http://localhost:8080' }}"
+  target: "{{ $processEnvironment.TARGET_URL }}"
   phases:
     - duration: 60
       arrivalRate: 5

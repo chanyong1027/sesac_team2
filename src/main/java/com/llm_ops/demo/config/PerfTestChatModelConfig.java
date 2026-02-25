@@ -39,8 +39,8 @@ public class PerfTestChatModelConfig {
             }
 
             ChatResponseMetadata metadata = ChatResponseMetadata.builder()
-                    .withKeyValue("model", "stub-perf-test")
-                    .withUsage(new DefaultUsage(STUB_PROMPT_TOKENS, STUB_COMPLETION_TOKENS, STUB_TOTAL_TOKENS))
+                    .keyValue("model", "stub-perf-test")
+                    .usage(new DefaultUsage(STUB_PROMPT_TOKENS, STUB_COMPLETION_TOKENS, STUB_TOTAL_TOKENS))
                     .build();
 
             return new ChatResponse(

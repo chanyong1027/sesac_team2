@@ -131,7 +131,7 @@ artillery run scenarios/02_gateway_chat_baseline.yml
 
 ## 디렉토리 구조
 
-```
+```text
 performance-tests/
 ├── artillery.yml              # 공통 config (target, env vars, plugins)
 ├── scenarios/
