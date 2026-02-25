@@ -1,6 +1,7 @@
 package com.llm_ops.demo.eval.repository;
 
 import com.llm_ops.demo.eval.domain.EvalRun;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
@@ -38,4 +39,20 @@ public interface EvalRunRepository extends JpaRepository<EvalRun, Long> {
     Optional<EvalRun> findById(Long id);
 
     long countByStatus(String status);
+
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT r
+            FROM EvalRun r
+            WHERE r.status = :status
+              AND r.startedAt < :cutoffTime
+            ORDER BY r.createdAt ASC
+            """)
+    List<EvalRun> findStuckRunsForUpdate(
+            @Param("status") String status,
+            @Param("cutoffTime") LocalDateTime cutoffTime,
+            Pageable pageable
+    );
+
 }

@@ -163,8 +163,30 @@ resilience4j:
         failureRateThreshold: 50
         permittedNumberOfCallsInHalfOpenState: 3
         waitDurationInOpenState: 120s
+      eval-openai:
+        registerHealthIndicator: true
+        minimumNumberOfCalls: 5
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 120s
+      eval-anthropic:
+        registerHealthIndicator: true
+        minimumNumberOfCalls: 5
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 120s
+      eval-gemini:
+        registerHealthIndicator: true
+        minimumNumberOfCalls: 5
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        permittedNumberOfCallsInHalfOpenState: 3
+        waitDurationInOpenState: 120s
 
 eval:
+  run-timeout-minutes: 30
   judge:
     provider: OPENAI
     model: gpt-4.1-mini
@@ -176,3 +198,5 @@ eval:
     batch-size: 3
   runner:
     request-timeout-ms: 20000
+    same-provider-retry-max-attempts: 2
+    same-provider-retry-backoff-ms: 200

@@ -11,6 +11,7 @@ import com.llm_ops.demo.eval.domain.EvalRun;
 import com.llm_ops.demo.eval.service.EvalExecutionService;
 import com.llm_ops.demo.eval.service.EvalMetrics;
 import com.llm_ops.demo.eval.service.EvalRunService;
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,5 +50,26 @@ class EvalWorkerTest {
         verify(evalExecutionService).processRun(1L);
         verify(evalExecutionService).processRun(2L);
         verify(evalExecutionService).processRun(3L);
+    }
+
+    @Test
+    @DisplayName("애플리케이션 시작 시 timeout 기준으로 stuck run 복구를 수행한다")
+    void 시작시_stuck_run_복구를_수행한다() {
+        // given
+        EvalProperties evalProperties = new EvalProperties();
+        evalProperties.setRunTimeoutMinutes(45L);
+
+        EvalRunService evalRunService = mock(EvalRunService.class);
+        EvalExecutionService evalExecutionService = mock(EvalExecutionService.class);
+        EvalMetrics evalMetrics = mock(EvalMetrics.class);
+        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics);
+
+        when(evalRunService.recoverStuckRuns(Duration.ofMinutes(45L))).thenReturn(2);
+
+        // when
+        worker.onStartupRecovery();
+
+        // then
+        verify(evalRunService).recoverStuckRuns(Duration.ofMinutes(45L));
     }
 }

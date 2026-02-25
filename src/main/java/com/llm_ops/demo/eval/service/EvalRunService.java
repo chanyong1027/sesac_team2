@@ -2,6 +2,7 @@ package com.llm_ops.demo.eval.service;
 
 import com.llm_ops.demo.eval.config.EvalProperties;
 import com.llm_ops.demo.eval.domain.EvalCaseResult;
+import com.llm_ops.demo.eval.domain.EvalCaseStatus;
 import com.llm_ops.demo.eval.domain.EvalMode;
 import com.llm_ops.demo.eval.domain.EvalRun;
 import com.llm_ops.demo.eval.domain.EvalRunStatus;
@@ -29,6 +30,8 @@ import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -421,7 +424,9 @@ public class EvalRunService {
             return queuedRuns;
         }
 
-        queuedRuns.forEach(EvalRun::markRunning);
+        long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
+        Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
+        queuedRuns.forEach(run -> run.markRunningWithTimeout(timeoutDuration));
         return evalRunRepository.saveAll(queuedRuns);
     }
 
@@ -581,4 +586,49 @@ public class EvalRunService {
         }
         return "LOW";
     }
+
+
+    @Transactional
+    public int recoverStuckRuns(Duration timeout) {
+        LocalDateTime cutoffTime = LocalDateTime.now().minus(timeout);
+        int totalRecovered = 0;
+        int batchSize = 50;
+        List<EvalRun> stuckRuns;
+
+        do {
+            stuckRuns = evalRunRepository.findStuckRunsForUpdate(
+                    EvalRunStatus.RUNNING.name(),
+                    cutoffTime,
+                    PageRequest.of(0, batchSize)
+            );
+
+            if (!stuckRuns.isEmpty()) {
+                List<Long> recoveredRunIds = stuckRuns.stream().map(EvalRun::getId).toList();
+                List<EvalCaseResult> runningCases = evalCaseResultRepository
+                        .findByEvalRunIdInAndStatusOrderByEvalRunIdAscIdAsc(
+                                recoveredRunIds,
+                                EvalCaseStatus.RUNNING.name()
+                        );
+
+                stuckRuns.forEach(EvalRun::resetToQueued);
+                runningCases.forEach(EvalCaseResult::resetToQueuedForRecovery);
+                evalRunRepository.saveAll(stuckRuns);
+                if (!runningCases.isEmpty()) {
+                    evalCaseResultRepository.saveAll(runningCases);
+                }
+                totalRecovered += stuckRuns.size();
+                log.info(
+                        "Recovered {} stuck eval runs and {} running eval cases to QUEUED status",
+                        stuckRuns.size(),
+                        runningCases.size()
+                );
+            }
+        } while (stuckRuns.size() == batchSize);
+
+        if (totalRecovered > 0) {
+            log.info("Startup recovery complete. Total recovered runs: {}", totalRecovered);
+        }
+        return totalRecovered;
+    }
+
 }

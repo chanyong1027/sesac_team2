@@ -254,6 +254,25 @@ public class EvalCaseResult {
         this.completedAt = LocalDateTime.now();
     }
 
+    public void resetToQueuedForRecovery() {
+        if (!EvalCaseStatus.RUNNING.name().equals(this.status)) {
+            return;
+        }
+        this.status = EvalCaseStatus.QUEUED.name();
+        this.candidateOutputText = null;
+        this.baselineOutputText = null;
+        this.candidateMetaJson = null;
+        this.baselineMetaJson = null;
+        this.ruleChecksJson = null;
+        this.judgeOutputJson = null;
+        this.overallScore = null;
+        this.pass = null;
+        this.errorCode = null;
+        this.errorMessage = null;
+        this.startedAt = null;
+        this.completedAt = null;
+    }
+
     public Boolean effectivePass() {
         if (humanReviewVerdict == EvalHumanReviewVerdict.INCORRECT && humanOverridePass != null) {
             return humanOverridePass;

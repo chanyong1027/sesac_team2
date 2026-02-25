@@ -87,6 +87,9 @@ public interface EvalCaseResultRepository extends JpaRepository<EvalCaseResult, 
     @EntityGraph(attributePaths = {"evalRun", "evalRun.prompt", "evalRun.promptVersion", "testCase"})
     List<EvalCaseResult> findByEvalRunIdAndStatusOrderByIdAsc(Long evalRunId, String status);
 
+    @EntityGraph(attributePaths = {"evalRun", "evalRun.prompt", "evalRun.promptVersion", "testCase"})
+    List<EvalCaseResult> findByEvalRunIdInAndStatusOrderByEvalRunIdAscIdAsc(List<Long> evalRunIds, String status);
+
     @Query(
             value = """
                     select
