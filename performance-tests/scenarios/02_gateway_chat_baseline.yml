@@ -15,6 +15,7 @@ config:
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true
+    expect: {}
   ensure:
     p99: 18000
     maxErrorRate: 5

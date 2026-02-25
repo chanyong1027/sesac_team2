@@ -9,6 +9,7 @@ config:
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true
+    expect: {}
 
 # ──────────────────────────────────────────────
 # Budget Block / Failover 시나리오

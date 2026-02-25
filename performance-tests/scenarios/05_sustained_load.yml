@@ -15,6 +15,7 @@ config:
   plugins:
     metrics-by-endpoint:
       useOnlyRequestNames: true
+    expect: {}
 
 scenarios:
   - name: "Mixed sustained load"
