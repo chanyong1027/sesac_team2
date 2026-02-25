@@ -234,7 +234,18 @@ public class LlmCallService {
     private static void invokeNullable(Object target, String methodName) {
         try {
             var m = target.getClass().getMethod(methodName, Integer.class);
-            m.invoke(target, new Object[] {null});
+            m.invoke(target, new Object[]{null});
+            return;
+        } catch (NoSuchMethodException ignored) {
+            // fallthrough
+        } catch (Exception ignored) {
+            return;
+        }
+
+        try {
+            var m = target.getClass().getMethod(methodName, int.class);
+            // Primitive setter cannot accept null; use 0 as neutral fallback.
+            m.invoke(target, 0);
         } catch (Exception ignored) {
         }
     }

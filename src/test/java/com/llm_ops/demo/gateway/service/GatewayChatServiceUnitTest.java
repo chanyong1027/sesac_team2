@@ -121,10 +121,16 @@ class GatewayChatServiceUnitTest {
     @InjectMocks
     private GatewayChatService gatewayChatService;
 
+    private final Map<String, CircuitBreaker> testCircuitBreakers = new HashMap<>();
+
     @BeforeEach
     void setUpCircuitBreakerRegistry() {
         lenient().when(circuitBreakerRegistry.circuitBreaker(anyString()))
-                .thenAnswer(invocation -> CircuitBreaker.ofDefaults(invocation.getArgument(0)));
+                .thenAnswer(invocation ->
+                        testCircuitBreakers.computeIfAbsent(
+                                invocation.getArgument(0),
+                                CircuitBreaker::ofDefaults
+                        ));
     }
 
     @Test
