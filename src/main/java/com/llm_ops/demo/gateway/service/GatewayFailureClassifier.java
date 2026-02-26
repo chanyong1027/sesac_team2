@@ -3,6 +3,7 @@ package com.llm_ops.demo.gateway.service;
 import com.google.genai.errors.ApiException;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import java.io.InterruptedIOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
@@ -51,6 +52,9 @@ public final class GatewayFailureClassifier {
             }
             if (current instanceof HttpStatusCodeException statusException) {
                 return classifyHttpStatusException(statusException);
+            }
+            if (current instanceof CallNotPermittedException) {
+                return circuitOpen();
             }
             if (current instanceof SocketTimeoutException) {
                 return timeout("SOCKET_TIMEOUT");
@@ -237,5 +241,15 @@ public final class GatewayFailureClassifier {
             }
         }
         return false;
+    }
+
+    private GatewayFailure circuitOpen() {
+        return new GatewayFailure(
+                "GW-UP-CIRCUIT_OPEN",
+                "CIRCUIT_BREAKER_OPEN",
+                "업스트림 회로가 열려 있어 즉시 failover를 시도합니다.",
+                HttpStatus.SERVICE_UNAVAILABLE.value(),
+                FailoverPolicy.IMMEDIATE_FAILOVER
+        );
     }
 }

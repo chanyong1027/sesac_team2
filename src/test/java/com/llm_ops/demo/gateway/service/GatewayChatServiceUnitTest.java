@@ -25,6 +25,8 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -119,11 +121,16 @@ class GatewayChatServiceUnitTest {
     @Mock
     private GatewayMetrics gatewayMetrics;
 
+    @Mock
+    private CircuitBreakerRegistry circuitBreakerRegistry;
+
     @InjectMocks
     private GatewayChatService gatewayChatService;
 
+    private final Map<String, CircuitBreaker> testCircuitBreakers = new HashMap<>();
+
     @BeforeEach
-    void setUpProviderExecutor() {
+    void setUpDependencies() {
         lenient().when(providerCallExecutor.submit(any(Callable.class)))
                 .thenAnswer(invocation -> {
                     @SuppressWarnings("unchecked")
@@ -134,6 +141,13 @@ class GatewayChatServiceUnitTest {
                     thread.start();
                     return task;
                 });
+
+        lenient().when(circuitBreakerRegistry.circuitBreaker(anyString()))
+                .thenAnswer(invocation ->
+                        testCircuitBreakers.computeIfAbsent(
+                                invocation.getArgument(0),
+                                CircuitBreaker::ofDefaults
+                        ));
     }
 
     @Test
@@ -398,6 +412,82 @@ class GatewayChatServiceUnitTest {
 
             // then
             assertThat(retryable).isTrue();
+        }
+
+        @Test
+        @DisplayName("Primary circuit breaker가 OPEN이면 primary 호출 없이 secondary로 failover한다")
+        void primary_circuit_open이면_secondary로_failover한다() {
+            // given
+            String apiKey = "lum_test";
+            Long organizationId = 1L;
+            Long workspaceId = 1L;
+            UUID requestId = UUID.randomUUID();
+
+            OrganizationApiKeyAuthService.AuthResult authResult =
+                    new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+            when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+            when(requestLogWriter.start(any())).thenReturn(requestId);
+
+            Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+            when(workspace.getId()).thenReturn(workspaceId);
+            when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+                    .thenReturn(Optional.of(workspace));
+
+            com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+            when(promptEntity.getId()).thenReturn(100L);
+            when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+                    .thenReturn(Optional.of(promptEntity));
+
+            PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+            when(activeVersion.getUserTemplate()).thenReturn("hello");
+            when(activeVersion.getSystemPrompt()).thenReturn(null);
+            when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+            when(activeVersion.getModel()).thenReturn("gpt-4o-mini");
+            when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.ANTHROPIC);
+            when(activeVersion.getSecondaryModel()).thenReturn("claude-3-5-haiku");
+
+            PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+            when(release.getActiveVersion()).thenReturn(activeVersion);
+            when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+                    .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key-openai"));
+            when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.ANTHROPIC)))
+                    .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(11L, ProviderType.ANTHROPIC, "provider-key-anthropic"));
+
+            when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+            when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+            when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
+
+            CircuitBreaker openAiCircuitBreaker = CircuitBreaker.ofDefaults("openai");
+            openAiCircuitBreaker.transitionToOpenState();
+            CircuitBreaker anthropicCircuitBreaker = CircuitBreaker.ofDefaults("anthropic");
+            when(circuitBreakerRegistry.circuitBreaker("openai")).thenReturn(openAiCircuitBreaker);
+            when(circuitBreakerRegistry.circuitBreaker("anthropic")).thenReturn(anthropicCircuitBreaker);
+
+            ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+                    .withModel("claude-3-5-haiku")
+                    .withUsage(new DefaultUsage(null, null, 10L))
+                    .build();
+            ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+            when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+                    .thenReturn(chatResponse);
+
+            GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+            // when
+            GatewayChatResponse response = gatewayChatService.chat(apiKey, request);
+
+            // then
+            assertThat(response).isNotNull();
+            assertThat(response.isFailover()).isTrue();
+            ArgumentCaptor<ProviderCredentialService.ResolvedProviderApiKey> credentialCaptor =
+                    ArgumentCaptor.forClass(ProviderCredentialService.ResolvedProviderApiKey.class);
+            verify(llmCallService, times(1))
+                    .callProvider(credentialCaptor.capture(), anyString(), any(), anyString(), any());
+            assertThat(credentialCaptor.getValue().providerType()).isEqualTo(ProviderType.ANTHROPIC);
+            assertThat(credentialCaptor.getValue().apiKey()).isEqualTo("provider-key-anthropic");
         }
 
         @Test

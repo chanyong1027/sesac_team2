@@ -12,12 +12,30 @@ import org.springframework.stereotype.Component;
 @Setter
 public class EvalProperties {
 
+    private long runTimeoutMinutes = 30L;
     private Judge judge = new Judge();
     private Worker worker = new Worker();
     private Runner runner = new Runner();
 
+    public long getRunTimeoutMinutes() {
+        return runTimeoutMinutes;
+    }
+
+    public void setRunTimeoutMinutes(long runTimeoutMinutes) {
+        this.runTimeoutMinutes = runTimeoutMinutes;
+    }
+
+
     public Judge getJudge() {
         return judge;
+    }
+
+    public Worker getWorker() {
+        return worker;
+    }
+
+    public Runner getRunner() {
+        return runner;
     }
 
     public static class Judge {
@@ -78,5 +96,7 @@ public class EvalProperties {
     @Setter
     public static class Runner {
         private long requestTimeoutMs = 20000L;
+        private int sameProviderRetryMaxAttempts = 1;
+        private long sameProviderRetryBackoffMs = 200L;
     }
 }

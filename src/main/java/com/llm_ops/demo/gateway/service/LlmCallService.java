@@ -9,6 +9,8 @@ import com.google.genai.types.ThinkingConfig;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -33,6 +35,7 @@ import java.util.Map;
 public class LlmCallService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final Logger log = LoggerFactory.getLogger(LlmCallService.class);
 
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final ObjectProvider<ChatModel> openAiChatModelProvider;
@@ -200,9 +203,7 @@ public class LlmCallService {
         if (chatOptions == null || config == null) return;
 
         if (config.maxTokens() != null && config.maxTokens() > 0) {
-            tryInvokeSetter(chatOptions, "setMaxTokens", config.maxTokens());
-            tryInvokeSetter(chatOptions, "setMaxOutputTokens", config.maxTokens());
-            tryInvokeSetter(chatOptions, "setMaxCompletionTokens", config.maxTokens());
+            applyMaxTokens(chatOptions, config.maxTokens());
         }
         if (config.temperature() != null) {
             tryInvokeDoubleSetter(chatOptions, "setTemperature", config.temperature());
@@ -215,21 +216,80 @@ public class LlmCallService {
         }
     }
 
-    private static void tryInvokeSetter(Object target, String methodName, Integer value) {
+    private static void applyMaxTokens(Object chatOptions, Integer maxTokens) {
+        clearTokenFields(chatOptions);
+
+        if (tryInvokeSetter(chatOptions, "setMaxTokens", maxTokens)) {
+            return;
+        }
+        if (tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxTokens)) {
+            return;
+        }
+        tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxTokens);
+    }
+
+    private static void clearTokenFields(Object chatOptions) {
+        invokeNullable(chatOptions, "setMaxTokens");
+        invokeNullable(chatOptions, "setMaxOutputTokens");
+        invokeNullable(chatOptions, "setMaxCompletionTokens");
+    }
+
+    private static void invokeNullable(Object target, String methodName) {
         try {
             var m = target.getClass().getMethod(methodName, Integer.class);
-            m.invoke(target, value);
+            m.invoke(target, new Object[]{null});
             return;
         } catch (NoSuchMethodException ignored) {
             // fallthrough
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.debug("Failed to invoke nullable setter {}.{}(Integer)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
             return;
+        }
+
+        try {
+            var m = target.getClass().getMethod(methodName, int.class);
+            // Primitive setter cannot accept null; use 0 as neutral fallback.
+            m.invoke(target, 0);
+        } catch (NoSuchMethodException ignored) {
+            // no compatible primitive setter
+        } catch (Exception e) {
+            log.debug("Failed to invoke nullable setter {}.{}(int)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
+        }
+    }
+
+    private static boolean tryInvokeSetter(Object target, String methodName, Integer value) {
+        try {
+            var m = target.getClass().getMethod(methodName, Integer.class);
+            m.invoke(target, value);
+            return true;
+        } catch (NoSuchMethodException ignored) {
+            // fallthrough
+        } catch (Exception e) {
+            log.debug("Failed to invoke setter {}.{}(Integer)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
+            return false;
         }
         try {
             var m = target.getClass().getMethod(methodName, int.class);
             m.invoke(target, value.intValue());
-        } catch (Exception ignored) {
+            return true;
+        } catch (NoSuchMethodException ignored) {
+            // no compatible primitive setter
+        } catch (Exception e) {
+            log.debug("Failed to invoke setter {}.{}(int)",
+                    target.getClass().getName(),
+                    methodName,
+                    e);
         }
+        return false;
     }
 
     private static void tryInvokeDoubleSetter(Object target, String methodName, Double value) {
