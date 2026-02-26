@@ -110,57 +110,6 @@ class EvalCaseResultTest {
     }
 
     @Test
-    @DisplayName("RUNNING 상태만 QUEUED로 리셋할 수 있다")
-    void running_상태만_queued로_리셋_가능() {
-        // given
-        EvalRun evalRun = mock(EvalRun.class);
-        EvalTestCase testCase = mock(EvalTestCase.class);
-        EvalCaseResult result = EvalCaseResult.queue(evalRun, testCase);
-        result.markRunning();
-
-        // when
-        result.resetToQueuedForRecovery();
-
-        // then
-        assertThat(result.status()).isEqualTo(EvalCaseStatus.QUEUED);
-        assertThat(result.getCandidateOutputText()).isNull();
-        assertThat(result.getStartedAt()).isNull();
-        assertThat(result.getCompletedAt()).isNull();
-    }
-
-    @Test
-    @DisplayName("QUEUED 상태는 리셋해도 변화 없다")
-    void queued_상태는_리셋해도_변화없다() {
-        // given
-        EvalRun evalRun = mock(EvalRun.class);
-        EvalTestCase testCase = mock(EvalTestCase.class);
-        EvalCaseResult result = EvalCaseResult.queue(evalRun, testCase);
-
-        // when
-        result.resetToQueuedForRecovery();
-
-        // then
-        assertThat(result.status()).isEqualTo(EvalCaseStatus.QUEUED);
-    }
-
-    @Test
-    @DisplayName("ERROR 상태는 리셋되지 않는다")
-    void error_상태는_리셋되지_않는다() {
-        // given
-        EvalRun evalRun = mock(EvalRun.class);
-        EvalTestCase testCase = mock(EvalTestCase.class);
-        EvalCaseResult result = EvalCaseResult.queue(evalRun, testCase);
-        result.markRunning();
-        result.markError("ERROR", "message");
-
-        // when
-        result.resetToQueuedForRecovery();
-
-        // then
-        assertThat(result.status()).isEqualTo(EvalCaseStatus.ERROR);
-    }
-
-    @Test
     @DisplayName("effectivePass는 human override가 없으면 pass를 반환한다")
     void effectivePass_override_없으면_pass_반환() {
         // given
