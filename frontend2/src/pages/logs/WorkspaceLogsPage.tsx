@@ -30,14 +30,14 @@ function statusBadge(status: RequestLogStatus) {
     'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border';
   switch (status) {
     case 'SUCCESS':
-      return `${base} bg-emerald-50 text-emerald-800 border-emerald-200`;
+      return `${base} bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-400/35`;
     case 'FAIL':
-      return `${base} bg-rose-50 text-rose-800 border-rose-200`;
+      return `${base} bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-400/35`;
     case 'BLOCKED':
-      return `${base} bg-amber-50 text-amber-900 border-amber-200`;
+      return `${base} bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-400/35`;
     case 'IN_PROGRESS':
     default:
-      return `${base} bg-gray-50 text-gray-700 border-gray-200`;
+      return `${base} bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border)]`;
   }
 }
 
@@ -111,15 +111,15 @@ export function WorkspaceLogsPage() {
   const logs = list?.content ?? [];
 
   if (!isValidWorkspaceId) {
-    return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
+    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Logs</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-semibold text-[var(--foreground)]">Logs</h1>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             최근 요청을 확인하고 trace 단위로 디버깅하세요.
           </p>
         </div>
@@ -127,14 +127,14 @@ export function WorkspaceLogsPage() {
           <button
             type="button"
             onClick={() => refetch()}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]"
           >
             <RefreshCw size={16} />
             새로고침
           </button>
           <Link
             to={`${basePath}`}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]"
           >
             <ExternalLink size={16} />
             대시보드
@@ -142,25 +142,25 @@ export function WorkspaceLogsPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+      <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 shadow-sm backdrop-blur-sm">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">
               promptKey (기본: 메인 프롬프트)
             </label>
             <input
               value={promptKey}
               onChange={(e) => setPromptKey(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               placeholder="예) sesac-assistant"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">status</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">status</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as 'ALL' | RequestLogStatus)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             >
               {STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -170,11 +170,11 @@ export function WorkspaceLogsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">RAG</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">RAG</label>
             <select
               value={ragEnabled}
               onChange={(e) => setRagEnabled(e.target.value as 'ALL' | 'true' | 'false')}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
             >
               <option value="ALL">전체</option>
               <option value="true">RAG on</option>
@@ -182,11 +182,11 @@ export function WorkspaceLogsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">provider</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">provider</label>
             <input
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               placeholder="예) openai"
             />
           </div>
@@ -194,20 +194,20 @@ export function WorkspaceLogsPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div className="md:col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">traceId</label>
+            <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">traceId</label>
             <input
               value={traceId}
               onChange={(e) => setTraceId(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-sm text-[var(--foreground)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
               placeholder="부분 검색 가능"
             />
           </div>
           <div className="md:col-span-3 flex items-end">
             <div className="w-full flex items-center justify-between gap-2">
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-[var(--text-secondary)]">
                 팁: 대시보드 “최근 요청”에서 넘어오면 promptKey가 자동으로 채워집니다.
               </div>
-              <div className="inline-flex items-center gap-2 text-xs text-gray-600">
+              <div className="inline-flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                 <Search size={14} />
                 필터 변경 시 자동 갱신
               </div>
@@ -216,10 +216,10 @@ export function WorkspaceLogsPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div className="text-sm font-medium text-gray-900">최근 로그</div>
-          <div className="text-xs text-gray-500">
+      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] shadow-sm backdrop-blur-sm">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
+          <div className="text-sm font-medium text-[var(--foreground)]">최근 로그</div>
+          <div className="text-xs text-[var(--text-secondary)]">
             {list ? `총 ${list.totalElements}개 중 상위 ${logs.length}개` : ''}
           </div>
         </div>
@@ -227,50 +227,50 @@ export function WorkspaceLogsPage() {
         {isLoading ? (
           <div className="p-4 space-y-3">
             {Array.from({ length: 8 }).map((_, idx) => (
-              <div key={idx} className="h-14 rounded-lg bg-gray-100 animate-pulse" />
+              <div key={idx} className="h-14 animate-pulse rounded-lg bg-[var(--surface-subtle)]" />
             ))}
           </div>
         ) : isError ? (
           <div className="p-6">
-            <div className="text-sm text-gray-700 font-medium">로그를 불러오지 못했습니다.</div>
+            <div className="text-sm font-medium text-[var(--foreground)]">로그를 불러오지 못했습니다.</div>
             <button
               type="button"
               onClick={() => refetch()}
-              className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]"
             >
               <RefreshCw size={16} />
               재시도
             </button>
           </div>
         ) : logs.length === 0 ? (
-          <div className="p-6 text-sm text-gray-500">
+          <div className="p-6 text-sm text-[var(--text-secondary)]">
             최근 요청이 없습니다. API 호출 후 확인하세요.
           </div>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-[var(--border)]">
             {logs.map((log) => (
-              <li key={log.traceId} className="px-4 py-4 hover:bg-gray-50">
+              <li key={log.traceId} className="px-4 py-4 transition-colors hover:bg-[var(--surface-subtle)]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={statusBadge(log.status)}>{log.status}</span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-[var(--text-secondary)]">
                         {formatShortDateTime(log.createdAt)}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-[var(--text-secondary)]">
                         {log.provider || '-'} · {modelLabel(log)}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-[var(--text-secondary)]">
                         HTTP {log.httpStatus ?? '-'}
                       </span>
                     </div>
 
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
                       <span className="font-mono truncate max-w-[420px]">{log.traceId}</span>
                       <button
                         type="button"
                         onClick={() => navigator.clipboard.writeText(log.traceId)}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                        className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-2 py-1 text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]"
                       >
                         <Copy size={14} />
                         복사
@@ -281,14 +281,14 @@ export function WorkspaceLogsPage() {
                         <span
                           className={
                             log.ragEnabled
-                              ? 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200'
-                              : 'px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200'
+                              ? 'rounded-full border border-indigo-400/35 bg-indigo-500/10 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:text-indigo-300'
+                              : 'rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]'
                           }
                         >
                           RAG {log.ragEnabled ? 'on' : 'off'}
                         </span>
                         {log.ragEnabled ? (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-[var(--text-secondary)]">
                             (chunks {log.ragChunksCount ?? '-'} · rag {log.ragLatencyMs ?? '-'}ms)
                           </span>
                         ) : null}
@@ -299,7 +299,7 @@ export function WorkspaceLogsPage() {
                   <div className="shrink-0">
                     <Link
                       to={`${basePath}/logs/${log.traceId}`}
-                      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)]"
                     >
                       상세
                       <ExternalLink size={16} />
@@ -308,7 +308,7 @@ export function WorkspaceLogsPage() {
                 </div>
 
                 {log.status === 'FAIL' || log.errorCode || log.errorMessage ? (
-                  <div className="mt-3 text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2">
+                  <div className="mt-3 rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">
                     <span className="font-medium">Error</span>
                     <span className="ml-2">
                       {log.errorCode || '-'} {log.errorMessage ? `· ${log.errorMessage}` : ''}
@@ -324,4 +324,3 @@ export function WorkspaceLogsPage() {
     </div>
   );
 }
-

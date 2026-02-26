@@ -120,7 +120,7 @@ export default function DashboardPage() {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="text-center glass-card rounded-2xl border border-[var(--border)] px-8 py-7">
-                    <AlertCircle className="w-12 h-12 text-rose-300 mx-auto mb-4" />
+                    <AlertCircle className="w-12 h-12 text-rose-600 dark:text-rose-300 mx-auto mb-4" />
                     <p className="text-[var(--foreground)] font-medium">통계 데이터를 불러오는데 실패했습니다.</p>
                     <p className="text-sm text-[var(--text-secondary)] mt-2">잠시 후 다시 시도해주세요.</p>
                 </div>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">Dashboard</h1>
-                    <p className="text-sm text-gray-400 mt-1">API 사용량 및 성능 현황을 한눈에 확인하세요</p>
+                    <p className="text-sm text-[var(--text-secondary)] mt-1">API 사용량 및 성능 현황을 한눈에 확인하세요</p>
                 </div>
 
                 {/* Filters */}
@@ -151,9 +151,9 @@ export default function DashboardPage() {
                                 title="워크스페이스 범위"
                             >
                                 {selectedWorkspaceId ? (
-                                    <Layers size={14} className="text-gray-300" />
+                                    <Layers size={14} className="text-[var(--text-secondary)]" />
                                 ) : (
-                                    <Building2 size={14} className="text-gray-300" />
+                                    <Building2 size={14} className="text-[var(--text-secondary)]" />
                                 )}
                                 <span className="max-w-[140px] truncate">
                                     {selectedWorkspaceId
@@ -162,7 +162,7 @@ export default function DashboardPage() {
                                 </span>
                                 <ChevronDown
                                     size={14}
-                                    className={`text-gray-400 transition-transform ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`}
+                                    className={`text-[var(--text-secondary)] transition-transform ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`}
                                 />
                             </button>
 
@@ -186,9 +186,9 @@ export default function DashboardPage() {
                                                 : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
                                                 }`}
                                         >
-                                            <Building2 size={16} className={!selectedWorkspaceId ? 'text-[var(--primary)]' : 'text-gray-400'} />
+                                            <Building2 size={16} className={!selectedWorkspaceId ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'} />
                                             <span className={!selectedWorkspaceId ? 'font-semibold' : ''}>전체 조직</span>
-                                            <span className="ml-auto text-xs text-gray-500">모든 워크스페이스</span>
+                                            <span className="ml-auto text-xs text-[var(--text-secondary)]">모든 워크스페이스</span>
                                         </button>
                                         {workspaces.map((ws) => (
                                             <button
@@ -203,7 +203,7 @@ export default function DashboardPage() {
                                                     : 'text-[var(--foreground)] hover:bg-[var(--muted)]'
                                                     }`}
                                             >
-                                                <Layers size={16} className={selectedWorkspaceId === ws.id ? 'text-[var(--primary)]' : 'text-gray-400'} />
+                                                <Layers size={16} className={selectedWorkspaceId === ws.id ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)]'} />
                                                 <span className={selectedWorkspaceId === ws.id ? 'font-semibold' : ''}>{ws.displayName}</span>
                                             </button>
                                         ))}
@@ -212,7 +212,7 @@ export default function DashboardPage() {
                             )}
                         </div>
 
-                        <div className="mx-1 h-6 w-px bg-white/10" />
+                        <div className="mx-1 h-6 w-px bg-[var(--border)]" />
 
                         {/* Period Filter */}
                         {(['daily', 'weekly', 'monthly'] as Period[]).map((p) => (
@@ -236,7 +236,7 @@ export default function DashboardPage() {
             {isLoading && (
                 <div className="flex items-center justify-center py-4">
                     <Loader2 className="w-6 h-6 animate-spin text-[var(--primary)]" />
-                    <span className="ml-2 text-gray-400">데이터를 불러오는 중...</span>
+                    <span className="ml-2 text-[var(--text-secondary)]">데이터를 불러오는 중...</span>
                 </div>
             )}
 
@@ -255,7 +255,7 @@ export default function DashboardPage() {
                     title="토큰 사용량"
                     value={formatNumber(overview?.totalTokens || 0)}
                     change={overview?.tokensChange || 0}
-                    icon={<Zap className="text-yellow-300" size={18} />}
+                    icon={<Zap className="text-yellow-600 dark:text-yellow-300" size={18} />}
                     iconWrapClassName="bg-yellow-500/10 border border-yellow-500/20"
                     subtitle="입력 + 출력 합계"
                     isLoading={isOverviewLoading}
@@ -264,7 +264,7 @@ export default function DashboardPage() {
                     title="평균 응답 속도"
                     value={`${overview?.avgLatencyMs || 0}ms`}
                     change={overview?.latencyChange || 0}
-                    icon={<Clock className="text-emerald-300" size={18} />}
+                    icon={<Clock className="text-emerald-600 dark:text-emerald-300" size={18} />}
                     iconWrapClassName="bg-emerald-500/10 border border-emerald-500/20"
                     subtitle={`P95: ${overview?.p95LatencyMs || 0}ms`}
                     invertChange
@@ -274,7 +274,7 @@ export default function DashboardPage() {
                     title="예상 비용"
                     value={formatCurrency(overview?.totalCost || 0)}
                     change={overview?.costChange || 0}
-                    icon={<Coins className="text-pink-300" size={18} />}
+                    icon={<Coins className="text-pink-600 dark:text-pink-300" size={18} />}
                     iconWrapClassName="bg-pink-500/10 border border-pink-500/20"
                     subtitle="USD 기준"
                     isLoading={isOverviewLoading}
@@ -286,14 +286,14 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h2 className="text-lg font-bold text-[var(--foreground)]">사용량 추이</h2>
-                        <p className="text-xs text-gray-500 mt-1">일별 요청 수 및 토큰 사용량</p>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">일별 요청 수 및 토큰 사용량</p>
                     </div>
                     <div className="flex items-center gap-4 text-xs">
-                        <span className="flex items-center gap-2 text-gray-400">
+                        <span className="flex items-center gap-2 text-[var(--text-secondary)]">
                             <span className="w-2.5 h-2.5 rounded-full bg-[var(--primary)] shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
                             요청 수
                         </span>
-                        <span className="flex items-center gap-2 text-gray-400">
+                        <span className="flex items-center gap-2 text-[var(--text-secondary)]">
                             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
                             토큰 (K)
                         </span>
@@ -315,16 +315,16 @@ export default function DashboardPage() {
                                         <stop offset="95%" stopColor="rgb(16,185,129)" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                                 <XAxis
                                     dataKey="date"
-                                    tick={{ fontSize: 12, fill: 'rgba(148,163,184,0.70)' }}
-                                    axisLine={{ stroke: 'rgba(255,255,255,0.08)' }}
+                                    tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
+                                    axisLine={{ stroke: 'var(--border)' }}
                                     tickLine={false}
                                 />
                                 <YAxis
                                     yAxisId="left"
-                                    tick={{ fontSize: 12, fill: 'rgba(148,163,184,0.70)' }}
+                                    tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value}
@@ -332,20 +332,20 @@ export default function DashboardPage() {
                                 <YAxis
                                     yAxisId="right"
                                     orientation="right"
-                                    tick={{ fontSize: 12, fill: 'rgba(148,163,184,0.70)' }}
+                                    tick={{ fontSize: 12, fill: 'var(--text-secondary)' }}
                                     axisLine={false}
                                     tickLine={false}
                                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
                                 />
                                 <Tooltip
-                                    cursor={{ stroke: 'rgba(255,255,255,0.10)', strokeDasharray: '4 3' }}
+                                    cursor={{ stroke: 'var(--border)', strokeDasharray: '4 3' }}
                                     contentStyle={{
-                                        backgroundColor: 'rgba(11,10,16,0.90)',
-                                        border: '1px solid rgba(255,255,255,0.10)',
+                                        backgroundColor: 'var(--surface-elevated)',
+                                        border: '1px solid var(--border)',
                                         borderRadius: '12px',
-                                        boxShadow: '0 10px 30px rgba(0,0,0,0.35)'
+                                        boxShadow: '0 10px 30px rgba(15,23,42,0.18)'
                                     }}
-                                    labelStyle={{ color: 'rgba(148,163,184,0.85)' }}
+                                    labelStyle={{ color: 'var(--text-secondary)' }}
                                     formatter={(value, name) => {
                                         const numValue = value as number;
                                         if (name === 'requests') return [`${numValue.toLocaleString()} 요청`, '요청 수'];
@@ -376,7 +376,7 @@ export default function DashboardPage() {
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
+                        <div className="flex items-center justify-center h-full text-[var(--text-secondary)]">
                             <div className="text-center">
                                 <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                 <p>데이터가 없습니다</p>
@@ -391,7 +391,7 @@ export default function DashboardPage() {
                 {/* Model Breakdown */}
                 <div className="glass-card rounded-xl border border-[var(--border)] p-6 h-full">
                     <div className="flex items-center gap-2 mb-6">
-                        <BarChart3 size={18} className="text-gray-400" />
+                        <BarChart3 size={18} className="text-[var(--text-secondary)]" />
                         <h2 className="font-bold text-[var(--foreground)] text-base">모델별 사용량</h2>
                     </div>
 
@@ -407,8 +407,8 @@ export default function DashboardPage() {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-4 text-xs">
-                                            <span className="text-gray-400">{formatNumber(model.requests)} req</span>
-                                            <span className="text-gray-200 font-mono">{formatCurrency(model.cost)}</span>
+                                            <span className="text-[var(--text-secondary)]">{formatNumber(model.requests)} req</span>
+                                            <span className="text-[var(--foreground)] font-mono">{formatCurrency(model.cost)}</span>
                                         </div>
                                     </div>
                                     <div className="h-1.5 bg-[var(--muted)] rounded-full overflow-hidden border border-[var(--border)]">
@@ -419,12 +419,12 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             ))}
-                            <div className="py-2 flex items-center justify-center text-gray-600 text-xs italic opacity-50">
+                            <div className="py-2 flex items-center justify-center text-[var(--text-secondary)] text-xs italic opacity-70">
                                 No more data available
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center justify-center h-32 text-gray-400">
+                        <div className="flex items-center justify-center h-32 text-[var(--text-secondary)]">
                             <p>사용 데이터가 없습니다</p>
                         </div>
                     )}
@@ -433,13 +433,13 @@ export default function DashboardPage() {
                 {/* Prompt Usage */}
                 <div className="glass-card rounded-xl border border-[var(--border)] p-6 h-full flex flex-col">
                     <div className="flex items-center gap-2 mb-6">
-                        <FileText size={18} className="text-gray-400" />
+                        <FileText size={18} className="text-[var(--text-secondary)]" />
                         <h2 className="font-bold text-[var(--foreground)] text-base">프롬프트별 사용량</h2>
                     </div>
 
                     {prompts.length > 0 ? (
                         <div className="w-full">
-                            <div className="grid grid-cols-12 gap-4 pb-3 border-b border-white/10 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            <div className="grid grid-cols-12 gap-4 pb-3 border-b border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                                 <div className="col-span-5">프롬프트</div>
                                 <div className="col-span-2 text-right">요청</div>
                                 <div className="col-span-2 text-right">토큰</div>
@@ -452,15 +452,15 @@ export default function DashboardPage() {
                                         className="grid grid-cols-12 gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-[var(--muted)] transition-colors items-center group cursor-default"
                                     >
                                         <div className="col-span-5 flex items-center gap-2 overflow-hidden">
-                                            <span className="text-xs text-gray-500 font-mono">ID:</span>
+                                            <span className="text-xs text-[var(--text-secondary)] font-mono">ID:</span>
                                             <span className="text-xs text-[var(--text-secondary)] truncate group-hover:text-[var(--foreground)] transition-colors">
                                                 {prompt.promptKey}
                                             </span>
                                         </div>
-                                        <div className="col-span-2 text-right text-sm text-gray-300 font-mono">
+                                        <div className="col-span-2 text-right text-sm text-[var(--foreground)] font-mono">
                                             {formatNumber(prompt.requests)}
                                         </div>
-                                        <div className="col-span-2 text-right text-sm text-gray-300 font-mono">
+                                        <div className="col-span-2 text-right text-sm text-[var(--foreground)] font-mono">
                                             {formatNumber(prompt.tokens)}
                                         </div>
                                         <div className="col-span-3 text-right text-sm text-[var(--foreground)] font-mono">
@@ -471,7 +471,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex items-center justify-center h-32 text-gray-400">
+                        <div className="flex items-center justify-center h-32 text-[var(--text-secondary)]">
                             <p>사용 데이터가 없습니다</p>
                         </div>
                     )}
@@ -480,7 +480,7 @@ export default function DashboardPage() {
 
             {/* Footer Note */}
             <div className="mt-2 text-center pb-4 border-t border-[var(--border)] pt-6">
-                <p className="text-[10px] text-gray-500">데이터는 실시간으로 업데이트됩니다</p>
+                <p className="text-[10px] text-[var(--text-secondary)]">데이터는 실시간으로 업데이트됩니다</p>
             </div>
         </div>
     );
@@ -515,12 +515,12 @@ function KPICard({
                     {icon}
                 </div>
                 {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+                    <Loader2 className="w-4 h-4 animate-spin text-[var(--text-secondary)]" />
                 ) : (
                     <div
                         className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${isPositive
-                            ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
-                            : 'text-rose-300 bg-rose-500/10 border-rose-500/20'
+                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
+                            : 'text-rose-700 dark:text-rose-300 bg-rose-500/10 border-rose-500/25'
                             }`}
                     >
                         {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
@@ -536,8 +536,8 @@ function KPICard({
                     <div className="text-3xl font-bold text-[var(--foreground)] mb-1 tracking-tight">{value}</div>
                 )}
                 <div className="flex flex-col">
-                    <p className="text-xs text-gray-400 font-medium mb-0.5">{title}</p>
-                    <p className="text-[10px] text-gray-600">{subtitle}</p>
+                    <p className="text-xs text-[var(--text-secondary)] font-medium mb-0.5">{title}</p>
+                    <p className="text-[10px] text-[var(--text-secondary)]">{subtitle}</p>
                 </div>
             </div>
         </div>

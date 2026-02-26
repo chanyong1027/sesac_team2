@@ -130,7 +130,7 @@ export function InvitationAcceptPage() {
         title={`${preview.organizationName}에서 초대했습니다`}
         description="초대 정보를 확인하고 팀에 참여하세요."
       >
-        <div className="space-y-3 rounded-lg border border-white/10 bg-white/5 p-4 text-left text-sm text-gray-200">
+        <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] p-4 text-left text-sm text-[var(--foreground)]">
           <InfoRow label="조직" value={preview.organizationName} />
           <InfoRow label="워크스페이스" value={preview.workspaceName} />
           <InfoRow label="역할" value={preview.role} />
@@ -155,7 +155,7 @@ export function InvitationAcceptPage() {
             </button>
             <button
               onClick={handleSignup}
-              className="flex-1 rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-sm font-medium text-white hover:bg-white/10"
+              className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-elevated)]"
             >
               회원가입
             </button>
@@ -240,13 +240,13 @@ function CenterPanel({
   children?: ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-lg rounded-xl border border-white/10 bg-white/5 p-6 text-center">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex items-center justify-center px-4">
+      <div className="w-full max-w-lg rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] p-6 text-center shadow-sm">
         {loading ? (
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-b-2 border-t-2 border-blue-500" />
         ) : null}
-        <h1 className="text-xl font-semibold text-white">{title}</h1>
-        <p className="mt-2 text-sm text-gray-400">{description}</p>
+        <h1 className="text-xl font-semibold text-[var(--foreground)]">{title}</h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">{description}</p>
         {children}
       </div>
     </div>
@@ -256,8 +256,8 @@ function CenterPanel({
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-gray-400">{label}</span>
-      <span className="text-right text-white">{value}</span>
+      <span className="text-[var(--text-secondary)]">{label}</span>
+      <span className="text-right text-[var(--foreground)]">{value}</span>
     </div>
   );
 }

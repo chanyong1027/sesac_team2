@@ -231,16 +231,16 @@ function statusBadge(status: RequestLogStatus) {
   const base = 'inline-flex items-center rounded-full px-3 py-1 text-xs font-bold tracking-wide border';
   switch (status) {
     case 'SUCCESS':
-      return `${base} bg-emerald-500/10 text-emerald-300 border-emerald-500/20 shadow-[0_0_12px_rgba(74,222,128,0.25)]`;
+      return `${base} bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 shadow-[0_0_12px_rgba(74,222,128,0.20)]`;
     case 'FAIL':
-      return `${base} bg-rose-500/10 text-rose-300 border-rose-500/20 shadow-[0_0_12px_rgba(244,63,94,0.20)]`;
+      return `${base} bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25 shadow-[0_0_12px_rgba(244,63,94,0.20)]`;
     case 'BLOCKED':
-      return `${base} bg-amber-500/10 text-amber-200 border-amber-500/20 shadow-[0_0_12px_rgba(251,191,36,0.12)]`;
+      return `${base} bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25 shadow-[0_0_12px_rgba(251,191,36,0.12)]`;
     case 'TIMEOUT':
-      return `${base} bg-orange-500/10 text-orange-200 border-orange-500/20 shadow-[0_0_12px_rgba(249,115,22,0.12)]`;
+      return `${base} bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/25 shadow-[0_0_12px_rgba(249,115,22,0.12)]`;
     case 'IN_PROGRESS':
     default:
-      return `${base} bg-white/5 text-gray-300 border-white/10`;
+      return `${base} bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border)]`;
   }
 }
 
@@ -365,7 +365,7 @@ export function WorkspaceLogDetailPage() {
   });
 
   if (!isValid) {
-    return <div className="p-8 text-gray-500">유효하지 않은 요청입니다.</div>;
+    return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 요청입니다.</div>;
   }
 
   const rawJson = log ? JSON.stringify(log, null, 2) : '';
@@ -387,25 +387,25 @@ export function WorkspaceLogDetailPage() {
   const failureInsight = buildFailureInsight(log);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <div className="space-y-6 max-w-7xl mx-auto pb-20 text-[var(--foreground)]">
       {/* Header */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-2 text-sm text-gray-400">
-          <Link to={`${basePath}/logs`} className="hover:text-white transition-colors">Logs</Link>
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <Link to={`${basePath}/logs`} className="transition-colors hover:text-[var(--foreground)]">Logs</Link>
           <span>/</span>
-          <span className="text-gray-200 truncate">{traceId}</span>
+          <span className="truncate text-[var(--foreground)]">{traceId}</span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link
               to={`${basePath}/logs`}
-              className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 text-gray-300 hover:text-white hover:bg-white/[0.08] transition-all"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-elevated)] hover:text-[var(--foreground)]"
             >
               <ArrowLeft size={20} />
             </Link>
             <div>
-              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+              <h1 className="flex items-center gap-3 text-2xl font-bold text-[var(--foreground)]">
                 Log Details
                 {log && (
                   <>
@@ -420,12 +420,12 @@ export function WorkspaceLogDetailPage() {
                   </>
                 )}
               </h1>
-              <div className="flex items-center gap-3 mt-1 text-sm text-gray-400 font-mono">
+              <div className="mt-1 flex items-center gap-3 font-mono text-sm text-[var(--text-secondary)]">
                 <Hash size={14} />
                 {traceId}
                 <button
                   onClick={() => navigator.clipboard.writeText(traceId!)}
-                  className="text-gray-500 hover:text-white transition-colors"
+                  className="text-[var(--text-secondary)] transition-colors hover:text-[var(--foreground)]"
                 >
                   <Copy size={12} />
                 </button>
@@ -434,23 +434,23 @@ export function WorkspaceLogDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="bg-black/20 p-1 rounded-lg border border-white/10 flex">
+            <div className="flex rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] p-1">
               <button
                 onClick={() => setActiveTab('details')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'details' ? 'bg-[var(--primary)]/20 text-[var(--primary)] shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'details' ? 'bg-[var(--primary)]/20 text-[var(--primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
               >
                 Overview
               </button>
               <button
                 onClick={() => setActiveTab('raw')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'raw' ? 'bg-[var(--primary)]/20 text-[var(--primary)] shadow-sm' : 'text-gray-400 hover:text-white'}`}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'raw' ? 'bg-[var(--primary)]/20 text-[var(--primary)] shadow-sm' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
               >
                 Raw JSON
               </button>
             </div>
             <button
               onClick={() => refetch()}
-              className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.03] border border-white/10 text-gray-300 hover:text-white hover:border-[var(--primary)]/40 hover:text-[var(--primary)] transition-all group"
+              className="group flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] transition-colors hover:border-[var(--primary)]/40 hover:text-[var(--primary)]"
             >
               <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
             </button>
@@ -460,27 +460,27 @@ export function WorkspaceLogDetailPage() {
 
       {isLoading ? (
         <div className="grid grid-cols-3 gap-6 animate-pulse">
-          <div className="h-40 bg-white/5 rounded-2xl" />
-          <div className="h-40 bg-white/5 rounded-2xl" />
-          <div className="h-40 bg-white/5 rounded-2xl" />
+          <div className="h-40 rounded-2xl bg-[var(--surface-subtle)]" />
+          <div className="h-40 rounded-2xl bg-[var(--surface-subtle)]" />
+          <div className="h-40 rounded-2xl bg-[var(--surface-subtle)]" />
         </div>
       ) : isError || !log ? (
-        <div className="glass-card border border-white/10 rounded-xl p-8 text-center">
-          <div className="text-lg font-medium text-white mb-2">Failed to load log details</div>
+        <div className="glass-card rounded-xl border border-[var(--border)] p-8 text-center">
+          <div className="mb-2 text-lg font-medium text-[var(--foreground)]">Failed to load log details</div>
           <button onClick={() => refetch()} className="text-[var(--primary)] hover:underline">Retry</button>
         </div>
       ) : activeTab === 'raw' ? (
-        <div className="glass-card p-0 rounded-xl overflow-hidden border border-white/10">
-          <div className="bg-white/[0.03] px-6 py-3 border-b border-white/10 flex justify-between items-center">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Raw JSON Data</span>
+        <div className="glass-card overflow-hidden rounded-xl border border-[var(--border)] p-0">
+          <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-subtle)] px-6 py-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">Raw JSON Data</span>
             <button
               onClick={() => navigator.clipboard.writeText(rawJson)}
-              className="text-xs text-[var(--primary)] hover:text-white transition-colors inline-flex items-center gap-2"
+              className="inline-flex items-center gap-2 text-xs text-[var(--primary)] transition-colors hover:text-[var(--foreground)]"
             >
               <Copy size={14} /> Copy
             </button>
           </div>
-          <pre className="p-6 bg-black/30 font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre max-h-[70vh] overflow-y-auto custom-scrollbar">
+          <pre className="max-h-[70vh] overflow-x-auto overflow-y-auto whitespace-pre bg-[color:rgba(15,23,42,0.04)] p-6 font-mono text-xs text-[var(--foreground)] custom-scrollbar dark:bg-black/30 dark:text-gray-300">
             {rawJson}
           </pre>
         </div>
@@ -489,22 +489,22 @@ export function WorkspaceLogDetailPage() {
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* 1. Model Info Card */}
-            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
+            <div className="glass-card relative overflow-hidden rounded-xl border border-[var(--border)] p-5 group">
               <div className="flex items-center gap-2 mb-4 text-[var(--primary)] border-l-2 border-[var(--primary)] pl-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider">모델 정보</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Provider</span>
-                  <span className="text-white font-medium">{log.provider}</span>
+                  <span className="text-[var(--text-secondary)]">Provider</span>
+                  <span className="font-medium text-[var(--foreground)]">{log.provider}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">요청 모델</span>
-                  <span className="text-gray-300 font-mono text-xs">{log.requestedModel}</span>
+                  <span className="text-[var(--text-secondary)]">요청 모델</span>
+                  <span className="font-mono text-xs text-[var(--text-secondary)]">{log.requestedModel}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">사용 모델</span>
-                  <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium ${log.isFailover ? 'bg-[var(--primary)]/20 text-[var(--primary)]' : 'bg-white/10 text-gray-300'}`}>
+                  <span className="text-[var(--text-secondary)]">사용 모델</span>
+                  <span className={`rounded border px-2 py-0.5 text-xs font-mono font-medium ${log.isFailover ? 'border-[var(--primary)]/30 bg-[var(--primary)]/20 text-[var(--primary)]' : 'border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                     {log.usedModel}
                   </span>
                 </div>
@@ -518,27 +518,27 @@ export function WorkspaceLogDetailPage() {
             </div>
 
             {/* 2. Token & Cost Card */}
-            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
-              <div className="flex items-center gap-2 mb-4 text-blue-400 border-l-2 border-blue-500 pl-2">
+            <div className="glass-card relative overflow-hidden rounded-xl border border-[var(--border)] p-5 group">
+              <div className="mb-4 flex items-center gap-2 border-l-2 border-blue-500 pl-2 text-blue-700 dark:text-blue-300">
                 <h3 className="text-xs font-bold uppercase tracking-wider">토큰 및 비용</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">입력 토큰</span>
-                  <span className="text-white font-mono">{log.inputTokens?.toLocaleString()}</span>
+                  <span className="text-[var(--text-secondary)]">입력 토큰</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.inputTokens?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">출력 토큰</span>
-                  <span className="text-white font-mono">{log.outputTokens?.toLocaleString()}</span>
+                  <span className="text-[var(--text-secondary)]">출력 토큰</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.outputTokens?.toLocaleString()}</span>
                 </div>
-                <div className="w-full h-px bg-white/5 my-2" />
+                <div className="my-2 h-px w-full bg-[var(--border)]" />
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">총 토큰</span>
-                  <span className="text-white font-bold font-mono">{log.totalTokens?.toLocaleString()}</span>
+                  <span className="text-[var(--text-secondary)]">총 토큰</span>
+                  <span className="font-mono font-bold text-[var(--foreground)]">{log.totalTokens?.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">비용</span>
-                  <span className="text-emerald-400 font-bold font-mono">
+                  <span className="text-[var(--text-secondary)]">비용</span>
+                  <span className="font-mono font-bold text-emerald-700 dark:text-emerald-300">
                     {typeof log.cost === 'number' ? `$${log.cost.toFixed(5)}` : '-'}
                   </span>
                 </div>
@@ -546,60 +546,60 @@ export function WorkspaceLogDetailPage() {
             </div>
 
             {/* 3. RAG Configuration Card */}
-            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
-              <div className="flex items-center gap-2 mb-4 text-purple-400 border-l-2 border-purple-500 pl-2">
+            <div className="glass-card relative overflow-hidden rounded-xl border border-[var(--border)] p-5 group">
+              <div className="mb-4 flex items-center gap-2 border-l-2 border-purple-500 pl-2 text-purple-700 dark:text-purple-300">
                 <h3 className="text-xs font-bold uppercase tracking-wider">RAG 설정</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">Top K</span>
-                  <span className="text-white font-mono">{log.ragTopK || '-'}</span>
+                  <span className="text-[var(--text-secondary)]">Top K</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragTopK || '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">유사도 임계값</span>
-                  <span className="text-white font-mono">{log.ragSimilarityThreshold || '-'}</span>
+                  <span className="text-[var(--text-secondary)]">유사도 임계값</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragSimilarityThreshold || '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">검색 청크 수</span>
-                  <span className="text-white font-mono">{log.ragChunksCount || 0}</span>
+                  <span className="text-[var(--text-secondary)]">검색 청크 수</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragChunksCount || 0}</span>
                 </div>
               </div>
             </div>
 
             {/* 4. Request Info Card */}
-            <div className="glass-card p-5 rounded-xl border border-white/10 relative overflow-hidden group">
-              <div className="flex items-center gap-2 mb-4 text-gray-400 border-l-2 border-gray-500 pl-2">
+            <div className="glass-card relative overflow-hidden rounded-xl border border-[var(--border)] p-5 group">
+              <div className="mb-4 flex items-center gap-2 border-l-2 border-[var(--border)] pl-2 text-[var(--text-secondary)]">
                 <h3 className="text-xs font-bold uppercase tracking-wider">요청 정보</h3>
               </div>
               <div className="space-y-3 relative z-10">
                 <div className="space-y-1">
-                  <span className="text-xs text-gray-500">Trace ID</span>
-                  <div className="flex items-start justify-between gap-2 p-1.5 rounded bg-black/30 border border-white/5">
-                    <code className="text-[10px] text-blue-300 font-mono break-all leading-tight flex-1">
+                  <span className="text-xs text-[var(--text-secondary)]">Trace ID</span>
+                  <div className="flex items-start justify-between gap-2 rounded border border-[var(--border)] bg-[var(--surface-subtle)] p-1.5">
+                    <code className="flex-1 break-all font-mono text-[10px] leading-tight text-blue-700 dark:text-blue-300">
                       {log.traceId}
                     </code>
-                    <button onClick={() => navigator.clipboard.writeText(log.traceId!)} className="text-gray-500 hover:text-white">
+                    <button onClick={() => navigator.clipboard.writeText(log.traceId!)} className="text-[var(--text-secondary)] hover:text-[var(--foreground)]">
                       <Copy size={10} />
                     </button>
                   </div>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">HTTP 상태</span>
-                  <span className={`font-mono font-bold ${log.httpStatus === 200 ? 'text-white' : 'text-rose-400'}`}>
+                  <span className="text-[var(--text-secondary)]">HTTP 상태</span>
+                  <span className={`font-mono font-bold ${log.httpStatus === 200 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-400'}`}>
                     {log.httpStatus}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-sm pt-1 border-t border-white/5">
-                  <span className="text-gray-500">요청 소스</span>
-                  <span className="text-gray-300 uppercase font-bold text-xs tracking-wider">{log.requestSource}</span>
+                <div className="flex justify-between items-center border-t border-[var(--border)] pt-1 text-sm">
+                  <span className="text-[var(--text-secondary)]">요청 소스</span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--foreground)]">{log.requestSource}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">생성 시각</span>
-                  <span className="text-gray-400 text-[10px] font-mono">{formatKstDateTimeOrFallback(log.createdAt)}</span>
+                  <span className="text-[var(--text-secondary)]">생성 시각</span>
+                  <span className="font-mono text-[10px] text-[var(--text-secondary)]">{formatKstDateTimeOrFallback(log.createdAt)}</span>
                 </div>
-                <div className="pt-2 border-t border-white/5 space-y-1">
-                  <span className="text-xs text-gray-500">요청 경로</span>
-                  <div className="text-xs text-gray-300 font-mono break-all leading-tight">
+                <div className="space-y-1 border-t border-[var(--border)] pt-2">
+                  <span className="text-xs text-[var(--text-secondary)]">요청 경로</span>
+                  <div className="break-all font-mono text-xs leading-tight text-[var(--text-secondary)]">
                     {log.requestPath || '/v1/models/chat'}
                   </div>
                 </div>
@@ -609,7 +609,7 @@ export function WorkspaceLogDetailPage() {
 
           {failureInsight && (
             <div className="glass-card p-5 rounded-xl border border-rose-500/30 bg-rose-500/[0.04]">
-              <div className="flex items-center gap-2 mb-4 text-rose-300 border-l-2 border-rose-400 pl-2">
+              <div className="mb-4 flex items-center gap-2 border-l-2 border-rose-400 pl-2 text-rose-700 dark:text-rose-300">
                 <AlertTriangle size={14} />
                 <h3 className="text-xs font-bold uppercase tracking-wider">실패/차단 원인 분석</h3>
               </div>
@@ -617,33 +617,33 @@ export function WorkspaceLogDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="space-y-2">
                   <div className="flex justify-between gap-3">
-                    <span className="text-gray-400">상태</span>
-                    <span className="text-white font-mono">{log.status}</span>
+                    <span className="text-[var(--text-secondary)]">상태</span>
+                    <span className="font-mono text-[var(--foreground)]">{log.status}</span>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <span className="text-gray-400">HTTP 상태</span>
-                    <span className="text-white font-mono">{failureInsight.httpStatus ?? '-'}</span>
+                    <span className="text-[var(--text-secondary)]">HTTP 상태</span>
+                    <span className="font-mono text-[var(--foreground)]">{failureInsight.httpStatus ?? '-'}</span>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <span className="text-gray-400">Error Code</span>
-                    <span className="text-rose-300 font-mono text-xs">{failureInsight.errorCode ?? '-'}</span>
+                    <span className="text-[var(--text-secondary)]">Error Code</span>
+                    <span className="text-xs font-mono text-rose-700 dark:text-rose-300">{failureInsight.errorCode ?? '-'}</span>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <span className="text-gray-400">Fail Reason</span>
-                    <span className="text-rose-200 font-mono text-xs">{failureInsight.failReason ?? '-'}</span>
+                    <span className="text-[var(--text-secondary)]">Fail Reason</span>
+                    <span className="text-xs font-mono text-rose-700/90 dark:text-rose-200">{failureInsight.failReason ?? '-'}</span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">실패/차단 메시지</div>
-                    <p className="text-sm text-rose-100 leading-relaxed">
+                    <div className="mb-1 text-xs text-[var(--text-secondary)]">실패/차단 메시지</div>
+                    <p className="text-sm leading-relaxed text-rose-700 dark:text-rose-100">
                       {failureInsight.errorMessage ?? '메시지가 저장되지 않았습니다.'}
                     </p>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">해석</div>
-                    <p className="text-sm text-gray-200 leading-relaxed">{failureInsight.reasonDescription}</p>
+                    <div className="mb-1 text-xs text-[var(--text-secondary)]">해석</div>
+                    <p className="text-sm leading-relaxed text-[var(--foreground)]">{failureInsight.reasonDescription}</p>
                   </div>
                 </div>
               </div>
@@ -651,73 +651,73 @@ export function WorkspaceLogDetailPage() {
           )}
 
           {/* Execution Timeline */}
-          <div className="glass-card p-6 rounded-2xl border border-white/10">
-            <div className="flex items-center gap-2 mb-6 text-blue-400">
+          <div className="glass-card rounded-2xl border border-[var(--border)] p-6">
+            <div className="mb-6 flex items-center gap-2 text-blue-700 dark:text-blue-300">
               <Clock size={16} />
               <h3 className="text-sm font-bold">실행 타임라인</h3>
             </div>
 
             <div className="relative pt-2 pb-6 px-2">
-              <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-gray-400">
-                <span className="inline-flex items-center gap-1.5 rounded border border-white/10 bg-white/5 px-2 py-1">
+              <div className="mb-4 flex flex-wrap gap-2 text-[11px] text-[var(--text-secondary)]">
+                <span className="inline-flex items-center gap-1.5 rounded border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-1">
                   <span className="h-2 w-2 rounded-full bg-slate-300/80" />
                   전체 요청
                 </span>
                 {log.ragEnabled && (
-                  <span className="inline-flex items-center gap-1.5 rounded border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-blue-300">
+                  <span className="inline-flex items-center gap-1.5 rounded border border-blue-500/25 bg-blue-500/10 px-2 py-1 text-blue-700 dark:text-blue-300">
                     <span className="h-2 w-2 rounded-full bg-blue-400/90" />
                     RAG 검색
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1.5 rounded border border-purple-500/20 bg-purple-500/10 px-2 py-1 text-purple-300">
+                <span className="inline-flex items-center gap-1.5 rounded border border-purple-500/25 bg-purple-500/10 px-2 py-1 text-purple-700 dark:text-purple-300">
                   <span className="h-2 w-2 rounded-full bg-purple-400/90" />
                   LLM 생성
                 </span>
               </div>
 
               <div className="mx-auto max-w-[460px]">
-                <div className="relative mx-auto h-44 w-44 rounded-full p-[1px] border border-white/10 bg-white/[0.02]">
+                <div className="relative mx-auto h-44 w-44 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] p-[1px]">
                   <div
                     className="absolute inset-0 rounded-full"
                     style={{ background: donutGradient }}
                   />
-                  <div className="absolute inset-[16px] rounded-full border border-white/10 bg-[#0b0d1d]/95 flex flex-col items-center justify-center text-center">
-                    <span className="text-[11px] text-gray-500">총 지연</span>
-                    <span className="text-2xl font-bold text-white font-mono leading-none">{totalLatencyMs}ms</span>
-                    <span className="mt-1 text-[11px] text-gray-400 font-mono">{formatSeconds(totalLatencyMs)}</span>
+                  <div className="absolute inset-[16px] flex flex-col items-center justify-center rounded-full border border-[var(--border)] bg-[var(--background-card)] text-center dark:bg-[#0b0d1d]/95">
+                    <span className="text-[11px] text-[var(--text-secondary)]">총 지연</span>
+                    <span className="font-mono text-2xl font-bold leading-none text-[var(--foreground)]">{totalLatencyMs}ms</span>
+                    <span className="mt-1 font-mono text-[11px] text-[var(--text-secondary)]">{formatSeconds(totalLatencyMs)}</span>
                   </div>
                 </div>
 
                 <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                    <span className="inline-flex items-center gap-2 text-xs text-gray-300">
+                  <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2">
+                    <span className="inline-flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                       <span className="h-2 w-2 rounded-full bg-slate-300/80" />
                       전체 요청
                     </span>
-                    <span className="text-xs font-mono text-gray-200">{totalLatencyMs}ms</span>
+                    <span className="text-xs font-mono text-[var(--foreground)]">{totalLatencyMs}ms</span>
                   </div>
 
                   {log.ragEnabled && (
                     <div className="flex items-center justify-between rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2">
-                      <span className="inline-flex items-center gap-2 text-xs text-blue-200">
+                      <span className="inline-flex items-center gap-2 text-xs text-blue-700 dark:text-blue-200">
                         <span className="h-2 w-2 rounded-full bg-blue-400/90" />
                         RAG 검색
                       </span>
-                      <span className="text-xs font-mono text-blue-200">{ragLatencyMs}ms · {ragPercent}%</span>
+                      <span className="text-xs font-mono text-blue-700 dark:text-blue-200">{ragLatencyMs}ms · {ragPercent}%</span>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/10 px-3 py-2">
-                    <span className="inline-flex items-center gap-2 text-xs text-purple-200">
+                    <span className="inline-flex items-center gap-2 text-xs text-purple-700 dark:text-purple-200">
                       <span className="h-2 w-2 rounded-full bg-purple-400/90" />
                       LLM 생성
                     </span>
-                    <span className="text-xs font-mono text-purple-200">{llmLatencyMs}ms · {llmPercent}%</span>
+                    <span className="text-xs font-mono text-purple-700 dark:text-purple-200">{llmLatencyMs}ms · {llmPercent}%</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3 text-[11px] text-gray-500">
+              <div className="mt-3 text-[11px] text-[var(--text-secondary)]">
                 현재 표시: 전체 요청, RAG 검색, LLM 생성(추정). 네트워크/DB 세부 시간은 백엔드 계측 추가 시 제공 가능합니다.
               </div>
             </div>
@@ -725,22 +725,22 @@ export function WorkspaceLogDetailPage() {
 
           <div className="space-y-6">
             {/* Request Payload */}
-            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
-              <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                <div className="flex items-center gap-2 text-blue-300">
+            <div className="glass-card overflow-hidden rounded-2xl border border-[var(--border)]">
+              <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-subtle)] px-6 py-4">
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                   <MessageSquare size={16} />
                   <h3 className="text-sm font-bold">User Input</h3>
                 </div>
-                <span className="text-xs text-gray-500 font-mono">
+                <span className="font-mono text-xs text-[var(--text-secondary)]">
                   {formatFullDateTime(log.createdAt)}
                 </span>
               </div>
               {extractedUserQuestions.length > 0 && (
-                <div className="px-6 py-4 border-b border-white/5 bg-blue-500/5">
-                  <div className="text-xs text-gray-400 mb-2">사용자 질문</div>
+                <div className="border-b border-blue-500/20 bg-blue-500/5 px-6 py-4">
+                  <div className="mb-2 text-xs text-[var(--text-secondary)]">사용자 질문</div>
                   <div className="space-y-2">
                     {extractedUserQuestions.map((question, idx) => (
-                      <p key={`${idx}-${question}`} className="text-sm text-white leading-relaxed">
+                      <p key={`${idx}-${question}`} className="text-sm leading-relaxed text-[var(--foreground)]">
                         {extractedUserQuestions.length > 1 ? `${idx + 1}. ${question}` : question}
                       </p>
                     ))}
@@ -748,26 +748,26 @@ export function WorkspaceLogDetailPage() {
                 </div>
               )}
               {extractedUserQuestions.length === 0 && (
-                <div className="px-6 py-6 text-sm text-gray-500">
+                <div className="px-6 py-6 text-sm text-[var(--text-secondary)]">
                   표시할 사용자 질문이 없습니다. 필요하면 Raw JSON 탭에서 원본 payload를 확인하세요.
                 </div>
               )}
             </div>
 
             {/* Response Payload */}
-            <div className="glass-card rounded-2xl border border-white/10 overflow-hidden">
-              <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                <div className="flex items-center gap-2 text-emerald-300">
+            <div className="glass-card overflow-hidden rounded-2xl border border-[var(--border)]">
+              <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface-subtle)] px-6 py-4">
+                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
                   <MessageSquare size={16} />
                   <h3 className="text-sm font-bold">Response Payload</h3>
                 </div>
-                <span className="text-xs text-gray-500 font-mono">
+                <span className="font-mono text-xs text-[var(--text-secondary)]">
                   {responsePayloadTimestamp ? formatFullDateTime(responsePayloadTimestamp) : '-'}
                 </span>
               </div>
               <div className="p-0">
-                <pre className="p-6 bg-[#0d0d0d] font-mono text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap max-h-[300px] overflow-y-auto custom-scrollbar leading-relaxed">
-                  {log.responsePayload || <span className="text-gray-600 italic">No response payload available</span>}
+                <pre className="max-h-[300px] overflow-x-auto overflow-y-auto whitespace-pre-wrap bg-[color:rgba(15,23,42,0.04)] p-6 font-mono text-xs leading-relaxed text-[var(--foreground)] custom-scrollbar dark:bg-[#0d0d0d] dark:text-gray-300">
+                  {log.responsePayload || <span className="italic text-[var(--text-secondary)]">No response payload available</span>}
                 </pre>
               </div>
             </div>
