@@ -124,7 +124,7 @@ class RequestLogQueryServiceTest {
         void 상태_필터로_SUCCESS만_조회한다() {
             // given
             RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                    null, null, RequestLogStatus.SUCCESS, null, null, null, null, null, null);
+                    null, null, RequestLogStatus.SUCCESS, null, null, null, null, null, null, null, null);
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when
@@ -156,7 +156,7 @@ class RequestLogQueryServiceTest {
         void 복합_필터로_검색한다() {
             // given: SUCCESS + openai 조합 검색
             RequestLogSearchCondition condition = new RequestLogSearchCondition(
-                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null);
+                    null, null, RequestLogStatus.SUCCESS, null, "openai", null, null, null, null, null, null);
             PageRequest pageable = PageRequest.of(0, 20);
 
             // when
@@ -166,6 +166,80 @@ class RequestLogQueryServiceTest {
             assertThat(response.totalElements()).isEqualTo(3);
             assertThat(response.content())
                     .allMatch(log -> log.status() == RequestLogStatus.SUCCESS && "openai".equals(log.provider()));
+        }
+
+        @Test
+        @DisplayName("errorCode_필터로_FAIL_로그를_검색한다")
+        void errorCode_필터로_FAIL_로그를_검색한다() {
+            // given
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, null, null, null, null, null, null, null, "ERROR", null);
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(2);
+            assertThat(response.content()).allMatch(log -> "ERROR".equals(log.errorCode()));
+        }
+
+        @Test
+        @DisplayName("requestSource_필터로_조회한다")
+        void requestSource_필터로_조회한다() {
+            // given
+            RequestLog playgroundFailLog = createFailLog(
+                    "trace-playground-only",
+                    WORKSPACE_ID,
+                    "PLAYGROUND_ERROR",
+                    "PLAYGROUND");
+            requestLogRepository.save(playgroundFailLog);
+
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, null, null, null, null, null, null, null, null, "PLAYGROUND");
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.content()).allMatch(log -> "PLAYGROUND".equals(log.requestSource()));
+            assertThat(response.content().get(0).traceId()).isEqualTo("trace-playground-only");
+        }
+
+        @Test
+        @DisplayName("errorCode와_requestSource_복합_필터로_정확히_조회한다")
+        void errorCode와_requestSource_복합_필터로_정확히_조회한다() {
+            // given
+            requestLogRepository.save(createFailLog(
+                    "trace-combined-match",
+                    WORKSPACE_ID,
+                    "FILTER_MATCH",
+                    "PLAYGROUND"));
+            requestLogRepository.save(createFailLog(
+                    "trace-combined-error-only",
+                    WORKSPACE_ID,
+                    "FILTER_MATCH",
+                    "GATEWAY"));
+            requestLogRepository.save(createFailLog(
+                    "trace-combined-source-only",
+                    WORKSPACE_ID,
+                    "OTHER_ERROR",
+                    "PLAYGROUND"));
+
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, null, null, null, null, null, null, null, "FILTER_MATCH", "PLAYGROUND");
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.content().get(0).traceId()).isEqualTo("trace-combined-match");
+            assertThat(response.content().get(0).errorCode()).isEqualTo("FILTER_MATCH");
+            assertThat(response.content().get(0).requestSource()).isEqualTo("PLAYGROUND");
         }
 
         @Test
@@ -179,6 +253,42 @@ class RequestLogQueryServiceTest {
 
             // then
             assertThat(response.totalElements()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("목록_조회_응답에서는_payload를_노출하지_않는다")
+        void 목록_조회_응답에서는_payload를_노출하지_않는다() {
+            // given
+            String traceId = "trace-payload-hidden";
+            RequestLog log = RequestLog.loggingStart(
+                    UUID.randomUUID(),
+                    traceId,
+                    1L,
+                    WORKSPACE_ID,
+                    1L,
+                    "prefix",
+                    "/v1/chat",
+                    "POST",
+                    "test-prompt",
+                    false,
+                    "{\"question\":\"secret\"}",
+                    "GATEWAY");
+            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, "{\"answer\":\"ok\"}");
+            requestLogRepository.save(log);
+
+            RequestLogSearchCondition condition = RequestLogSearchCondition.empty();
+            PageRequest pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            RequestLogResponse summary = response.content().stream()
+                    .filter(item -> traceId.equals(item.traceId()))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(summary.requestPayload()).isNull();
+            assertThat(summary.responsePayload()).isNull();
         }
     }
 
@@ -206,6 +316,31 @@ class RequestLogQueryServiceTest {
         } else if (status == RequestLogStatus.FAIL) {
             log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR", null);
         }
+        return log;
+    }
+
+    private RequestLog createFailLog(String traceId, Long workspaceId, String errorCode, String requestSource) {
+        RequestLog log = RequestLog.loggingStart(
+                UUID.randomUUID(),
+                traceId,
+                1L,
+                workspaceId,
+                1L,
+                "prefix",
+                "/v1/chat",
+                "POST",
+                "test-prompt",
+                false,
+                null,
+                requestSource);
+        log.markFail(
+                java.time.LocalDateTime.now(),
+                500,
+                100,
+                errorCode,
+                "error message",
+                "INTERNAL_ERROR",
+                null);
         return log;
     }
 }

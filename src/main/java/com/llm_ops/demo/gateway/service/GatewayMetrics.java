@@ -5,8 +5,10 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -14,14 +16,19 @@ import java.util.concurrent.TimeUnit;
 public class GatewayMetrics {
 
     private final MeterRegistry registry;
+    private final ExecutorService providerCallExecutor;
 
-    public GatewayMetrics(MeterRegistry registry) {
+    public GatewayMetrics(
+            MeterRegistry registry,
+            @Qualifier("providerCallExecutor") ExecutorService providerCallExecutor
+    ) {
         this.registry = registry;
+        this.providerCallExecutor = providerCallExecutor;
     }
 
     @PostConstruct
     void registerThreadPoolGauges() {
-        if (GatewayChatService.PROVIDER_CALL_EXECUTOR instanceof ThreadPoolExecutor tpe) {
+        if (providerCallExecutor instanceof ThreadPoolExecutor tpe) {
             registry.gauge("gateway_provider_call_threads_active", tpe, ThreadPoolExecutor::getActiveCount);
             registry.gauge("gateway_provider_call_queue_size", tpe, e -> e.getQueue().size());
         }

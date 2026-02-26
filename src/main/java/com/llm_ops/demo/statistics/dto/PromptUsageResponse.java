@@ -7,9 +7,9 @@ public record PromptUsageResponse(
         List<PromptUsageItem> prompts
 ) {
     public record PromptUsageItem(
-            Long id,
-            String name,
-            String key,
+            Long promptId,
+            String promptName,
+            String promptKey,
             Long requests,
             Long tokens,
             BigDecimal cost

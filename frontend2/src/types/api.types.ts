@@ -10,7 +10,17 @@ export interface ApiResponse<T> {
 // ========================================
 // Logs
 // ========================================
-export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED';
+export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED' | 'TIMEOUT';
+
+export interface RetrievedDocument {
+  id: number;
+  content: string;
+  score: number | null;
+  documentId?: number | null;
+  documentName?: string | null;
+  durationMs?: number | null;
+  ranking?: number | null;
+}
 
 export interface RequestLogResponse {
   requestId: string;
@@ -29,11 +39,19 @@ export interface RequestLogResponse {
   ragEnabled: boolean;
   ragLatencyMs: number | null;
   ragChunksCount: number | null;
+  ragTopK?: number;
+  ragSimilarityThreshold?: number;
+  requestPath?: string;
   errorCode: string | null;
   errorMessage: string | null;
   failReason: string | null;
   createdAt: string;
   finishedAt: string | null;
+  requestPayload: string | null;
+  responsePayload: string | null;
+  requestSource: string;
+  retrievedDocuments?: RetrievedDocument[];
+  cost?: number;
 }
 
 export interface RequestLogListResponse {
@@ -395,6 +413,7 @@ export interface PromptDetailResponse {
 }
 
 export interface PromptUpdateRequest {
+  promptKey?: string;
   description?: string;
   status?: PromptStatus;
 }
@@ -429,7 +448,7 @@ export interface PromptReleaseHistoryResponse {
 }
 
 export interface PromptRollbackRequest {
-  targetVersionId: number;
+  versionId: number;
   reason?: string;
 }
 // ========================================

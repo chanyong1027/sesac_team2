@@ -7,8 +7,14 @@ import java.math.BigDecimal;
  */
 public interface ModelUsageProjection {
     String getProvider();
+
     String getModelName();
+
     Long getRequests();
+
     Long getTokens();
+
     BigDecimal getCost();
+
+    Integer getAvgLatencyMs();
 }

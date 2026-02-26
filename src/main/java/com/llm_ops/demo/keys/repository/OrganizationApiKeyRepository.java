@@ -34,4 +34,12 @@ public interface OrganizationApiKeyRepository extends JpaRepository<Organization
      * @return 해당 조직의 API 키 엔티티 리스트
      */
     List<OrganizationApiKey> findAllByOrganizationId(Long organizationId);
+
+    /**
+     * 지정된 조직에 API 키가 하나라도 존재하는지 확인합니다.
+     *
+     * @param organizationId 확인할 조직의 ID
+     * @return 존재하면 true, 그렇지 않으면 false
+     */
+    boolean existsByOrganizationId(Long organizationId);
 }

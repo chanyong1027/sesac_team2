@@ -314,7 +314,7 @@ export function DocumentListPage() {
   const presetButtonClass = (preset: RagPreset) =>
     `px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
       selectedPreset === preset
-        ? 'border-[var(--primary)] text-purple-200 bg-[var(--primary)]/10'
+        ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary)]/10'
         : 'border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]'
     }`;
 
@@ -424,7 +424,7 @@ export function DocumentListPage() {
             >
               {showAdvancedSettings ? '고급 설정 숨기기' : '고급 설정 보기'}
             </button>
-            <div className="text-xs text-gray-500">전문가용: 하이브리드/리랭크/청킹</div>
+            <div className="text-xs text-[var(--text-secondary)]">전문가용: 하이브리드/리랭크/청킹</div>
           </div>
 
           {showAdvancedSettings && (
@@ -463,7 +463,7 @@ export function DocumentListPage() {
                     className="w-full bg-[var(--card)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition-all disabled:opacity-40"
                   />
                 </label>
-                <div className="text-xs text-gray-500 flex items-center">
+                <div className="text-xs text-[var(--text-secondary)] flex items-center">
                   리랭크는 정확도를 높이지만 비용/지연이 늘 수 있습니다.
                 </div>
               </div>
@@ -495,7 +495,7 @@ export function DocumentListPage() {
                 </label>
               </div>
 
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-[var(--text-secondary)]">
                 청킹 설정(청크 크기/오버랩)은 <span className="font-medium text-[var(--foreground)]">새로 업로드/재인게스트</span>되는 문서부터 적용됩니다.
                 이미 업로드된 문서에는 적용되지 않으니 변경 후 문서를 재업로드하세요.
               </div>
@@ -538,7 +538,7 @@ export function DocumentListPage() {
           </div>
 
           {settingsMessage && (
-            <div className="text-xs text-purple-200 bg-[var(--primary)]/10 border border-[var(--primary)]/20 rounded-lg px-3 py-2">
+            <div className="text-xs text-[var(--primary)] bg-[var(--primary)]/10 border border-[var(--primary)]/20 rounded-lg px-3 py-2">
               {settingsMessage}
             </div>
           )}
@@ -565,7 +565,7 @@ export function DocumentListPage() {
               type="button"
               onClick={() => searchMutation.mutate()}
               disabled={searchMutation.isPending || !previewQuery.trim()}
-              className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-[var(--foreground)] hover:opacity-90 text-[var(--background)] px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {searchMutation.isPending ? '검색 중...' : '검색'}
             </button>
@@ -576,7 +576,7 @@ export function DocumentListPage() {
           <div className="flex-1 min-h-[320px]">
             {searchMutation.isPending ? (
               <div className="h-full border-2 border-dashed border-[var(--border)] rounded-xl flex flex-col items-center justify-center p-8 text-center bg-[var(--muted)]">
-                <Loader2 className="animate-spin text-gray-400 mb-3" />
+                <Loader2 className="animate-spin text-[var(--text-secondary)] mb-3" />
                 <p className="text-sm text-[var(--text-secondary)]">검색 중...</p>
               </div>
             ) : previewResults.length > 0 ? (
@@ -586,7 +586,7 @@ export function DocumentListPage() {
                     key={`${chunk.documentId ?? 'doc'}-${index}`}
                     className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]"
                   >
-                    <div className="text-xs text-gray-400 mb-2">
+                    <div className="text-xs text-[var(--text-secondary)] mb-2">
                       {chunk.documentName || `문서 ${chunk.documentId ?? '-'}`} · score {chunk.score?.toFixed(3) ?? '-'}
                     </div>
                     <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{chunk.content}</p>
@@ -595,9 +595,9 @@ export function DocumentListPage() {
               </div>
             ) : (
               <div className="h-full border-2 border-dashed border-[var(--border)] rounded-xl flex flex-col items-center justify-center p-8 text-center bg-[var(--muted)]">
-                <Search className="text-gray-600 mb-3" size={44} />
-                <p className="text-sm text-gray-400">검색 결과가 아직 없습니다.</p>
-                <p className="text-xs text-gray-600 mt-1">좌측 설정을 조정하거나 문서를 추가하세요.</p>
+                <Search className="text-[var(--text-tertiary)] mb-3" size={44} />
+                <p className="text-sm text-[var(--text-secondary)]">검색 결과가 아직 없습니다.</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">좌측 설정을 조정하거나 문서를 추가하세요.</p>
               </div>
             )}
           </div>
@@ -605,7 +605,7 @@ export function DocumentListPage() {
       </div>
 
       <div className="relative w-full glass-card rounded-xl border border-[var(--border)]">
-        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--text-secondary)]">
           <Search size={18} />
         </span>
         <input
@@ -621,10 +621,10 @@ export function DocumentListPage() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider w-1/2">파일명</th>
-              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">상태</th>
-              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">업로드 일시</th>
-              <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider text-right">관리</th>
+              <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider w-1/2">파일명</th>
+              <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">상태</th>
+              <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">업로드 일시</th>
+              <th className="px-6 py-4 text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider text-right">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]">
@@ -633,7 +633,7 @@ export function DocumentListPage() {
                 <tr key={doc.id} className="group hover:bg-[var(--muted)] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-9 w-9 bg-blue-900/30 rounded-lg flex items-center justify-center text-blue-300 border border-blue-500/20">
+                      <div className="flex-shrink-0 h-9 w-9 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-700 dark:text-blue-300 border border-blue-500/20">
                         <FileText size={18} className="opacity-90" />
                       </div>
                       <button
@@ -651,9 +651,9 @@ export function DocumentListPage() {
                   <td className="px-6 py-4">
                     <StatusBadge status={doc.status} />
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-400 font-light">{new Date(doc.createdAt).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-sm text-[var(--text-secondary)] font-light">{new Date(doc.createdAt).toLocaleString()}</td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 text-gray-400">
+                    <div className="flex justify-end gap-2 text-[var(--text-secondary)]">
                       <button
                         type="button"
                         onClick={() => {
@@ -679,13 +679,13 @@ export function DocumentListPage() {
               ))
             ) : (
               <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={4} className="px-6 py-12 text-center text-[var(--text-secondary)]">
                   <div className="flex flex-col items-center justify-center">
                     <div className="w-12 h-12 bg-[var(--muted)] rounded-full flex items-center justify-center mb-3 border border-[var(--border)]">
-                      <File size={24} className="text-gray-500" />
+                      <File size={24} className="text-[var(--text-secondary)]" />
                     </div>
                     <p className="text-sm font-medium text-[var(--foreground)]">등록된 문서가 없습니다.</p>
-                    <p className="text-xs text-gray-500 mt-1">새 문서를 업로드하여 지식 베이스를 구축하세요.</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-1">새 문서를 업로드하여 지식 베이스를 구축하세요.</p>
                   </div>
                 </td>
               </tr>
@@ -701,7 +701,7 @@ export function DocumentListPage() {
             <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-[var(--foreground)]">문서 상세 보기</h3>
-                <p className="text-xs text-gray-400 mt-1">추출된 내용과 청크 예시를 확인합니다.</p>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">추출된 내용과 청크 예시를 확인합니다.</p>
               </div>
               <button
                 type="button"
@@ -712,17 +712,17 @@ export function DocumentListPage() {
               </button>
             </div>
             <div className="p-6 space-y-6">
-              {isPreviewLoading && <p className="text-sm text-gray-400">미리보기를 불러오는 중...</p>}
+              {isPreviewLoading && <p className="text-sm text-[var(--text-secondary)]">미리보기를 불러오는 중...</p>}
               {isPreviewError && <p className="text-sm text-red-400">{resolvePreviewError(previewLoadError)}</p>}
               {!isPreviewLoading && !isPreviewError && documentPreview && (
                 <>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
-                      <p className="text-xs text-gray-500">파일명</p>
+                      <p className="text-xs text-[var(--text-secondary)]">파일명</p>
                       <p className="text-[var(--foreground)] font-medium mt-1">{documentPreview.document.fileName}</p>
                     </div>
                     <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
-                      <p className="text-xs text-gray-500">상태</p>
+                      <p className="text-xs text-[var(--text-secondary)]">상태</p>
                       <p className="text-[var(--foreground)] mt-1">{documentPreview.document.status}</p>
                     </div>
                   </div>
@@ -737,20 +737,20 @@ export function DocumentListPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="text-sm font-semibold text-[var(--foreground)]">청크 예시</h4>
-                      <span className="text-xs text-gray-400">총 {documentPreview.totalChunks}개</span>
+                      <span className="text-xs text-[var(--text-secondary)]">총 {documentPreview.totalChunks}개</span>
                     </div>
                     <div className="space-y-3">
                       {documentPreview.chunkSamples.length ? (
                         documentPreview.chunkSamples.map((chunk, index) => (
                           <div key={`${chunk.chunkIndex ?? index}`} className="p-4 rounded-xl border border-[var(--border)] bg-[var(--muted)]">
-                            <div className="text-xs text-gray-400 mb-2">
+                            <div className="text-xs text-[var(--text-secondary)] mb-2">
                               청크 {chunk.chunkIndex ?? index + 1}/{chunk.chunkTotal ?? documentPreview.totalChunks}
                             </div>
                             <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{chunk.content}</p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-xs text-gray-400">청크 예시가 없습니다.</p>
+                        <p className="text-xs text-[var(--text-secondary)]">청크 예시가 없습니다.</p>
                       )}
                     </div>
                   </div>
@@ -844,7 +844,7 @@ export function DocumentListPage() {
                       </div>
                       <div className="text-left min-w-0">
                         <div className="text-sm font-medium text-[var(--foreground)] truncate">{uploadFile.name}</div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-[var(--text-secondary)]">
                           {(uploadFile.size / (1024 * 1024)).toFixed(1)} MB
                         </div>
                       </div>
@@ -865,13 +865,13 @@ export function DocumentListPage() {
               </div>
 
               {uploadError && (
-                <div className="mt-4 text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                <div className="mt-4 text-sm text-red-700 dark:text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
                   {uploadError}
                 </div>
               )}
 
               <div className="mt-10">
-                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4 px-2">
+                <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] mb-4 px-2">
                   <span>Pipeline Stages</span>
                   <span className="text-[var(--primary)]">{uploadMutation.isPending ? 'UPLOADING...' : 'READY TO START'}</span>
                 </div>
@@ -951,7 +951,7 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
 
   if (status === 'UPLOADED') {
     return (
-      <span className={`${base} bg-blue-500/10 text-blue-300 border-blue-500/20`}>
+      <span className={`${base} bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25`}>
         <CheckCircle2 size={12} />
         업로드 완료
       </span>
@@ -959,7 +959,7 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
   }
   if (status === 'PARSING' || status === 'CHUNKING' || status === 'EMBEDDING' || status === 'INDEXING') {
     return (
-      <span className={`${base} bg-amber-500/10 text-amber-300 border-amber-500/20`}>
+      <span className={`${base} bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/25`}>
         <Loader2 size={12} className="animate-spin" />
         처리 중
       </span>
@@ -967,7 +967,7 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
   }
   if (status === 'DONE' || status === 'ACTIVE') {
     return (
-      <span className={`${base} bg-green-500/10 text-green-300 border-green-500/20`}>
+      <span className={`${base} bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/25`}>
         <CheckCircle2 size={12} />
         완료
       </span>
@@ -975,7 +975,7 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
   }
   if (status === 'FAILED') {
     return (
-      <span className={`${base} bg-red-500/10 text-red-300 border-red-500/20`}>
+      <span className={`${base} bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/25`}>
         <AlertCircle size={12} />
         실패
       </span>
@@ -983,16 +983,16 @@ function StatusBadge({ status }: { status: RagDocumentStatus }) {
   }
   if (status === 'DELETING') {
     return (
-      <span className={`${base} bg-gray-500/10 text-gray-200 border-gray-500/20`}>
+      <span className={`${base} bg-gray-500/10 text-[var(--text-secondary)] border-gray-500/25`}>
         <Loader2 size={12} className="animate-spin" />
         삭제 중
       </span>
     );
   }
   if (status === 'DELETED') {
-    return <span className={`${base} bg-gray-500/10 text-gray-300 border-gray-500/20`}>삭제됨</span>;
+    return <span className={`${base} bg-gray-500/10 text-[var(--text-secondary)] border-gray-500/25`}>삭제됨</span>;
   }
-  return <span className={`${base} bg-gray-500/10 text-gray-200 border-gray-500/20`}>{status}</span>;
+  return <span className={`${base} bg-gray-500/10 text-[var(--text-secondary)] border-gray-500/25`}>{status}</span>;
 }
 
 function PipelineConnector({ active }: { active: boolean }) {

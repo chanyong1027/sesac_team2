@@ -114,22 +114,20 @@ function Sidebar({
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
-  const settingsItems = useMemo(() => {
-    return [
-      {
-        to: `${basePath}/settings/security`,
-        label: '조직 및 보안',
-        icon: <User size={20} />,
-        active: isActive(`${basePath}/settings/security`) || isActive(`${basePath}/settings/members`) || isActive(`${basePath}/settings/api-keys`),
-      },
-      {
-        to: `${basePath}/settings/provider-keys`,
-        label: 'Provider 키',
-        icon: <Shield size={20} />,
-        active: isActive(`${basePath}/settings/provider-keys`),
-      },
-    ];
-  }, [basePath, location.pathname]);
+  const settingsItems = [
+    {
+      to: `${basePath}/settings/security`,
+      label: '조직 및 보안',
+      icon: <User size={20} />,
+      active: isActive(`${basePath}/settings/security`) || isActive(`${basePath}/settings/members`) || isActive(`${basePath}/settings/api-keys`),
+    },
+    {
+      to: `${basePath}/settings/provider-keys`,
+      label: 'Provider 키',
+      icon: <Shield size={20} />,
+      active: isActive(`${basePath}/settings/provider-keys`),
+    },
+  ];
 
   return (
     <aside
@@ -143,21 +141,10 @@ function Sidebar({
       {/* Logo */}
       <div className={`h-16 flex items-center px-6 border-b ${variant === 'workspace' ? 'border-[var(--sidebar-border)]' : 'border-[var(--sidebar-border)]'} gap-3`}>
         <Link to={dashboardPath} className="flex items-center gap-3 overflow-hidden">
-          {variant === 'workspace' ? (
-            <>
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[var(--primary)] to-fuchsia-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]" />
-              <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] to-[var(--text-secondary)]">
-                LuminaOps
-              </span>
-            </>
-          ) : (
-            <>
-              <div className="size-9 bg-[color:rgba(168,85,247,0.20)] border border-[color:rgba(168,85,247,0.50)] rounded-xl flex items-center justify-center text-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.25)]">
-                <span className="text-sm font-extrabold tracking-tight">✦</span>
-              </div>
-              <span className="text-lg font-bold tracking-tight text-[var(--foreground)]">LuminaOps</span>
-            </>
-          )}
+          <div className="size-9 bg-[color:rgba(168,85,247,0.20)] border border-[color:rgba(168,85,247,0.50)] rounded-xl flex items-center justify-center text-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.25)]">
+            <span className="text-sm font-extrabold tracking-tight">✦</span>
+          </div>
+          <span className="text-lg font-bold tracking-tight text-[var(--foreground)]">LuminaOps</span>
         </Link>
 
         {mode === 'mobile' ? (
@@ -173,7 +160,7 @@ function Sidebar({
       </div>
 
       <div className={`px-6 py-4 border-b ${variant === 'workspace' ? 'border-[var(--sidebar-border)]' : 'border-[var(--sidebar-border)]'}`}>
-        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">
+        <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-3">
           Organization
         </p>
         <button
@@ -189,7 +176,7 @@ function Sidebar({
 
       {/* Navigation */}
       <nav className="flex-1 p-4 flex flex-col gap-2 overflow-y-auto">
-        <p className="px-2 mt-2 mb-1 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Menu</p>
+        <p className="px-2 mt-2 mb-1 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">Menu</p>
         <SidebarItem
           icon={<LayoutDashboard size={20} />}
           label="대시보드"
@@ -205,13 +192,13 @@ function Sidebar({
 
         {/* Workspace Section */}
         <div className="mt-8 mb-2 px-3 flex items-center justify-between">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">
             Workspaces
           </span>
           <button
             type="button"
             onClick={onCreateOrg}
-            className="text-gray-500 hover:text-[var(--primary)] transition-colors"
+            className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition-colors"
             title="새 워크스페이스 만들기"
           >
             <Plus size={16} />
@@ -239,14 +226,14 @@ function Sidebar({
           ))}
 
           {workspaces && workspaces.length > 5 && (
-            <div className="px-3 py-1 text-xs text-gray-400">
+            <div className="px-3 py-1 text-xs text-[var(--text-secondary)]">
               + {workspaces.length - 5} more
             </div>
           )}
         </div>
 
         <div className="mt-8 mb-2 px-3">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+          <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">
             Settings
           </span>
         </div>
@@ -281,7 +268,7 @@ function SidebarItem({ icon, label, to, active }: { icon: ReactNode, label: stri
       `}
       title={label}
     >
-      <span className={active ? 'text-[var(--primary)]' : 'text-gray-500 group-hover:text-[var(--primary)]'}>
+      <span className={active ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--primary)]'}>
         {icon}
       </span>
       <span className="text-sm font-medium">{label}</span>
@@ -303,13 +290,13 @@ function UserProfile() {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-semibold text-[var(--foreground)] truncate">{user?.name ?? 'User'}</p>
-          <p className="text-xs text-gray-400 truncate">{user?.email ?? ''}</p>
+          <p className="text-xs text-[var(--text-secondary)] truncate">{user?.email ?? ''}</p>
         </div>
       </div>
       <button
         type="button"
         onClick={logout}
-        className="text-gray-400 hover:text-rose-300 transition-colors p-2 rounded-lg hover:bg-[var(--sidebar-accent)]"
+        className="text-[var(--text-secondary)] hover:text-rose-400 dark:hover:text-rose-300 transition-colors p-2 rounded-lg hover:bg-[var(--sidebar-accent)]"
         title="로그아웃"
       >
         <LogOut size={18} />
@@ -320,7 +307,6 @@ function UserProfile() {
 
 function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
   const location = useLocation();
-  const isWorkspaceRoute = location.pathname.includes('/workspaces/');
 
   const breadcrumb = useMemo(() => {
     const path = location.pathname;
@@ -350,16 +336,6 @@ function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
       </div>
 
       <div className="flex items-center gap-3">
-        {isWorkspaceRoute ? (
-          <div className="relative hidden md:block">
-            <input
-              type="text"
-              placeholder="검색 (Cmd+K)"
-              className="bg-[var(--card)] border border-[var(--border)] rounded-full py-1.5 pl-4 pr-10 text-sm text-[var(--foreground)] focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] placeholder-[var(--text-secondary)] w-64 transition-all"
-            />
-            <span className="material-symbols-outlined absolute right-3 top-1.5 text-gray-600 text-lg">search</span>
-          </div>
-        ) : null}
         <button
           type="button"
           className="relative p-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors rounded-lg"
@@ -369,7 +345,7 @@ function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
           <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-[var(--background)] shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
         </button>
         <ThemeToggle />
-        <div className="h-6 w-px bg-white/10 hidden sm:block" />
+        <div className="h-6 w-px bg-[var(--border)] hidden sm:block" />
         <Link
           to="/guide"
           className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--muted)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors text-xs font-medium backdrop-blur-md"

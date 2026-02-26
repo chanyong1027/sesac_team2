@@ -32,6 +32,7 @@ public class OrganizationApiKeyCreateService {
      */
     @Transactional
     public OrganizationApiKeyCreateResponse create(Long organizationId, OrganizationApiKeyCreateRequest request) {
+        validateSingleKeyPolicy(organizationId);
         validateNameUnique(organizationId, request.name());
 
         ApiKeyGenerator.GeneratedKey generatedKey = apiKeyGenerator.generateWithHash();
@@ -46,6 +47,15 @@ public class OrganizationApiKeyCreateService {
         );
 
         return new OrganizationApiKeyCreateResponse(generatedKey.plaintext());
+    }
+
+    /**
+     * 조직당 API 키는 하나만 허용하는 정책을 검증합니다.
+     */
+    private void validateSingleKeyPolicy(Long organizationId) {
+        if (organizationApiKeyRepository.existsByOrganizationId(organizationId)) {
+            throw new BusinessException(ErrorCode.CONFLICT, "API 키는 조직당 하나만 생성할 수 있습니다.");
+        }
     }
 
     /**

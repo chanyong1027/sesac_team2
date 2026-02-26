@@ -66,6 +66,16 @@ public class RequestLogSpecification {
                 predicates.add(cb.equal(root.get("traceId"), condition.traceId()));
             }
 
+            // errorCode 필터
+            if (condition.errorCode() != null && !condition.errorCode().isBlank()) {
+                predicates.add(cb.equal(root.get("errorCode"), condition.errorCode()));
+            }
+
+            // requestSource 필터
+            if (condition.requestSource() != null && !condition.requestSource().isBlank()) {
+                predicates.add(cb.equal(root.get("requestSource"), condition.requestSource()));
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
     }

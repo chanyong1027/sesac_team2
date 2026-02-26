@@ -216,7 +216,7 @@ function WorkspaceCard({
     const usageBarClass = usagePercentRounded != null && usagePercentRounded >= 90
         ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'
         : 'bg-gradient-to-r from-[var(--primary)] to-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]';
-    const usageTextClass = usagePercentRounded != null && usagePercentRounded >= 90 ? 'text-red-400' : 'text-[var(--foreground)]';
+    const usageTextClass = usagePercentRounded != null && usagePercentRounded >= 90 ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]';
 
     return (
         <div className="glass-card glass-card-hover rounded-2xl p-0 flex flex-col group h-full">
@@ -288,7 +288,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
     return (
         <div className="text-center py-20 glass-card rounded-2xl border border-dashed border-[var(--border)]">
             <div className="w-16 h-16 bg-[var(--muted)] rounded-full flex items-center justify-center mx-auto mb-4 border border-[var(--border)]">
-                <LayoutGrid className="text-gray-400" size={32} />
+                <LayoutGrid className="text-[var(--text-secondary)]" size={32} />
             </div>
             <h3 className="text-lg font-semibold text-[var(--foreground)]">아직 워크스페이스가 없습니다</h3>
             <p className="text-sm text-[var(--text-secondary)] mt-1 mb-6 max-w-sm mx-auto">
@@ -326,17 +326,17 @@ function DashboardSkeleton() {
 function badgeClass(status: string) {
     // Visually align with ACTIVE / INDEXING / WARNING styles in the mock.
     const base = 'inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold border tracking-wider';
-    if (status === 'ACTIVE') return `${base} bg-green-500/10 text-green-400 border-green-500/20`;
-    if (status === 'INDEXING') return `${base} bg-yellow-500/10 text-yellow-400 border-yellow-500/20`;
-    if (status === 'FAILED') return `${base} bg-red-500/10 text-red-400 border-red-500/20`;
-    return `${base} bg-gray-500/10 text-gray-400 border-gray-500/20`;
+    if (status === 'ACTIVE') return `${base} bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/25`;
+    if (status === 'INDEXING') return `${base} bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border-yellow-500/25`;
+    if (status === 'FAILED') return `${base} bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/25`;
+    return `${base} bg-gray-500/10 text-[var(--text-secondary)] border-gray-500/20`;
 }
 
 function getRagStatus(documents: Array<{ status: string }> | null, isLoading: boolean) {
     if (isLoading) {
         return {
             label: 'Processing',
-            pillClass: 'text-amber-400 bg-amber-500/5 border-amber-500/10',
+            pillClass: 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/25',
             icon: <Loader2 size={14} className="animate-spin" />,
         };
     }
@@ -353,7 +353,7 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
     if (statuses.has('FAILED')) {
         return {
             label: 'Warning',
-            pillClass: 'text-red-400 bg-red-500/5 border-red-500/10',
+            pillClass: 'text-red-700 dark:text-red-300 bg-red-500/10 border-red-500/25',
             icon: <AlertTriangle size={14} />,
         };
     }
@@ -364,14 +364,14 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
     if (inFlight) {
         return {
             label: 'Processing',
-            pillClass: 'text-amber-400 bg-amber-500/5 border-amber-500/10',
+            pillClass: 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/25',
             icon: <Loader2 size={14} className="animate-spin" />,
         };
     }
 
     return {
         label: 'Ready',
-        pillClass: 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10 shadow-[0_0_10px_rgba(16,185,129,0.15)]',
+        pillClass: 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.15)]',
         icon: <CheckCircle2 size={14} />,
     };
 }
