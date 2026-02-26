@@ -6,7 +6,6 @@ import {
   Copy,
   RefreshCw,
   ArrowLeft,
-  Activity,
   Hash,
   MessageSquare,
   Zap,
@@ -563,17 +562,6 @@ export function WorkspaceLogDetailPage() {
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-gray-500">검색 청크 수</span>
                   <span className="text-white font-mono">{log.ragChunksCount || 0}</span>
-                </div>
-                {/* Mocked fields for UI completeness based on design */}
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">컨텍스트 글자 수</span>
-                  <span className="text-white font-mono">2450</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-500">컨텍스트 잘림</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1">
-                    <Activity size={10} /> Yes
-                  </span>
                 </div>
               </div>
             </div>
