@@ -55,8 +55,8 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-card rounded-2xl p-8 w-full max-w-md text-white">
-        <h2 className="text-2xl font-bold text-white mb-2">새 워크스페이스 만들기</h2>
+      <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-8 w-full max-w-md">
+        <h2 className="text-2xl font-bold text-[var(--foreground)] mb-2">새 워크스페이스 만들기</h2>
         <p className="text-sm text-[var(--text-secondary)] mb-6">
           새로운 프로젝트를 위한 작업 공간을 생성합니다.
         </p>
@@ -70,13 +70,13 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* 1. Workspace Display Name */}
           <div>
-            <label className="block text-sm font-medium text-white/90 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
               워크스페이스 이름
             </label>
             <input
               {...register('workspaceDisplayName')}
               type="text"
-              className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
+              className="w-full px-4 py-3 bg-[var(--input)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
               placeholder="예: 내 프로젝트"
               autoFocus
             />
@@ -89,14 +89,14 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
 
           {/* 2. Workspace ID (Name) */}
           <div>
-            <label className="block text-sm font-medium text-white/90 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
               URL 식별자 (ID)
             </label>
             <div className="relative">
               <input
                 {...register('workspaceName')}
                 type="text"
-                className="w-full px-4 py-3 bg-white/[0.03] border border-white/10 rounded-xl text-white placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
+                className="w-full px-4 py-3 bg-[var(--input)] border border-[var(--border)] rounded-xl text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-all"
                 placeholder="my-project"
               />
             </div>
@@ -113,14 +113,14 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-white/[0.02] border border-white/10 text-white/90 font-semibold rounded-xl hover:bg-white/[0.06] transition-colors"
+              className="flex-1 py-3 bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-semibold rounded-xl hover:bg-[var(--accent)] transition-colors"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending || !currentOrgId}
-              className="flex-1 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] disabled:opacity-50 transition-colors shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-white/10"
+              className="flex-1 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] disabled:opacity-50 transition-colors shadow-[0_0_15px_rgba(168,85,247,0.25)] border border-[var(--border)]"
             >
               {createMutation.isPending ? '생성 중...' : '워크스페이스 생성'}
             </button>

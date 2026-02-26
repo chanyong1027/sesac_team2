@@ -141,21 +141,10 @@ function Sidebar({
       {/* Logo */}
       <div className={`h-16 flex items-center px-6 border-b ${variant === 'workspace' ? 'border-[var(--sidebar-border)]' : 'border-[var(--sidebar-border)]'} gap-3`}>
         <Link to={dashboardPath} className="flex items-center gap-3 overflow-hidden">
-          {variant === 'workspace' ? (
-            <>
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-[var(--primary)] to-fuchsia-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]" />
-              <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] to-[var(--text-secondary)]">
-                LuminaOps
-              </span>
-            </>
-          ) : (
-            <>
-              <div className="size-9 bg-[color:rgba(168,85,247,0.20)] border border-[color:rgba(168,85,247,0.50)] rounded-xl flex items-center justify-center text-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.25)]">
-                <span className="text-sm font-extrabold tracking-tight">✦</span>
-              </div>
-              <span className="text-lg font-bold tracking-tight text-[var(--foreground)]">LuminaOps</span>
-            </>
-          )}
+          <div className="size-9 bg-[color:rgba(168,85,247,0.20)] border border-[color:rgba(168,85,247,0.50)] rounded-xl flex items-center justify-center text-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.25)]">
+            <span className="text-sm font-extrabold tracking-tight">✦</span>
+          </div>
+          <span className="text-lg font-bold tracking-tight text-[var(--foreground)]">LuminaOps</span>
         </Link>
 
         {mode === 'mobile' ? (
@@ -318,7 +307,6 @@ function UserProfile() {
 
 function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
   const location = useLocation();
-  const isWorkspaceRoute = location.pathname.includes('/workspaces/');
 
   const breadcrumb = useMemo(() => {
     const path = location.pathname;
@@ -348,16 +336,6 @@ function Header({ onOpenMobileSidebar }: { onOpenMobileSidebar: () => void }) {
       </div>
 
       <div className="flex items-center gap-3">
-        {isWorkspaceRoute ? (
-          <div className="relative hidden md:block">
-            <input
-              type="text"
-              placeholder="검색 (Cmd+K)"
-              className="bg-[var(--card)] border border-[var(--border)] rounded-full py-1.5 pl-4 pr-10 text-sm text-[var(--foreground)] focus:ring-1 focus:ring-[var(--primary)] focus:border-[var(--primary)] placeholder-[var(--text-secondary)] w-64 transition-all"
-            />
-            <span className="material-symbols-outlined absolute right-3 top-1.5 text-[var(--text-tertiary)] text-lg">search</span>
-          </div>
-        ) : null}
         <button
           type="button"
           className="relative p-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors rounded-lg"

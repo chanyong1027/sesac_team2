@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -96,7 +96,7 @@ export function PromptDetailPage() {
                                 {prompt.status}
                             </span>
                         </div>
-                        <p className="text-[var(--text-secondary)] text-sm mt-1">Prompt Configuration &amp; Version Control</p>
+                        <p className="text-[var(--text-secondary)] text-sm mt-1">프롬프트 설정 &amp; 버전 관리</p>
                     </div>
                 </div>
             </div>
@@ -108,32 +108,31 @@ export function PromptDetailPage() {
                         active={activeTab === 'overview'}
                         onClick={() => setActiveTab('overview')}
                         iconName="settings"
-                        label="개요 (Overview)"
+                        label="개요"
                     />
                     <TabButton
                         active={activeTab === 'versions'}
                         onClick={() => setActiveTab('versions')}
                         iconName="history"
-                        label="버전 (Versions)"
+                        label="버전"
                     />
                     <TabButton
                         active={activeTab === 'release'}
                         onClick={() => setActiveTab('release')}
                         iconName="rocket_launch"
-                        label="배포 (Release)"
+                        label="배포"
                     />
                     <TabButton
                         active={activeTab === 'playground'}
                         onClick={() => setActiveTab('playground')}
                         iconName="play_circle"
-                        label="Playground"
-                        kind="playground"
+                        label="플레이그라운드"
                     />
                     <TabButton
                         active={activeTab === 'evaluate'}
                         onClick={() => setActiveTab('evaluate')}
                         iconName="analytics"
-                        label="Evaluate"
+                        label="평가"
                     />
                 </nav>
             </div>
@@ -168,21 +167,19 @@ function TabButton({
     onClick,
     iconName,
     label,
-    kind = 'default',
 }: {
     active: boolean;
     onClick: () => void;
     iconName: string;
     label: string;
-    kind?: 'default' | 'playground';
 }) {
     return (
         <button
             onClick={onClick}
-            className={`relative py-3 flex items-center gap-2 transition-colors ${kind === 'playground' ? 'ml-4' : ''} ${active ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'} group`}
+            className={`relative py-3 flex items-center gap-2 transition-colors ${active ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'} group`}
         >
             <span
-                className={`material-symbols-outlined text-lg ${active ? (kind === 'playground' ? 'text-[var(--primary)]' : 'text-[var(--primary)]') : (kind === 'playground' ? 'text-[var(--primary)] group-hover:text-[var(--foreground)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--foreground)]')} transition-colors`}
+                className={`material-symbols-outlined text-lg ${active ? 'text-[var(--primary)]' : 'text-[var(--text-secondary)] group-hover:text-[var(--foreground)]'} transition-colors`}
                 aria-hidden="true"
             >
                 {iconName}
@@ -214,17 +211,26 @@ function OverviewTab({
 }) {
     const queryClient = useQueryClient();
     const [isEditing, setIsEditing] = useState(false);
+    const [draftPromptKey, setDraftPromptKey] = useState(prompt.promptKey);
     const [draftDescription, setDraftDescription] = useState(prompt.description ?? '');
+
+    const promptKeyError = isEditing && draftPromptKey && !/^[a-z0-9_-]+$/.test(draftPromptKey)
+        ? '소문자, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다.'
+        : isEditing && !draftPromptKey.trim()
+            ? 'Prompt Key는 필수입니다.'
+            : null;
 
     useEffect(() => {
         // Keep local draft in sync when navigating between prompts.
+        setDraftPromptKey(prompt.promptKey);
         setDraftDescription(prompt.description ?? '');
         setIsEditing(false);
-    }, [prompt.id, prompt.description]);
+    }, [prompt.id, prompt.promptKey, prompt.description]);
 
     const saveMutation = useMutation({
         mutationFn: async () => {
             return promptApi.updatePrompt(prompt.workspaceId, prompt.id, {
+                promptKey: draftPromptKey,
                 description: draftDescription,
             });
         },
@@ -232,8 +238,9 @@ function OverviewTab({
             await queryClient.invalidateQueries({ queryKey: ['prompt', prompt.workspaceId, prompt.id] });
             setIsEditing(false);
         },
-        onError: () => {
-            alert('설명 저장에 실패했습니다.');
+        onError: (error: unknown) => {
+            const msg = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            alert(msg ?? '저장에 실패했습니다.');
         },
     });
 
@@ -288,6 +295,7 @@ function OverviewTab({
                                 <button
                                     type="button"
                                     onClick={() => {
+                                        setDraftPromptKey(prompt.promptKey);
                                         setDraftDescription(prompt.description ?? '');
                                         setIsEditing(false);
                                     }}
@@ -297,9 +305,9 @@ function OverviewTab({
                                 </button>
                                 <button
                                     type="button"
-                                    disabled={saveMutation.isPending}
+                                    disabled={saveMutation.isPending || !!promptKeyError}
                                     onClick={() => saveMutation.mutate()}
-                                    className="text-xs text-[var(--primary)] hover:text-[var(--foreground)] transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20 disabled:opacity-50 inline-flex items-center gap-1"
+                                    className="text-xs text-[var(--primary)] hover:text-[var(--foreground)] transition-colors border border-[var(--primary)]/30 px-3 py-1.5 rounded-lg hover:bg-[var(--primary)]/20 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1"
                                 >
                                     <Save size={14} />
                                     저장
@@ -322,20 +330,34 @@ function OverviewTab({
                         <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide ml-1">Prompt Key</label>
                         <div className="relative group">
                             <input
-                                className="w-full bg-[var(--input)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)] transition-all font-mono tracking-wide"
-                                readOnly
-                                value={prompt.promptKey}
+                                className={`w-full border rounded-xl px-4 py-3 text-sm font-mono tracking-wide transition-all ${isEditing
+                                    ? 'bg-[var(--input)] border-[var(--border)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary)]/50 focus:border-[var(--primary)]'
+                                    : 'bg-[var(--input)] border-[var(--border)] text-[var(--foreground)]'
+                                }`}
+                                readOnly={!isEditing}
+                                value={isEditing ? draftPromptKey : prompt.promptKey}
+                                onChange={(e) => setDraftPromptKey(e.target.value)}
                             />
-                            <button
-                                type="button"
-                                onClick={async () => { try { await navigator.clipboard.writeText(prompt.promptKey); } catch { /* ignore */ } }}
-                                className="absolute right-3 top-3 text-gray-500 hover:text-[var(--foreground)] transition-colors opacity-0 group-hover:opacity-100"
-                                aria-label="copy prompt key"
-                            >
-                                <Copy size={16} />
-                            </button>
+                            {!isEditing && (
+                                <button
+                                    type="button"
+                                    onClick={async () => { try { await navigator.clipboard.writeText(prompt.promptKey); } catch { /* ignore */ } }}
+                                    className="absolute right-3 top-3 text-gray-500 hover:text-[var(--foreground)] transition-colors opacity-0 group-hover:opacity-100"
+                                    aria-label="copy prompt key"
+                                >
+                                    <Copy size={16} />
+                                </button>
+                            )}
                         </div>
-                        <p className="text-[11px] text-gray-500 pl-1">Use this key in your API calls to reference this prompt.</p>
+                        {promptKeyError ? (
+                            <p className="text-[11px] text-red-500 pl-1">{promptKeyError}</p>
+                        ) : (
+                            <p className="text-[11px] text-gray-500 pl-1">
+                                {isEditing
+                                    ? '소문자, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다.'
+                                    : 'API 호출 시 이 키로 프롬프트를 참조합니다.'}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -353,7 +375,7 @@ function OverviewTab({
 
                     <div className="pt-4 mt-auto border-t border-[var(--border)]">
                         <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-500">Created At</span>
+                            <span className="text-gray-500">생성일시</span>
                             <span className="text-[var(--text-secondary)] font-mono">{new Date(prompt.createdAt).toLocaleString('ko-KR')}</span>
                         </div>
                     </div>
@@ -368,7 +390,7 @@ function OverviewTab({
                     <div className={`px-2.5 py-1 rounded-full border flex items-center gap-1.5 ${release ? 'bg-green-500/10 border-green-500/20' : 'bg-amber-500/10 border-amber-500/20'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${release ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
                         <span className={`text-[10px] font-bold tracking-wide ${release ? 'text-green-400' : 'text-amber-300'}`}>
-                            {release ? 'OPERATIONAL' : 'NO RELEASE'}
+                            {release ? '운영 중' : '미배포'}
                         </span>
                     </div>
                 </div>
@@ -391,11 +413,11 @@ function OverviewTab({
                             <p className="text-sm text-gray-400 font-medium mb-1">현재 서비스 중인 버전</p>
                             <div className="text-6xl font-bold text-[var(--foreground)] tracking-tighter flex items-baseline gap-1">
                                 {isReleaseLoading ? (
-                                    <span className="text-2xl text-[var(--text-secondary)]">Loading...</span>
+                                    <span className="text-2xl text-[var(--text-secondary)]">불러오는 중...</span>
                                 ) : release ? (
                                     <>
                                         v{release.activeVersionNo}
-                                        <span className="text-lg font-medium text-gray-500 tracking-normal">latest</span>
+                                        <span className="text-lg font-medium text-gray-500 tracking-normal">최신</span>
                                     </>
                                 ) : (
                                     <span className="text-2xl text-[var(--text-secondary)]">-</span>
@@ -408,7 +430,7 @@ function OverviewTab({
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2 text-gray-400 text-sm">
                                 <span className="material-symbols-outlined text-sm">schedule</span>
-                                <span>Last Deployed</span>
+                                <span>마지막 배포</span>
                             </div>
                             <span className="text-[var(--foreground)] font-mono text-sm">
                                 {release ? new Date(release.releasedAt).toLocaleString('ko-KR') : '-'}
@@ -418,7 +440,7 @@ function OverviewTab({
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2 text-gray-400 text-sm">
                                 <span className="material-symbols-outlined text-sm">person</span>
-                                <span>Deployed By</span>
+                                <span>배포자</span>
                             </div>
                             <span className="text-[var(--foreground)] text-sm">
                                 {latestReleaseEvent?.changedByName ?? '-'}
@@ -428,7 +450,7 @@ function OverviewTab({
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2 text-gray-400 text-sm">
                                 <span className="material-symbols-outlined text-sm">model_training</span>
-                                <span>Model</span>
+                                <span>사용 모델</span>
                             </div>
                             <span className="text-[var(--primary)] font-mono text-sm bg-[var(--primary)]/10 px-2 py-0.5 rounded border border-[var(--primary)]/20">
                                 {activeVersionDetail ? `${activeVersionDetail.provider} / ${activeVersionDetail.model}` : '-'}
@@ -676,6 +698,17 @@ function VersionsTab({ promptId }: { promptId: number }) {
             }
             return;
         }
+        setForm({
+            title: '',
+            provider: 'OPENAI' as ProviderType,
+            model: '',
+            secondaryProvider: '' as ProviderType | '',
+            secondaryModel: '',
+            systemPrompt: '',
+            userTemplate: '',
+            contextUrl: '',
+            modelConfig: '',
+        });
         setBaseVersionId(null);
         setConfigError(null);
         setTemplateError(null);
@@ -836,11 +869,11 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         <div className="space-y-1 min-w-0">
                                             <div className="flex items-center gap-3 flex-wrap">
                                                 <span className={`text-base font-bold ${isCurrent ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)]'} truncate`}>
-                                                    {ver.title || '(untitled)'}
+                                                    {ver.title || '(제목 없음)'}
                                                 </span>
                                                 {isCurrent ? (
                                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--primary)]/20 text-[var(--primary)] border border-[var(--primary)]/30">
-                                                        CURRENT
+                                                        현재
                                                     </span>
                                                 ) : null}
                                             </div>
@@ -864,14 +897,14 @@ function VersionsTab({ promptId }: { promptId: number }) {
 
                                     <div className="flex items-center gap-8 flex-shrink-0">
                                         <div className="text-right">
-                                            <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>Last Updated</div>
+                                            <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>마지막 수정</div>
                                             <div className={`text-sm text-[var(--text-secondary)] font-mono ${isCurrent ? '' : 'opacity-80'}`}>
                                                 {formatKoDateTime(ver.createdAt)}
                                             </div>
                                         </div>
 
                                         <div className="text-right hidden md:block">
-                                            <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>Author</div>
+                                            <div className={`text-xs mb-0.5 ${isCurrent ? 'text-gray-500' : 'text-gray-600'}`}>작성자</div>
                                             <div className="flex items-center justify-end gap-2">
                                                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] text-white ${isCurrent ? 'bg-gradient-to-br from-purple-600 to-indigo-700' : 'bg-gray-700 text-gray-300'}`}>
                                                     {(ver.createdByName || '?').slice(0, 1)}
@@ -1149,7 +1182,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         className="w-full rounded-md py-3 px-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none shadow-inner font-mono bg-[var(--input)] border border-[var(--border)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                         placeholder="// 시스템 프롬프트를 입력하세요."
                                     />
-                                    <div className="absolute bottom-2 right-3 text-[10px] text-gray-600 font-mono">markdown supported</div>
+                                    <div className="absolute bottom-2 right-3 text-[10px] text-gray-600 font-mono">마크다운 지원</div>
                                 </div>
                             </div>
 
@@ -1167,7 +1200,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         setTemplateError(null);
                                     }}
                                     rows={5}
-                                    className="w-full rounded-md py-3 px-4 text-sm text-gray-300 placeholder-gray-600 resize-none font-mono bg-[#050507] border border-[var(--primary)]/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
+                                    className="w-full rounded-md py-3 px-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] resize-none shadow-inner font-mono bg-[var(--input)] border border-[var(--border)] focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/30 outline-none transition-all"
                                     placeholder="예: {{question}} 에 대해 답변해주세요. 또는 {{productName}} 상품 설명을 작성해주세요."
                                 />
                                 <p className="text-[11px] text-gray-400 flex items-center gap-1.5 pl-1">
@@ -1289,7 +1322,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                 <>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
-                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Version ID</div>
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">버전 ID</div>
                                             <div className="flex items-center gap-2">
                                                 <span className="font-mono text-lg font-bold text-[var(--foreground)] tracking-tight">v{versionDetail.versionNumber}</span>
                                                 <span
@@ -1302,7 +1335,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         </div>
 
                                         <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
-                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Primary Model</div>
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">기본 모델</div>
                                             <div className="flex items-center text-sm font-medium text-[var(--foreground)]">
                                                 <span className="px-2 py-1 rounded bg-purple-500/10 text-[10px] font-bold text-purple-300 mr-2 border border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.10)]">
                                                     {versionDetail.provider}
@@ -1312,17 +1345,17 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                         </div>
 
                                         <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
-                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Title</div>
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">제목</div>
                                             <div className="text-sm font-medium text-[var(--foreground)] truncate">{versionDetail.title || '-'}</div>
                                         </div>
 
                                         <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
-                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Created At</div>
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">생성일시</div>
                                             <div className="font-mono text-sm text-gray-400">{formatKoDateTime(versionDetail.createdAt)}</div>
                                         </div>
 
                                         <div className="space-y-1.5 p-3 rounded-xl hover:bg-[var(--muted)] transition-colors border border-transparent hover:border-[var(--border)]">
-                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Fallback Model</div>
+                                            <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">예비 모델</div>
                                             <div className="flex items-center text-sm font-medium text-[var(--foreground)]">
                                                 {versionDetail.secondaryProvider && versionDetail.secondaryModel ? (
                                                     <>
@@ -1357,7 +1390,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
                                                 <span className="material-symbols-outlined text-sm mr-2 text-[var(--primary)]">terminal</span>
                                                 System Prompt
                                             </label>
-                                            <span className="text-[10px] text-gray-600 font-mono bg-[var(--muted)] px-2 py-0.5 rounded border border-[var(--border)]">READ ONLY</span>
+                                            <span className="text-[10px] text-gray-600 font-mono bg-[var(--muted)] px-2 py-0.5 rounded border border-[var(--border)]">읽기 전용</span>
                                         </div>
 
                                         <div className="relative group">
@@ -1472,6 +1505,22 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
     });
 
+    const { data: currentRelease } = useQuery({
+        queryKey: ['promptRelease', promptId],
+        queryFn: async () => {
+            try {
+                const response = await promptApi.getRelease(promptId);
+                return response.data;
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
+        },
+        retry: false,
+    });
+
     const { data: releaseHistory, isLoading: isHistoryLoading, refetch: refetchReleaseHistory } = useQuery({
         queryKey: ['promptReleaseHistory', promptId],
         queryFn: async () => {
@@ -1487,27 +1536,51 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
     });
 
+    type DeployAction = 'release' | 'rollback';
+
+    const selectedVersion = versions?.find((ver) => ver.id === selectedVersionId) ?? null;
+    const currentVersionNo = currentRelease?.activeVersionNo ?? null;
+    const isRollbackAction = Boolean(
+        selectedVersion
+        && currentVersionNo != null
+        && selectedVersion.versionNumber < currentVersionNo
+    );
+    const isCurrentVersionSelected = Boolean(
+        selectedVersion
+        && currentRelease
+        && selectedVersion.id === currentRelease.activeVersionId
+    );
+    const actionType: DeployAction = isRollbackAction ? 'rollback' : 'release';
+
     const releaseMutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (action: DeployAction) => {
             if (!selectedVersionId) {
                 throw new Error('버전을 선택해주세요.');
+            }
+            if (action === 'rollback') {
+                return promptApi.rollbackPrompt(promptId, {
+                    versionId: selectedVersionId,
+                    reason: releaseReason.trim() || undefined,
+                });
             }
             return promptApi.releasePrompt(promptId, {
                 versionId: selectedVersionId,
                 reason: releaseReason.trim() || undefined,
             });
         },
-        onSuccess: () => {
+        onSuccess: (_data, action) => {
             queryClient.invalidateQueries({ queryKey: ['promptRelease', promptId] });
             queryClient.invalidateQueries({ queryKey: ['promptReleaseHistory', promptId] });
             setReleaseReason('');
-            setReleaseMessage('배포가 완료되었습니다.');
+            setReleaseMessage(action === 'rollback' ? '롤백이 완료되었습니다.' : '배포가 완료되었습니다.');
             setReleaseError(null);
             window.setTimeout(() => setReleaseMessage(null), 2500);
         },
-        onError: (error) => {
-            console.error('Release failed:', error);
-            setReleaseError('배포에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        onError: (error, action) => {
+            console.error('Deploy action failed:', error);
+            setReleaseError(action === 'rollback'
+                ? '롤백에 실패했습니다. 잠시 후 다시 시도해주세요.'
+                : '배포에 실패했습니다. 잠시 후 다시 시도해주세요.');
             setReleaseMessage(null);
         },
     });
@@ -1530,11 +1603,11 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--primary)]/5 rounded-full blur-[80px] -mr-16 -mt-16 pointer-events-none" />
 
                 <h3 className="text-xl font-bold text-[var(--foreground)] mb-2 flex items-center gap-2">
-                    Manual Release
+                    수동 배포
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)] shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
                 </h3>
                 <p className="text-[var(--text-secondary)] text-sm mb-8 leading-relaxed max-w-2xl">
-                    특정 버전을 선택하여 운영 환경(Production)에 배포합니다. 배포 즉시 API 응답에 반영됩니다.
+                    특정 버전을 선택해 운영 환경에 배포하거나 롤백할 수 있습니다. 변경 즉시 API 응답에 반영됩니다.
                 </p>
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-end">
@@ -1548,7 +1621,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                     className="block w-full rounded-xl border border-[var(--border)] bg-[var(--input)] text-[var(--foreground)] py-3 px-4 text-sm focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] focus:outline-none transition-all cursor-pointer hover:border-[var(--ring)] appearance-none"
                                     value={selectedVersionId ?? ''}
                                     onChange={(e) => setSelectedVersionId(e.target.value ? Number(e.target.value) : null)}
-                                    disabled={isVersionsLoading || !versions?.length}
+                                    disabled={isVersionsLoading || !versions?.length || releaseMutation.isPending}
                                 >
                                     <option value="">
                                         {isVersionsLoading
@@ -1568,8 +1641,13 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                 </div>
                             </div>
                             <p className="mt-2 text-[11px] text-gray-500">
-                                배포할 버전을 선택하면 현재 서비스 버전이 즉시 변경됩니다.
+                                현재 운영 버전보다 낮은 버전을 선택하면 자동으로 롤백으로 처리됩니다.
                             </p>
+                            {isCurrentVersionSelected ? (
+                                <p className="mt-2 text-[11px] text-amber-300">
+                                    현재 운영 중인 버전입니다. 다른 버전을 선택해주세요.
+                                </p>
+                            ) : null}
                             {!isVersionsLoading && !versions?.length ? (
                                 <p className="mt-2 text-[11px] text-amber-300">
                                     배포할 버전이 없습니다. 먼저 버전을 생성해주세요.
@@ -1579,7 +1657,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
 
                         <div className="group/input">
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 group-hover/input:text-[var(--primary)] transition-colors">
-                                배포 사유 (선택)
+                                배포/롤백 사유 (선택)
                             </label>
                             <input
                                 value={releaseReason}
@@ -1605,12 +1683,16 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                     <div className="lg:col-span-1">
                         <button
                             type="button"
-                            onClick={() => releaseMutation.mutate()}
-                            disabled={!selectedVersionId || releaseMutation.isPending}
+                            onClick={() => releaseMutation.mutate(actionType)}
+                            disabled={!selectedVersionId || isCurrentVersionSelected || releaseMutation.isPending}
                             className="w-full flex justify-center items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(168,85,247,0.35)] transition-all hover:shadow-[0_0_25px_rgba(168,85,247,0.50)] transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                         >
-                            <span className="material-symbols-outlined text-xl">rocket_launch</span>
-                            {releaseMutation.isPending ? '배포 중...' : '배포하기'}
+                            <span className="material-symbols-outlined text-xl">
+                                {actionType === 'rollback' ? 'history' : 'rocket_launch'}
+                            </span>
+                            {releaseMutation.isPending
+                                ? actionType === 'rollback' ? '롤백 중...' : '배포 중...'
+                                : actionType === 'rollback' ? '롤백하기' : '배포하기'}
                         </button>
                     </div>
                 </div>
@@ -1626,7 +1708,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                         type="button"
                         onClick={() => refetchReleaseHistory()}
                         className="p-2 text-gray-500 hover:text-[var(--foreground)] transition-colors rounded-lg hover:bg-[var(--muted)]"
-                        aria-label="refresh release history"
+                        aria-label="배포 이력 새로고침"
                     >
                         <span className="material-symbols-outlined text-xl">refresh</span>
                     </button>
@@ -1638,12 +1720,15 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                     <div className="relative timeline-line ml-2 space-y-6">
                         {releaseHistory.map((history: PromptReleaseHistoryResponse, idx: number) => {
                             const isLatest = idx === 0;
-                            const badge =
-                                history.changeType === 'ROLLBACK'
-                                    ? { label: 'ROLLBACK', className: 'bg-amber-500/15 text-amber-200 border-amber-500/25' }
-                                    : isLatest
-                                        ? { label: 'SUCCESS', className: 'bg-green-500/20 text-green-300 border-green-500/20' }
-                                        : { label: 'ARCHIVED', className: 'bg-gray-700/40 text-gray-300 border-gray-600/30' };
+                            const isRollbackHistory = history.changeType === 'ROLLBACK';
+                            const badge = isRollbackHistory
+                                ? {
+                                    label: isLatest ? '최근 롤백' : '롤백',
+                                    className: 'bg-amber-500/15 text-amber-200 border-amber-500/25'
+                                }
+                                : isLatest
+                                    ? { label: '최근 배포', className: 'bg-green-500/20 text-green-300 border-green-500/20' }
+                                    : { label: '이전 배포', className: 'bg-gray-700/40 text-gray-300 border-gray-600/30' };
 
                             return (
                                 <div
@@ -1661,7 +1746,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                             <div>
                                                 <div className="flex items-center gap-3 mb-2">
                                                     <h4 className={`font-bold ${isLatest ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)]'} text-base`}>
-                                                        v{history.toVersionNo} Release
+                                                        v{history.toVersionNo} {isRollbackHistory ? '롤백' : '배포'}
                                                     </h4>
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.className}`}>
                                                         {badge.label}
@@ -1680,7 +1765,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                                                         {(history.changedByName || 'S').slice(0, 1)}
                                                     </div>
                                                     <span className={`text-xs ${isLatest ? 'text-[var(--text-secondary)]' : 'text-[var(--text-secondary)]'}`}>
-                                                        {history.changedByName || 'System'}
+                                                        {history.changedByName || '시스템'}
                                                     </span>
                                                 </div>
                                             </div>
@@ -1939,7 +2024,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-[var(--foreground)] flex items-center gap-2">
                     <span className="material-symbols-outlined text-[var(--primary)]">play_circle</span>
-                    Playground
+                    플레이그라운드
                 </h2>
                 <div className="flex items-center gap-3">
                     {versions && versions.length > 0 && (

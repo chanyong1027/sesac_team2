@@ -271,11 +271,11 @@ export function CaseDetailPanel({
                         <div className="p-4 border-t border-[var(--border)] space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">Rule Check Detail</p>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">룰 체크 상세</p>
                                     <pre className="text-[10px] text-[var(--text-secondary)] bg-[var(--input)] p-2 rounded overflow-auto max-h-40">{prettyJson(item.ruleChecks)}</pre>
                                 </div>
                                 <div>
-                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">AI Judge Detail</p>
+                                    <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">AI 심사 상세</p>
                                     <pre className="text-[10px] text-[var(--text-secondary)] bg-[var(--input)] p-2 rounded overflow-auto max-h-40">{prettyJson(item.judgeOutput)}</pre>
                                 </div>
                             </div>
@@ -473,7 +473,7 @@ function DetailBlock({ title, value }: { title: string; value: string }) {
                     }}
                     className="text-[10px] text-gray-500 hover:text-[var(--foreground)] opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                    {copied ? 'Copied!' : 'Copy'}
+                    {copied ? '복사됨!' : '복사'}
                 </button>
             </div>
             <pre className="text-[10px] font-mono text-gray-400 overflow-auto max-h-60 leading-relaxed custom-scrollbar">

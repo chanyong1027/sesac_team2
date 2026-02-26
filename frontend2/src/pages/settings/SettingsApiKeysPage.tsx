@@ -200,9 +200,10 @@ function RotateConfirmModal({
           </div>
         </div>
 
-        <div className="p-4 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <p className="text-sm text-amber-800">
-            ⚠️ 기존 키는 즉시 무효화됩니다. 해당 키를 사용 중인 모든 서비스에서 새 키로 교체해야 합니다.
+        <div className="p-4 mb-4 bg-orange-600/10 border border-orange-500/30 rounded-lg flex items-start gap-2">
+          <span className="text-orange-400 mt-0.5 shrink-0">⚠️</span>
+          <p className="text-sm text-[var(--foreground)]">
+            기존 키는 즉시 무효화됩니다. 해당 키를 사용 중인 모든 서비스에서 새 키로 교체해야 합니다.
           </p>
         </div>
 
@@ -275,7 +276,8 @@ export function SettingsApiKeysPage() {
       queryClient.invalidateQueries({ queryKey: ['organization-api-keys'] });
       setRotateTarget(null);
       setRotateError(null);
-      setRotatedKey(response.data.apiKey);
+      const key = response.data.apiKey;
+      setTimeout(() => setRotatedKey(key), 200);
     },
     onError: () => {
       setRotateError('재발급에 실패했습니다. 다시 시도해주세요.');
@@ -312,13 +314,15 @@ export function SettingsApiKeysPage() {
             외부 서비스 연동을 위한 API 키를 관리합니다.
           </p>
         </div>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-        >
-          <Plus size={16} />
-          새 API 키
-        </button>
+        {!isLoading && (!apiKeys || apiKeys.length === 0) && (
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+          >
+            <Plus size={16} />
+            새 API 키
+          </button>
+        )}
       </div>
 
       <div className="p-4 mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg">

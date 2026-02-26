@@ -133,7 +133,7 @@ export default function DashboardPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">Dashboard</h1>
+                    <h1 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">대시보드</h1>
                     <p className="text-sm text-[var(--text-secondary)] mt-1">API 사용량 및 성능 현황을 한눈에 확인하세요</p>
                 </div>
 
@@ -420,7 +420,7 @@ export default function DashboardPage() {
                                 </div>
                             ))}
                             <div className="py-2 flex items-center justify-center text-[var(--text-secondary)] text-xs italic opacity-70">
-                                No more data available
+                                더 이상 데이터가 없습니다
                             </div>
                         </div>
                     ) : (
@@ -440,7 +440,7 @@ export default function DashboardPage() {
                     {prompts.length > 0 ? (
                         <div className="w-full">
                             <div className="grid grid-cols-12 gap-4 pb-3 border-b border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                                <div className="col-span-5">프롬프트</div>
+                                <div className="col-span-5">Prompt Key</div>
                                 <div className="col-span-2 text-right">요청</div>
                                 <div className="col-span-2 text-right">토큰</div>
                                 <div className="col-span-3 text-right">비용</div>
@@ -451,9 +451,8 @@ export default function DashboardPage() {
                                         key={prompt.promptId ?? prompt.promptKey}
                                         className="grid grid-cols-12 gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-[var(--muted)] transition-colors items-center group cursor-default"
                                     >
-                                        <div className="col-span-5 flex items-center gap-2 overflow-hidden">
-                                            <span className="text-xs text-[var(--text-secondary)] font-mono">ID:</span>
-                                            <span className="text-xs text-[var(--text-secondary)] truncate group-hover:text-[var(--foreground)] transition-colors">
+                                        <div className="col-span-5 overflow-hidden">
+                                            <span className="inline-block max-w-full px-2 py-0.5 rounded bg-[var(--muted)] border border-[var(--border)] text-xs font-mono text-[var(--foreground)] truncate group-hover:border-[var(--primary)]/40 transition-colors">
                                                 {prompt.promptKey}
                                             </span>
                                         </div>
