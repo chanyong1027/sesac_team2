@@ -329,7 +329,7 @@ export function WorkspaceDashboardPage() {
                                     <Settings size={15} className="text-[var(--primary)]" />
                                     워크스페이스 설정
                                 </h2>
-                                <button type="button" onClick={() => setIsSettingsOpen(false)} className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
+                                <button type="button" onClick={() => setIsSettingsOpen(false)} aria-label="설정 닫기" className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
                                     <span className="material-symbols-outlined text-xl">close</span>
                                 </button>
                             </div>

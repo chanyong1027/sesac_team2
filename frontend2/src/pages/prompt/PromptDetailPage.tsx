@@ -1505,7 +1505,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
         },
     });
 
-    const { data: currentRelease } = useQuery({
+    const { data: currentRelease, isLoading: isReleaseLoading } = useQuery({
         queryKey: ['promptRelease', promptId],
         queryFn: async () => {
             try {
@@ -1684,7 +1684,7 @@ function ReleaseTab({ promptId }: { promptId: number }) {
                         <button
                             type="button"
                             onClick={() => releaseMutation.mutate(actionType)}
-                            disabled={!selectedVersionId || isCurrentVersionSelected || releaseMutation.isPending}
+                            disabled={!selectedVersionId || isCurrentVersionSelected || releaseMutation.isPending || isReleaseLoading}
                             className="w-full flex justify-center items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-medium py-3 px-6 rounded-xl shadow-[0_0_15px_rgba(168,85,247,0.35)] transition-all hover:shadow-[0_0_25px_rgba(168,85,247,0.50)] transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
                         >
                             <span className="material-symbols-outlined text-xl">

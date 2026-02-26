@@ -112,7 +112,7 @@ export function CreateOrganizationModal({ isOpen, onClose }: Props) {
           <div className="flex gap-4 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => { reset(); onClose(); }}
               className="flex-1 py-3 bg-[var(--muted)] border border-[var(--border)] text-[var(--foreground)] font-semibold rounded-xl hover:bg-[var(--accent)] transition-colors"
             >
               취소
