@@ -4,8 +4,11 @@ import com.llm_ops.demo.eval.config.EvalProperties;
 import com.llm_ops.demo.eval.service.EvalExecutionService;
 import com.llm_ops.demo.eval.service.EvalMetrics;
 import com.llm_ops.demo.eval.service.EvalRunService;
+import java.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +32,18 @@ public class EvalWorker {
         this.evalExecutionService = evalExecutionService;
         this.evalProperties = evalProperties;
         this.evalMetrics = evalMetrics;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartupRecovery() {
+        long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
+        log.info("EvalWorker startup recovery initiated. Timeout: {} minutes", timeoutMinutes);
+        try {
+            int recovered = evalRunService.recoverStuckRuns(Duration.ofMinutes(timeoutMinutes));
+            log.info("EvalWorker startup recovery completed. Recovered {} stuck runs", recovered);
+        } catch (Exception e) {
+            log.error("EvalWorker startup recovery failed. timeoutMinutes={}", timeoutMinutes, e);
+        }
     }
 
     @Scheduled(fixedDelayString = "${eval.worker.poll-interval-ms:3000}")

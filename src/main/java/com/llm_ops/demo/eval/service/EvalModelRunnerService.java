@@ -6,10 +6,12 @@ import com.google.genai.types.GenerateContentResponse;
 import com.llm_ops.demo.eval.config.EvalProperties;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.gateway.service.GatewayChatOptionsCreateService;
+import com.llm_ops.demo.gateway.service.GatewayFailureClassifier;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
+import java.io.InterruptedIOException;
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -33,11 +35,14 @@ import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 
 @Service
 public class EvalModelRunnerService {
 
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite";
+    private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
     private static final int PROVIDER_CALL_MAX_THREADS = 16;
     private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
     private static final ExecutorService PROVIDER_CALL_EXECUTOR = Executors.newFixedThreadPool(
@@ -53,15 +58,18 @@ public class EvalModelRunnerService {
     private final EvalProperties evalProperties;
     private final ProviderCredentialService providerCredentialService;
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     public EvalModelRunnerService(
             EvalProperties evalProperties,
             ProviderCredentialService providerCredentialService,
-            GatewayChatOptionsCreateService gatewayChatOptionsCreateService
+            GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
+            CircuitBreakerRegistry circuitBreakerRegistry
     ) {
         this.evalProperties = evalProperties;
         this.providerCredentialService = providerCredentialService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
     }
 
     public ModelExecution run(
@@ -81,21 +89,48 @@ public class EvalModelRunnerService {
 
         ProviderCredentialService.ResolvedProviderApiKey resolved =
                 providerCredentialService.resolveApiKey(organizationId, provider);
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("eval-" + provider.getValue());
+        int sameProviderRetryMaxAttempts = Math.max(0, evalProperties.getRunner().getSameProviderRetryMaxAttempts());
+        int sameProviderTotalAttempts = 1 + sameProviderRetryMaxAttempts;
+        long sameProviderRetryBackoffMs = Math.max(0L, evalProperties.getRunner().getSameProviderRetryBackoffMs());
 
         long startedAtNanos = System.nanoTime();
-        ChatResponse response = switch (provider) {
-            case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-            case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-            case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-        };
+        for (int attempt = 1; attempt <= sameProviderTotalAttempts; attempt++) {
+            try {
+                ChatResponse response = circuitBreaker.executeCallable(() -> switch (provider) {
+                    case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                    case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                    case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                });
+                int retryCount = attempt - 1;
+                return toExecution(provider, model, response, startedAtNanos, retryCount);
+            } catch (Exception exception) {
+                GatewayFailureClassifier.GatewayFailure failure = classifyFailure(exception);
+                boolean canRetrySameProvider = failure != null && failure.retrySameRouteOnce();
+                if (attempt < sameProviderTotalAttempts && canRetrySameProvider) {
+                    shortRetryBackoff(provider, sameProviderRetryBackoffMs);
+                    continue;
+                }
+                throw toProviderException(provider, failure, exception);
+            }
+        }
+        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, provider.name() + " provider 호출 실패");
+    }
 
+    private ModelExecution toExecution(
+            ProviderType provider,
+            String requestedModel,
+            ChatResponse response,
+            long startedAtNanos,
+            int retryCount
+    ) {
         String output = response.getResult() != null && response.getResult().getOutput() != null
                 ? response.getResult().getOutput().getText()
                 : "";
 
         String usedModel = response.getMetadata() != null && response.getMetadata().getModel() != null
                 ? response.getMetadata().getModel()
-                : model;
+                : requestedModel;
 
         Long inputTokens = null;
         Long outputTokens = null;
@@ -112,7 +147,7 @@ public class EvalModelRunnerService {
         }
 
         BigDecimal estimatedCost = null;
-        String pricingModel = usedModel != null ? usedModel : model;
+        String pricingModel = usedModel != null ? usedModel : requestedModel;
         boolean pricingKnown = ModelPricing.isKnownModel(pricingModel);
         if (pricingKnown) {
             if (inputTokens != null && outputTokens != null) {
@@ -125,7 +160,7 @@ public class EvalModelRunnerService {
         long latencyMs = Math.max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L);
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("provider", provider.name());
-        meta.put("requestedModel", model);
+        meta.put("requestedModel", requestedModel);
         meta.put("usedModel", usedModel);
         meta.put("pricingKnown", pricingKnown);
         meta.put("latencyMs", latencyMs);
@@ -134,8 +169,51 @@ public class EvalModelRunnerService {
         meta.put("totalTokens", totalTokens);
         meta.put("estimatedCostUsd", estimatedCost);
         meta.put("pricingVersion", ModelPricing.getPricingVersion());
+        meta.put("retryCount", retryCount);
 
         return new ModelExecution(output, meta);
+    }
+
+    private GatewayFailureClassifier.GatewayFailure classifyFailure(Exception exception) {
+        if (exception instanceof BusinessException businessException) {
+            return FAILURE_CLASSIFIER.classifyBusiness(businessException, null);
+        }
+        return FAILURE_CLASSIFIER.classifyProvider(exception);
+    }
+
+    private static void shortRetryBackoff(ProviderType provider, long backoffMs) {
+        if (backoffMs <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(backoffMs);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            throw new BusinessException(
+                    ErrorCode.INTERNAL_SERVER_ERROR,
+                    provider.name() + " provider 재시도 대기 중 인터럽트되었습니다."
+            );
+        }
+    }
+
+    private RuntimeException toProviderException(
+            ProviderType provider,
+            GatewayFailureClassifier.GatewayFailure failure,
+            Exception exception
+    ) {
+        if (exception instanceof BusinessException businessException) {
+            return businessException;
+        }
+
+        String reason = failure != null && failure.failReason() != null ? failure.failReason() : "UNKNOWN";
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) {
+            message = exception.getClass().getSimpleName();
+        }
+        return new BusinessException(
+                ErrorCode.INTERNAL_SERVER_ERROR,
+                provider.name() + " provider 호출 실패 (" + reason + "): " + message
+        );
     }
 
     private ChatResponse callOpenAi(
@@ -294,17 +372,15 @@ public class EvalModelRunnerService {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException timeoutException) {
             future.cancel(true);
-            throw new BusinessException(
-                    ErrorCode.INTERNAL_SERVER_ERROR,
-                    providerType.name() + " 평가 모델 호출 시간이 초과되었습니다."
-            );
+            throw new RuntimeException(timeoutException);
         } catch (InterruptedException interruptedException) {
             future.cancel(true);
             Thread.currentThread().interrupt();
-            throw new BusinessException(
-                    ErrorCode.INTERNAL_SERVER_ERROR,
+            InterruptedIOException interruptedIo = new InterruptedIOException(
                     providerType.name() + " 평가 모델 호출이 중단되었습니다."
             );
+            interruptedIo.initCause(interruptedException);
+            throw new RuntimeException(interruptedIo);
         } catch (ExecutionException executionException) {
             Throwable cause = executionException.getCause();
             if (cause instanceof BusinessException businessException) {

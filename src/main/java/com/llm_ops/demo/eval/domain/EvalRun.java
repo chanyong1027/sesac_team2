@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -102,6 +103,14 @@ public class EvalRun {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "timeout_at")
+    private LocalDateTime timeoutAt;
+
+    @Column(name = "fail_reason_code", length = 50)
+    private String failReasonCode;
+
+    @Column(name = "fail_reason", length = 500)
+    private String failReason;
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 
@@ -172,6 +181,37 @@ public class EvalRun {
         }
     }
 
+    public void markRunningWithTimeout(Duration maxDuration) {
+        if (status() == EvalRunStatus.QUEUED) {
+            status = EvalRunStatus.RUNNING.name();
+            startedAt = LocalDateTime.now();
+            timeoutAt = startedAt.plus(maxDuration);
+        }
+    }
+
+    public boolean ensureTimeoutIfMissing(Duration maxDuration) {
+        if (status() == EvalRunStatus.RUNNING && startedAt != null && timeoutAt == null) {
+            timeoutAt = startedAt.plus(maxDuration);
+            return true;
+        }
+        return false;
+    }
+
+    public boolean isTimedOut() {
+        if (timeoutAt == null) {
+            return false;
+        }
+        return LocalDateTime.now().isAfter(timeoutAt);
+    }
+
+    public void fail(String reasonCode, String reasonMessage) {
+        this.status = EvalRunStatus.FAILED.name();
+        this.failReasonCode = reasonCode;
+        this.failReason = reasonMessage;
+        this.completedAt = LocalDateTime.now();
+    }
+
+
     public void markCancelled() {
         if (status() == EvalRunStatus.QUEUED || status() == EvalRunStatus.RUNNING) {
             status = EvalRunStatus.CANCELLED.name();
@@ -206,4 +246,11 @@ public class EvalRun {
         this.status = EvalRunStatus.FAILED.name();
         this.completedAt = LocalDateTime.now();
     }
+
+    public void resetToQueued() {
+        this.status = EvalRunStatus.QUEUED.name();
+        this.startedAt = null;
+        this.timeoutAt = null;
+    }
+
 }
