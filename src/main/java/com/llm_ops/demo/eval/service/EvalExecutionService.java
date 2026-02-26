@@ -14,10 +14,12 @@ import com.llm_ops.demo.eval.repository.EvalRunRepository;
 import com.llm_ops.demo.eval.rubric.EvalRubricTemplateRegistry;
 import com.llm_ops.demo.eval.rubric.ResolvedRubricConfig;
 import com.llm_ops.demo.eval.rule.EvalRuleCheckerService;
+import com.llm_ops.demo.eval.config.EvalProperties;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -47,6 +49,7 @@ public class EvalExecutionService {
     private final EvalReleaseDecisionCalculator evalReleaseDecisionCalculator;
     private final ObjectMapper objectMapper;
     private final EvalMetrics evalMetrics;
+    private final EvalProperties evalProperties;
 
     public EvalExecutionService(
             EvalRunRepository evalRunRepository,
@@ -60,6 +63,7 @@ public class EvalExecutionService {
             EvalReleaseCriteriaService evalReleaseCriteriaService,
             EvalReleaseDecisionCalculator evalReleaseDecisionCalculator,
             ObjectMapper objectMapper,
+            EvalProperties evalProperties,
             EvalMetrics evalMetrics
     ) {
         this.evalRunRepository = evalRunRepository;
@@ -73,6 +77,7 @@ public class EvalExecutionService {
         this.evalReleaseCriteriaService = evalReleaseCriteriaService;
         this.evalReleaseDecisionCalculator = evalReleaseDecisionCalculator;
         this.objectMapper = objectMapper;
+        this.evalProperties = evalProperties;
         this.evalMetrics = evalMetrics;
     }
 
@@ -84,11 +89,18 @@ public class EvalExecutionService {
         if (run.status() != EvalRunStatus.QUEUED && run.status() != EvalRunStatus.RUNNING) {
             return;
         }
+        long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
+        Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
         if (run.status() == EvalRunStatus.QUEUED) {
-            run.markRunning();
+            run.markRunningWithTimeout(timeoutDuration);
+            evalRunRepository.save(run);
+        } else if (run.ensureTimeoutIfMissing(timeoutDuration)) {
             evalRunRepository.save(run);
         }
 
+        if (failRunIfTimedOut(run, "at start")) {
+            return;
+        }
         CostAccumulator costAccumulator = new CostAccumulator();
 
         try {
@@ -109,6 +121,11 @@ public class EvalExecutionService {
                 if (caseResult.status() != EvalCaseStatus.QUEUED) {
                     continue;
                 }
+
+                EvalRun currentRun = evalRunRepository.findById(run.getId()).orElseThrow();
+                if (failRunIfTimedOut(currentRun, "during case processing")) {
+                    return;
+                }
                 long caseStartNanos = System.nanoTime();
                 String caseStatus = "unknown";
                 try {
@@ -119,11 +136,26 @@ public class EvalExecutionService {
                 }
             }
 
+            EvalRun finalRun = evalRunRepository.findById(run.getId()).orElseThrow();
+            if (failRunIfTimedOut(finalRun, "before finalize")) {
+                return;
+            }
             finishRun(run.getId(), costAccumulator, compareBaselineAvailable);
         } catch (Exception e) {
             log.error("Eval run failed. runId={}", runId, e);
             failRun(runId, costAccumulator, e.getMessage());
         }
+    }
+
+    private boolean failRunIfTimedOut(EvalRun run, String phase) {
+        if (!run.isTimedOut()) {
+            return false;
+        }
+        long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
+        run.fail("RUN_TIMEOUT", "실행 시간 초과 (" + timeoutMinutes + "분)");
+        evalRunRepository.save(run);
+        log.warn("Eval run timed out {}. runId={}", phase, run.getId());
+        return true;
     }
 
     private void processCase(
