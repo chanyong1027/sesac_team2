@@ -60,7 +60,10 @@ public class SecurityConfig {
                         ).permitAll()
                         // 게이트웨이 외부 호출(조직 API 키로 인증)
                         .requestMatchers("/v1/chat/**").permitAll()
+                        // 운영 모니터링 엔드포인트 중 public 접근 허용 대상
                         .requestMatchers("/health", "/actuator/health", "/actuator/prometheus").permitAll()
+                        // 내부 모니터링 엔드포인트는 인증 필요
+                        .requestMatchers("/actuator/info", "/actuator/metrics/**").authenticated()
                         // 그 외 모든 요청(로그아웃 포함)은 인증 필요
                         .anyRequest().authenticated())
                 // H2 Console을 위한 frameOptions 설정
