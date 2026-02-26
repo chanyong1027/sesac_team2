@@ -413,6 +413,7 @@ export interface PromptDetailResponse {
 }
 
 export interface PromptUpdateRequest {
+  promptKey?: string;
   description?: string;
   status?: PromptStatus;
 }
@@ -447,7 +448,7 @@ export interface PromptReleaseHistoryResponse {
 }
 
 export interface PromptRollbackRequest {
-  targetVersionId: number;
+  versionId: number;
   reason?: string;
 }
 // ========================================

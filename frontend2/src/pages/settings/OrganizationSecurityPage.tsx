@@ -306,8 +306,10 @@ export function OrganizationSecurityPage() {
   const rotateKeyMutation = useMutation({
     mutationFn: ({ id }: { id: number }) => organizationApi.rotateApiKey(orgId!, id, {}),
     onSuccess: async (res) => {
-      setRotatedKeyValue(res.data.apiKey);
+      const key = res.data.apiKey;
       await queryClient.invalidateQueries({ queryKey: ['organization-api-keys', orgId] });
+      setRotateTarget(null);
+      setTimeout(() => setRotatedKeyValue(key), 200);
     },
   });
 
@@ -559,20 +561,22 @@ export function OrganizationSecurityPage() {
               ))
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                const name = prompt('새 API 키 이름을 입력하세요 (예: Default Org Key)');
-                if (!name?.trim()) return;
-                setCreatingKey(true);
-                createKeyMutation.mutate(name.trim());
-              }}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"
-              disabled={creatingKey}
-            >
-              <Plus size={18} />
-              <span className="text-sm font-medium">새 API 키 생성</span>
-            </button>
+            {!isApiKeysLoading && (!apiKeys || apiKeys.length === 0) && (
+              <button
+                type="button"
+                onClick={() => {
+                  const name = prompt('새 API 키 이름을 입력하세요 (예: Default Org Key)');
+                  if (!name?.trim()) return;
+                  setCreatingKey(true);
+                  createKeyMutation.mutate(name.trim());
+                }}
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border border-dashed border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--accent)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-all"
+                disabled={creatingKey}
+              >
+                <Plus size={18} />
+                <span className="text-sm font-medium">새 API 키 생성</span>
+              </button>
+            )}
 
             {createKeyMutation.isError ? (
               <div className="text-sm text-rose-200 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
@@ -697,8 +701,9 @@ export function OrganizationSecurityPage() {
               </div>
             </div>
             <div className="p-6 space-y-4">
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-sm text-amber-200">
-                ⚠️ 기존 키는 즉시 무효화됩니다. 사용 중인 서비스에서 새 키로 교체하세요.
+              <div className="p-4 bg-orange-600/10 border border-orange-500/30 rounded-lg flex items-start gap-2">
+                <span className="text-orange-400 mt-0.5 shrink-0">⚠️</span>
+                <p className="text-sm text-[var(--foreground)]">기존 키는 즉시 무효화됩니다. 사용 중인 서비스에서 새 키로 교체하세요.</p>
               </div>
               {rotateKeyMutation.isError ? (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg text-sm text-rose-200">

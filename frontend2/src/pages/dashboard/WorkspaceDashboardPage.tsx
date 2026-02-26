@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useOrganizationWorkspaces } from '@/features/workspace/hooks/useOrganizationWorkspaces';
 import { organizationApi } from '@/api/organization.api';
+import { workspaceApi } from '@/api/workspace.api';
 import { promptApi } from '@/api/prompt.api';
 import { documentApi } from '@/api/document.api';
 import { logsApi } from '@/api/logs.api';
@@ -15,7 +16,8 @@ import {
     Copy,
     Check,
     RefreshCw,
-    ExternalLink
+    ExternalLink,
+    Settings,
 } from 'lucide-react';
 import type {
     BudgetPolicyUpdateRequest,
@@ -187,6 +189,10 @@ export function WorkspaceDashboardPage() {
 
     const [copiedCurl, setCopiedCurl] = useState(false);
     const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [draftName, setDraftName] = useState('');
+    const [deleteConfirmName, setDeleteConfirmName] = useState('');
+    const [isDeleteStep, setIsDeleteStep] = useState(false);
 
     const { data: workspaceBudgetPolicy } = useQuery({
         queryKey: ['budget-policy', 'workspace', workspaceId],
@@ -220,6 +226,37 @@ export function WorkspaceDashboardPage() {
         },
     });
     
+    const updateWorkspaceMutation = useMutation({
+        mutationFn: async () => {
+            if (!resolvedOrgId) throw new Error('조직 ID가 없습니다.');
+            const res = await workspaceApi.updateWorkspace(resolvedOrgId, workspaceId, {
+                displayName: draftName.trim(),
+            });
+            return res.data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+            setIsSettingsOpen(false);
+        },
+        onError: () => {
+            alert('이름 변경에 실패했습니다.');
+        },
+    });
+
+    const deleteWorkspaceMutation = useMutation({
+        mutationFn: async () => {
+            if (!resolvedOrgId) throw new Error('조직 ID가 없습니다.');
+            await workspaceApi.deleteWorkspace(resolvedOrgId, workspaceId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+            navigate(orgId ? `/orgs/${orgId}/dashboard` : '/');
+        },
+        onError: () => {
+            alert('워크스페이스 삭제에 실패했습니다.');
+        },
+    });
+
     const handleCopyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text).then(() => {
             setCopiedCurl(true);
@@ -234,6 +271,14 @@ export function WorkspaceDashboardPage() {
     }
     if (isWorkspaceLoading) return <div className="p-8 text-[var(--text-secondary)]">로딩 중...</div>;
     if (!workspace) return <div className="p-8 text-[var(--text-secondary)]">워크스페이스를 찾을 수 없습니다.</div>;
+
+    const canManage = workspace.myRole === 'OWNER' || workspace.myRole === 'ADMIN';
+    const openSettings = () => {
+        setDraftName(workspace.displayName);
+        setDeleteConfirmName('');
+        setIsDeleteStep(false);
+        setIsSettingsOpen(true);
+    };
 
     const overview = overviewData?.data;
     const statsLink = orgId ? `/orgs/${orgId}/stats` : undefined;
@@ -262,7 +307,7 @@ export function WorkspaceDashboardPage() {
                 <div className="absolute bottom-[-10%] right-[10%] w-[600px] h-[600px] bg-blue-600/5 rounded-full blur-[120px]" />
             </div>
 
-            <div className="relative z-10 max-w-7xl mx-auto space-y-8">
+            <div className="relative max-w-7xl mx-auto space-y-8">
                 <BudgetPolicyModal
                     open={isBudgetModalOpen}
                     mode="WORKSPACE"
@@ -274,11 +319,119 @@ export function WorkspaceDashboardPage() {
                     isSaving={updateWorkspaceBudgetPolicyMutation.isPending}
                 />
 
+                {/* Workspace Settings Modal */}
+                {isSettingsOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsSettingsOpen(false)} />
+                        <div className="relative z-10 w-full max-w-md rounded-2xl overflow-hidden border border-[var(--border)] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] bg-[var(--card)]">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+                                <h2 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
+                                    <Settings size={15} className="text-[var(--primary)]" />
+                                    워크스페이스 설정
+                                </h2>
+                                <button type="button" onClick={() => setIsSettingsOpen(false)} aria-label="설정 닫기" className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors">
+                                    <span className="material-symbols-outlined text-xl">close</span>
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {/* 이름 변경 */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-semibold text-[var(--foreground)]">이름 변경</h3>
+                                    <input
+                                        type="text"
+                                        value={draftName}
+                                        onChange={(e) => setDraftName(e.target.value)}
+                                        className="w-full rounded-xl px-4 py-2.5 text-sm bg-[var(--input)] border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:border-[var(--primary)] transition-all"
+                                        placeholder="워크스페이스 이름"
+                                    />
+                                    <button
+                                        type="button"
+                                        disabled={!draftName.trim() || draftName.trim() === workspace.displayName || updateWorkspaceMutation.isPending}
+                                        onClick={() => updateWorkspaceMutation.mutate()}
+                                        className="px-4 py-2 text-sm font-medium rounded-lg bg-[var(--primary)] text-white hover:bg-purple-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                    >
+                                        {updateWorkspaceMutation.isPending ? '저장 중...' : '저장'}
+                                    </button>
+                                </div>
+
+                                <div className="h-px bg-[var(--border)]" />
+
+                                {/* 위험 영역 */}
+                                <div className="space-y-3">
+                                    <h3 className="text-sm font-semibold text-red-500 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-sm">warning</span>
+                                        위험 영역
+                                    </h3>
+                                    {!isDeleteStep ? (
+                                        <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-3">
+                                            <p className="text-xs text-[var(--text-secondary)]">
+                                                워크스페이스를 삭제하면 모든 프롬프트, 문서, 로그가 비활성화되며{' '}
+                                                <strong className="text-[var(--foreground)]">복구할 수 없습니다.</strong>
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDeleteStep(true)}
+                                                className="px-4 py-2 text-sm font-medium rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10 transition-all"
+                                            >
+                                                워크스페이스 삭제
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 space-y-3">
+                                            <p className="text-xs text-red-300">
+                                                삭제하려면 워크스페이스 이름{' '}
+                                                <strong>"{workspace.displayName}"</strong>을 입력하세요.
+                                            </p>
+                                            <input
+                                                type="text"
+                                                value={deleteConfirmName}
+                                                onChange={(e) => setDeleteConfirmName(e.target.value)}
+                                                className="w-full rounded-lg px-3 py-2 text-sm bg-[var(--input)] border border-red-500/30 text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500/50 transition-all"
+                                                placeholder={workspace.displayName}
+                                            />
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setIsDeleteStep(false); setDeleteConfirmName(''); }}
+                                                    className="px-4 py-2 text-sm font-medium rounded-lg border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-all"
+                                                >
+                                                    취소
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={deleteConfirmName !== workspace.displayName || deleteWorkspaceMutation.isPending}
+                                                    onClick={() => deleteWorkspaceMutation.mutate()}
+                                                    className="px-4 py-2 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                                                >
+                                                    {deleteWorkspaceMutation.isPending ? '삭제 중...' : '삭제 확인'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Workspace Header */}
                 <div className="flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-bold mb-1 text-[var(--foreground)] dark:neon-text tracking-tight">{workspace.displayName}</h1>
-                        <p className="text-[var(--text-secondary)] text-sm">LLMOps workspace settings &amp; overview</p>
+                        <div className="flex items-center gap-2 mb-1">
+                            <h1 className="text-3xl font-bold text-[var(--foreground)] dark:neon-text tracking-tight">{workspace.displayName}</h1>
+                            {canManage && (
+                                <button
+                                    type="button"
+                                    onClick={openSettings}
+                                    title="워크스페이스 설정"
+                                    className="text-[var(--text-secondary)] hover:text-[var(--foreground)] p-1 rounded-lg hover:bg-[var(--muted)] transition-colors"
+                                >
+                                    <Settings size={16} />
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-[var(--text-secondary)] text-sm">워크스페이스 설정 &amp; 현황</p>
                     </div>
                     <div className="flex gap-2">
                         <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/30">
