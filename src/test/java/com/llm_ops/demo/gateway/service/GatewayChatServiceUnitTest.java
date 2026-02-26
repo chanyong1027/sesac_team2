@@ -55,6 +55,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.FutureTask;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,6 +84,9 @@ class GatewayChatServiceUnitTest {
 
     @Mock
     private LlmCallService llmCallService;
+
+    @Mock
+    private ExecutorService providerCallExecutor;
 
     @Mock
     private RagSearchService ragSearchService;
@@ -124,7 +130,18 @@ class GatewayChatServiceUnitTest {
     private final Map<String, CircuitBreaker> testCircuitBreakers = new HashMap<>();
 
     @BeforeEach
-    void setUpCircuitBreakerRegistry() {
+    void setUpDependencies() {
+        lenient().when(providerCallExecutor.submit(any(Callable.class)))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Callable<ChatResponse> callable = invocation.getArgument(0);
+                    FutureTask<ChatResponse> task = new FutureTask<>(callable);
+                    Thread thread = new Thread(task);
+                    thread.setDaemon(true);
+                    thread.start();
+                    return task;
+                });
+
         lenient().when(circuitBreakerRegistry.circuitBreaker(anyString()))
                 .thenAnswer(invocation ->
                         testCircuitBreakers.computeIfAbsent(

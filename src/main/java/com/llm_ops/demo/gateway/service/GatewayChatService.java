@@ -35,8 +35,10 @@ import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -44,15 +46,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.YearMonth;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 게이트웨이의 핵심 비즈니스 로직을 처리하는 서비스 클래스입니다.
@@ -63,19 +64,8 @@ public class GatewayChatService {
 
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
-    private static final ObjectMapper REQUEST_PAYLOAD_MAPPER = new ObjectMapper();
+    private static final ObjectMapper LOG_PAYLOAD_MAPPER = new ObjectMapper();
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
-    private static final int PROVIDER_CALL_MAX_THREADS = 16;
-    private static final AtomicInteger PROVIDER_CALL_THREAD_SEQUENCE = new AtomicInteger(1);
-    static final ExecutorService PROVIDER_CALL_EXECUTOR = Executors.newFixedThreadPool(
-            PROVIDER_CALL_MAX_THREADS,
-            runnable -> {
-                Thread thread = new Thread(runnable);
-                thread.setName("gateway-provider-call-" + PROVIDER_CALL_THREAD_SEQUENCE.getAndIncrement());
-                thread.setDaemon(true);
-                return thread;
-            }
-    );
     private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
     private static final String RAG_CONTEXT_PREFIX = """
             다음은 질문과 관련된 참고 문서입니다:
@@ -100,6 +90,7 @@ public class GatewayChatService {
     private final PromptReleaseRepository promptReleaseRepository;
     private final BudgetGuardrailService budgetGuardrailService;
     private final BudgetUsageService budgetUsageService;
+    private final ExecutorService providerCallExecutor;
     private final GatewayMetrics gatewayMetrics;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
 
@@ -108,7 +99,7 @@ public class GatewayChatService {
             GatewayReliabilityProperties gatewayReliabilityProperties,
             ProviderCredentialService providerCredentialService,
             LlmCallService llmCallService,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) RagSearchService ragSearchService,
+            @Nullable RagSearchService ragSearchService,
             RagContextBuilder ragContextBuilder,
             WorkspaceRepository workspaceRepository,
             WorkspaceRagSettingsService workspaceRagSettingsService,
@@ -117,6 +108,7 @@ public class GatewayChatService {
             PromptReleaseRepository promptReleaseRepository,
             BudgetGuardrailService budgetGuardrailService,
             BudgetUsageService budgetUsageService,
+            @Qualifier("providerCallExecutor") ExecutorService providerCallExecutor,
             GatewayMetrics gatewayMetrics,
             CircuitBreakerRegistry circuitBreakerRegistry) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
@@ -132,6 +124,7 @@ public class GatewayChatService {
         this.promptReleaseRepository = promptReleaseRepository;
         this.budgetGuardrailService = budgetGuardrailService;
         this.budgetUsageService = budgetUsageService;
+        this.providerCallExecutor = providerCallExecutor;
         this.gatewayMetrics = gatewayMetrics;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
     }
@@ -181,7 +174,7 @@ public class GatewayChatService {
         GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
         Long promptVersionId = null;
-        java.util.List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
+        List<RequestLogWriter.RetrievedDocumentInfo> retrievedDocumentInfos = null;
         YearMonth budgetMonth = budgetUsageService.currentUtcYearMonth();
         boolean ragEnabledEffective = request.isRagEnabled();
         long providerCallStartNanos = 0;
@@ -270,16 +263,7 @@ public class GatewayChatService {
                         ragContextChars = result.contextChars();
                         ragContextTruncated = result.truncated();
                         ragContextHash = sha256HexOrNull(result.context());
-                        retrievedDocumentInfos = new java.util.ArrayList<>();
-                        for (int i = 0; i < ragResponse.chunks().size() && i < result.chunksIncluded(); i++) {
-                            var chunk = ragResponse.chunks().get(i);
-                            retrievedDocumentInfos.add(new RequestLogWriter.RetrievedDocumentInfo(
-                                    chunk.documentName(),
-                                    chunk.score(),
-                                    chunk.content(),
-                                    null,
-                                    i + 1));
-                        }
+                        retrievedDocumentInfos = toRetrievedDocumentInfos(ragResponse, result.chunksIncluded());
                         userPrompt = RAG_CONTEXT_PREFIX + result.context() + RAG_CONTEXT_SUFFIX + userPrompt;
                     }
                 }
@@ -643,6 +627,60 @@ public class GatewayChatService {
         }
     }
 
+    private static String toRequestPayloadJson(GatewayChatRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            RequestPayloadForLog payload = new RequestPayloadForLog(
+                    request.workspaceId(),
+                    request.promptKey(),
+                    request.isRagEnabled(),
+                    request.variables() != null ? request.variables().size() : 0
+            );
+            return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
+        if (gatewayFailure == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("errorCode", gatewayFailure.errorCode());
+            payload.put("status", gatewayFailure.httpStatus());
+            payload.put("failReason", gatewayFailure.failReason());
+            payload.put("type", "GATEWAY_FAILURE");
+            return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
+        } catch (Exception ignored) {
+            return gatewayFailure.errorCode();
+        }
+    }
+
+    private static List<RequestLogWriter.RetrievedDocumentInfo> toRetrievedDocumentInfos(
+            RagSearchResponse ragResponse,
+            int includedCount
+    ) {
+        if (ragResponse == null || ragResponse.chunks() == null || ragResponse.chunks().isEmpty() || includedCount <= 0) {
+            return List.of();
+        }
+        List<RequestLogWriter.RetrievedDocumentInfo> infos = new java.util.ArrayList<>();
+        for (int i = 0; i < ragResponse.chunks().size() && i < includedCount; i++) {
+            var chunk = ragResponse.chunks().get(i);
+            infos.add(new RequestLogWriter.RetrievedDocumentInfo(
+                    chunk.documentName(),
+                    chunk.score(),
+                    chunk.content(),
+                    null,
+                    i + 1
+            ));
+        }
+        return infos;
+    }
+
 
     private static String sha256HexOrNull(String value) {
         if (value == null || value.isBlank()) {
@@ -729,39 +767,6 @@ public class GatewayChatService {
             }
         }
         return renderedUserPrompt;
-    }
-
-    private static String toRequestPayloadJson(GatewayChatRequest request) {
-        if (request == null) {
-            return null;
-        }
-        try {
-            RequestPayloadForLog payload = new RequestPayloadForLog(
-                    request.workspaceId(),
-                    request.promptKey(),
-                    request.isRagEnabled(),
-                    request.variables() != null ? request.variables().size() : 0
-            );
-            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
-        if (gatewayFailure == null) {
-            return null;
-        }
-        try {
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("errorCode", gatewayFailure.errorCode());
-            payload.put("message", gatewayFailure.errorMessage());
-            payload.put("httpStatus", gatewayFailure.httpStatus());
-            payload.put("failReason", gatewayFailure.failReason());
-            return REQUEST_PAYLOAD_MAPPER.writeValueAsString(payload);
-        } catch (Exception ignored) {
-            return gatewayFailure.errorCode();
-        }
     }
 
     /**
@@ -899,7 +904,7 @@ public class GatewayChatService {
         }
 
         long attemptTimeoutMs = Math.max(1L, usableBudgetMs);
-        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(() ->
+        Future<ChatResponse> future = providerCallExecutor.submit(() ->
                 callProvider(resolved, requestedModel, systemPrompt, userPrompt, maxOutputTokensOverride));
 
         try {

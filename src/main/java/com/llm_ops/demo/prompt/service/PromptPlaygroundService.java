@@ -454,9 +454,6 @@ public class PromptPlaygroundService {
     }
 
     private static String resolveBusinessErrorMessage(BusinessException exception) {
-        if (exception == null) {
-            return ErrorCode.INTERNAL_SERVER_ERROR.getDefaultMessage();
-        }
         String message = exception.getMessage();
         if (message == null || message.isBlank()) {
             return exception.getErrorCode().getDefaultMessage();
@@ -465,9 +462,6 @@ public class PromptPlaygroundService {
     }
 
     private static String toBusinessErrorResponsePayload(BusinessException exception) {
-        if (exception == null) {
-            return null;
-        }
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("errorCode", exception.getErrorCode().name());

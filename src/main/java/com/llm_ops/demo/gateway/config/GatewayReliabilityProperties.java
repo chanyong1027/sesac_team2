@@ -18,11 +18,15 @@ public class GatewayReliabilityProperties {
     private static final long DEFAULT_RETRY_BACKOFF_MS = 200L;
     private static final long DEFAULT_MIN_RETRY_BUDGET_MS = 1_200L;
     private static final long DEFAULT_MIN_FAILOVER_BUDGET_MS = 1_200L;
+    private static final int DEFAULT_PROVIDER_CALL_MAX_THREADS = 16;
+    private static final int DEFAULT_PROVIDER_CALL_QUEUE_CAPACITY = 256;
 
     private long requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS;
     private long retryBackoffMs = DEFAULT_RETRY_BACKOFF_MS;
     private long minRetryBudgetMs = DEFAULT_MIN_RETRY_BUDGET_MS;
     private long minFailoverBudgetMs = DEFAULT_MIN_FAILOVER_BUDGET_MS;
+    private int providerCallMaxThreads = DEFAULT_PROVIDER_CALL_MAX_THREADS;
+    private int providerCallQueueCapacity = DEFAULT_PROVIDER_CALL_QUEUE_CAPACITY;
 
     public long resolvedRequestTimeoutMs() {
         return requestTimeoutMs > 0 ? requestTimeoutMs : DEFAULT_REQUEST_TIMEOUT_MS;
@@ -38,5 +42,13 @@ public class GatewayReliabilityProperties {
 
     public long resolvedMinFailoverBudgetMs() {
         return minFailoverBudgetMs > 0 ? minFailoverBudgetMs : DEFAULT_MIN_FAILOVER_BUDGET_MS;
+    }
+
+    public int resolvedProviderCallMaxThreads() {
+        return providerCallMaxThreads > 0 ? providerCallMaxThreads : DEFAULT_PROVIDER_CALL_MAX_THREADS;
+    }
+
+    public int resolvedProviderCallQueueCapacity() {
+        return providerCallQueueCapacity > 0 ? providerCallQueueCapacity : DEFAULT_PROVIDER_CALL_QUEUE_CAPACITY;
     }
 }
