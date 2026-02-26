@@ -90,11 +90,12 @@ public class EvalModelRunnerService {
         ProviderCredentialService.ResolvedProviderApiKey resolved =
                 providerCredentialService.resolveApiKey(organizationId, provider);
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker("eval-" + provider.getValue());
-        int sameProviderMaxAttempts = Math.max(1, evalProperties.getRunner().getSameProviderRetryMaxAttempts());
+        int sameProviderRetryMaxAttempts = Math.max(0, evalProperties.getRunner().getSameProviderRetryMaxAttempts());
+        int sameProviderTotalAttempts = 1 + sameProviderRetryMaxAttempts;
         long sameProviderRetryBackoffMs = Math.max(0L, evalProperties.getRunner().getSameProviderRetryBackoffMs());
 
         long startedAtNanos = System.nanoTime();
-        for (int attempt = 1; attempt <= sameProviderMaxAttempts; attempt++) {
+        for (int attempt = 1; attempt <= sameProviderTotalAttempts; attempt++) {
             try {
                 ChatResponse response = circuitBreaker.executeCallable(() -> switch (provider) {
                     case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
@@ -106,7 +107,7 @@ public class EvalModelRunnerService {
             } catch (Exception exception) {
                 GatewayFailureClassifier.GatewayFailure failure = classifyFailure(exception);
                 boolean canRetrySameProvider = failure != null && failure.retrySameRouteOnce();
-                if (attempt < sameProviderMaxAttempts && canRetrySameProvider) {
+                if (attempt < sameProviderTotalAttempts && canRetrySameProvider) {
                     shortRetryBackoff(provider, sameProviderRetryBackoffMs);
                     continue;
                 }

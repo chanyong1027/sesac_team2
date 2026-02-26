@@ -1,5 +1,6 @@
 package com.llm_ops.demo.eval.worker;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -71,5 +72,26 @@ class EvalWorkerTest {
 
         // then
         verify(evalRunService).recoverStuckRuns(Duration.ofMinutes(45L));
+    }
+
+    @Test
+    @DisplayName("애플리케이션 시작 복구 중 예외가 발생해도 시작은 중단되지 않는다")
+    void 시작복구_예외가_발생해도_시작은_중단되지_않는다() {
+        // given
+        EvalProperties evalProperties = new EvalProperties();
+        evalProperties.setRunTimeoutMinutes(30L);
+
+        EvalRunService evalRunService = mock(EvalRunService.class);
+        EvalExecutionService evalExecutionService = mock(EvalExecutionService.class);
+        EvalMetrics evalMetrics = mock(EvalMetrics.class);
+        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics);
+
+        doThrow(new RuntimeException("db unavailable"))
+                .when(evalRunService)
+                .recoverStuckRuns(Duration.ofMinutes(30L));
+
+        // when // then
+        assertDoesNotThrow(worker::onStartupRecovery);
+        verify(evalRunService).recoverStuckRuns(Duration.ofMinutes(30L));
     }
 }

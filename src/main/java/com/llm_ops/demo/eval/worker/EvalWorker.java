@@ -38,8 +38,12 @@ public class EvalWorker {
     public void onStartupRecovery() {
         long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
         log.info("EvalWorker startup recovery initiated. Timeout: {} minutes", timeoutMinutes);
-        int recovered = evalRunService.recoverStuckRuns(Duration.ofMinutes(timeoutMinutes));
-        log.info("EvalWorker startup recovery completed. Recovered {} stuck runs", recovered);
+        try {
+            int recovered = evalRunService.recoverStuckRuns(Duration.ofMinutes(timeoutMinutes));
+            log.info("EvalWorker startup recovery completed. Recovered {} stuck runs", recovered);
+        } catch (Exception e) {
+            log.error("EvalWorker startup recovery failed. timeoutMinutes={}", timeoutMinutes, e);
+        }
     }
 
     @Scheduled(fixedDelayString = "${eval.worker.poll-interval-ms:3000}")
