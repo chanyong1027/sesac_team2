@@ -169,6 +169,80 @@ class RequestLogQueryServiceTest {
         }
 
         @Test
+        @DisplayName("errorCode_필터로_FAIL_로그를_검색한다")
+        void errorCode_필터로_FAIL_로그를_검색한다() {
+            // given
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, null, null, null, null, null, null, null, "ERROR", null);
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(2);
+            assertThat(response.content()).allMatch(log -> "ERROR".equals(log.errorCode()));
+        }
+
+        @Test
+        @DisplayName("requestSource_필터로_조회한다")
+        void requestSource_필터로_조회한다() {
+            // given
+            RequestLog playgroundFailLog = createFailLog(
+                    "trace-playground-only",
+                    WORKSPACE_ID,
+                    "PLAYGROUND_ERROR",
+                    "PLAYGROUND");
+            requestLogRepository.save(playgroundFailLog);
+
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, null, null, null, null, null, null, null, null, "PLAYGROUND");
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.content()).allMatch(log -> "PLAYGROUND".equals(log.requestSource()));
+            assertThat(response.content().get(0).traceId()).isEqualTo("trace-playground-only");
+        }
+
+        @Test
+        @DisplayName("errorCode와_requestSource_복합_필터로_정확히_조회한다")
+        void errorCode와_requestSource_복합_필터로_정확히_조회한다() {
+            // given
+            requestLogRepository.save(createFailLog(
+                    "trace-combined-match",
+                    WORKSPACE_ID,
+                    "FILTER_MATCH",
+                    "PLAYGROUND"));
+            requestLogRepository.save(createFailLog(
+                    "trace-combined-error-only",
+                    WORKSPACE_ID,
+                    "FILTER_MATCH",
+                    "GATEWAY"));
+            requestLogRepository.save(createFailLog(
+                    "trace-combined-source-only",
+                    WORKSPACE_ID,
+                    "OTHER_ERROR",
+                    "PLAYGROUND"));
+
+            RequestLogSearchCondition condition = new RequestLogSearchCondition(
+                    null, null, null, null, null, null, null, null, null, "FILTER_MATCH", "PLAYGROUND");
+            PageRequest pageable = PageRequest.of(0, 20);
+
+            // when
+            RequestLogListResponse response = requestLogQueryService.search(WORKSPACE_ID, condition, pageable);
+
+            // then
+            assertThat(response.totalElements()).isEqualTo(1);
+            assertThat(response.content().get(0).traceId()).isEqualTo("trace-combined-match");
+            assertThat(response.content().get(0).errorCode()).isEqualTo("FILTER_MATCH");
+            assertThat(response.content().get(0).requestSource()).isEqualTo("PLAYGROUND");
+        }
+
+        @Test
         @DisplayName("null_condition이면_전체_조회된다")
         void null_condition이면_전체_조회된다() {
             // given
@@ -242,6 +316,31 @@ class RequestLogQueryServiceTest {
         } else if (status == RequestLogStatus.FAIL) {
             log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR", null);
         }
+        return log;
+    }
+
+    private RequestLog createFailLog(String traceId, Long workspaceId, String errorCode, String requestSource) {
+        RequestLog log = RequestLog.loggingStart(
+                UUID.randomUUID(),
+                traceId,
+                1L,
+                workspaceId,
+                1L,
+                "prefix",
+                "/v1/chat",
+                "POST",
+                "test-prompt",
+                false,
+                null,
+                requestSource);
+        log.markFail(
+                java.time.LocalDateTime.now(),
+                500,
+                100,
+                errorCode,
+                "error message",
+                "INTERNAL_ERROR",
+                null);
         return log;
     }
 }
