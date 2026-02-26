@@ -33,6 +33,8 @@ import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.domain.WorkspaceStatus;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -99,6 +101,7 @@ public class GatewayChatService {
     private final BudgetGuardrailService budgetGuardrailService;
     private final BudgetUsageService budgetUsageService;
     private final GatewayMetrics gatewayMetrics;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     public GatewayChatService(
             OrganizationApiKeyAuthService organizationApiKeyAuthService,
@@ -114,7 +117,8 @@ public class GatewayChatService {
             PromptReleaseRepository promptReleaseRepository,
             BudgetGuardrailService budgetGuardrailService,
             BudgetUsageService budgetUsageService,
-            GatewayMetrics gatewayMetrics) {
+            GatewayMetrics gatewayMetrics,
+            CircuitBreakerRegistry circuitBreakerRegistry) {
         this.organizationApiKeyAuthService = organizationApiKeyAuthService;
         this.gatewayReliabilityProperties = gatewayReliabilityProperties;
         this.providerCredentialService = providerCredentialService;
@@ -129,6 +133,7 @@ public class GatewayChatService {
         this.budgetGuardrailService = budgetGuardrailService;
         this.budgetUsageService = budgetUsageService;
         this.gatewayMetrics = gatewayMetrics;
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
     }
 
     /**
@@ -789,13 +794,16 @@ public class GatewayChatService {
             String userPrompt,
             Integer maxOutputTokensOverride
     ) {
-        return llmCallService.callProvider(
-                resolved,
-                requestedModel,
-                systemPrompt,
-                userPrompt,
-                ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride)
-        );
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(resolved.providerType().getValue());
+        return CircuitBreaker.decorateSupplier(circuitBreaker, () ->
+                llmCallService.callProvider(
+                        resolved,
+                        requestedModel,
+                        systemPrompt,
+                        userPrompt,
+                        ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride)
+                )
+        ).get();
     }
 
     private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
