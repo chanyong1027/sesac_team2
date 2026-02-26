@@ -1,9 +1,11 @@
 package com.llm_ops.demo.gateway.config;
 
 import jakarta.annotation.PreDestroy;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
@@ -14,11 +16,17 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class GatewayProviderCallExecutorConfig {
 
-    private final int providerCallMaxThreads = 16;
+    private final GatewayReliabilityProperties reliabilityProperties;
     private ExecutorService providerCallExecutor;
+
+    public GatewayProviderCallExecutorConfig(GatewayReliabilityProperties reliabilityProperties) {
+        this.reliabilityProperties = reliabilityProperties;
+    }
 
     @Bean(name = "providerCallExecutor")
     public ExecutorService providerCallExecutor() {
+        int providerCallMaxThreads = reliabilityProperties.resolvedProviderCallMaxThreads();
+        int providerCallQueueCapacity = reliabilityProperties.resolvedProviderCallQueueCapacity();
         AtomicInteger threadSequence = new AtomicInteger(1);
         ThreadFactory threadFactory = runnable -> {
             Thread thread = new Thread(runnable);
@@ -26,7 +34,16 @@ public class GatewayProviderCallExecutorConfig {
             thread.setDaemon(true);
             return thread;
         };
-        this.providerCallExecutor = Executors.newFixedThreadPool(providerCallMaxThreads, threadFactory);
+        BlockingQueue<Runnable> workQueue = new LinkedBlockingQueue<>(providerCallQueueCapacity);
+        this.providerCallExecutor = new ThreadPoolExecutor(
+                providerCallMaxThreads,
+                providerCallMaxThreads,
+                0L,
+                TimeUnit.MILLISECONDS,
+                workQueue,
+                threadFactory,
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
         return this.providerCallExecutor;
     }
 
