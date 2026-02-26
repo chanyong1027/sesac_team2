@@ -49,7 +49,7 @@ export interface RequestLogResponse {
   finishedAt: string | null;
   requestPayload: string | null;
   responsePayload: string | null;
-  requestSource: string | null;
+  requestSource: string;
   retrievedDocuments?: RetrievedDocument[];
   cost?: number;
 }
