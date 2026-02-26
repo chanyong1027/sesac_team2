@@ -58,7 +58,7 @@ const OrgScopedDashboardLayout = () => {
   }, [isAccessibleOrg, parsedOrgId, currentOrgId, setCurrentOrgId]);
 
   if (isLoading) {
-    return <div className="p-6 text-gray-500">조직 권한을 확인하는 중...</div>;
+    return <div className="p-6 text-[var(--text-secondary)]">조직 권한을 확인하는 중...</div>;
   }
 
   if (!workspaces || workspaces.length === 0) {
@@ -87,7 +87,7 @@ function NavigateToOrgDashboard() {
   const orgId = currentOrgId ?? workspaces?.[0]?.organizationId;
 
   if (isLoading) {
-    return <div className="p-6 text-gray-500">조직 정보를 불러오는 중...</div>;
+    return <div className="p-6 text-[var(--text-secondary)]">조직 정보를 불러오는 중...</div>;
   }
 
   if (!orgId) {
@@ -104,7 +104,7 @@ function LegacyWorkspaceRedirect() {
   const workspace = workspaces?.find((ws) => ws.id === parsedWorkspaceId);
 
   if (isLoading) {
-    return <div className="p-6 text-gray-500">워크스페이스 정보를 불러오는 중...</div>;
+    return <div className="p-6 text-[var(--text-secondary)]">워크스페이스 정보를 불러오는 중...</div>;
   }
 
   if (!workspace || Number.isNaN(parsedWorkspaceId)) {

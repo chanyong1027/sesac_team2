@@ -46,25 +46,25 @@ export function OnboardingPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#FBFBFB] flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-4 duration-700">
                 {/* Header Icon */}
-                <div className="mx-auto w-12 h-12 bg-white border border-gray-200 rounded-xl flex items-center justify-center mb-8 shadow-sm">
-                    <Building2 className="w-6 h-6 text-gray-700" />
+                <div className="mx-auto w-12 h-12 bg-[var(--card)] border border-[var(--border)] rounded-xl flex items-center justify-center mb-8 shadow-sm">
+                    <Building2 className="w-6 h-6 text-[var(--text-secondary)]" />
                 </div>
 
                 {/* Main Content */}
                 <div className="text-center mb-8 space-y-2">
-                    <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">
+                    <h1 className="text-2xl font-semibold text-[var(--foreground)] tracking-tight">
                         Welcome to LuminaOps{user?.name ? `, ${user.name}` : ''}!
                     </h1>
-                    <p className="text-gray-500">
+                    <p className="text-[var(--text-secondary)]">
                         To get started, let's create your first organization.
                     </p>
                 </div>
 
                 {/* Form Card */}
-                <div className="bg-white border border-gray-200 rounded-2xl p-2 shadow-sm">
+                <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-2 shadow-sm">
                     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
                         <div className="relative">
                             <input
@@ -72,7 +72,7 @@ export function OnboardingPage() {
                                 value={orgName}
                                 onChange={(e) => setOrgName(e.target.value)}
                                 placeholder="Acme Corp"
-                                className="w-full px-4 py-3 bg-transparent text-gray-900 placeholder-gray-400 outline-none text-lg"
+                                className="w-full px-4 py-3 bg-transparent text-[var(--foreground)] placeholder:text-[var(--text-tertiary)] outline-none text-lg"
                                 autoFocus
                                 disabled={isSubmitting}
                             />
@@ -94,8 +94,8 @@ export function OnboardingPage() {
                         className={`
                             group flex items-center gap-2 pl-6 pr-5 py-2.5 rounded-full font-medium transition-all duration-300
                             ${orgName.trim()
-                                ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-md hover:shadow-lg translate-y-0'
-                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                ? 'bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 shadow-md hover:shadow-lg translate-y-0'
+                                : 'bg-[var(--muted)] text-[var(--text-secondary)] cursor-not-allowed'
                             }
                         `}
                     >
@@ -112,8 +112,8 @@ export function OnboardingPage() {
                         )}
                     </button>
 
-                    <p className="text-xs text-gray-400">
-                        Press <span className="font-medium text-gray-500">Enter</span> to continue
+                    <p className="text-xs text-[var(--text-secondary)]">
+                        Press <span className="font-medium text-[var(--foreground)]">Enter</span> to continue
                     </p>
                 </div>
             </div>

@@ -35,17 +35,17 @@ function activityStatusLabel(status: RequestLogStatus) {
 }
 
 function activityStatusBadgeClass(status: RequestLogStatus) {
-    const base = 'px-2 py-0.5 rounded text-[10px] font-bold shadow';
+    const base = 'px-2 py-0.5 rounded text-[10px] font-bold shadow border';
     switch (status) {
         case 'SUCCESS':
-            return `${base} bg-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.4)]`;
+            return `${base} bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/30 shadow-[0_0_10px_rgba(34,197,94,0.25)]`;
         case 'FAIL':
-            return `${base} bg-red-500 text-[var(--foreground)] shadow-[0_0_10px_rgba(239,68,68,0.4)]`;
+            return `${base} bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30 shadow-[0_0_10px_rgba(239,68,68,0.25)]`;
         case 'BLOCKED':
-            return `${base} bg-amber-500 text-black shadow-[0_0_10px_rgba(245,158,11,0.35)]`;
+            return `${base} bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.22)]`;
         case 'IN_PROGRESS':
         default:
-            return `${base} bg-gray-700 text-gray-100 shadow-none`;
+            return `${base} bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border)] shadow-none`;
     }
 }
 
@@ -230,10 +230,10 @@ export function WorkspaceDashboardPage() {
     };
 
     if (!isValidWorkspaceId) {
-        return <div className="p-8 text-gray-500">유효하지 않은 워크스페이스입니다.</div>;
+        return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 워크스페이스입니다.</div>;
     }
-    if (isWorkspaceLoading) return <div className="p-8 text-gray-300">로딩 중...</div>;
-    if (!workspace) return <div className="p-8 text-gray-300">워크스페이스를 찾을 수 없습니다.</div>;
+    if (isWorkspaceLoading) return <div className="p-8 text-[var(--text-secondary)]">로딩 중...</div>;
+    if (!workspace) return <div className="p-8 text-[var(--text-secondary)]">워크스페이스를 찾을 수 없습니다.</div>;
 
     const overview = overviewData?.data;
     const statsLink = orgId ? `/orgs/${orgId}/stats` : undefined;
@@ -278,10 +278,10 @@ export function WorkspaceDashboardPage() {
                 <div className="flex justify-between items-end">
                     <div>
                         <h1 className="text-3xl font-bold mb-1 text-[var(--foreground)] dark:neon-text tracking-tight">{workspace.displayName}</h1>
-                        <p className="text-gray-400 text-sm">LLMOps workspace settings &amp; overview</p>
+                        <p className="text-[var(--text-secondary)] text-sm">LLMOps workspace settings &amp; overview</p>
                     </div>
                     <div className="flex gap-2">
-                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
+                        <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/30">
                             SYSTEM OPERATIONAL
                         </span>
                     </div>
@@ -302,7 +302,7 @@ export function WorkspaceDashboardPage() {
                                     버전 중심 관리
                                 </span>
                             </div>
-                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">프롬프트 설정</h3>
+                            <h3 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-1">프롬프트 설정</h3>
                             <div className="flex items-baseline gap-2">
                                 <p className="text-4xl font-bold text-[var(--foreground)] tracking-tight">{prompts?.length ?? 0}</p>
                                 {release?.activeVersionNo ? (
@@ -333,10 +333,10 @@ export function WorkspaceDashboardPage() {
                                                 : 'Ready'}
                                 </span>
                             </div>
-                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">RAG 문서</h3>
+                            <h3 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-1">RAG 문서</h3>
                             <div className="flex items-baseline gap-2">
                                 <p className="text-4xl font-bold text-[var(--foreground)] tracking-tight">{documents?.length ?? 0}</p>
-                                <span className="text-xs text-gray-500">Documents</span>
+                                <span className="text-xs text-[var(--text-secondary)]">Documents</span>
                             </div>
                         </div>
                     </Link>
@@ -354,12 +354,12 @@ export function WorkspaceDashboardPage() {
                                     Failover: {recentLogs?.content?.filter(l => l.isFailover).length ?? 0}
                                 </span>
                             </div>
-                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">API Reliability</h3>
+                            <h3 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wide mb-1">API Reliability</h3>
                             <div className="flex items-baseline gap-2">
                                 <p className="text-4xl font-bold text-[var(--foreground)] tracking-tight">
                                     {overview ? `${Math.round(overview.successRate ?? 0)}%` : '-'}
                                 </p>
-                                <span className="text-xs text-gray-500">Success</span>
+                                <span className="text-xs text-[var(--text-secondary)]">Success</span>
                             </div>
                         </div>
                     </Link>
@@ -370,7 +370,7 @@ export function WorkspaceDashboardPage() {
                     <div className="lg:col-span-2 space-y-8">
                         {/* Quick Actions */}
                         <div>
-                            <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">Quick Actions</h2>
+                            <h2 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-4">Quick Actions</h2>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <QuickActionCard
                                     to={`${basePath}/prompts`}
@@ -411,7 +411,7 @@ export function WorkspaceDashboardPage() {
                                         Recent Activity
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                     </h2>
-                                    <p className="text-xs text-gray-500 mt-1">
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1">
                                         Monitoring real-time requests for '{promptKey || workspace.displayName}'
                                     </p>
                                 </div>
@@ -435,7 +435,7 @@ export function WorkspaceDashboardPage() {
                             </div>
 
                             {!promptKey ? (
-                                <div className="p-4 text-sm text-gray-400">
+                                <div className="p-4 text-sm text-[var(--text-secondary)]">
                                     아직 프롬프트가 없습니다. 프롬프트를 먼저 생성하세요.
                                     <Link to={`${basePath}/prompts`} className="ml-2 text-[var(--primary)] font-medium hover:underline">
                                         프롬프트 설정
@@ -444,7 +444,7 @@ export function WorkspaceDashboardPage() {
                             ) : isRecentLogsLoading ? (
                                 <div className="p-4 space-y-3">
                                     {Array.from({ length: 5 }).map((_, idx) => (
-                                        <div key={idx} className="h-16 rounded-xl bg-white/[0.03] animate-pulse" />
+                                        <div key={idx} className="h-16 rounded-xl bg-[var(--surface-subtle)] animate-pulse" />
                                     ))}
                                 </div>
                             ) : isRecentLogsError ? (
@@ -459,32 +459,32 @@ export function WorkspaceDashboardPage() {
                                     </button>
                                 </div>
                             ) : (recentLogs?.content?.length ?? 0) === 0 ? (
-                                <div className="p-4 text-sm text-gray-400">최근 요청이 없습니다. API 호출 후 확인하세요.</div>
+                                <div className="p-4 text-sm text-[var(--text-secondary)]">최근 요청이 없습니다. API 호출 후 확인하세요.</div>
                             ) : (
-                                <div className="divide-y divide-white/5">
+                                <div className="divide-y divide-[var(--border)]">
                                     {recentLogs!.content.map((log) => (
                                         <button
                                             key={log.traceId}
                                             type="button"
                                             onClick={() => navigate(`${basePath}/logs/${log.traceId}`)}
-                                            className="w-full text-left p-4 hover:bg-white/[0.02] transition-colors group"
+                                            className="w-full text-left p-4 hover:bg-[var(--surface-subtle)] transition-colors group"
                                         >
                                             <div className="flex items-center justify-between mb-2">
                                                 <div className="flex items-center gap-3">
                                                     <span className={activityStatusBadgeClass(log.status)}>{activityStatusLabel(log.status)}</span>
-                                                    <span className="text-xs text-gray-500">{formatTimeHHmmss(log.createdAt)}</span>
-                                                    <span className="text-xs text-gray-600 mx-1">|</span>
-                                                    <span className="text-xs text-gray-300 font-medium">{modelLabel(log)}</span>
+                                                    <span className="text-xs text-[var(--text-secondary)]">{formatTimeHHmmss(log.createdAt)}</span>
+                                                    <span className="text-xs text-[var(--text-tertiary)] mx-1">|</span>
+                                                    <span className="text-xs text-[var(--foreground)] font-medium">{modelLabel(log)}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span
                                                         className={
                                                             log.ragEnabled
                                                                 ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--primary)]/20 text-[var(--primary)] border border-[var(--primary)]/30 flex items-center gap-1'
-                                                                : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-800 text-gray-500 border border-gray-700 flex items-center gap-1'
+                                                                : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--surface-subtle)] text-[var(--text-secondary)] border border-[var(--border)] flex items-center gap-1'
                                                         }
                                                     >
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${log.ragEnabled ? 'bg-[var(--primary)] animate-pulse' : 'bg-gray-500'}`} />
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${log.ragEnabled ? 'bg-[var(--primary)] animate-pulse' : 'bg-[var(--text-secondary)]'}`} />
                                                         RAG {log.ragEnabled ? 'ON' : 'OFF'}
                                                     </span>
                                                 </div>
@@ -492,7 +492,7 @@ export function WorkspaceDashboardPage() {
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-6">
                                                     <div className="flex items-center gap-2">
-                                                        <code className={`text-[11px] font-mono text-gray-400 transition-colors ${log.status === 'FAIL' ? 'group-hover:text-red-400' : 'group-hover:text-[var(--primary)]'}`}>
+                                                        <code className={`text-[11px] font-mono text-[var(--text-secondary)] transition-colors ${log.status === 'FAIL' ? 'group-hover:text-red-600 dark:group-hover:text-red-400' : 'group-hover:text-[var(--primary)]'}`}>
                                                             {log.traceId.slice(0, 8)}...
                                                         </code>
                                                         <button
@@ -501,23 +501,23 @@ export function WorkspaceDashboardPage() {
                                                                 e.stopPropagation();
                                                                 navigator.clipboard.writeText(log.traceId);
                                                             }}
-                                                            className="text-gray-600 hover:text-[var(--foreground)] transition-colors opacity-0 group-hover:opacity-100"
+                                                            className="text-[var(--text-tertiary)] hover:text-[var(--foreground)] transition-colors opacity-0 group-hover:opacity-100"
                                                             aria-label="copy trace id"
                                                         >
                                                             <Copy size={14} />
                                                         </button>
                                                     </div>
-                                                    <div className="flex items-center gap-4 text-xs font-mono text-gray-500">
+                                                    <div className="flex items-center gap-4 text-xs font-mono text-[var(--text-secondary)]">
                                                         <span className="flex items-center gap-1">
-                                                            <span className="text-gray-400">⏱</span> <span className="text-gray-300">{formatLatency(log.latencyMs)}</span>
+                                                            <span className="text-[var(--text-secondary)]">⏱</span> <span className="text-[var(--foreground)]">{formatLatency(log.latencyMs)}</span>
                                                         </span>
                                                         <span className="flex items-center gap-1">
-                                                            <span className="text-gray-400">∑</span> <span className="text-gray-300">{formatTokens(log.totalTokens)}</span>
+                                                            <span className="text-[var(--text-secondary)]">∑</span> <span className="text-[var(--foreground)]">{formatTokens(log.totalTokens)}</span>
                                                         </span>
                                                         {log.status === 'FAIL' ? (
                                                             <span className="flex items-center gap-1">
-                                                                <span className="text-gray-400">!</span>{' '}
-                                                                <span className="text-red-400">{log.failReason || log.errorCode || 'Error'}</span>
+                                                                <span className="text-[var(--text-secondary)]">!</span>{' '}
+                                                                <span className="text-red-600 dark:text-red-400">{log.failReason || log.errorCode || 'Error'}</span>
                                                             </span>
                                                         ) : null}
                                                     </div>
@@ -546,7 +546,7 @@ export function WorkspaceDashboardPage() {
                                 Quick Setup
                             </h2>
                             <div className="relative space-y-4">
-                                <div className="absolute left-[9px] top-2 bottom-4 w-0.5 bg-gray-800 -z-10" />
+                                <div className="absolute left-[9px] top-2 bottom-4 w-0.5 bg-[var(--border)] -z-10" />
                                 <SetupStep
                                     idx={1}
                                     checked={hasProviderKeys}
@@ -621,17 +621,17 @@ export function WorkspaceDashboardPage() {
                             </div>
 
                             <div className="bg-[var(--muted)] rounded-xl p-4 font-mono text-[11px] text-[var(--foreground)] overflow-x-auto border border-[var(--border)] shadow-inner relative">
-                                <div className="absolute top-2 right-2 text-[10px] text-gray-600 font-bold uppercase select-none">BASH</div>
+                                <div className="absolute top-2 right-2 text-[10px] text-[var(--text-tertiary)] font-bold uppercase select-none">BASH</div>
                                 <pre><code>{curlExample}</code></pre>
                             </div>
 
                             <div className="mt-3 flex gap-2">
                                 <div className="flex-1 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-bold text-blue-300">Tip</span>
+                                        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">Tip</span>
                                     </div>
-                                    <p className="text-[10px] text-blue-200/70 leading-relaxed">
-                                        Set <code className="bg-blue-900/30 dark:bg-blue-900/50 px-1 rounded text-blue-700 dark:text-blue-200">ragEnabled</code> to <span className="text-[var(--foreground)]">true</span> to use your indexed documents context.
+                                    <p className="text-[10px] text-blue-800/80 dark:text-blue-200/70 leading-relaxed">
+                                        Set <code className="bg-blue-500/10 dark:bg-blue-900/50 px-1 rounded text-blue-800 dark:text-blue-200">ragEnabled</code> to <span className="text-[var(--foreground)]">true</span> to use your indexed documents context.
                                     </p>
                                 </div>
                             </div>
@@ -693,7 +693,7 @@ function QuickActionCard({
                 <span className="material-symbols-outlined">{icon}</span>
             </div>
             <div className="font-medium text-sm text-[var(--foreground)]">{title}</div>
-            <div className="text-[11px] text-gray-500 mt-1">{subtitle}</div>
+            <div className="text-[11px] text-[var(--text-secondary)] mt-1">{subtitle}</div>
         </Link>
     );
 }
@@ -718,11 +718,11 @@ function SetupStep({
     return (
         <div className={`flex gap-3 relative ${opacity}`}>
             {checked ? (
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500 text-black flex items-center justify-center shadow-[0_0_10px_rgba(34,197,94,0.4)] z-10">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30 flex items-center justify-center shadow-[0_0_10px_rgba(34,197,94,0.25)] z-10">
                     <span className="material-symbols-outlined text-[14px] font-bold">check</span>
                 </span>
             ) : (
-                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-gray-800 border border-gray-600 text-gray-400 flex items-center justify-center z-10 text-[10px] font-bold">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[var(--surface-subtle)] border border-[var(--border)] text-[var(--text-secondary)] flex items-center justify-center z-10 text-[10px] font-bold">
                     {idx}
                 </span>
             )}
@@ -734,7 +734,7 @@ function SetupStep({
                     </div>
                     {action}
                 </div>
-                <div className={`text-[11px] ${checked ? 'text-gray-500' : 'text-gray-400'}`}>
+                <div className={`text-[11px] ${checked ? 'text-[var(--text-secondary)]' : 'text-[var(--foreground)]'}`}>
                     {description}
                 </div>
             </div>
