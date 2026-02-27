@@ -65,6 +65,7 @@ public class GatewayChatService {
     private static final String GATEWAY_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";
     private static final String GATEWAY_HTTP_METHOD = "POST";
     private static final ObjectMapper LOG_PAYLOAD_MAPPER = new ObjectMapper();
+    private static final int LOGGED_QUESTION_MAX_CHARS = 500;
     private static final long FAILOVER_GUARD_BUFFER_MS = 100L;
     private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
     private static final String RAG_CONTEXT_PREFIX = """
@@ -636,12 +637,42 @@ public class GatewayChatService {
                     request.workspaceId(),
                     request.promptKey(),
                     request.isRagEnabled(),
-                    request.variables() != null ? request.variables().size() : 0
+                    request.variables() != null ? request.variables().size() : 0,
+                    extractQuestionForLog(request.variables())
             );
             return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static String extractQuestionForLog(Map<String, String> variables) {
+        if (variables == null || variables.isEmpty()) {
+            return null;
+        }
+
+        String[] preferredKeys = {"question", "query", "input", "message", "userInput", "userQuery"};
+        for (String key : preferredKeys) {
+            String candidate = normalizeQuestion(variables.get(key));
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    private static String normalizeQuestion(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > LOGGED_QUESTION_MAX_CHARS) {
+            return trimmed.substring(0, LOGGED_QUESTION_MAX_CHARS);
+        }
+        return trimmed;
     }
 
     private static String toErrorResponsePayload(GatewayFailureClassifier.GatewayFailure gatewayFailure) {
@@ -1033,7 +1064,8 @@ public class GatewayChatService {
             Long workspaceId,
             String promptKey,
             boolean ragEnabled,
-            int variablesCount
+            int variablesCount,
+            String question
     ) {
     }
 }
