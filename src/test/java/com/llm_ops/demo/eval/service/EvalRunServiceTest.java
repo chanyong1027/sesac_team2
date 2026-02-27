@@ -20,12 +20,14 @@ import com.llm_ops.demo.eval.domain.EvalTestCase;
 import com.llm_ops.demo.eval.domain.EvalTriggerType;
 import com.llm_ops.demo.eval.domain.RubricTemplateCode;
 import com.llm_ops.demo.eval.dto.EvalRunCreateRequest;
+import com.llm_ops.demo.eval.dto.EvalRunEstimateRequest;
 import com.llm_ops.demo.eval.repository.EvalCaseResultRepository;
 import com.llm_ops.demo.eval.repository.EvalRunRepository;
 import com.llm_ops.demo.eval.repository.EvalTestCaseRepository;
 import com.llm_ops.demo.eval.repository.PromptEvalDefaultRepository;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.prompt.domain.PromptRelease;
 import com.llm_ops.demo.prompt.domain.Prompt;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
@@ -45,6 +47,73 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 
 class EvalRunServiceTest {
+
+    @Test
+    @DisplayName("estimateRun은 contextJson.question이 비어도 input 값을 question으로 사용한다")
+    void estimateRun은_contextJson_question이_비어도_input을_question으로_사용한다() {
+        // given
+        EvalAccessService evalAccessService = mock(EvalAccessService.class);
+        EvalRunRepository evalRunRepository = mock(EvalRunRepository.class);
+        EvalCaseResultRepository evalCaseResultRepository = mock(EvalCaseResultRepository.class);
+        EvalTestCaseRepository evalTestCaseRepository = mock(EvalTestCaseRepository.class);
+        PromptReleaseRepository promptReleaseRepository = mock(PromptReleaseRepository.class);
+
+        EvalRunService service = new EvalRunService(
+                evalAccessService,
+                new EvalProperties(),
+                evalRunRepository,
+                evalCaseResultRepository,
+                evalTestCaseRepository,
+                mock(PromptEvalDefaultRepository.class),
+                promptReleaseRepository,
+                mock(PromptRepository.class),
+                mock(PromptVersionRepository.class)
+        );
+
+        Prompt prompt = mock(Prompt.class);
+        when(prompt.getId()).thenReturn(100L);
+        Workspace workspace = mock(Workspace.class);
+        when(workspace.getId()).thenReturn(10L);
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(1L);
+
+        EvalAccessService.PromptScope scope = new EvalAccessService.PromptScope(user, workspace, prompt);
+        when(evalAccessService.requirePromptScope(10L, 100L, 1L)).thenReturn(scope);
+
+        PromptVersion candidateVersion = mock(PromptVersion.class);
+        when(candidateVersion.getId()).thenReturn(200L);
+        when(candidateVersion.getVersionNo()).thenReturn(4);
+        when(candidateVersion.getUserTemplate()).thenReturn("질문: {{question}}");
+        when(candidateVersion.getSystemPrompt()).thenReturn(null);
+        when(candidateVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+        when(candidateVersion.getModel()).thenReturn("gpt-4.1-mini");
+        when(candidateVersion.getModelConfig()).thenReturn(null);
+        when(evalAccessService.requirePromptVersion(prompt, 200L)).thenReturn(candidateVersion);
+
+        EvalDataset dataset = mock(EvalDataset.class);
+        when(dataset.getId()).thenReturn(300L);
+        when(evalAccessService.requireDataset(10L, 300L)).thenReturn(dataset);
+
+        EvalTestCase caseRow = mock(EvalTestCase.class);
+        when(caseRow.getCaseOrder()).thenReturn(1);
+        when(caseRow.getExternalId()).thenReturn("case-question-override");
+        when(caseRow.getInputText()).thenReturn("환불 정책");
+        when(caseRow.getContextJson()).thenReturn(Map.of("question", "", "audience", "초보 사용자"));
+        when(evalTestCaseRepository.findByDatasetIdAndEnabledTrueOrderByCaseOrderAsc(300L)).thenReturn(List.of(caseRow));
+
+        EvalRunEstimateRequest request = new EvalRunEstimateRequest(
+                200L,
+                300L,
+                EvalMode.CANDIDATE_ONLY,
+                RubricTemplateCode.GENERAL_TEXT
+        );
+
+        // when
+        var response = service.estimateRun(10L, 100L, 1L, request);
+
+        // then
+        assertThat(response.estimatedCases()).isEqualTo(1);
+    }
 
     @Test
     @DisplayName("createRun은 후보 버전 템플릿 변수 누락 케이스가 있으면 실행을 거부한다")

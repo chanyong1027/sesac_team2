@@ -532,6 +532,9 @@ public class EvalRunService {
                 if (entry.getKey() == null || entry.getValue() == null) {
                     continue;
                 }
+                if ("question".equals(entry.getKey()) && !isBlank(variables.get("question"))) {
+                    continue;
+                }
                 variables.put(entry.getKey(), String.valueOf(entry.getValue()));
             }
             if (!variables.containsKey("context")) {

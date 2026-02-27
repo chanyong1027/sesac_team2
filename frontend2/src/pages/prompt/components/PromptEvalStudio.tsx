@@ -21,6 +21,10 @@ import {
     type CaseJsonField,
     type JsonObject,
 } from './CaseEditorUtils';
+import {
+    buildContextJsonExample,
+    extractTemplateVariables,
+} from './templateVariableUtils';
 import type {
     EvalCaseResultListResponse,
     EvalCaseResultResponse,
@@ -685,33 +689,6 @@ function extractApiError(error: unknown): { status: number | null; message: stri
     return { status: null, message: null };
 }
 
-function extractTemplateVariables(template: string | null | undefined): string[] {
-    if (!template) {
-        return [];
-    }
-    const matches = template.match(/\{\{\s*[^{}\s]+\s*\}\}/g) ?? [];
-    return [...new Set(matches.map((token) => token.replace(/\{\{|\}\}/g, '').trim()).filter(Boolean))];
-}
-
-function sampleVariableValue(key: string): string {
-    const lower = key.toLowerCase();
-    if (lower.includes('locale') || lower.includes('lang')) return 'ko-KR';
-    if (lower.includes('product')) return 'premium_plus';
-    if (lower.includes('tone')) return '친절한 톤';
-    if (lower.includes('category')) return 'refund';
-    if (lower.includes('channel')) return 'email';
-    if (lower.includes('name')) return '홍길동';
-    return `sample_${key}`;
-}
-
-function buildContextJsonExample(keys: string[]): string {
-    if (keys.length === 0) {
-        return '{}';
-    }
-    const fields = keys.map((key) => `"${key}":"${sampleVariableValue(key)}"`).join(', ');
-    return `{${fields}}`;
-}
-
 export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProps) {
     const queryClient = useQueryClient();
 
@@ -832,8 +809,11 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
         staleTime: 30_000,
     });
     const templateVariables = useMemo(
-        () => extractTemplateVariables(selectedVersionDetail?.userTemplate),
-        [selectedVersionDetail?.userTemplate]
+        () => extractTemplateVariables(
+            selectedVersionDetail?.userTemplate,
+            selectedVersionDetail?.systemPrompt
+        ),
+        [selectedVersionDetail?.userTemplate, selectedVersionDetail?.systemPrompt]
     );
     const defaultInputBindingVariable = useMemo(() => {
         if (templateVariables.includes('question')) {

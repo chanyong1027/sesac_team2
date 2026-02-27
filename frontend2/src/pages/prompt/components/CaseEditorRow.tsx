@@ -8,6 +8,7 @@ import {
     toStringArray,
     truncateText,
 } from './CaseEditorUtils';
+import { buildContextJsonExample } from './templateVariableUtils';
 
 type EditableCaseField = Exclude<keyof CaseFormRow, 'id'>;
 
@@ -33,25 +34,6 @@ interface TagListEditorProps {
     placeholder: string;
     onChange: (values: string[]) => void;
     tone?: TagTone;
-}
-
-function sampleVariableValue(key: string): string {
-    const lower = key.toLowerCase();
-    if (lower.includes('locale') || lower.includes('lang')) return 'ko-KR';
-    if (lower.includes('product')) return 'premium_plus';
-    if (lower.includes('tone')) return '친절한 톤';
-    if (lower.includes('category')) return 'refund';
-    if (lower.includes('channel')) return 'email';
-    if (lower.includes('name')) return '홍길동';
-    return `sample_${key}`;
-}
-
-function buildContextJsonExample(keys: string[]): string {
-    if (keys.length === 0) {
-        return '{"locale":"ko-KR","product":"premium"}';
-    }
-    const fields = keys.map((key) => `"${key}":"${sampleVariableValue(key)}"`).join(', ');
-    return `{${fields}}`;
 }
 
 export function CaseEditorRow({
