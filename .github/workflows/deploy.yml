@@ -35,7 +35,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build & Test
-        run: ./gradlew clean build -Dspring.profiles.active=test
+        run: ./gradlew clean build --no-build-cache -Dspring.profiles.active=test
 
       # ✅ jar를 다음 job으로 넘겨서 "중복 빌드" 제거
       - name: Upload JAR artifact
