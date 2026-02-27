@@ -10,7 +10,7 @@ class ModelPricingTest {
 
     @Test
     void calculateCostFromTotalTokens_knownModel_returnsPositiveCost() {
-        BigDecimal cost = ModelPricing.calculateCostFromTotalTokens("gpt-4o-mini", 1000);
+        BigDecimal cost = ModelPricing.calculateCostFromTotalTokens("gpt-4.1-mini", 1000);
         assertThat(cost).isGreaterThan(BigDecimal.ZERO);
     }
 
@@ -30,22 +30,20 @@ class ModelPricingTest {
     void isKnownModel_supportsPromptModelAllowlist() {
         // prompt.model-allowlist (application.yml) 에 등록된 모델은 비용 인식이 가능해야 한다.
         List<String> allowlistModels = List.of(
-                "gpt-4o-mini",
-                "gpt-4o",
-                "gpt-4.1-mini",
+                // OpenAI
+                "gpt-5.2",
                 "gpt-4.1",
-                "gpt-4.1-nano",
-                "gpt-4",
-                "gpt-3.5-turbo",
-                "claude-3-haiku-20240307",
-                "claude-3-haiku",
-                "claude-3-5-haiku",
-                "claude-3-5-sonnet",
-                "claude-3-opus",
-                "claude-3-sonnet",
+                "gpt-4.1-mini",
+                "o3",
+                "o4-mini",
+                // Anthropic
+                "claude-opus-4-6",
+                "claude-sonnet-4-6",
+                "claude-haiku-4-5",
+                // Google Gemini
+                "gemini-2.5-pro",
                 "gemini-2.5-flash",
-                "gemini-2.5-flash-lite",
-                "gemini-2.0-flash"
+                "gemini-2.5-flash-lite"
         );
 
         assertThat(allowlistModels)

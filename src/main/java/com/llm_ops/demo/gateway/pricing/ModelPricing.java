@@ -18,7 +18,7 @@ public class ModelPricing {
     static {
         // ============================================================
         // OpenAI — 2026-02 기준, per 1K tokens
-        //   출처: https://costgoat.com/pricing/openai-api
+        //   출처: https://platform.openai.com/pricing
         // ============================================================
         PRICING_TABLE.put("gpt-5.2",      new PriceInfo("0.00175", "0.014"));   // $1.75 / $14.00 per 1M
         PRICING_TABLE.put("gpt-4.1",      new PriceInfo("0.002",   "0.008"));   // $2.00 / $8.00  per 1M
