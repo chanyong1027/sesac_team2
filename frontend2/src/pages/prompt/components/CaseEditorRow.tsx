@@ -8,6 +8,7 @@ import {
     toStringArray,
     truncateText,
 } from './CaseEditorUtils';
+import { buildContextJsonExample } from './templateVariableUtils';
 
 type EditableCaseField = Exclude<keyof CaseFormRow, 'id'>;
 
@@ -22,6 +23,8 @@ interface CaseEditorRowProps {
     setCaseArrayField: (rowId: string, field: CaseJsonField, key: string, values: string[]) => void;
     setConstraintJsonOnly: (rowId: string, checked: boolean) => void;
     updateCaseJsonObject: (rowId: string, field: CaseJsonField, updater: (current: JsonObject) => JsonObject) => void;
+    templateVariables: string[];
+    inputBindingVariable: string;
 }
 
 type TagTone = 'emerald' | 'sky' | 'rose' | 'neutral';
@@ -44,6 +47,8 @@ export function CaseEditorRow({
     setCaseArrayField,
     setConstraintJsonOnly,
     updateCaseJsonObject,
+    templateVariables,
+    inputBindingVariable,
 }: CaseEditorRowProps) {
     const isExpanded = expandedEditorCaseId === row.id;
     const summaryInput = row.input.trim() ? truncateText(row.input, 50) : '새로운 질문';
@@ -51,6 +56,9 @@ export function CaseEditorRow({
     const expectedObj = parseObjectTextLoose(row.expectedJsonText);
     const constraintsObj = parseObjectTextLoose(row.constraintsJsonText);
     const contextObj = parseObjectTextLoose(row.contextJsonText);
+    const versionTemplateVariables = templateVariables.filter((key) => key.trim().length > 0);
+    const contextTemplateVariables = versionTemplateVariables.filter((key) => key !== inputBindingVariable);
+    const contextJsonPlaceholder = `예: ${buildContextJsonExample(contextTemplateVariables)}`;
 
     const mustCover = toStringArray(expectedObj.must_cover);
     const mustInclude = toStringArray(constraintsObj.must_include);
@@ -167,22 +175,44 @@ export function CaseEditorRow({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-[var(--text-secondary)]">외부 식별자 (External ID)</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)]">외부 식별자 (선택)</label>
                                 <input
                                     className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 outline-none"
-                                    placeholder="예: refund-case-01"
+                                    placeholder="테스트 케이스를 추적할 고유 ID를 입력하세요 (예: refund_policy_kr_001)"
                                     value={row.externalId}
                                     onChange={(event) => updateCaseRow(row.id, 'externalId', event.target.value)}
                                 />
+                                <p className="text-[10px] text-[var(--text-secondary)]">
+                                    결과/로그에서 케이스를 식별할 때 사용합니다. 영문, 숫자, '-', '_' 조합을 권장합니다.
+                                </p>
                             </div>
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-[var(--text-secondary)]">추가 Context (JSON)</label>
+                                <label className="text-xs font-bold text-[var(--text-secondary)]">추가 Context (JSON, 나머지 변수 입력)</label>
                                 <textarea
                                     className="w-full bg-[var(--input)] border border-[var(--border)] rounded-lg px-3 py-2 text-xs text-[var(--foreground)] focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 outline-none resize-y min-h-[74px] font-mono"
-                                    placeholder='예: {"locale":"ko-KR","product":"premium"}'
+                                    placeholder={contextJsonPlaceholder}
                                     value={row.contextJsonText}
                                     onChange={(event) => updateCaseRow(row.id, 'contextJsonText', event.target.value)}
                                 />
+                                <p className="text-[10px] text-[var(--text-secondary)]">
+                                    {`질문(핵심 입력)은 {{${inputBindingVariable}}}로 자동 매핑됩니다. 나머지 변수는 JSON key/value로 입력하세요.`}
+                                </p>
+                                {contextTemplateVariables.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                        {contextTemplateVariables.map((key) => (
+                                            <span
+                                                key={key}
+                                                className="text-[10px] px-2 py-0.5 rounded border bg-[var(--accent)] border-[var(--border)] text-[var(--text-secondary)] font-mono"
+                                            >
+                                                {`{{${key}}}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-[var(--text-secondary)]">
+                                        현재 템플릿은 추가로 입력할 변수가 없습니다.
+                                    </p>
+                                )}
                                 {!isJsonTextValid(row.contextJsonText) && (
                                     <p className="text-[10px] text-rose-400">유효한 JSON 형식이 아닙니다. 저장 시 빈 객체로 처리됩니다.</p>
                                 )}
@@ -215,7 +245,7 @@ export function CaseEditorRow({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="bg-sky-500/5 border border-sky-500/20 rounded-lg p-3">
-                                <p className="text-[10px] text-sky-200 mb-2 font-semibold">필수 포함 단어</p>
+                                <p className="text-[10px] text-sky-700 dark:text-sky-200 mb-2 font-semibold">필수 포함 단어</p>
                                 <TagListEditor
                                     placeholder="예: 환불 (Enter)"
                                     values={mustInclude}
@@ -224,7 +254,7 @@ export function CaseEditorRow({
                                 />
                             </div>
                             <div className="bg-rose-500/5 border border-rose-500/20 rounded-lg p-3">
-                                <p className="text-[10px] text-rose-200 mb-2 font-semibold">금지 단어</p>
+                                <p className="text-[10px] text-rose-700 dark:text-rose-200 mb-2 font-semibold">금지 단어</p>
                                 <TagListEditor
                                     placeholder="예: 죄송 (Enter)"
                                     values={mustNotInclude}
@@ -343,9 +373,9 @@ function TagListEditor({ values, placeholder, onChange, tone = 'neutral' }: TagL
     const [draft, setDraft] = useState('');
 
     const colors = {
-        emerald: 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
-        sky: 'bg-sky-500/20 text-sky-200 border-sky-500/30',
-        rose: 'bg-rose-500/20 text-rose-200 border-rose-500/30',
+        emerald: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 border-emerald-500/30',
+        sky: 'bg-sky-500/20 text-sky-700 dark:text-sky-200 border-sky-500/30',
+        rose: 'bg-rose-500/20 text-rose-700 dark:text-rose-200 border-rose-500/30',
         neutral: 'bg-[var(--accent)] text-[var(--text-secondary)] border-[var(--border)]',
     };
 

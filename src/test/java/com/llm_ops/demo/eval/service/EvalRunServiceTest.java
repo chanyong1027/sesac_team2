@@ -1,6 +1,7 @@
 package com.llm_ops.demo.eval.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -18,25 +19,248 @@ import com.llm_ops.demo.eval.domain.EvalRunStatus;
 import com.llm_ops.demo.eval.domain.EvalTestCase;
 import com.llm_ops.demo.eval.domain.EvalTriggerType;
 import com.llm_ops.demo.eval.domain.RubricTemplateCode;
+import com.llm_ops.demo.eval.dto.EvalRunCreateRequest;
+import com.llm_ops.demo.eval.dto.EvalRunEstimateRequest;
 import com.llm_ops.demo.eval.repository.EvalCaseResultRepository;
 import com.llm_ops.demo.eval.repository.EvalRunRepository;
 import com.llm_ops.demo.eval.repository.EvalTestCaseRepository;
 import com.llm_ops.demo.eval.repository.PromptEvalDefaultRepository;
+import com.llm_ops.demo.global.error.BusinessException;
+import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.keys.domain.ProviderType;
+import com.llm_ops.demo.prompt.domain.PromptRelease;
 import com.llm_ops.demo.prompt.domain.Prompt;
 import com.llm_ops.demo.prompt.domain.PromptVersion;
 import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import com.llm_ops.demo.prompt.repository.PromptRepository;
 import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
+import com.llm_ops.demo.auth.domain.User;
+import com.llm_ops.demo.workspace.domain.Workspace;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.Pageable;
 
 class EvalRunServiceTest {
+
+    @Test
+    @DisplayName("estimateRun은 contextJson.question이 비어도 input 값을 question으로 사용한다")
+    void estimateRun은_contextJson_question이_비어도_input을_question으로_사용한다() {
+        // given
+        EvalAccessService evalAccessService = mock(EvalAccessService.class);
+        EvalRunRepository evalRunRepository = mock(EvalRunRepository.class);
+        EvalCaseResultRepository evalCaseResultRepository = mock(EvalCaseResultRepository.class);
+        EvalTestCaseRepository evalTestCaseRepository = mock(EvalTestCaseRepository.class);
+        PromptReleaseRepository promptReleaseRepository = mock(PromptReleaseRepository.class);
+
+        EvalRunService service = new EvalRunService(
+                evalAccessService,
+                new EvalProperties(),
+                evalRunRepository,
+                evalCaseResultRepository,
+                evalTestCaseRepository,
+                mock(PromptEvalDefaultRepository.class),
+                promptReleaseRepository,
+                mock(PromptRepository.class),
+                mock(PromptVersionRepository.class)
+        );
+
+        Prompt prompt = mock(Prompt.class);
+        when(prompt.getId()).thenReturn(100L);
+        Workspace workspace = mock(Workspace.class);
+        when(workspace.getId()).thenReturn(10L);
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(1L);
+
+        EvalAccessService.PromptScope scope = new EvalAccessService.PromptScope(user, workspace, prompt);
+        when(evalAccessService.requirePromptScope(10L, 100L, 1L)).thenReturn(scope);
+
+        PromptVersion candidateVersion = mock(PromptVersion.class);
+        when(candidateVersion.getId()).thenReturn(200L);
+        when(candidateVersion.getVersionNo()).thenReturn(4);
+        when(candidateVersion.getUserTemplate()).thenReturn("질문: {{question}}");
+        when(candidateVersion.getSystemPrompt()).thenReturn(null);
+        when(candidateVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+        when(candidateVersion.getModel()).thenReturn("gpt-4.1-mini");
+        when(candidateVersion.getModelConfig()).thenReturn(null);
+        when(evalAccessService.requirePromptVersion(prompt, 200L)).thenReturn(candidateVersion);
+
+        EvalDataset dataset = mock(EvalDataset.class);
+        when(dataset.getId()).thenReturn(300L);
+        when(evalAccessService.requireDataset(10L, 300L)).thenReturn(dataset);
+
+        EvalTestCase caseRow = mock(EvalTestCase.class);
+        when(caseRow.getCaseOrder()).thenReturn(1);
+        when(caseRow.getExternalId()).thenReturn("case-question-override");
+        when(caseRow.getInputText()).thenReturn("환불 정책");
+        when(caseRow.getContextJson()).thenReturn(Map.of("question", "", "audience", "초보 사용자"));
+        when(evalTestCaseRepository.findByDatasetIdAndEnabledTrueOrderByCaseOrderAsc(300L)).thenReturn(List.of(caseRow));
+
+        EvalRunEstimateRequest request = new EvalRunEstimateRequest(
+                200L,
+                300L,
+                EvalMode.CANDIDATE_ONLY,
+                RubricTemplateCode.GENERAL_TEXT
+        );
+
+        // when
+        var response = service.estimateRun(10L, 100L, 1L, request);
+
+        // then
+        assertThat(response.estimatedCases()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("createRun은 후보 버전 템플릿 변수 누락 케이스가 있으면 실행을 거부한다")
+    void createRun은_후보_버전_템플릿_변수_누락_케이스가_있으면_실행을_거부한다() {
+        // given
+        EvalAccessService evalAccessService = mock(EvalAccessService.class);
+        EvalRunRepository evalRunRepository = mock(EvalRunRepository.class);
+        EvalCaseResultRepository evalCaseResultRepository = mock(EvalCaseResultRepository.class);
+        EvalTestCaseRepository evalTestCaseRepository = mock(EvalTestCaseRepository.class);
+        PromptReleaseRepository promptReleaseRepository = mock(PromptReleaseRepository.class);
+
+        EvalRunService service = new EvalRunService(
+                evalAccessService,
+                new EvalProperties(),
+                evalRunRepository,
+                evalCaseResultRepository,
+                evalTestCaseRepository,
+                mock(PromptEvalDefaultRepository.class),
+                promptReleaseRepository,
+                mock(PromptRepository.class),
+                mock(PromptVersionRepository.class)
+        );
+
+        Prompt prompt = mock(Prompt.class);
+        when(prompt.getId()).thenReturn(100L);
+        Workspace workspace = mock(Workspace.class);
+        when(workspace.getId()).thenReturn(10L);
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(1L);
+
+        EvalAccessService.PromptScope scope = new EvalAccessService.PromptScope(user, workspace, prompt);
+        when(evalAccessService.requirePromptScope(10L, 100L, 1L)).thenReturn(scope);
+
+        PromptVersion candidateVersion = mock(PromptVersion.class);
+        when(candidateVersion.getId()).thenReturn(200L);
+        when(candidateVersion.getVersionNo()).thenReturn(4);
+        when(candidateVersion.getUserTemplate()).thenReturn("{{topic}}에 대해 {{audience}}에게 설명해줘");
+        when(candidateVersion.getSystemPrompt()).thenReturn(null);
+        when(evalAccessService.requirePromptVersion(prompt, 200L)).thenReturn(candidateVersion);
+
+        EvalDataset dataset = mock(EvalDataset.class);
+        when(dataset.getId()).thenReturn(300L);
+        when(evalAccessService.requireDataset(10L, 300L)).thenReturn(dataset);
+
+        EvalTestCase caseRow = mock(EvalTestCase.class);
+        when(caseRow.getCaseOrder()).thenReturn(1);
+        when(caseRow.getExternalId()).thenReturn("case-1");
+        when(caseRow.getInputText()).thenReturn("환불 정책");
+        when(caseRow.getContextJson()).thenReturn(Map.of("audience", "초보 사용자"));
+        when(evalTestCaseRepository.findByDatasetIdAndEnabledTrueOrderByCaseOrderAsc(300L)).thenReturn(List.of(caseRow));
+
+        EvalRunCreateRequest request = new EvalRunCreateRequest(
+                200L,
+                300L,
+                EvalMode.CANDIDATE_ONLY,
+                RubricTemplateCode.GENERAL_TEXT,
+                null
+        );
+
+        // when // then
+        assertThatThrownBy(() -> service.createRun(10L, 100L, 1L, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException ex = (BusinessException) error;
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+                    assertThat(ex.getMessage()).contains("missing=topic");
+                });
+    }
+
+    @Test
+    @DisplayName("createRun 비교 모드는 운영 버전 템플릿 변수 누락도 함께 검증한다")
+    void createRun_비교모드는_운영버전_템플릿_변수_누락도_함께_검증한다() {
+        // given
+        EvalAccessService evalAccessService = mock(EvalAccessService.class);
+        EvalRunRepository evalRunRepository = mock(EvalRunRepository.class);
+        EvalCaseResultRepository evalCaseResultRepository = mock(EvalCaseResultRepository.class);
+        EvalTestCaseRepository evalTestCaseRepository = mock(EvalTestCaseRepository.class);
+        PromptReleaseRepository promptReleaseRepository = mock(PromptReleaseRepository.class);
+
+        EvalRunService service = new EvalRunService(
+                evalAccessService,
+                new EvalProperties(),
+                evalRunRepository,
+                evalCaseResultRepository,
+                evalTestCaseRepository,
+                mock(PromptEvalDefaultRepository.class),
+                promptReleaseRepository,
+                mock(PromptRepository.class),
+                mock(PromptVersionRepository.class)
+        );
+
+        Prompt prompt = mock(Prompt.class);
+        when(prompt.getId()).thenReturn(100L);
+        Workspace workspace = mock(Workspace.class);
+        when(workspace.getId()).thenReturn(10L);
+        User user = mock(User.class);
+        when(user.getId()).thenReturn(1L);
+
+        EvalAccessService.PromptScope scope = new EvalAccessService.PromptScope(user, workspace, prompt);
+        when(evalAccessService.requirePromptScope(10L, 100L, 1L)).thenReturn(scope);
+
+        PromptVersion candidateVersion = mock(PromptVersion.class);
+        when(candidateVersion.getId()).thenReturn(200L);
+        when(candidateVersion.getVersionNo()).thenReturn(7);
+        when(candidateVersion.getUserTemplate()).thenReturn("{{topic}}를 설명해줘");
+        when(candidateVersion.getSystemPrompt()).thenReturn(null);
+        when(evalAccessService.requirePromptVersion(prompt, 200L)).thenReturn(candidateVersion);
+
+        PromptVersion activeVersion = mock(PromptVersion.class);
+        when(activeVersion.getId()).thenReturn(201L);
+        when(activeVersion.getVersionNo()).thenReturn(3);
+        when(activeVersion.getUserTemplate()).thenReturn("{{style}} 톤으로 답변해줘");
+        when(activeVersion.getSystemPrompt()).thenReturn(null);
+
+        PromptRelease release = mock(PromptRelease.class);
+        when(release.getActiveVersion()).thenReturn(activeVersion);
+        when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+        EvalDataset dataset = mock(EvalDataset.class);
+        when(dataset.getId()).thenReturn(300L);
+        when(evalAccessService.requireDataset(10L, 300L)).thenReturn(dataset);
+
+        EvalTestCase caseRow = mock(EvalTestCase.class);
+        when(caseRow.getCaseOrder()).thenReturn(1);
+        when(caseRow.getExternalId()).thenReturn("case-compare-1");
+        when(caseRow.getInputText()).thenReturn("환불 정책");
+        when(caseRow.getContextJson()).thenReturn(Map.of("topic", "환불 정책"));
+        when(evalTestCaseRepository.findByDatasetIdAndEnabledTrueOrderByCaseOrderAsc(300L)).thenReturn(List.of(caseRow));
+
+        EvalRunCreateRequest request = new EvalRunCreateRequest(
+                200L,
+                300L,
+                EvalMode.COMPARE_ACTIVE,
+                RubricTemplateCode.GENERAL_TEXT,
+                null
+        );
+
+        // when // then
+        assertThatThrownBy(() -> service.createRun(10L, 100L, 1L, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> {
+                    BusinessException ex = (BusinessException) error;
+                    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+                    assertThat(ex.getMessage()).contains("운영 버전(Active)");
+                    assertThat(ex.getMessage()).contains("missing=style");
+                });
+    }
 
     @Test
     @DisplayName("pickQueuedRuns는 조회한 QUEUED run을 RUNNING으로 선점한다")
