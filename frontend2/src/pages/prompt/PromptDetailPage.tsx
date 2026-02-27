@@ -518,7 +518,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
             data: {
                 title: 'CS-Bot 기본 응답',
                 provider: 'OPENAI' as const,
-                model: 'gpt-4o-mini',
+                model: 'gpt-4.1-mini',
                 systemPrompt: '너는 고객 문의를 친절하고 간결하게 안내하는 CS 챗봇이다.',
                 userTemplate: '사용자 질문: {{question}}\n답변:',
                 modelConfig: '{"temperature":0.2,"topP":0.9,"maxTokens":512}',
@@ -529,7 +529,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
             data: {
                 title: 'FAQ 요약 응답',
                 provider: 'ANTHROPIC' as const,
-                model: 'claude-3-5-sonnet',
+                model: 'claude-sonnet-4-6',
                 systemPrompt: 'FAQ를 근거로 핵심만 요약해 답변한다.',
                 userTemplate: '질문: {{question}}\nFAQ:\n{{context}}\n요약 답변:',
                 modelConfig: '{"temperature":0.1,"topP":0.8,"maxTokens":400}',
@@ -540,7 +540,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
             data: {
                 title: 'RAG 기반 응답',
                 provider: 'GEMINI' as const,
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-flash',
                 systemPrompt: '문서 컨텍스트를 근거로 답하고, 모르면 모른다고 말한다.',
                 userTemplate: '컨텍스트:\n{{context}}\n질문: {{question}}\n답변:',
                 modelConfig: '{"temperature":0.3,"topP":0.9,"maxTokens":600}',
@@ -817,8 +817,23 @@ function VersionsTab({ promptId }: { promptId: number }) {
     const prettyModel = (model: string) => {
         const raw = model ?? '';
         if (!raw) return '-';
+        const MAP: Record<string, string> = {
+            // OpenAI
+            'gpt-5.2': 'GPT-5.2', 'gpt-4.1': 'GPT-4.1', 'gpt-4.1-mini': 'GPT-4.1 mini',
+            'gpt-4.1-nano': 'GPT-4.1 nano', 'gpt-4o': 'GPT-4o', 'gpt-4o-mini': 'GPT-4o mini',
+            'o3': 'o3', 'o4-mini': 'o4-mini',
+            // Anthropic
+            'claude-opus-4-6': 'Claude Opus 4.6', 'claude-sonnet-4-6': 'Claude Sonnet 4.6',
+            'claude-haiku-4-5': 'Claude Haiku 4.5',
+            // Gemini
+            'gemini-2.5-pro': 'Gemini 2.5 Pro', 'gemini-2.5-flash': 'Gemini 2.5 Flash',
+            'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite', 'gemini-2.0-flash': 'Gemini 2.0 Flash',
+        };
+        const key = raw.toLowerCase();
+        if (MAP[key]) return MAP[key];
+        // fallback
         const lowered = raw.toLowerCase();
-        if (lowered.startsWith('gpt')) return raw.replace(/^gpt/i, 'GPT').replace(/-/g, '-');
+        if (lowered.startsWith('gpt')) return raw.replace(/^gpt/i, 'GPT');
         if (lowered.startsWith('gemini')) return raw.replace(/^gemini/i, 'Gemini').replace(/-/g, ' ');
         if (lowered.startsWith('claude')) return raw.replace(/^claude/i, 'Claude').replace(/-/g, ' ');
         return raw;
