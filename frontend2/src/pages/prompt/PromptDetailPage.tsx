@@ -24,6 +24,9 @@ const PromptEvaluateTab = lazy(async () => {
     return { default: mod.PromptEvaluateTab };
 });
 
+// 현재 미지원 모델 - 선택 UI에서 숨김
+const HIDDEN_MODELS = new Set(['o3', 'o4-mini']);
+
 // 탭 정의
 type TabType = 'overview' | 'versions' | 'release' | 'playground' | 'evaluate';
 
@@ -592,7 +595,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
 
     const providerModels = useMemo(() => {
         if (!modelAllowlist) return [];
-        return modelAllowlist[form.provider] ?? [];
+        return (modelAllowlist[form.provider] ?? []).filter((m) => !HIDDEN_MODELS.has(m));
     }, [modelAllowlist, form.provider]);
 
     const secondaryProviderModels = useMemo(() => {
@@ -1875,7 +1878,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
 
     const providerModels = useMemo(() => {
         if (!modelAllowlist) return [];
-        return modelAllowlist[provider] ?? [];
+        return (modelAllowlist[provider] ?? []).filter((m) => !HIDDEN_MODELS.has(m));
     }, [modelAllowlist, provider]);
 
     // Extract {{variables}} from userTemplate
