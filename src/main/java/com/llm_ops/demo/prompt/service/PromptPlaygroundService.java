@@ -12,6 +12,7 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.global.error.GatewayException;
 import org.springframework.http.HttpStatus;
+import com.llm_ops.demo.global.util.LoggingUtils;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
 import com.llm_ops.demo.prompt.domain.Prompt;
@@ -292,8 +293,7 @@ public class PromptPlaygroundService {
                     request.baseVersionId(),
                     request.provider() != null ? request.provider().name().toLowerCase() : null,
                     request.model(),
-                    null,
-                    false,
+                    null, false,
                     null, null, null, null, null,
                     failure.errorCode(),
                     failure.errorMessage(),
@@ -434,7 +434,8 @@ public class PromptPlaygroundService {
                     request.userTemplate() != null ? request.userTemplate().length() : 0,
                     request.modelConfig() != null ? request.modelConfig().size() : 0,
                     request.variables() != null ? request.variables().size() : 0,
-                    request.baseVersionId()
+                    request.baseVersionId(),
+                    LoggingUtils.extractQuestionForLog(request.variables())
             );
             return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
         } catch (Exception ignored) {
@@ -491,7 +492,8 @@ public class PromptPlaygroundService {
             int userTemplateLength,
             int modelConfigCount,
             int variablesCount,
-            Long baseVersionId
+            Long baseVersionId,
+            String question
     ) {
     }
 }
