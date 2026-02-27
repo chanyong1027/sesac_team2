@@ -26,6 +26,17 @@ function prettyJson(value: unknown): string {
     try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
+function formatVariableValue(value: unknown): string {
+    if (value == null) return '-';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return String(value);
+    }
+}
+
 function extractCompareSummary(judgeOutput: any) {
     return (judgeOutput && typeof judgeOutput === 'object' && judgeOutput.compare) ? judgeOutput.compare : null;
 }
@@ -78,6 +89,13 @@ export function CaseDetailPanel({
 
     // Data Extraction
     const caseInput = inputText || caseContext?.input || '입력 데이터 없음';
+    const contextVariables = caseContext?.contextJson && typeof caseContext.contextJson === 'object'
+        ? Object.entries(caseContext.contextJson).filter(([, value]) => {
+            if (value == null) return false;
+            if (typeof value === 'string') return value.trim().length > 0;
+            return true;
+        })
+        : [];
     const compare = extractCompareSummary(item.judgeOutput);
     const failedChecks = extractFailedChecks(item.ruleChecks);
 
@@ -188,6 +206,25 @@ export function CaseDetailPanel({
                                 <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{caseInput}</p>
                             </div>
                         </div>
+
+                        {contextVariables.length > 0 && (
+                            <div className="flex gap-3">
+                                <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
+                                    <span className="material-symbols-outlined text-sm text-[var(--text-secondary)]">data_object</span>
+                                </div>
+                                <div className="bg-[var(--muted)] rounded-2xl rounded-tl-none p-4 max-w-[80%] border border-[var(--border)]">
+                                    <p className="text-xs font-bold text-gray-400 mb-2">추가 템플릿 변수 (Context)</p>
+                                    <div className="space-y-1.5">
+                                        {contextVariables.map(([key, value]) => (
+                                            <div key={key} className="text-sm text-[var(--foreground)] leading-relaxed">
+                                                <span className="font-mono text-xs text-[var(--text-secondary)] mr-2">{`{{${key}}}`}</span>
+                                                <span className="whitespace-pre-wrap">{formatVariableValue(value)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Model Answer (Split or Single) */}
                         <div className="flex gap-3">
@@ -443,6 +480,10 @@ export function CaseDetailPanel({
                         🛠️ 개발자용 디버깅 데이터입니다.
                     </div>
                     <div className="grid grid-cols-1 gap-4">
+                        <DetailBlock title="Case Input" value={prettyJson(caseInput)} />
+                        <DetailBlock title="Case Context (contextJson)" value={prettyJson(caseContext?.contextJson ?? null)} />
+                        <DetailBlock title="Case Expected (expectedJson)" value={prettyJson(caseContext?.expectedJson ?? null)} />
+                        <DetailBlock title="Case Constraints (constraintsJson)" value={prettyJson(caseContext?.constraintsJson ?? null)} />
                         <DetailBlock title="Full Response Object" value={prettyJson(item)} />
                         <DetailBlock title="Candidate Meta (Token/Cost)" value={prettyJson(item.candidateMeta)} />
                         {isCompareMode && <DetailBlock title="Baseline Meta" value={prettyJson(item.baselineMeta)} />}

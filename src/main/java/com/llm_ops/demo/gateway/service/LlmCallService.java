@@ -224,13 +224,13 @@ public class LlmCallService {
     private static void applyMaxTokens(Object chatOptions, Integer maxTokens) {
         clearTokenFields(chatOptions);
 
-        if (tryInvokeSetter(chatOptions, "setMaxTokens", maxTokens)) {
+        if (tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxTokens)) {
             return;
         }
         if (tryInvokeSetter(chatOptions, "setMaxOutputTokens", maxTokens)) {
             return;
         }
-        tryInvokeSetter(chatOptions, "setMaxCompletionTokens", maxTokens);
+        tryInvokeSetter(chatOptions, "setMaxTokens", maxTokens);
     }
 
     private static void clearTokenFields(Object chatOptions) {

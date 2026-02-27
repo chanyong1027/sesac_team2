@@ -21,6 +21,10 @@ import {
     type CaseJsonField,
     type JsonObject,
 } from './CaseEditorUtils';
+import {
+    buildContextJsonExample,
+    extractTemplateVariables,
+} from './templateVariableUtils';
 import type {
     EvalCaseResultListResponse,
     EvalCaseResultResponse,
@@ -696,6 +700,7 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
     const [isCreatingDataset, setIsCreatingDataset] = useState(false);
     const [newDatasetName, setNewDatasetName] = useState('');
     const [caseRows, setCaseRows] = useState<CaseFormRow[]>([createEmptyCaseFormRow()]);
+    const [datasetInputBindingVariable, setDatasetInputBindingVariable] = useState('question');
 
     const [expandedEditorCaseId, setExpandedEditorCaseId] = useState<string | null>(null);
 
@@ -788,6 +793,43 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
         return datasets?.[0]?.id ?? null;
     }, [runDatasetId, datasets]);
     const resolvedVersionId = selectedVersionId ?? versions?.[0]?.id ?? null;
+    const selectedVersion = useMemo(
+        () => versions?.find((item) => item.id === resolvedVersionId) ?? null,
+        [versions, resolvedVersionId]
+    );
+    const { data: selectedVersionDetail } = useQuery({
+        queryKey: ['promptVersionDetail', promptId, resolvedVersionId],
+        queryFn: async () => {
+            if (!resolvedVersionId) {
+                return null;
+            }
+            return (await promptApi.getVersion(promptId, resolvedVersionId)).data;
+        },
+        enabled: !!resolvedVersionId,
+        staleTime: 30_000,
+    });
+    const templateVariables = useMemo(
+        () => extractTemplateVariables(
+            selectedVersionDetail?.userTemplate,
+            selectedVersionDetail?.systemPrompt
+        ),
+        [selectedVersionDetail?.userTemplate, selectedVersionDetail?.systemPrompt]
+    );
+    const defaultInputBindingVariable = useMemo(() => {
+        if (templateVariables.includes('question')) {
+            return 'question';
+        }
+        return templateVariables[0] ?? 'question';
+    }, [templateVariables]);
+    const resolvedInputBindingVariable = useMemo(() => {
+        if (templateVariables.length === 0) {
+            return 'question';
+        }
+        if (templateVariables.includes(datasetInputBindingVariable)) {
+            return datasetInputBindingVariable;
+        }
+        return defaultInputBindingVariable;
+    }, [templateVariables, datasetInputBindingVariable, defaultInputBindingVariable]);
     const resolvedMode = mode ?? defaults?.defaultMode ?? 'CANDIDATE_ONLY';
     const resolvedRubricTemplateCode = rubricTemplateCode ?? defaults?.rubricTemplateCode ?? 'GENERAL_TEXT';
     const activeReleaseVersionLabel = useMemo(() => {
@@ -972,7 +1014,9 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
                 throw new Error('데이터셋 이름을 입력하세요.');
             }
 
-            const testCases = parseCaseRows(caseRows);
+            const testCases = parseCaseRows(caseRows, {
+                inputBindingVariable: resolvedInputBindingVariable,
+            });
             if (testCases.length === 0) {
                 throw new Error('최소 1개 이상의 케이스가 필요합니다.');
             }
@@ -1253,6 +1297,10 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
                         isSaving={createDatasetMutation.isPending}
                         onNext={() => setCurrentStep('CONFIG')}
                         existingCases={datasetCases || []}
+                        templateVariables={templateVariables}
+                        selectedVersionLabel={selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
+                        inputBindingVariable={resolvedInputBindingVariable}
+                        onChangeInputBindingVariable={setDatasetInputBindingVariable}
                     />
                 )}
 
@@ -1342,6 +1390,10 @@ interface DatasetSectionProps {
     isSaving: boolean;
     onNext: () => void;
     existingCases: EvalTestCaseResponse[];
+    templateVariables: string[];
+    selectedVersionLabel: string;
+    inputBindingVariable: string;
+    onChangeInputBindingVariable: (value: string) => void;
 }
 
 function DatasetSection({
@@ -1365,7 +1417,15 @@ function DatasetSection({
     isSaving,
     onNext,
     existingCases,
+    templateVariables,
+    selectedVersionLabel,
+    inputBindingVariable,
+    onChangeInputBindingVariable,
 }: DatasetSectionProps) {
+    const availableTemplateVariables = templateVariables.length > 0 ? templateVariables : ['question'];
+    const contextVariables = availableTemplateVariables.filter((key) => key !== inputBindingVariable);
+    const contextJsonExample = buildContextJsonExample(contextVariables);
+
     return (
         <div className="grid grid-cols-12 gap-6 h-full">
             <div className="col-span-3 glass-card border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
@@ -1431,6 +1491,46 @@ function DatasetSection({
                                     placeholder="예: v1.0 테스트용"
                                 />
                             </div>
+                            <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-xs font-semibold text-[var(--foreground)]">템플릿 변수 매핑</p>
+                                    <span className="text-[10px] text-[var(--text-secondary)]">기준 버전: {selectedVersionLabel}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-[11px] text-[var(--text-secondary)] shrink-0">질문(핵심 입력) 매핑 변수</label>
+                                    <select
+                                        value={inputBindingVariable}
+                                        onChange={(event) => onChangeInputBindingVariable(event.target.value)}
+                                        className="bg-[var(--input)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)]"
+                                    >
+                                        {availableTemplateVariables.map((key) => (
+                                            <option key={key} value={key}>{`{{${key}}}`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {availableTemplateVariables.map((key) => (
+                                        <span
+                                            key={key}
+                                            className={`text-[10px] px-2 py-0.5 rounded border ${
+                                                key === inputBindingVariable
+                                                    ? 'bg-[var(--primary)]/15 border-[var(--primary)]/40 text-[var(--foreground)]'
+                                                    : 'bg-[var(--accent)] border-[var(--border)] text-[var(--text-secondary)]'
+                                            }`}
+                                        >
+                                            {`{{${key}}}`}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] space-y-1">
+                                    <p>1) 위에서 질문(핵심 입력) 매핑 변수를 고릅니다. 선택된 변수: <span className="font-mono text-[var(--foreground)]">{`{{${inputBindingVariable}}}`}</span></p>
+                                    <p>2) 각 케이스의 "질문 (핵심 입력)" 칸에 메인 질문을 입력하면 위 변수에 자동으로 들어갑니다.</p>
+                                    <p>3) 남은 변수는 "추가 Context (JSON)"에 key/value로 입력합니다.</p>
+                                </div>
+                                <p className="text-[11px] text-[var(--text-tertiary)] font-mono">
+                                    Context 예시: {contextJsonExample}
+                                </p>
+                            </div>
                             <div className="space-y-3">
                                 <p className="text-xs text-gray-400">테스트 케이스 (질문 및 규칙)</p>
                                 {rows.map((row, idx) => (
@@ -1446,6 +1546,8 @@ function DatasetSection({
                                         setCaseArrayField={setCaseArrayField}
                                         setConstraintJsonOnly={setConstraintJsonOnly}
                                         updateCaseJsonObject={updateCaseJsonObject}
+                                        templateVariables={templateVariables}
+                                        inputBindingVariable={inputBindingVariable}
                                     />
                                 ))}
                             </div>
@@ -1490,6 +1592,19 @@ function DatasetSection({
                                 const mustCover = Array.isArray(item.expectedJson?.must_cover) ? item.expectedJson.must_cover : [];
                                 const mustInclude = Array.isArray(item.constraintsJson?.must_include) ? item.constraintsJson.must_include : [];
                                 const mustNotInclude = Array.isArray(item.constraintsJson?.must_not_include) ? item.constraintsJson.must_not_include : [];
+                                const previewTemplateVariables = templateVariables.length > 0 ? templateVariables : ['question'];
+                                const contextRecord = item.contextJson ?? {};
+                                const variableEntries = previewTemplateVariables.map((key) => {
+                                    const isInputVariable = key === inputBindingVariable;
+                                    const rawValue = isInputVariable ? item.input : contextRecord[key];
+                                    const value = rawValue == null ? '' : String(rawValue);
+                                    return {
+                                        key,
+                                        isInputVariable,
+                                        value,
+                                        hasValue: value.trim().length > 0,
+                                    };
+                                });
                                 const rules = [
                                     ...mustInclude.map((word) => `필수: "${String(word)}"`),
                                     ...mustNotInclude.map((word) => `금지: "${String(word)}"`),
@@ -1506,19 +1621,44 @@ function DatasetSection({
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-sm text-gray-200">{item.input}</p>
+                                        <p className="text-sm text-[var(--foreground)]">{item.input}</p>
 
                                         {(mustCover.length > 0 || rules.length > 0) && <div className="h-px bg-white/5" />}
+
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wide">
+                                                템플릿 변수 값
+                                            </p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {variableEntries.map(({ key, isInputVariable, value, hasValue }) => (
+                                                    <span
+                                                        key={`${item.id}-${key}`}
+                                                        className={`text-[11px] px-2 py-1 rounded border ${
+                                                            hasValue
+                                                                ? 'bg-[var(--accent)] border-[var(--border)] text-[var(--foreground)]'
+                                                                : 'bg-rose-500/10 border-rose-500/25 text-rose-700 dark:text-rose-300'
+                                                        }`}
+                                                    >
+                                                        <span className="font-mono">{`{{${key}}}`}</span>
+                                                        {' = '}
+                                                        {hasValue ? value : '미입력'}
+                                                        {isInputVariable && (
+                                                            <span className="ml-1 text-[10px] text-[var(--text-secondary)]">(질문)</span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             {mustCover.length > 0 && (
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-emerald-500/80 mb-1 uppercase">AI 정답 가이드</p>
+                                                    <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 mb-1 uppercase">AI 정답 가이드</p>
                                                     <div className="flex flex-wrap gap-1">
                                                         {mustCover.map((text, index) => (
                                                             <span
                                                                 key={`${String(text)}-${index}`}
-                                                                className="text-[11px] bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded border border-emerald-500/20"
+                                                                className="text-[11px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded border border-emerald-500/20"
                                                             >
                                                                 {String(text)}
                                                             </span>
@@ -1528,12 +1668,12 @@ function DatasetSection({
                                             )}
                                             {rules.length > 0 && (
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-sky-500/80 mb-1 uppercase">룰 체크</p>
+                                                    <p className="text-[10px] font-bold text-sky-700 dark:text-sky-300 mb-1 uppercase">룰 체크</p>
                                                     <div className="flex flex-wrap gap-1">
                                                         {rules.map((text, index) => (
                                                             <span
                                                                 key={`${text}-${index}`}
-                                                                className="text-[11px] bg-sky-500/10 text-sky-300 px-2 py-1 rounded border border-sky-500/20"
+                                                                className="text-[11px] bg-sky-500/10 text-sky-700 dark:text-sky-300 px-2 py-1 rounded border border-sky-500/20"
                                                             >
                                                                 {text}
                                                             </span>
@@ -2004,27 +2144,27 @@ function ConfigSection({
                             <div className="glass-card rounded-xl p-5 border border-[var(--border)] space-y-3">
                                 {singleMode && (
                                     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 animate-in fade-in duration-200">
-                                        <p className="text-[10px] text-emerald-200 mb-1">단일 검증</p>
-                                        <p className="text-sm text-emerald-100 font-semibold">
+                                        <p className="text-[10px] text-emerald-700 dark:text-emerald-200 mb-1">단일 검증</p>
+                                        <p className="text-sm text-emerald-800 dark:text-emerald-100 font-semibold">
                                             내 버전 {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
                                         </p>
-                                        <p className="text-[11px] text-emerald-200/80 mt-1">선택한 버전만 기준 충족 여부를 검사합니다.</p>
+                                        <p className="text-[11px] text-emerald-700/85 dark:text-emerald-200/80 mt-1">선택한 버전만 기준 충족 여부를 검사합니다.</p>
                                     </div>
                                 )}
 
                                 {compareMode && (
                                     <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
                                         <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
-                                            <p className="text-[10px] text-blue-200 mb-1">내 버전</p>
-                                            <p className="text-sm text-blue-100 font-semibold">
+                                            <p className="text-[10px] text-blue-700 dark:text-blue-200 mb-1">내 버전</p>
+                                            <p className="text-sm text-blue-800 dark:text-blue-100 font-semibold">
                                                 {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
                                             </p>
-                                            <p className="text-[10px] text-blue-200/75 mt-1">{selectedVersion?.model ?? '-'}</p>
+                                            <p className="text-[10px] text-blue-700/85 dark:text-blue-200/75 mt-1">{selectedVersion?.model ?? '-'}</p>
                                         </div>
                                         <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
-                                            <p className="text-[10px] text-indigo-200 mb-1">운영 버전 (Active)</p>
-                                            <p className="text-sm text-indigo-100 font-semibold">{activeReleaseVersionLabel ?? '(없음)'}</p>
-                                            <p className="text-[10px] text-indigo-200/75 mt-1">현재 배포 상태와 직접 비교합니다.</p>
+                                            <p className="text-[10px] text-indigo-700 dark:text-indigo-200 mb-1">운영 버전 (Active)</p>
+                                            <p className="text-sm text-indigo-800 dark:text-indigo-100 font-semibold">{activeReleaseVersionLabel ?? '(없음)'}</p>
+                                            <p className="text-[10px] text-indigo-700/85 dark:text-indigo-200/75 mt-1">현재 배포 상태와 직접 비교합니다.</p>
                                         </div>
                                     </div>
                                 )}
@@ -2065,8 +2205,8 @@ function ConfigSection({
                                 {releaseCriteriaNotice && (
                                     <div
                                         className={`rounded-lg border px-3 py-2 text-xs ${releaseCriteriaNotice.type === 'success'
-                                            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                                            : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
+                                            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                                            : 'border-rose-400/40 bg-rose-500/10 text-rose-700 dark:text-rose-200'
                                             }`}
                                     >
                                         {releaseCriteriaNotice.message}
