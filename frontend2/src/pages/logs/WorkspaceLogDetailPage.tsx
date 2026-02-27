@@ -261,6 +261,9 @@ type FailureInsight = {
 
 const FAIL_REASON_DESCRIPTION: Record<string, string> = {
   PROVIDER_BUDGET_EXCEEDED: 'Provider 예산 한도에 도달해 호출이 차단되었습니다.',
+  PRIMARY_PROVIDER_BUDGET_BLOCKED: '기본 Provider 예산이 차단되어 보조 경로로 우회했습니다.',
+  PRIMARY_ROUTE_FAILED: '기본 Provider 경로 실패로 보조 경로로 우회했습니다.',
+  CIRCUIT_BREAKER_OPEN: '연속 실패로 서킷브레이커가 열려 업스트림 호출을 차단했습니다.',
   REQUEST_DEADLINE_EXCEEDED: '요청 전체 제한 시간을 초과했습니다.',
   MODEL_404: '요청한 모델명이 Provider에 존재하지 않습니다.',
   RESOURCE_EXHAUSTED: '업스트림 쿼터/요청 제한으로 처리되지 않았습니다.',
@@ -306,6 +309,13 @@ function resolveReasonDescription(
 ): string {
   if (failReason && FAIL_REASON_DESCRIPTION[failReason]) {
     return FAIL_REASON_DESCRIPTION[failReason];
+  }
+  if (failReason?.startsWith('ALL_FAILED_')) {
+    const nested = failReason.slice('ALL_FAILED_'.length);
+    if (FAIL_REASON_DESCRIPTION[nested]) {
+      return `주/보조 경로 모두 실패했습니다. 최종 원인: ${FAIL_REASON_DESCRIPTION[nested]}`;
+    }
+    return '주/보조 경로 모두 실패해 요청을 완료하지 못했습니다.';
   }
   if (errorCode && ERROR_CODE_DESCRIPTION[errorCode]) {
     return ERROR_CODE_DESCRIPTION[errorCode];
@@ -512,6 +522,15 @@ export function WorkspaceLogDetailPage() {
                   <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center gap-2 text-xs text-amber-500 font-medium">
                     <Zap size={12} fill="currentColor" />
                     Failover Active
+                  </div>
+                )}
+                {log.isFailover && log.failReason && (
+                  <div className="mt-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+                    <div className="text-[11px] text-amber-700 dark:text-amber-200">Failover 원인</div>
+                    <div className="mt-1 text-xs font-mono text-amber-700 dark:text-amber-100">{log.failReason}</div>
+                    <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
+                      {resolveReasonDescription(log.status, log.errorCode, log.failReason)}
+                    </div>
                   </div>
                 )}
               </div>

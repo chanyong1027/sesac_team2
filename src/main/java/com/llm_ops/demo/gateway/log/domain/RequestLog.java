@@ -192,7 +192,7 @@ public class RequestLog {
     }
 
     public void markSuccess(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs,
-            String responsePayload) {
+            String failReason, String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
             return;
         }
@@ -200,6 +200,7 @@ public class RequestLog {
         this.finishedAt = finishedAt;
         this.httpStatus = httpStatus;
         this.latencyMs = latencyMs;
+        this.failReason = failReason;
         this.responsePayload = responsePayload;
     }
 
