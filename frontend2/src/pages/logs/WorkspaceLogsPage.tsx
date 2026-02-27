@@ -254,6 +254,11 @@ export function WorkspaceLogsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={statusBadge(log.status)}>{log.status}</span>
+                      {log.isFailover ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/35 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                          FAILOVER
+                        </span>
+                      ) : null}
                       <span className="text-xs text-[var(--text-secondary)]">
                         {formatShortDateTime(log.createdAt)}
                       </span>
@@ -293,6 +298,11 @@ export function WorkspaceLogsPage() {
                           </span>
                         ) : null}
                       </span>
+                      {log.isFailover && log.failReason ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] text-amber-700 dark:text-amber-300">
+                          failover {log.failReason}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
 

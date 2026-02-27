@@ -252,6 +252,7 @@ public class PromptPlaygroundService {
                     ragContextHash,
                     ragTopK,
                     ragSimilarityThreshold,
+                    null,
                     answer,
                     retrievedDocuments));
 

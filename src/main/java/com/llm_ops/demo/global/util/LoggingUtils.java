@@ -25,10 +25,10 @@ public final class LoggingUtils {
     }
 
     public static String normalizeQuestion(Object raw) {
-        if (raw == null) {
+        if (!(raw instanceof CharSequence)) {
             return null;
         }
-        String trimmed = String.valueOf(raw).trim();
+        String trimmed = raw.toString().trim();
         if (trimmed.isEmpty()) {
             return null;
         }

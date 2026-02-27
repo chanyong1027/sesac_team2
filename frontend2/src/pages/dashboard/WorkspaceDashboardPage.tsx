@@ -568,7 +568,7 @@ export function WorkspaceDashboardPage() {
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                     </h2>
                                     <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                        '{promptKey || workspace.displayName}' 실시간 요청 모니터링
+                                        '{promptKey || workspace.displayName}'의 실시간 요청을 모니터링하고 있습니다.
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -675,6 +675,12 @@ export function WorkspaceDashboardPage() {
                                                             <span className="flex items-center gap-1">
                                                                 <span className="text-[var(--text-secondary)]">!</span>{' '}
                                                                 <span className="text-red-600 dark:text-red-400">{log.failReason || log.errorCode || 'Error'}</span>
+                                                            </span>
+                                                        ) : null}
+                                                        {log.isFailover && log.failReason ? (
+                                                            <span className="flex items-center gap-1">
+                                                                <span className="text-[var(--text-secondary)]">↺</span>{' '}
+                                                                <span className="text-amber-700 dark:text-amber-300">{log.failReason}</span>
                                                             </span>
                                                         ) : null}
                                                     </div>

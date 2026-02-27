@@ -169,6 +169,7 @@ public class GatewayChatService {
         ProviderType usedProvider = null;
         String usedRequestedModel = null;
         boolean isFailover = false;
+        String failoverReason = null;
         boolean failoverAttempted = false;
         Long usedProviderCredentialId = null;
         String budgetFailReason = null;
@@ -296,6 +297,7 @@ public class GatewayChatService {
                 }
 
                 isFailover = true;
+                failoverReason = "PRIMARY_PROVIDER_BUDGET_BLOCKED";
                 failoverAttempted = true;
                 gatewayMetrics.incrementFailover(
                         providerType != null ? providerType.name().toLowerCase() : "unknown",
@@ -369,6 +371,11 @@ public class GatewayChatService {
                     }
 
                     isFailover = true;
+                    failoverReason = (lastProviderFailure != null
+                            && lastProviderFailure.failReason() != null
+                            && !lastProviderFailure.failReason().isBlank())
+                            ? lastProviderFailure.failReason()
+                            : "PRIMARY_ROUTE_FAILED";
                     failoverAttempted = true;
                     gatewayMetrics.incrementFailover(
                             providerType != null ? providerType.name().toLowerCase() : "unknown",
@@ -496,6 +503,7 @@ public class GatewayChatService {
                     ragContextHash,
                     ragTopK,
                     ragSimilarityThreshold,
+                    isFailover ? failoverReason : null,
                     answer,
                     retrievedDocumentInfos));
 
