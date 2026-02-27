@@ -83,7 +83,7 @@ public class RequestLogWriter {
 
                         RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs(),
-                                        update.responsePayload());
+                                        update.failReason(), update.responsePayload());
 
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.SUCCESS)) {
@@ -262,6 +262,7 @@ public class RequestLogWriter {
                         String ragContextHash,
                         Integer ragTopK,
                         Double ragSimilarityThreshold,
+                        String failReason,
                         String responsePayload,
                         List<RetrievedDocumentInfo> retrievedDocuments) {
         }
