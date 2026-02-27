@@ -192,6 +192,6 @@ eval:
     poll-interval-ms: 3000
     batch-size: 3
   runner:
-    request-timeout-ms: 20000
+    request-timeout-ms: 120000
     same-provider-retry-max-attempts: 1
     same-provider-retry-backoff-ms: 200
