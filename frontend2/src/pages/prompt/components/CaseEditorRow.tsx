@@ -215,7 +215,7 @@ export function CaseEditorRow({
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="bg-sky-500/5 border border-sky-500/20 rounded-lg p-3">
-                                <p className="text-[10px] text-sky-200 mb-2 font-semibold">필수 포함 단어</p>
+                                <p className="text-[10px] text-sky-700 dark:text-sky-200 mb-2 font-semibold">필수 포함 단어</p>
                                 <TagListEditor
                                     placeholder="예: 환불 (Enter)"
                                     values={mustInclude}
@@ -224,7 +224,7 @@ export function CaseEditorRow({
                                 />
                             </div>
                             <div className="bg-rose-500/5 border border-rose-500/20 rounded-lg p-3">
-                                <p className="text-[10px] text-rose-200 mb-2 font-semibold">금지 단어</p>
+                                <p className="text-[10px] text-rose-700 dark:text-rose-200 mb-2 font-semibold">금지 단어</p>
                                 <TagListEditor
                                     placeholder="예: 죄송 (Enter)"
                                     values={mustNotInclude}
@@ -343,9 +343,9 @@ function TagListEditor({ values, placeholder, onChange, tone = 'neutral' }: TagL
     const [draft, setDraft] = useState('');
 
     const colors = {
-        emerald: 'bg-emerald-500/20 text-emerald-200 border-emerald-500/30',
-        sky: 'bg-sky-500/20 text-sky-200 border-sky-500/30',
-        rose: 'bg-rose-500/20 text-rose-200 border-rose-500/30',
+        emerald: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 border-emerald-500/30',
+        sky: 'bg-sky-500/20 text-sky-700 dark:text-sky-200 border-sky-500/30',
+        rose: 'bg-rose-500/20 text-rose-700 dark:text-rose-200 border-rose-500/30',
         neutral: 'bg-[var(--accent)] text-[var(--text-secondary)] border-[var(--border)]',
     };
 

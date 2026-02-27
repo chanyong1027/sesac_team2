@@ -1506,19 +1506,19 @@ function DatasetSection({
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-sm text-gray-200">{item.input}</p>
+                                        <p className="text-sm text-[var(--foreground)]">{item.input}</p>
 
                                         {(mustCover.length > 0 || rules.length > 0) && <div className="h-px bg-white/5" />}
 
                                         <div className="grid grid-cols-2 gap-4">
                                             {mustCover.length > 0 && (
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-emerald-500/80 mb-1 uppercase">AI 정답 가이드</p>
+                                                    <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 mb-1 uppercase">AI 정답 가이드</p>
                                                     <div className="flex flex-wrap gap-1">
                                                         {mustCover.map((text, index) => (
                                                             <span
                                                                 key={`${String(text)}-${index}`}
-                                                                className="text-[11px] bg-emerald-500/10 text-emerald-300 px-2 py-1 rounded border border-emerald-500/20"
+                                                                className="text-[11px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded border border-emerald-500/20"
                                                             >
                                                                 {String(text)}
                                                             </span>
@@ -1528,12 +1528,12 @@ function DatasetSection({
                                             )}
                                             {rules.length > 0 && (
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-sky-500/80 mb-1 uppercase">룰 체크</p>
+                                                    <p className="text-[10px] font-bold text-sky-700 dark:text-sky-300 mb-1 uppercase">룰 체크</p>
                                                     <div className="flex flex-wrap gap-1">
                                                         {rules.map((text, index) => (
                                                             <span
                                                                 key={`${text}-${index}`}
-                                                                className="text-[11px] bg-sky-500/10 text-sky-300 px-2 py-1 rounded border border-sky-500/20"
+                                                                className="text-[11px] bg-sky-500/10 text-sky-700 dark:text-sky-300 px-2 py-1 rounded border border-sky-500/20"
                                                             >
                                                                 {text}
                                                             </span>
@@ -2004,27 +2004,27 @@ function ConfigSection({
                             <div className="glass-card rounded-xl p-5 border border-[var(--border)] space-y-3">
                                 {singleMode && (
                                     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 animate-in fade-in duration-200">
-                                        <p className="text-[10px] text-emerald-200 mb-1">단일 검증</p>
-                                        <p className="text-sm text-emerald-100 font-semibold">
+                                        <p className="text-[10px] text-emerald-700 dark:text-emerald-200 mb-1">단일 검증</p>
+                                        <p className="text-sm text-emerald-800 dark:text-emerald-100 font-semibold">
                                             내 버전 {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
                                         </p>
-                                        <p className="text-[11px] text-emerald-200/80 mt-1">선택한 버전만 기준 충족 여부를 검사합니다.</p>
+                                        <p className="text-[11px] text-emerald-700/85 dark:text-emerald-200/80 mt-1">선택한 버전만 기준 충족 여부를 검사합니다.</p>
                                     </div>
                                 )}
 
                                 {compareMode && (
                                     <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-1 duration-300">
                                         <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
-                                            <p className="text-[10px] text-blue-200 mb-1">내 버전</p>
-                                            <p className="text-sm text-blue-100 font-semibold">
+                                            <p className="text-[10px] text-blue-700 dark:text-blue-200 mb-1">내 버전</p>
+                                            <p className="text-sm text-blue-800 dark:text-blue-100 font-semibold">
                                                 {selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
                                             </p>
-                                            <p className="text-[10px] text-blue-200/75 mt-1">{selectedVersion?.model ?? '-'}</p>
+                                            <p className="text-[10px] text-blue-700/85 dark:text-blue-200/75 mt-1">{selectedVersion?.model ?? '-'}</p>
                                         </div>
                                         <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3">
-                                            <p className="text-[10px] text-indigo-200 mb-1">운영 버전 (Active)</p>
-                                            <p className="text-sm text-indigo-100 font-semibold">{activeReleaseVersionLabel ?? '(없음)'}</p>
-                                            <p className="text-[10px] text-indigo-200/75 mt-1">현재 배포 상태와 직접 비교합니다.</p>
+                                            <p className="text-[10px] text-indigo-700 dark:text-indigo-200 mb-1">운영 버전 (Active)</p>
+                                            <p className="text-sm text-indigo-800 dark:text-indigo-100 font-semibold">{activeReleaseVersionLabel ?? '(없음)'}</p>
+                                            <p className="text-[10px] text-indigo-700/85 dark:text-indigo-200/75 mt-1">현재 배포 상태와 직접 비교합니다.</p>
                                         </div>
                                     </div>
                                 )}
@@ -2065,8 +2065,8 @@ function ConfigSection({
                                 {releaseCriteriaNotice && (
                                     <div
                                         className={`rounded-lg border px-3 py-2 text-xs ${releaseCriteriaNotice.type === 'success'
-                                            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                                            : 'border-rose-400/40 bg-rose-500/10 text-rose-200'
+                                            ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                                            : 'border-rose-400/40 bg-rose-500/10 text-rose-700 dark:text-rose-200'
                                             }`}
                                     >
                                         {releaseCriteriaNotice.message}
