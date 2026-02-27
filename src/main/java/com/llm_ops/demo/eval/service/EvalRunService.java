@@ -32,10 +32,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -47,6 +51,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class EvalRunService {
 
     private static final Logger log = LoggerFactory.getLogger(EvalRunService.class);
+    private static final Pattern DOUBLE_BRACE_VARIABLE_PATTERN = Pattern.compile("\\{\\{\\s*([a-zA-Z0-9_]+)\\s*\\}\\}");
+    private static final Pattern SINGLE_BRACE_VARIABLE_PATTERN = Pattern.compile("\\{([a-zA-Z0-9_]+)\\}");
 
     private final EvalAccessService evalAccessService;
     private final EvalProperties evalProperties;
@@ -86,15 +92,18 @@ public class EvalRunService {
         PromptVersion promptVersion = evalAccessService.requirePromptVersion(scope.prompt(), request.promptVersionId());
         var dataset = evalAccessService.requireDataset(scope.workspace().getId(), request.datasetId());
 
-        long totalCases = evalTestCaseRepository.countByDatasetIdAndEnabledTrue(dataset.getId());
-        if (totalCases <= 0) {
+        var testCases = evalTestCaseRepository.findByDatasetIdAndEnabledTrueOrderByCaseOrderAsc(dataset.getId());
+        if (testCases.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "활성화된 testCase가 없습니다.");
         }
 
+        PromptVersion baselineVersion = null;
         if (request.mode() == EvalMode.COMPARE_ACTIVE) {
             // Validate baseline exists and is different from candidate.
-            resolveBaselineVersionForEstimate(scope.prompt(), promptVersion, request.mode());
+            baselineVersion = resolveBaselineVersionForEstimate(scope.prompt(), promptVersion, request.mode());
         }
+
+        validateTemplateVariablesForRun(promptVersion, baselineVersion, testCases);
 
         EvalRun run = enqueueRun(
                 scope.prompt(),
@@ -105,7 +114,7 @@ public class EvalRunService {
                 EvalTriggerType.MANUAL,
                 request.rubricTemplateCode(),
                 request.rubricOverrides(),
-                Math.toIntExact(totalCases),
+                testCases.size(),
                 scope.user().getId()
         );
         return EvalRunResponse.from(run);
@@ -127,6 +136,7 @@ public class EvalRunService {
         }
 
         PromptVersion baselineVersion = resolveBaselineVersionForEstimate(scope.prompt(), candidateVersion, request.mode());
+        validateTemplateVariablesForRun(candidateVersion, baselineVersion, testCases);
 
         int caseCount = testCases.size();
         int judgeAttemptsMin = 1;
@@ -343,19 +353,26 @@ public class EvalRunService {
             return;
         }
 
-        long totalCases = evalTestCaseRepository.countByDatasetIdAndEnabledTrue(dataset.getId());
-        if (totalCases <= 0) {
+        var testCases = evalTestCaseRepository.findByDatasetIdAndEnabledTrueOrderByCaseOrderAsc(dataset.getId());
+        if (testCases.isEmpty()) {
             log.info("Skip auto eval run. no enabled test cases. promptId={}, datasetId={}", promptId, dataset.getId());
             return;
         }
 
+        PromptVersion baselineVersion = null;
         if (defaults.defaultMode() == EvalMode.COMPARE_ACTIVE) {
             try {
-                resolveBaselineVersionForEstimate(prompt, promptVersion, defaults.defaultMode());
+                baselineVersion = resolveBaselineVersionForEstimate(prompt, promptVersion, defaults.defaultMode());
             } catch (BusinessException e) {
                 log.info("Skip auto eval compare run. promptId={}, reason={}", promptId, e.getMessage());
                 return;
             }
+        }
+        try {
+            validateTemplateVariablesForRun(promptVersion, baselineVersion, testCases);
+        } catch (BusinessException e) {
+            log.info("Skip auto eval run. promptId={}, datasetId={}, reason={}", promptId, dataset.getId(), e.getMessage());
+            return;
         }
 
         Long createdBy = actorUserId != null ? actorUserId : promptVersion.getCreatedBy().getId();
@@ -368,7 +385,7 @@ public class EvalRunService {
                 EvalTriggerType.AUTO_VERSION_CREATE,
                 defaults.rubricTemplateCode(),
                 defaults.getRubricOverridesJson(),
-                Math.toIntExact(totalCases),
+                testCases.size(),
                 createdBy
         );
     }
@@ -448,20 +465,7 @@ public class EvalRunService {
     }
 
     private String buildFinalPrompt(PromptVersion version, com.llm_ops.demo.eval.domain.EvalTestCase testCase) {
-        Map<String, String> variables = new LinkedHashMap<>();
-        variables.put("question", testCase.getInputText());
-
-        if (testCase.getContextJson() != null) {
-            for (Map.Entry<String, Object> entry : testCase.getContextJson().entrySet()) {
-                if (entry.getKey() == null || entry.getValue() == null) {
-                    continue;
-                }
-                variables.put(entry.getKey(), String.valueOf(entry.getValue()));
-            }
-            if (!variables.containsKey("context")) {
-                variables.put("context", String.valueOf(testCase.getContextJson()));
-            }
-        }
+        Map<String, String> variables = buildTemplateVariables(testCase);
 
         String userTemplate = version.getUserTemplate();
         if (userTemplate == null || userTemplate.isBlank()) {
@@ -478,6 +482,102 @@ public class EvalRunService {
             return renderedUser;
         }
         return renderedSystem + "\n\n" + renderedUser;
+    }
+
+    private void validateTemplateVariablesForRun(
+            PromptVersion candidateVersion,
+            PromptVersion baselineVersion,
+            List<com.llm_ops.demo.eval.domain.EvalTestCase> testCases
+    ) {
+        validateTemplateVariables(candidateVersion, testCases, "후보 버전");
+        if (baselineVersion != null) {
+            validateTemplateVariables(baselineVersion, testCases, "운영 버전(Active)");
+        }
+    }
+
+    private void validateTemplateVariables(
+            PromptVersion version,
+            List<com.llm_ops.demo.eval.domain.EvalTestCase> testCases,
+            String versionLabel
+    ) {
+        Set<String> requiredVariables = extractTemplateVariables(version);
+        if (requiredVariables.isEmpty()) {
+            return;
+        }
+
+        for (com.llm_ops.demo.eval.domain.EvalTestCase testCase : testCases) {
+            Map<String, String> variables = buildTemplateVariables(testCase);
+            List<String> missingVariables = requiredVariables.stream()
+                    .filter(key -> isBlank(variables.get(key)))
+                    .toList();
+
+            if (!missingVariables.isEmpty()) {
+                String caseLabel = resolveCaseLabel(testCase);
+                String versionInfo = version.getVersionNo() != null ? "v" + version.getVersionNo() : "id=" + version.getId();
+                throw new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "%s(%s) 템플릿 변수 값이 누락된 testCase가 있습니다. %s, missing=%s"
+                                .formatted(versionLabel, versionInfo, caseLabel, String.join(", ", missingVariables))
+                );
+            }
+        }
+    }
+
+    private Map<String, String> buildTemplateVariables(com.llm_ops.demo.eval.domain.EvalTestCase testCase) {
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("question", testCase.getInputText());
+
+        if (testCase.getContextJson() != null) {
+            for (Map.Entry<String, Object> entry : testCase.getContextJson().entrySet()) {
+                if (entry.getKey() == null || entry.getValue() == null) {
+                    continue;
+                }
+                variables.put(entry.getKey(), String.valueOf(entry.getValue()));
+            }
+            if (!variables.containsKey("context")) {
+                variables.put("context", String.valueOf(testCase.getContextJson()));
+            }
+        }
+        return variables;
+    }
+
+    private Set<String> extractTemplateVariables(PromptVersion version) {
+        Set<String> keys = new LinkedHashSet<>();
+        keys.addAll(extractTemplateVariables(version.getUserTemplate()));
+        keys.addAll(extractTemplateVariables(version.getSystemPrompt()));
+        return keys;
+    }
+
+    private Set<String> extractTemplateVariables(String template) {
+        if (template == null || template.isBlank()) {
+            return Set.of();
+        }
+
+        Set<String> keys = new LinkedHashSet<>();
+        Matcher doubleBraceMatcher = DOUBLE_BRACE_VARIABLE_PATTERN.matcher(template);
+        while (doubleBraceMatcher.find()) {
+            keys.add(doubleBraceMatcher.group(1));
+        }
+        Matcher singleBraceMatcher = SINGLE_BRACE_VARIABLE_PATTERN.matcher(template);
+        while (singleBraceMatcher.find()) {
+            keys.add(singleBraceMatcher.group(1));
+        }
+        return keys;
+    }
+
+    private String resolveCaseLabel(com.llm_ops.demo.eval.domain.EvalTestCase testCase) {
+        StringBuilder label = new StringBuilder();
+        label.append("caseOrder=").append(testCase.getCaseOrder());
+        if (testCase.getExternalId() != null && !testCase.getExternalId().isBlank()) {
+            label.append(", externalId=").append(testCase.getExternalId());
+        } else if (testCase.getId() != null) {
+            label.append(", testCaseId=").append(testCase.getId());
+        }
+        return label.toString();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private String renderTemplate(String template, Map<String, String> variables) {

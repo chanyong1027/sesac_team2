@@ -685,6 +685,33 @@ function extractApiError(error: unknown): { status: number | null; message: stri
     return { status: null, message: null };
 }
 
+function extractTemplateVariables(template: string | null | undefined): string[] {
+    if (!template) {
+        return [];
+    }
+    const matches = template.match(/\{\{\s*[^{}\s]+\s*\}\}/g) ?? [];
+    return [...new Set(matches.map((token) => token.replace(/\{\{|\}\}/g, '').trim()).filter(Boolean))];
+}
+
+function sampleVariableValue(key: string): string {
+    const lower = key.toLowerCase();
+    if (lower.includes('locale') || lower.includes('lang')) return 'ko-KR';
+    if (lower.includes('product')) return 'premium_plus';
+    if (lower.includes('tone')) return '친절한 톤';
+    if (lower.includes('category')) return 'refund';
+    if (lower.includes('channel')) return 'email';
+    if (lower.includes('name')) return '홍길동';
+    return `sample_${key}`;
+}
+
+function buildContextJsonExample(keys: string[]): string {
+    if (keys.length === 0) {
+        return '{}';
+    }
+    const fields = keys.map((key) => `"${key}":"${sampleVariableValue(key)}"`).join(', ');
+    return `{${fields}}`;
+}
+
 export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProps) {
     const queryClient = useQueryClient();
 
@@ -696,6 +723,7 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
     const [isCreatingDataset, setIsCreatingDataset] = useState(false);
     const [newDatasetName, setNewDatasetName] = useState('');
     const [caseRows, setCaseRows] = useState<CaseFormRow[]>([createEmptyCaseFormRow()]);
+    const [datasetInputBindingVariable, setDatasetInputBindingVariable] = useState('question');
 
     const [expandedEditorCaseId, setExpandedEditorCaseId] = useState<string | null>(null);
 
@@ -788,6 +816,40 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
         return datasets?.[0]?.id ?? null;
     }, [runDatasetId, datasets]);
     const resolvedVersionId = selectedVersionId ?? versions?.[0]?.id ?? null;
+    const selectedVersion = useMemo(
+        () => versions?.find((item) => item.id === resolvedVersionId) ?? null,
+        [versions, resolvedVersionId]
+    );
+    const { data: selectedVersionDetail } = useQuery({
+        queryKey: ['promptVersionDetail', promptId, resolvedVersionId],
+        queryFn: async () => {
+            if (!resolvedVersionId) {
+                return null;
+            }
+            return (await promptApi.getVersion(promptId, resolvedVersionId)).data;
+        },
+        enabled: !!resolvedVersionId,
+        staleTime: 30_000,
+    });
+    const templateVariables = useMemo(
+        () => extractTemplateVariables(selectedVersionDetail?.userTemplate),
+        [selectedVersionDetail?.userTemplate]
+    );
+    const defaultInputBindingVariable = useMemo(() => {
+        if (templateVariables.includes('question')) {
+            return 'question';
+        }
+        return templateVariables[0] ?? 'question';
+    }, [templateVariables]);
+    const resolvedInputBindingVariable = useMemo(() => {
+        if (templateVariables.length === 0) {
+            return 'question';
+        }
+        if (templateVariables.includes(datasetInputBindingVariable)) {
+            return datasetInputBindingVariable;
+        }
+        return defaultInputBindingVariable;
+    }, [templateVariables, datasetInputBindingVariable, defaultInputBindingVariable]);
     const resolvedMode = mode ?? defaults?.defaultMode ?? 'CANDIDATE_ONLY';
     const resolvedRubricTemplateCode = rubricTemplateCode ?? defaults?.rubricTemplateCode ?? 'GENERAL_TEXT';
     const activeReleaseVersionLabel = useMemo(() => {
@@ -972,7 +1034,9 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
                 throw new Error('데이터셋 이름을 입력하세요.');
             }
 
-            const testCases = parseCaseRows(caseRows);
+            const testCases = parseCaseRows(caseRows, {
+                inputBindingVariable: resolvedInputBindingVariable,
+            });
             if (testCases.length === 0) {
                 throw new Error('최소 1개 이상의 케이스가 필요합니다.');
             }
@@ -1253,6 +1317,10 @@ export function PromptEvalStudio({ workspaceId, promptId }: PromptEvalStudioProp
                         isSaving={createDatasetMutation.isPending}
                         onNext={() => setCurrentStep('CONFIG')}
                         existingCases={datasetCases || []}
+                        templateVariables={templateVariables}
+                        selectedVersionLabel={selectedVersion ? `v${selectedVersion.versionNumber}` : '(미선택)'}
+                        inputBindingVariable={resolvedInputBindingVariable}
+                        onChangeInputBindingVariable={setDatasetInputBindingVariable}
                     />
                 )}
 
@@ -1342,6 +1410,10 @@ interface DatasetSectionProps {
     isSaving: boolean;
     onNext: () => void;
     existingCases: EvalTestCaseResponse[];
+    templateVariables: string[];
+    selectedVersionLabel: string;
+    inputBindingVariable: string;
+    onChangeInputBindingVariable: (value: string) => void;
 }
 
 function DatasetSection({
@@ -1365,7 +1437,15 @@ function DatasetSection({
     isSaving,
     onNext,
     existingCases,
+    templateVariables,
+    selectedVersionLabel,
+    inputBindingVariable,
+    onChangeInputBindingVariable,
 }: DatasetSectionProps) {
+    const availableTemplateVariables = templateVariables.length > 0 ? templateVariables : ['question'];
+    const contextVariables = availableTemplateVariables.filter((key) => key !== inputBindingVariable);
+    const contextJsonExample = buildContextJsonExample(contextVariables);
+
     return (
         <div className="grid grid-cols-12 gap-6 h-full">
             <div className="col-span-3 glass-card border border-[var(--border)] rounded-xl p-4 flex flex-col gap-3">
@@ -1431,6 +1511,46 @@ function DatasetSection({
                                     placeholder="예: v1.0 테스트용"
                                 />
                             </div>
+                            <div className="rounded-lg border border-[var(--border)] bg-[var(--muted)] p-3 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-xs font-semibold text-[var(--foreground)]">템플릿 변수 매핑</p>
+                                    <span className="text-[10px] text-[var(--text-secondary)]">기준 버전: {selectedVersionLabel}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <label className="text-[11px] text-[var(--text-secondary)] shrink-0">질문(핵심 입력) 매핑 변수</label>
+                                    <select
+                                        value={inputBindingVariable}
+                                        onChange={(event) => onChangeInputBindingVariable(event.target.value)}
+                                        className="bg-[var(--input)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--foreground)]"
+                                    >
+                                        {availableTemplateVariables.map((key) => (
+                                            <option key={key} value={key}>{`{{${key}}}`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {availableTemplateVariables.map((key) => (
+                                        <span
+                                            key={key}
+                                            className={`text-[10px] px-2 py-0.5 rounded border ${
+                                                key === inputBindingVariable
+                                                    ? 'bg-[var(--primary)]/15 border-[var(--primary)]/40 text-[var(--foreground)]'
+                                                    : 'bg-[var(--accent)] border-[var(--border)] text-[var(--text-secondary)]'
+                                            }`}
+                                        >
+                                            {`{{${key}}}`}
+                                        </span>
+                                    ))}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-secondary)] space-y-1">
+                                    <p>1) 위에서 질문(핵심 입력) 매핑 변수를 고릅니다. 선택된 변수: <span className="font-mono text-[var(--foreground)]">{`{{${inputBindingVariable}}}`}</span></p>
+                                    <p>2) 각 케이스의 "질문 (핵심 입력)" 칸에 메인 질문을 입력하면 위 변수에 자동으로 들어갑니다.</p>
+                                    <p>3) 남은 변수는 "추가 Context (JSON)"에 key/value로 입력합니다.</p>
+                                </div>
+                                <p className="text-[11px] text-[var(--text-tertiary)] font-mono">
+                                    Context 예시: {contextJsonExample}
+                                </p>
+                            </div>
                             <div className="space-y-3">
                                 <p className="text-xs text-gray-400">테스트 케이스 (질문 및 규칙)</p>
                                 {rows.map((row, idx) => (
@@ -1446,6 +1566,8 @@ function DatasetSection({
                                         setCaseArrayField={setCaseArrayField}
                                         setConstraintJsonOnly={setConstraintJsonOnly}
                                         updateCaseJsonObject={updateCaseJsonObject}
+                                        templateVariables={templateVariables}
+                                        inputBindingVariable={inputBindingVariable}
                                     />
                                 ))}
                             </div>
@@ -1490,6 +1612,19 @@ function DatasetSection({
                                 const mustCover = Array.isArray(item.expectedJson?.must_cover) ? item.expectedJson.must_cover : [];
                                 const mustInclude = Array.isArray(item.constraintsJson?.must_include) ? item.constraintsJson.must_include : [];
                                 const mustNotInclude = Array.isArray(item.constraintsJson?.must_not_include) ? item.constraintsJson.must_not_include : [];
+                                const previewTemplateVariables = templateVariables.length > 0 ? templateVariables : ['question'];
+                                const contextRecord = item.contextJson ?? {};
+                                const variableEntries = previewTemplateVariables.map((key) => {
+                                    const isInputVariable = key === inputBindingVariable;
+                                    const rawValue = isInputVariable ? item.input : contextRecord[key];
+                                    const value = rawValue == null ? '' : String(rawValue);
+                                    return {
+                                        key,
+                                        isInputVariable,
+                                        value,
+                                        hasValue: value.trim().length > 0,
+                                    };
+                                });
                                 const rules = [
                                     ...mustInclude.map((word) => `필수: "${String(word)}"`),
                                     ...mustNotInclude.map((word) => `금지: "${String(word)}"`),
@@ -1509,6 +1644,31 @@ function DatasetSection({
                                         <p className="text-sm text-[var(--foreground)]">{item.input}</p>
 
                                         {(mustCover.length > 0 || rules.length > 0) && <div className="h-px bg-white/5" />}
+
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wide">
+                                                템플릿 변수 값
+                                            </p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {variableEntries.map(({ key, isInputVariable, value, hasValue }) => (
+                                                    <span
+                                                        key={`${item.id}-${key}`}
+                                                        className={`text-[11px] px-2 py-1 rounded border ${
+                                                            hasValue
+                                                                ? 'bg-[var(--accent)] border-[var(--border)] text-[var(--foreground)]'
+                                                                : 'bg-rose-500/10 border-rose-500/25 text-rose-700 dark:text-rose-300'
+                                                        }`}
+                                                    >
+                                                        <span className="font-mono">{`{{${key}}}`}</span>
+                                                        {' = '}
+                                                        {hasValue ? value : '미입력'}
+                                                        {isInputVariable && (
+                                                            <span className="ml-1 text-[10px] text-[var(--text-secondary)]">(질문)</span>
+                                                        )}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             {mustCover.length > 0 && (
