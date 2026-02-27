@@ -43,6 +43,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -128,6 +129,11 @@ class PromptPlaygroundServiceTest {
         assertThat(response.usage().totalTokens()).isEqualTo(150);
         assertThat(response.traceId()).isNotNull();
         assertThat(response.latencyMs()).isNotNull();
+
+        ArgumentCaptor<RequestLogWriter.StartRequest> startCaptor =
+                ArgumentCaptor.forClass(RequestLogWriter.StartRequest.class);
+        verify(requestLogWriter).start(startCaptor.capture());
+        assertThat(startCaptor.getValue().requestPayload()).contains("\"question\":\"안녕하세요?\"");
 
         verify(requestLogWriter).markSuccess(any(), any());
     }

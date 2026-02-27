@@ -213,6 +213,35 @@ class GatewayChatServiceTest {
                 assertThat(requestLog.getApiKeyPrefix()).isEqualTo(apiKeyEntity.getKeyPrefix());
         }
 
+        @Test
+        @DisplayName("question 변수가 있으면 requestPayload에 사용자 질문 원문이 저장된다")
+        void question_변수가_있으면_requestPayload에_질문이_저장된다() {
+                // given
+                OrganizationApiKeyCreateResponse response = organizationApiKeyCreateService.create(
+                                organizationId,
+                                new OrganizationApiKeyCreateRequest("prod"));
+
+                providerCredentialService.register(
+                                organizationId,
+                                new ProviderCredentialCreateRequest("openai", "provider-key"));
+                activateCredential(organizationId, ProviderType.OPENAI);
+
+                String questionPromptKey = createReleasedPrompt("question-bot", "{{question}}");
+                String question = "스타벅스가 뭐야?";
+                GatewayChatRequest request = new GatewayChatRequest(
+                                workspaceId,
+                                questionPromptKey,
+                                Map.of("question", question),
+                                false);
+
+                // when
+                var chatResponse = gatewayChatService.chat(response.apiKey(), request);
+
+                // then
+                RequestLog requestLog = requestLogRepository.findByTraceId(chatResponse.traceId()).orElseThrow();
+                assertThat(requestLog.getRequestPayload()).contains("\"question\":\"" + question + "\"");
+        }
+
         private void activateCredential(Long orgId, ProviderType providerType) {
                 var credential = providerCredentialRepository
                         .findByOrganizationIdAndProvider(orgId, providerType).orElseThrow();
