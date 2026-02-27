@@ -16,6 +16,7 @@ import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.global.error.GatewayException;
+import com.llm_ops.demo.global.util.LoggingUtils;
 import com.llm_ops.demo.keys.domain.ProviderType;
 import com.llm_ops.demo.keys.service.OrganizationApiKeyAuthService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
@@ -636,7 +637,8 @@ public class GatewayChatService {
                     request.workspaceId(),
                     request.promptKey(),
                     request.isRagEnabled(),
-                    request.variables() != null ? request.variables().size() : 0
+                    request.variables() != null ? request.variables().size() : 0,
+                    LoggingUtils.extractQuestionForLog(request.variables())
             );
             return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
         } catch (Exception ignored) {
@@ -1033,7 +1035,8 @@ public class GatewayChatService {
             Long workspaceId,
             String promptKey,
             boolean ragEnabled,
-            int variablesCount
+            int variablesCount,
+            String question
     ) {
     }
 }

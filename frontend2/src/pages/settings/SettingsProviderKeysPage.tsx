@@ -25,7 +25,7 @@ const providerInfo: Record<
 > = {
   OPENAI: {
     label: 'OpenAI',
-    subtitle: 'GPT-4, GPT-3.5 Turbo',
+    subtitle: 'GPT-5.2, GPT-4.1, o3',
     accentText: 'text-[var(--foreground)]',
     iconNode: (
       <div className="size-12 rounded-xl bg-white text-black flex items-center justify-center shadow-[0_0_15px_rgba(255,255,255,0.10)]">
@@ -35,7 +35,7 @@ const providerInfo: Record<
   },
   GEMINI: {
     label: 'Gemini',
-    subtitle: 'Gemini Pro, Ultra',
+    subtitle: 'Gemini 2.5 Pro, Flash',
     accentText: 'text-[var(--foreground)]',
     iconNode: (
       <div className="size-12 rounded-xl bg-gradient-to-r from-blue-500 via-purple-500 to-red-500 p-[1px] shadow-[0_0_15px_rgba(168,85,247,0.20)]">
@@ -49,7 +49,7 @@ const providerInfo: Record<
   },
   ANTHROPIC: {
     label: 'Anthropic',
-    subtitle: 'Claude 3 Opus, Sonnet',
+    subtitle: 'Claude Opus 4.6, Sonnet 4.6',
     accentText: 'text-[var(--foreground)]',
     iconNode: (
       <div className="size-12 rounded-xl bg-[#d09b73] text-[#1a1022] flex items-center justify-center font-serif font-black text-xl shadow-[0_0_15px_rgba(208,155,115,0.20)]">
@@ -728,6 +728,7 @@ export function SettingsProviderKeysPage() {
         </div>
       </div>
 
+      {/* BYOK 정책 배너 - 보안 백서 미사용으로 임시 비노출 (복구 필요 시 주석 해제)
       <div className="glass-card rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-start md:items-center relative overflow-hidden border border-[var(--border)]">
         <div className="absolute -left-10 -top-10 w-40 h-40 bg-[var(--primary)]/20 rounded-full blur-[60px] pointer-events-none" />
         <div className="relative size-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center flex-shrink-0 backdrop-blur-md shadow-inner">
@@ -750,6 +751,7 @@ export function SettingsProviderKeysPage() {
           보안 백서 보기 <span className="material-symbols-outlined text-base">arrow_forward</span>
         </a>
       </div>
+      */}
 
       {isLoading ? (
         <div className="py-12 text-center text-sm text-[var(--text-secondary)]">

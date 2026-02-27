@@ -129,6 +129,9 @@ export function WorkspaceDashboardPage() {
 
     const firstPromptId = prompts?.[0]?.id;
     const promptKey = prompts?.[0]?.promptKey || '';
+    const logsPagePath = promptKey
+        ? `${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`
+        : `${basePath}/logs`;
 
     const { data: versions } = useQuery({
         queryKey: ['prompt-versions', firstPromptId],
@@ -558,17 +561,17 @@ export function WorkspaceDashboardPage() {
 
                         {/* Recent Activity */}
                         <section className="glass-card rounded-2xl overflow-hidden">
-                            <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[var(--muted)]/40">
+                            <div className="p-5 border-b border-[var(--border)] flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-[var(--muted)]/40">
                                 <div>
                                     <h2 className="text-base font-bold text-[var(--foreground)] flex items-center gap-2">
-                                        Recent Activity
+                                        최근 활동
                                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                                     </h2>
                                     <p className="text-xs text-[var(--text-secondary)] mt-1">
-                                        Monitoring real-time requests for '{promptKey || workspace.displayName}'
+                                        '{promptKey || workspace.displayName}' 실시간 요청 모니터링
                                     </p>
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex items-center gap-2 self-start sm:self-auto">
                                     <button
                                         type="button"
                                         onClick={() => refetchRecentLogs()}
@@ -578,11 +581,12 @@ export function WorkspaceDashboardPage() {
                                         <RefreshCw size={18} />
                                     </button>
                                     <Link
-                                        to={`${basePath}/logs?promptKey=${encodeURIComponent(promptKey)}`}
-                                        className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--muted)] transition-colors"
-                                        aria-label="open logs page"
+                                        to={logsPagePath}
+                                        className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-xs sm:text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]"
+                                        aria-label="전체 로그 보기"
                                     >
-                                        <ExternalLink size={18} />
+                                        전체 로그 보기
+                                        <ExternalLink size={16} />
                                     </Link>
                                 </div>
                             </div>
@@ -686,7 +690,7 @@ export function WorkspaceDashboardPage() {
                     {/* Right Column */}
                     <div className="space-y-6">
                         <BudgetUsageCard
-                            title="Monthly Budget"
+                            title="월별 예산"
                             subtitle={`이번 달 사용량 (UTC ${formatUsageMonth(workspaceBudgetUsage?.month)})`}
                             usage={workspaceBudgetUsage ?? null}
                             enabled={!!workspaceBudgetPolicy?.enabled}
@@ -696,7 +700,7 @@ export function WorkspaceDashboardPage() {
 
                         <section className="glass-card rounded-2xl p-6">
                             <h2 className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-4 border-b border-[var(--border)] pb-2">
-                                Quick Setup
+                                빠른 시작
                             </h2>
                             <div className="relative space-y-4">
                                 <div className="absolute left-[9px] top-2 bottom-4 w-0.5 bg-[var(--border)] -z-10" />
@@ -715,7 +719,7 @@ export function WorkspaceDashboardPage() {
                                     idx={2}
                                     checked={hasGatewayApiKeys}
                                     title="Gateway 키 생성"
-                                    description="Service API Access Key"
+                                    description="서비스 API 접근 키"
                                     action={!hasGatewayApiKeys ? (
                                         <Link to={orgId ? `/orgs/${orgId}/settings/api-keys` : '/settings/api-keys'} className="text-xs text-[var(--primary)] font-medium hover:underline">
                                             생성
@@ -726,7 +730,7 @@ export function WorkspaceDashboardPage() {
                                     idx={3}
                                     checked={hasVersions}
                                     title="첫 버전 생성"
-                                    description="Create v1.0 prompt"
+                                    description="v1.0 프롬프트 생성"
                                     action={!hasVersions && hasPrompts ? (
                                         <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-[var(--primary)] font-medium hover:underline">
                                             생성
@@ -737,7 +741,7 @@ export function WorkspaceDashboardPage() {
                                     idx={4}
                                     checked={hasRelease}
                                     title="배포"
-                                    description="Publish to production"
+                                    description="프로덕션 배포"
                                     dim={!hasVersions}
                                     action={!hasRelease && hasVersions ? (
                                         <Link to={`${basePath}/prompts/${firstPromptId}`} className="text-xs text-[var(--primary)] font-medium hover:underline">
@@ -752,7 +756,7 @@ export function WorkspaceDashboardPage() {
                             <div className="flex justify-between items-center mb-3">
                                 <h2 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
-                                    Unified API Endpoint
+                                    통합 API 엔드포인트
                                 </h2>
                                 <button
                                     type="button"
@@ -762,12 +766,12 @@ export function WorkspaceDashboardPage() {
                                     {copiedCurl ? (
                                         <>
                                             <Check size={12} />
-                                            COPIED
+                                            복사됨
                                         </>
                                     ) : (
                                         <>
                                             <Copy size={12} />
-                                            COPY
+                                            복사
                                         </>
                                     )}
                                 </button>
@@ -781,10 +785,10 @@ export function WorkspaceDashboardPage() {
                             <div className="mt-3 flex gap-2">
                                 <div className="flex-1 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">Tip</span>
+                                        <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300">팁</span>
                                     </div>
                                     <p className="text-[10px] text-blue-800/80 dark:text-blue-200/70 leading-relaxed">
-                                        Set <code className="bg-blue-500/10 dark:bg-blue-900/50 px-1 rounded text-blue-800 dark:text-blue-200">ragEnabled</code> to <span className="text-[var(--foreground)]">true</span> to use your indexed documents context.
+                                        문서 RAG를 활성화하려면 <code className="bg-blue-500/10 dark:bg-blue-900/50 px-1 rounded text-blue-800 dark:text-blue-200">ragEnabled</code>를 <span className="text-[var(--foreground)]">true</span>로 설정하세요.
                                     </p>
                                 </div>
                             </div>
