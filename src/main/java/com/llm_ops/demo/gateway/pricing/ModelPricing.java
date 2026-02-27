@@ -29,6 +29,8 @@ public class ModelPricing {
         PRICING_TABLE.put("gpt-4o",       new PriceInfo("0.005",   "0.015"));
         PRICING_TABLE.put("gpt-4o-mini",  new PriceInfo("0.00015", "0.0006"));
         PRICING_TABLE.put("gpt-4.1-nano", new PriceInfo("0.0001",  "0.0004"));
+        PRICING_TABLE.put("gpt-4",        new PriceInfo("0.03",    "0.06"));
+        PRICING_TABLE.put("gpt-3.5-turbo",new PriceInfo("0.0005",  "0.0015"));
 
         // ============================================================
         // Anthropic — 2026-02 기준, per 1K tokens
@@ -72,6 +74,9 @@ public class ModelPricing {
             return BigDecimal.ZERO;
         }
 
+        int safeInputTokens = Math.max(0, inputTokens);
+        int safeOutputTokens = Math.max(0, outputTokens);
+
         // 모델명 정규화 (버전 번호 제거, 소문자 변환)
         String normalizedModelName = normalizeModelName(modelName);
 
@@ -83,11 +88,11 @@ public class ModelPricing {
 
         // 비용 = (입력 토큰 / 1000 * 입력 단가) + (출력 토큰 / 1000 * 출력 단가)
         BigDecimal inputCost = priceInfo.inputPricePer1k
-                .multiply(BigDecimal.valueOf(inputTokens))
+                .multiply(BigDecimal.valueOf(safeInputTokens))
                 .divide(BigDecimal.valueOf(1000), 8, RoundingMode.HALF_UP);
 
         BigDecimal outputCost = priceInfo.outputPricePer1k
-                .multiply(BigDecimal.valueOf(outputTokens))
+                .multiply(BigDecimal.valueOf(safeOutputTokens))
                 .divide(BigDecimal.valueOf(1000), 8, RoundingMode.HALF_UP);
 
         return inputCost.add(outputCost);
