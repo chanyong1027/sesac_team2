@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS retrieved_documents (
     ranking INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
-ALTER TABLE retrieved_documents ALTER COLUMN ranking SET DEFAULT 0;
+ALTER TABLE retrieved_documents ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now();
 ALTER TABLE retrieved_documents ALTER COLUMN content SET STORAGE EXTENDED;
 
 COMMENT ON TABLE retrieved_documents IS 'RAG 검색 결과 문서 (1요청 N문서)';
