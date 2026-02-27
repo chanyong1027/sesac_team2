@@ -5,6 +5,7 @@ import java.util.Map;
 public final class LoggingUtils {
 
     public static final int LOGGED_QUESTION_MAX_CHARS = 500;
+    private static final String[] PREFERRED_KEYS = {"question", "query", "input", "message", "userInput", "userQuery"};
 
     private LoggingUtils() {
     }
@@ -14,8 +15,7 @@ public final class LoggingUtils {
             return null;
         }
 
-        String[] preferredKeys = {"question", "query", "input", "message", "userInput", "userQuery"};
-        for (String key : preferredKeys) {
+        for (String key : PREFERRED_KEYS) {
             String candidate = normalizeQuestion(variables.get(key));
             if (candidate != null) {
                 return candidate;
