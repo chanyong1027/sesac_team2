@@ -126,6 +126,11 @@ public class LlmCallService {
             chatOptions.setModel(modelOverride);
         }
         applyModelConfig(chatOptions, config);
+        // Anthropic API does not accept both temperature and top_p simultaneously.
+        // If both are set, drop top_p (temperature takes precedence).
+        if (chatOptions.getTemperature() != null && chatOptions.getTopP() != null) {
+            chatOptions.setTopP(null);
+        }
         return anthropicChatModel.call(new Prompt(buildMessages(systemPrompt, userPrompt), chatOptions));
     }
 
