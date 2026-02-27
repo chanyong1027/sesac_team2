@@ -728,6 +728,7 @@ export function SettingsProviderKeysPage() {
         </div>
       </div>
 
+      {/* BYOK 정책 배너 - 보안 백서 미사용으로 임시 비노출 (복구 필요 시 주석 해제)
       <div className="glass-card rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-start md:items-center relative overflow-hidden border border-[var(--border)]">
         <div className="absolute -left-10 -top-10 w-40 h-40 bg-[var(--primary)]/20 rounded-full blur-[60px] pointer-events-none" />
         <div className="relative size-14 rounded-2xl bg-[var(--muted)] border border-[var(--border)] flex items-center justify-center flex-shrink-0 backdrop-blur-md shadow-inner">
@@ -750,6 +751,7 @@ export function SettingsProviderKeysPage() {
           보안 백서 보기 <span className="material-symbols-outlined text-base">arrow_forward</span>
         </a>
       </div>
+      */}
 
       {isLoading ? (
         <div className="py-12 text-center text-sm text-[var(--text-secondary)]">

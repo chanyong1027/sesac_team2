@@ -26,6 +26,7 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 import { statisticsApi } from '@/api/statistics.api';
+import { formatModelName } from '@/lib/utils';
 import type { OverviewResponse, TimeseriesDataPoint, ModelUsage, PromptUsage } from '@/api/statistics.api';
 import { workspaceApi } from '@/api/workspace.api';
 
@@ -401,7 +402,7 @@ export default function DashboardPage() {
                                 <div key={i} className="space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-sm font-semibold text-[var(--foreground)]">{model.modelName}</span>
+                                            <span className="text-sm font-semibold text-[var(--foreground)]">{formatModelName(model.modelName)}</span>
                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--text-secondary)] border border-[var(--border)]">
                                                 {model.provider}
                                             </span>

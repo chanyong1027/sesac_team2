@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { promptApi } from '@/api/prompt.api';
+import { formatModelName } from '@/lib/utils';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import {
@@ -817,30 +818,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         return 'bg-gray-500';
     };
 
-    const prettyModel = (model: string) => {
-        const raw = model ?? '';
-        if (!raw) return '-';
-        const MAP: Record<string, string> = {
-            // OpenAI
-            'gpt-5.2': 'GPT-5.2', 'gpt-4.1': 'GPT-4.1', 'gpt-4.1-mini': 'GPT-4.1 mini',
-            'gpt-4.1-nano': 'GPT-4.1 nano', 'gpt-4o': 'GPT-4o', 'gpt-4o-mini': 'GPT-4o mini',
-            'o3': 'o3', 'o4-mini': 'o4-mini',
-            // Anthropic
-            'claude-opus-4-6': 'Claude Opus 4.6', 'claude-sonnet-4-6': 'Claude Sonnet 4.6',
-            'claude-haiku-4-5': 'Claude Haiku 4.5',
-            // Gemini
-            'gemini-2.5-pro': 'Gemini 2.5 Pro', 'gemini-2.5-flash': 'Gemini 2.5 Flash',
-            'gemini-2.5-flash-lite': 'Gemini 2.5 Flash Lite', 'gemini-2.0-flash': 'Gemini 2.0 Flash',
-        };
-        const key = raw.toLowerCase();
-        if (MAP[key]) return MAP[key];
-        // fallback
-        const lowered = raw.toLowerCase();
-        if (lowered.startsWith('gpt')) return raw.replace(/^gpt/i, 'GPT');
-        if (lowered.startsWith('gemini')) return raw.replace(/^gemini/i, 'Gemini').replace(/-/g, ' ');
-        if (lowered.startsWith('claude')) return raw.replace(/^claude/i, 'Claude').replace(/-/g, ' ');
-        return raw;
-    };
+    const prettyModel = formatModelName;
 
     const formatKoDateTime = (iso: string) => {
         const d = new Date(iso);
