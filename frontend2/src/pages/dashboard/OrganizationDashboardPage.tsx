@@ -116,22 +116,19 @@ export function OrganizationDashboardPage() {
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard
-                    label="Total Workspaces"
+                    label="전체 워크스페이스"
                     value={sortedWorkspaces.length}
                     icon={<LayoutGrid className="text-[var(--primary)]" />}
-                    subtext="전체 워크스페이스"
                 />
                 <StatCard
-                    label="Org Members"
+                    label="조직 멤버"
                     value={members?.length || 0}
                     icon={<Users className="text-[var(--primary)]" />}
-                    subtext="현재 조직 멤버"
                 />
                 <StatCard
-                    label="Active API Keys"
+                    label="사용 가능 API 키"
                     value={apiKeys?.length || 0}
                     icon={<KeyRound className="text-[var(--primary)]" />}
-                    subtext="사용 가능한 키"
                 />
             </div>
 
@@ -236,7 +233,7 @@ function WorkspaceCard({
 
                 <div className="space-y-5 py-5 border-t border-dashed border-[var(--border)]">
                     <div className="flex items-center justify-between text-sm">
-                        <span className="text-[var(--text-secondary)] text-xs font-semibold uppercase tracking-wider">RAG Status</span>
+                        <span className="text-[var(--text-secondary)] text-xs font-semibold uppercase tracking-wider">RAG 상태</span>
                         <div className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md border ${rag.pillClass}`}>
                             {rag.icon}
                             {rag.label}
@@ -246,7 +243,7 @@ function WorkspaceCard({
                     <div className="space-y-2">
                         <div className="flex justify-between items-end">
                             <div className="flex flex-col">
-                                <span className="text-[var(--text-secondary)] text-xs font-medium">Budget Usage</span>
+                                <span className="text-[var(--text-secondary)] text-xs font-medium">예산 사용량</span>
                                 <span className="text-[10px] text-[var(--text-secondary)]">UTC {monthLabel}</span>
                             </div>
                             <span className={`${usageTextClass} text-xs font-bold`}>
@@ -260,8 +257,8 @@ function WorkspaceCard({
                             />
                         </div>
                         <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-medium">
-                            <span>Reqs: {requestCountText}</span>
-                            <span>Cost: {costText}</span>
+                            <span>요청: {requestCountText}</span>
+                            <span>비용: {costText}</span>
                         </div>
                     </div>
                 </div>
@@ -270,7 +267,7 @@ function WorkspaceCard({
 
             <div className="mt-auto px-6 py-4 flex items-center justify-between border-t border-[var(--border)] bg-[var(--muted)]/40">
                 <span className="text-[11px] text-[var(--text-secondary)] font-medium">
-                    Updated {formatRelativeTime(workspace.createdAt)}
+                    {formatRelativeTime(workspace.createdAt)} 업데이트
                 </span>
                 <Link
                     to={`/orgs/${workspace.organizationId}/workspaces/${workspace.id}`}
@@ -335,7 +332,7 @@ function badgeClass(status: string) {
 function getRagStatus(documents: Array<{ status: string }> | null, isLoading: boolean) {
     if (isLoading) {
         return {
-            label: 'Processing',
+            label: '처리 중',
             pillClass: 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/25',
             icon: <Loader2 size={14} className="animate-spin" />,
         };
@@ -343,7 +340,7 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
     const docs = documents ?? [];
     if (docs.length === 0) {
         return {
-            label: 'Disabled',
+            label: '비활성',
             pillClass: 'text-[var(--text-secondary)] bg-[var(--muted)] border-[var(--border)]',
             icon: <Ban size={14} />,
         };
@@ -352,7 +349,7 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
     const statuses = new Set(docs.map((d) => String(d.status).toUpperCase()));
     if (statuses.has('FAILED')) {
         return {
-            label: 'Warning',
+            label: '경고',
             pillClass: 'text-red-700 dark:text-red-300 bg-red-500/10 border-red-500/25',
             icon: <AlertTriangle size={14} />,
         };
@@ -363,14 +360,14 @@ function getRagStatus(documents: Array<{ status: string }> | null, isLoading: bo
         .some((s) => statuses.has(s));
     if (inFlight) {
         return {
-            label: 'Processing',
+            label: '처리 중',
             pillClass: 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/25',
             icon: <Loader2 size={14} className="animate-spin" />,
         };
     }
 
     return {
-        label: 'Ready',
+        label: '준비됨',
         pillClass: 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.15)]',
         icon: <CheckCircle2 size={14} />,
     };
@@ -381,10 +378,10 @@ function formatRelativeTime(iso: string) {
     if (!Number.isFinite(then)) return '-';
     const diffMs = Date.now() - then;
     const diffMin = Math.max(0, Math.floor(diffMs / 60000));
-    if (diffMin < 1) return 'just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 1) return '방금 전';
+    if (diffMin < 60) return `${diffMin}분 전`;
     const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) return `${diffH}h ago`;
+    if (diffH < 24) return `${diffH}시간 전`;
     const diffD = Math.floor(diffH / 24);
-    return `${diffD}d ago`;
+    return `${diffD}일 전`;
 }

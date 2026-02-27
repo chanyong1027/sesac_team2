@@ -5,10 +5,13 @@ import com.llm_ops.demo.auth.domain.User;
 import com.llm_ops.demo.auth.repository.UserRepository;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
+import com.llm_ops.demo.gateway.service.GatewayFailureClassifier;
 import com.llm_ops.demo.gateway.service.LlmCallService;
 import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.global.error.GatewayException;
+import org.springframework.http.HttpStatus;
 import com.llm_ops.demo.global.util.LoggingUtils;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
@@ -51,6 +54,7 @@ public class PromptPlaygroundService {
 
     private static final ObjectMapper LOG_PAYLOAD_MAPPER = new ObjectMapper();
     private static final String UNHANDLED_EXCEPTION_PAYLOAD = "error-logged";
+    private static final GatewayFailureClassifier FAILURE_CLASSIFIER = new GatewayFailureClassifier();
     private static final String PLAYGROUND_REQUEST_PATH = "/api/v1/prompts/playground/run";
     private static final String PLAYGROUND_HTTP_METHOD = "POST";
     private static final String RAG_CONTEXT_PREFIX = """
@@ -282,24 +286,29 @@ public class PromptPlaygroundService {
             throw e;
         } catch (Exception e) {
             log.error("Playground run failed: requestId={}", requestId, e);
+            GatewayFailureClassifier.GatewayFailure failure = FAILURE_CLASSIFIER.classifyProvider(e);
             requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
-                    ErrorCode.INTERNAL_SERVER_ERROR.getStatus().value(),
+                    failure.httpStatus(),
                     toLatencyMs(startedAtNanos),
                     promptId,
                     request.baseVersionId(),
                     request.provider() != null ? request.provider().name().toLowerCase() : null,
                     request.model(),
-                    null,
-                    false,
+                    null, false,
                     null, null, null, null, null,
-                    ErrorCode.INTERNAL_SERVER_ERROR.name(),
-                    "Unhandled exception",
-                    "UNHANDLED_EXCEPTION",
+                    failure.errorCode(),
+                    failure.errorMessage(),
+                    failure.failReason(),
                     ragLatencyMs, ragChunksCount, ragContextChars,
                     ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
                     UNHANDLED_EXCEPTION_PAYLOAD,
                     retrievedDocuments));
-            throw e;
+            HttpStatus httpStatus = HttpStatus.resolve(failure.httpStatus());
+            throw new GatewayException(
+                    failure.errorCode(),
+                    httpStatus != null ? httpStatus : HttpStatus.INTERNAL_SERVER_ERROR,
+                    failure.errorMessage(),
+                    e);
         }
     }
 

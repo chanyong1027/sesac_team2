@@ -13,35 +13,52 @@ public class ModelPricing {
 
     private static final Map<String, PriceInfo> PRICING_TABLE = new HashMap<>();
     private static final Map<String, String> MODEL_ALIASES = new HashMap<>();
-    private static final String VERSION = "v1.0.0";
+    private static final String VERSION = "v2.0.0";
 
     static {
-        // OpenAI
-        PRICING_TABLE.put("gpt-4o", new PriceInfo("0.005", "0.015"));
-        PRICING_TABLE.put("gpt-4o-mini", new PriceInfo("0.00015", "0.0006"));
-        PRICING_TABLE.put("gpt-4.1", new PriceInfo("0.002", "0.008"));
-        PRICING_TABLE.put("gpt-4.1-mini", new PriceInfo("0.0004", "0.0016"));
-        PRICING_TABLE.put("gpt-4.1-nano", new PriceInfo("0.0001", "0.0004"));
-        PRICING_TABLE.put("gpt-4", new PriceInfo("0.03", "0.06"));
-        PRICING_TABLE.put("gpt-3.5-turbo", new PriceInfo("0.0005", "0.0015"));
+        // ============================================================
+        // OpenAI — 2026-02 기준, per 1K tokens
+        //   출처: https://platform.openai.com/pricing
+        // ============================================================
+        PRICING_TABLE.put("gpt-5.2",      new PriceInfo("0.00175", "0.014"));   // $1.75 / $14.00 per 1M
+        PRICING_TABLE.put("gpt-4.1",      new PriceInfo("0.002",   "0.008"));   // $2.00 / $8.00  per 1M
+        PRICING_TABLE.put("gpt-4.1-mini", new PriceInfo("0.0004",  "0.0016"));  // $0.40 / $1.60  per 1M
+        PRICING_TABLE.put("o3",           new PriceInfo("0.002",   "0.008"));   // $2.00 / $8.00  per 1M
+        PRICING_TABLE.put("o4-mini",      new PriceInfo("0.0011",  "0.0044"));  // $1.10 / $4.40  per 1M
+        // legacy — allowlist에서 제거됐으나 기존 로그 비용 계산용으로 유지
+        PRICING_TABLE.put("gpt-4o",       new PriceInfo("0.005",   "0.015"));
+        PRICING_TABLE.put("gpt-4o-mini",  new PriceInfo("0.00015", "0.0006"));
+        PRICING_TABLE.put("gpt-4.1-nano", new PriceInfo("0.0001",  "0.0004"));
+        PRICING_TABLE.put("gpt-4",        new PriceInfo("0.03",    "0.06"));
+        PRICING_TABLE.put("gpt-3.5-turbo",new PriceInfo("0.0005",  "0.0015"));
 
-        // Anthropic
-        PRICING_TABLE.put("claude-3-5-sonnet", new PriceInfo("0.003", "0.015"));
-        PRICING_TABLE.put("claude-3-5-haiku", new PriceInfo("0.001", "0.005"));
-        PRICING_TABLE.put("claude-3-opus", new PriceInfo("0.015", "0.075"));
-        PRICING_TABLE.put("claude-3-sonnet", new PriceInfo("0.003", "0.015"));
-        PRICING_TABLE.put("claude-3-haiku", new PriceInfo("0.00025", "0.00125"));
+        // ============================================================
+        // Anthropic — 2026-02 기준, per 1K tokens
+        //   출처: https://platform.claude.com/docs/en/about-claude/pricing
+        // ============================================================
+        PRICING_TABLE.put("claude-opus-4-6",   new PriceInfo("0.005",  "0.025"));  // $5.00 / $25.00 per 1M
+        PRICING_TABLE.put("claude-sonnet-4-6", new PriceInfo("0.003",  "0.015"));  // $3.00 / $15.00 per 1M
+        PRICING_TABLE.put("claude-haiku-4-5",  new PriceInfo("0.001",  "0.005"));  // $1.00 / $5.00  per 1M
+        // legacy
+        PRICING_TABLE.put("claude-3-5-sonnet", new PriceInfo("0.003",   "0.015"));
+        PRICING_TABLE.put("claude-3-5-haiku",  new PriceInfo("0.001",   "0.005"));
+        PRICING_TABLE.put("claude-3-opus",     new PriceInfo("0.015",   "0.075"));
+        PRICING_TABLE.put("claude-3-haiku",    new PriceInfo("0.00025", "0.00125"));
 
-        // Google Gemini
-        PRICING_TABLE.put("gemini-1.5-pro", new PriceInfo("0.00125", "0.005"));
-        PRICING_TABLE.put("gemini-2.0-flash", new PriceInfo("0.0001", "0.0004"));
-        PRICING_TABLE.put("gemini-2.5-flash", new PriceInfo("0.00005", "0.0002"));
-        PRICING_TABLE.put("gemini-2.5-flash-lite", new PriceInfo("0.00005", "0.0002"));
+        // ============================================================
+        // Google Gemini — 2026-02 기준, per 1K tokens
+        //   출처: https://ai.google.dev/gemini-api/docs/pricing
+        // ============================================================
+        PRICING_TABLE.put("gemini-2.5-pro",       new PriceInfo("0.00125", "0.01"));    // $1.25 / $10.00 per 1M
+        PRICING_TABLE.put("gemini-2.5-flash",      new PriceInfo("0.0003",  "0.0025")); // $0.30 / $2.50  per 1M
+        PRICING_TABLE.put("gemini-2.5-flash-lite", new PriceInfo("0.0001",  "0.0004")); // $0.10 / $0.40  per 1M
+        // legacy
+        PRICING_TABLE.put("gemini-2.0-flash",      new PriceInfo("0.0001",  "0.0004"));
 
-        // Aliases (대표 키로 접어서 통계 비용이 0으로 붕괴되는 케이스 완화)
-        MODEL_ALIASES.put("gpt-4-turbo", "gpt-4");
-        MODEL_ALIASES.put("gpt-4-turbo-preview", "gpt-4");
-        MODEL_ALIASES.put("gemini-2.5-flash", "gemini-2.5-flash-lite");
+        // Aliases — 기존 로그에서 날짜 포함 모델명이 올 경우 대표 키로 접기
+        // (날짜 패턴은 normalizeModelName() 에서 regex로 우선 제거됨)
+        MODEL_ALIASES.put("gpt-4-turbo",         "gpt-4o");
+        MODEL_ALIASES.put("gpt-4-turbo-preview",  "gpt-4o");
     }
 
     /**
@@ -57,6 +74,9 @@ public class ModelPricing {
             return BigDecimal.ZERO;
         }
 
+        int safeInputTokens = Math.max(0, inputTokens);
+        int safeOutputTokens = Math.max(0, outputTokens);
+
         // 모델명 정규화 (버전 번호 제거, 소문자 변환)
         String normalizedModelName = normalizeModelName(modelName);
 
@@ -68,11 +88,11 @@ public class ModelPricing {
 
         // 비용 = (입력 토큰 / 1000 * 입력 단가) + (출력 토큰 / 1000 * 출력 단가)
         BigDecimal inputCost = priceInfo.inputPricePer1k
-                .multiply(BigDecimal.valueOf(inputTokens))
+                .multiply(BigDecimal.valueOf(safeInputTokens))
                 .divide(BigDecimal.valueOf(1000), 8, RoundingMode.HALF_UP);
 
         BigDecimal outputCost = priceInfo.outputPricePer1k
-                .multiply(BigDecimal.valueOf(outputTokens))
+                .multiply(BigDecimal.valueOf(safeOutputTokens))
                 .divide(BigDecimal.valueOf(1000), 8, RoundingMode.HALF_UP);
 
         return inputCost.add(outputCost);

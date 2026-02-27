@@ -27,9 +27,9 @@ class LlmCallServiceTest {
         LlmCallService.applyModelConfig(options, config);
 
         // then
-        assertThat(options.maxTokens).isEqualTo(64);
+        assertThat(options.maxTokens).isNull();
         assertThat(options.maxOutputTokens).isNull();
-        assertThat(options.maxCompletionTokens).isNull();
+        assertThat(options.maxCompletionTokens).isEqualTo(64);
     }
 
     @Test

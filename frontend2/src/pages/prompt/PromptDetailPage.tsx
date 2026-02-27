@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { promptApi } from '@/api/prompt.api';
+import { formatModelName } from '@/lib/utils';
 import { organizationApi } from '@/api/organization.api';
 import { useOrganizationStore } from '@/features/organization/store/organizationStore';
 import {
@@ -23,6 +24,9 @@ const PromptEvaluateTab = lazy(async () => {
     const mod = await import('./components/PromptEvaluateTab');
     return { default: mod.PromptEvaluateTab };
 });
+
+// 현재 미지원 모델 - 선택 UI에서 숨김
+const HIDDEN_MODELS = new Set(['o3', 'o4-mini']);
 
 // 탭 정의
 type TabType = 'overview' | 'versions' | 'release' | 'playground' | 'evaluate';
@@ -518,7 +522,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
             data: {
                 title: 'CS-Bot 기본 응답',
                 provider: 'OPENAI' as const,
-                model: 'gpt-4o-mini',
+                model: 'gpt-4.1-mini',
                 systemPrompt: '너는 고객 문의를 친절하고 간결하게 안내하는 CS 챗봇이다.',
                 userTemplate: '사용자 질문: {{question}}\n답변:',
                 modelConfig: '{"temperature":0.2,"topP":0.9,"maxTokens":512}',
@@ -529,7 +533,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
             data: {
                 title: 'FAQ 요약 응답',
                 provider: 'ANTHROPIC' as const,
-                model: 'claude-3-5-sonnet',
+                model: 'claude-sonnet-4-6',
                 systemPrompt: 'FAQ를 근거로 핵심만 요약해 답변한다.',
                 userTemplate: '질문: {{question}}\nFAQ:\n{{context}}\n요약 답변:',
                 modelConfig: '{"temperature":0.1,"topP":0.8,"maxTokens":400}',
@@ -540,7 +544,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
             data: {
                 title: 'RAG 기반 응답',
                 provider: 'GEMINI' as const,
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-flash',
                 systemPrompt: '문서 컨텍스트를 근거로 답하고, 모르면 모른다고 말한다.',
                 userTemplate: '컨텍스트:\n{{context}}\n질문: {{question}}\n답변:',
                 modelConfig: '{"temperature":0.3,"topP":0.9,"maxTokens":600}',
@@ -592,7 +596,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
 
     const providerModels = useMemo(() => {
         if (!modelAllowlist) return [];
-        return modelAllowlist[form.provider] ?? [];
+        return (modelAllowlist[form.provider] ?? []).filter((m) => !HIDDEN_MODELS.has(m));
     }, [modelAllowlist, form.provider]);
 
     const secondaryProviderModels = useMemo(() => {
@@ -814,15 +818,7 @@ function VersionsTab({ promptId }: { promptId: number }) {
         return 'bg-gray-500';
     };
 
-    const prettyModel = (model: string) => {
-        const raw = model ?? '';
-        if (!raw) return '-';
-        const lowered = raw.toLowerCase();
-        if (lowered.startsWith('gpt')) return raw.replace(/^gpt/i, 'GPT').replace(/-/g, '-');
-        if (lowered.startsWith('gemini')) return raw.replace(/^gemini/i, 'Gemini').replace(/-/g, ' ');
-        if (lowered.startsWith('claude')) return raw.replace(/^claude/i, 'Claude').replace(/-/g, ' ');
-        return raw;
-    };
+    const prettyModel = formatModelName;
 
     const formatKoDateTime = (iso: string) => {
         const d = new Date(iso);
@@ -1860,7 +1856,7 @@ function PlaygroundTab({ promptId }: { promptId: number }) {
 
     const providerModels = useMemo(() => {
         if (!modelAllowlist) return [];
-        return modelAllowlist[provider] ?? [];
+        return (modelAllowlist[provider] ?? []).filter((m) => !HIDDEN_MODELS.has(m));
     }, [modelAllowlist, provider]);
 
     // Extract {{variables}} from userTemplate

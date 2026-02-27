@@ -52,10 +52,16 @@ export function createEmptyCaseFormRow(nextId?: string): CaseFormRow {
     };
 }
 
-export function parseCaseRows(rows: CaseFormRow[]): EvalTestCaseCreateRequest[] {
+interface ParseCaseRowsOptions {
+    inputBindingVariable?: string;
+}
+
+export function parseCaseRows(rows: CaseFormRow[], options?: ParseCaseRowsOptions): EvalTestCaseCreateRequest[] {
     if (rows.length === 0) {
         throw new Error('최소 1개 이상의 케이스가 필요합니다.');
     }
+
+    const bindingKey = options?.inputBindingVariable?.trim();
 
     return rows.map((row) => {
         if (!row.input.trim()) {
@@ -63,6 +69,9 @@ export function parseCaseRows(rows: CaseFormRow[]): EvalTestCaseCreateRequest[] 
         }
 
         const contextJson = parseObjectTextLoose(row.contextJsonText);
+        if (bindingKey && bindingKey !== 'question') {
+            contextJson[bindingKey] = row.input;
+        }
         const expectedJson = parseObjectTextLoose(row.expectedJsonText);
         const constraintsJson = parseObjectTextLoose(row.constraintsJsonText);
 

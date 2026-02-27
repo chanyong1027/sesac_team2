@@ -12,17 +12,17 @@ interface ComparisonResult {
 }
 
 const MODEL_OPTIONS = [
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI', color: 'bg-green-500' },
-  { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', provider: 'Anthropic', color: 'bg-orange-500' },
-  { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'Google', color: 'bg-blue-500' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI', color: 'bg-green-400' },
-  { id: 'claude-3-5-haiku', name: 'Claude 3.5 Haiku', provider: 'Anthropic', color: 'bg-orange-400' },
-  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', provider: 'Google', color: 'bg-blue-400' },
+  { id: 'gpt-5.2',            name: 'GPT-5.2',             provider: 'OpenAI',    color: 'bg-green-500' },
+  { id: 'gpt-4.1',            name: 'GPT-4.1',             provider: 'OpenAI',    color: 'bg-green-400' },
+  { id: 'claude-sonnet-4-6',  name: 'Claude Sonnet 4.6',   provider: 'Anthropic', color: 'bg-orange-500' },
+  { id: 'claude-haiku-4-5',   name: 'Claude Haiku 4.5',    provider: 'Anthropic', color: 'bg-orange-400' },
+  { id: 'gemini-2.5-pro',     name: 'Gemini 2.5 Pro',      provider: 'Google',    color: 'bg-blue-500' },
+  { id: 'gemini-2.5-flash',   name: 'Gemini 2.5 Flash',    provider: 'Google',    color: 'bg-blue-400' },
 ];
 
 export function ModelComparisonPage() {
   const [query, setQuery] = useState('');
-  const [selectedModels, setSelectedModels] = useState<string[]>(['gpt-4o', 'claude-3-5-sonnet', 'gemini-2.0-flash']);
+  const [selectedModels, setSelectedModels] = useState<string[]>(['gpt-5.2', 'claude-sonnet-4-6', 'gemini-2.5-pro']);
   const [results, setResults] = useState<ComparisonResult[]>([]);
   const [isComparing, setIsComparing] = useState(false);
 
@@ -260,9 +260,9 @@ function ResultCard({ result }: { result: ComparisonResult }) {
 // Mock 데이터 생성 함수들
 function generateMockAnswer(modelName: string, query: string): string {
   const answers: Record<string, string> = {
-    'GPT-4o': `[GPT-4o 답변]
+    'GPT-5.2': `[GPT-5.2 답변]
 
-질문에 대한 상세한 답변을 제공합니다. GPT-4o는 최신 정보를 바탕으로 정확하고 포괄적인 답변을 생성합니다.
+질문에 대한 상세한 답변을 제공합니다. GPT-5.2는 최신 정보를 바탕으로 정확하고 포괄적인 답변을 생성합니다.
 
 주요 포인트:
 1. 첫 번째 핵심 내용
@@ -271,7 +271,18 @@ function generateMockAnswer(modelName: string, query: string): string {
 
 이러한 관점에서 볼 때, ${query}에 대한 종합적인 이해가 필요합니다.`,
 
-    'Claude 3.5 Sonnet': `[Claude 3.5 Sonnet 답변]
+    'GPT-4.1': `[GPT-4.1 답변]
+
+안정적이고 균형 잡힌 답변을 제공합니다.
+
+주요 포인트:
+1. 첫 번째 핵심 내용
+2. 두 번째 중요한 사항
+3. 세 번째 보충 설명
+
+${query}에 대한 포괄적인 분석을 바탕으로 답변드립니다.`,
+
+    'Claude Sonnet 4.6': `[Claude Sonnet 4.6 답변]
 
 질문을 분석한 결과, 다음과 같이 답변드립니다.
 
@@ -283,7 +294,28 @@ Claude는 논리적 추론과 분석에 강점이 있어, 복잡한 주제를 �
 
 따라서 ${query}는 이러한 관점에서 이해할 수 있습니다.`,
 
-    'Gemini 2.0 Flash': `[Gemini 2.0 Flash 답변]
+    'Claude Haiku 4.5': `[Claude Haiku 4.5 답변]
+
+간결하고 빠른 답변을 제공합니다.
+
+• 핵심 포인트 1
+• 핵심 포인트 2
+• 핵심 포인트 3
+
+${query}에 대한 핵심만 짚어 드렸습니다.`,
+
+    'Gemini 2.5 Pro': `[Gemini 2.5 Pro 답변]
+
+고성능 추론으로 답변을 제공합니다!
+
+✨ 주요 내용:
+- 첫 번째 포인트: 핵심 내용
+- 두 번째 포인트: 심층 분석
+- 세 번째 포인트: 결론
+
+Gemini 2.5 Pro는 복잡한 추론과 코딩에 최적화되어 있습니다. ${query}에 대한 답변이 도움이 되셨기를 바랍니다!`,
+
+    'Gemini 2.5 Flash': `[Gemini 2.5 Flash 답변]
 
 빠르고 효율적인 답변을 제공합니다!
 
@@ -292,7 +324,7 @@ Claude는 논리적 추론과 분석에 강점이 있어, 복잡한 주제를 �
 - 두 번째 포인트: 보충 설명
 - 세 번째 포인트: 결론
 
-Gemini는 속도와 비용 효율성이 뛰어나 간단한 질문에 최적화되어 있습니다. ${query}에 대한 답변이 도움이 되셨기를 바랍니다!`,
+Gemini 2.5 Flash는 속도와 비용 효율성이 뛰어납니다. ${query}에 대한 답변이 도움이 되셨기를 바랍니다!`,
   };
 
   return answers[modelName] || `[${modelName}의 답변]\n\n${query}에 대한 답변입니다.`;
@@ -300,12 +332,12 @@ Gemini는 속도와 비용 효율성이 뛰어나 간단한 질문에 최적화�
 
 function getMockCost(modelId: string): number {
   const costs: Record<string, number> = {
-    'gpt-4o': 0.015,
-    'claude-3-5-sonnet': 0.008,
-    'gemini-2.0-flash': 0.002,
-    'gpt-4o-mini': 0.003,
-    'claude-3-5-haiku': 0.002,
-    'gemini-2.5-flash-lite': 0.001,
+    'gpt-5.2': 0.032,
+    'gpt-4.1': 0.018,
+    'claude-sonnet-4-6': 0.024,
+    'claude-haiku-4-5': 0.008,
+    'gemini-2.5-pro': 0.016,
+    'gemini-2.5-flash': 0.004,
   };
   return costs[modelId] || 0.01;
 }
