@@ -69,6 +69,7 @@ class RequestLogWriterTest {
                                 "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                                 5,
                                 0.7,
+                                null,
                                 "Hello! I'm an AI assistant.",
                                 null));
 

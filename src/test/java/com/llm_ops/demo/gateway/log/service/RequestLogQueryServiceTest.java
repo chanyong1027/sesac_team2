@@ -273,7 +273,7 @@ class RequestLogQueryServiceTest {
                     false,
                     "{\"question\":\"secret\"}",
                     "GATEWAY");
-            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, "{\"answer\":\"ok\"}");
+            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, null, "{\"answer\":\"ok\"}");
             requestLogRepository.save(log);
 
             RequestLogSearchCondition condition = RequestLogSearchCondition.empty();
@@ -312,7 +312,7 @@ class RequestLogQueryServiceTest {
                 null,
                 "GATEWAY");
         if (status == RequestLogStatus.SUCCESS) {
-            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, null);
+            log.markSuccess(java.time.LocalDateTime.now(), 200, 100, null, null);
         } else if (status == RequestLogStatus.FAIL) {
             log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR", null);
         }
