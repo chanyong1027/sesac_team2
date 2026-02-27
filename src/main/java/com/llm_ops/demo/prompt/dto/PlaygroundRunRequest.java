@@ -22,7 +22,7 @@ public record PlaygroundRunRequest(
     Map<String, Object> modelConfig,
 
     @NotNull(message = "variables는 필수입니다.")
-    Map<String, @NotBlank String> variables,
+    Map<String, String> variables,
 
     Long baseVersionId
 ) {}
