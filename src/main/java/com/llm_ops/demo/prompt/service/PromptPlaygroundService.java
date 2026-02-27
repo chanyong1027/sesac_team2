@@ -9,6 +9,7 @@ import com.llm_ops.demo.gateway.service.LlmCallService;
 import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import com.llm_ops.demo.global.util.LoggingUtils;
 import com.llm_ops.demo.keys.service.ProviderCredentialService;
 import com.llm_ops.demo.keys.service.ProviderCredentialService.ResolvedProviderApiKey;
 import com.llm_ops.demo.prompt.domain.Prompt;
@@ -49,7 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class PromptPlaygroundService {
 
     private static final ObjectMapper LOG_PAYLOAD_MAPPER = new ObjectMapper();
-    private static final int LOGGED_QUESTION_MAX_CHARS = 500;
     private static final String UNHANDLED_EXCEPTION_PAYLOAD = "error-logged";
     private static final String PLAYGROUND_REQUEST_PATH = "/api/v1/prompts/playground/run";
     private static final String PLAYGROUND_HTTP_METHOD = "POST";
@@ -426,41 +426,12 @@ public class PromptPlaygroundService {
                     request.modelConfig() != null ? request.modelConfig().size() : 0,
                     request.variables() != null ? request.variables().size() : 0,
                     request.baseVersionId(),
-                    extractQuestionForLog(request.variables())
+                    LoggingUtils.extractQuestionForLog(request.variables())
             );
             return LOG_PAYLOAD_MAPPER.writeValueAsString(payload);
         } catch (Exception ignored) {
             return null;
         }
-    }
-
-    private static String extractQuestionForLog(Map<String, ?> variables) {
-        if (variables == null || variables.isEmpty()) {
-            return null;
-        }
-
-        String[] preferredKeys = {"question", "query", "input", "message", "userInput", "userQuery"};
-        for (String key : preferredKeys) {
-            String candidate = normalizeQuestion(variables.get(key));
-            if (candidate != null) {
-                return candidate;
-            }
-        }
-        return null;
-    }
-
-    private static String normalizeQuestion(Object raw) {
-        if (raw == null) {
-            return null;
-        }
-        String trimmed = String.valueOf(raw).trim();
-        if (trimmed.isEmpty()) {
-            return null;
-        }
-        if (trimmed.length() > LOGGED_QUESTION_MAX_CHARS) {
-            return trimmed.substring(0, LOGGED_QUESTION_MAX_CHARS);
-        }
-        return trimmed;
     }
 
     private static List<RequestLogWriter.RetrievedDocumentInfo> toRetrievedDocumentInfos(
