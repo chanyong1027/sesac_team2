@@ -6,7 +6,9 @@ import { promptApi } from '@/api/prompt.api';
 import { logsApi } from '@/api/logs.api';
 import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
 
-const PAGE_SIZE = 20;
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 40, 60] as const;
+const PAGE_NUMBER_CHUNK = 10;
 
 type LogStatusFilter = 'ALL' | 'SUCCESS' | 'FAILOVER' | 'FAIL' | 'BLOCKED';
 type LogsListParams = NonNullable<Parameters<typeof logsApi.list>[1]>;
@@ -50,6 +52,14 @@ function modelLabel(log: RequestLogResponse) {
   return log.usedModel || log.requestedModel || '-';
 }
 
+function buildVisiblePages(currentPage: number, totalPages: number) {
+  if (totalPages <= 0) return [];
+  const chunkStart = Math.floor(currentPage / PAGE_NUMBER_CHUNK) * PAGE_NUMBER_CHUNK;
+  const end = Math.min(totalPages - 1, chunkStart + PAGE_NUMBER_CHUNK - 1);
+  const start = Math.max(0, chunkStart);
+  return Array.from({ length: end - start + 1 }, (_, idx) => start + idx);
+}
+
 export function WorkspaceLogsPage() {
   const { orgId, workspaceId: workspaceIdParam } = useParams<{
     orgId: string;
@@ -81,6 +91,7 @@ export function WorkspaceLogsPage() {
   const [provider, setProvider] = useState('');
   const [traceId, setTraceId] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   // Prompt key: URL → state → defaultPromptKey 순서로 초기화
   useEffect(() => {
@@ -92,7 +103,7 @@ export function WorkspaceLogsPage() {
   const resolvedParams = useMemo(() => {
     const params: LogsListParams = {
       page,
-      size: PAGE_SIZE,
+      size: pageSize,
     };
     if (promptKey.trim()) params.promptKey = promptKey.trim();
     if (status === 'SUCCESS') {
@@ -108,11 +119,11 @@ export function WorkspaceLogsPage() {
     if (provider.trim()) params.provider = provider.trim();
     if (traceId.trim()) params.traceId = traceId.trim();
     return params;
-  }, [page, promptKey, status, ragEnabled, provider, traceId]);
+  }, [page, pageSize, promptKey, status, ragEnabled, provider, traceId]);
 
   useEffect(() => {
     setPage(0);
-  }, [promptKey, status, ragEnabled, provider, traceId]);
+  }, [promptKey, status, ragEnabled, provider, traceId, pageSize]);
 
   const {
     data: list,
@@ -130,9 +141,13 @@ export function WorkspaceLogsPage() {
   const totalElements = list?.totalElements ?? 0;
   const totalPages = list?.totalPages ?? 0;
   const currentPage = list?.page ?? page;
-  const pageSize = list?.size ?? PAGE_SIZE;
-  const firstItemIndex = totalElements === 0 ? 0 : currentPage * pageSize + 1;
-  const lastItemIndex = totalElements === 0 ? 0 : currentPage * pageSize + logs.length;
+  const resolvedPageSize = list?.size ?? pageSize;
+  const firstItemIndex = totalElements === 0 ? 0 : currentPage * resolvedPageSize + 1;
+  const lastItemIndex = totalElements === 0 ? 0 : currentPage * resolvedPageSize + logs.length;
+  const visiblePages = useMemo(
+    () => buildVisiblePages(currentPage, totalPages),
+    [currentPage, totalPages]
+  );
 
   useEffect(() => {
     if (!list) return;
@@ -367,12 +382,29 @@ export function WorkspaceLogsPage() {
               <div className="text-xs text-[var(--text-secondary)]">
                 {`총 ${totalElements}개 중 ${firstItemIndex}-${lastItemIndex}개`}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-[var(--text-secondary)]">페이지당</label>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-[var(--text-secondary)]">개</span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setPage(0)}
                   disabled={currentPage === 0}
-                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   처음
                 </button>
@@ -380,18 +412,34 @@ export function WorkspaceLogsPage() {
                   type="button"
                   onClick={() => setPage((prev) => Math.max(prev - 1, 0))}
                   disabled={currentPage === 0}
-                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   이전
                 </button>
-                <span className="px-2 text-xs text-[var(--text-secondary)]">
+
+                {visiblePages.map((pageNumber) => (
+                  <button
+                    key={pageNumber}
+                    type="button"
+                    onClick={() => setPage(pageNumber)}
+                    className={`inline-flex min-w-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                      pageNumber === currentPage
+                        ? 'border-[var(--primary)] bg-[var(--primary)]/15 text-[var(--primary)]'
+                        : 'border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--foreground)] hover:bg-[var(--surface-subtle)]'
+                    }`}
+                  >
+                    {pageNumber + 1}
+                  </button>
+                ))}
+
+                <span className="px-2 text-sm text-[var(--text-secondary)]">
                   {`${currentPage + 1} / ${Math.max(totalPages, 1)} 페이지`}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPage((prev) => Math.min(prev + 1, Math.max(totalPages - 1, 0)))}
                   disabled={currentPage >= Math.max(totalPages - 1, 0)}
-                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   다음
                 </button>
@@ -399,10 +447,11 @@ export function WorkspaceLogsPage() {
                   type="button"
                   onClick={() => setPage(Math.max(totalPages - 1, 0))}
                   disabled={currentPage >= Math.max(totalPages - 1, 0)}
-                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   마지막
                 </button>
+                </div>
               </div>
             </div>
           </>
