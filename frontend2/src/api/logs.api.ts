@@ -8,6 +8,7 @@ export const logsApi = {
       page?: number;
       size?: number;
       status?: string;
+      failover?: boolean;
       provider?: string;
       usedModel?: string;
       ragEnabled?: boolean;
@@ -31,4 +32,3 @@ export const logsApi = {
     return res.data.data;
   },
 };
-
