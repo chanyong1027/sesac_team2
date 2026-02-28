@@ -186,6 +186,7 @@ public class GatewayChatService {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
             ActiveVersionResolution resolution = resolveActiveVersion(workspace, request.promptKey());
             PromptVersion activeVersion = resolution.version();
+            ModelConfigOverride versionModelConfig = ModelConfigOverride.from(activeVersion.getModelConfig());
             promptId = resolution.promptId();
             promptVersionId = resolution.promptVersionId();
 
@@ -329,7 +330,7 @@ public class GatewayChatService {
                         secondaryModelEffective,
                         systemPrompt,
                         userPrompt,
-                        secondaryMaxTokens,
+                        buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens),
                         deadlineNanos,
                         false
                 );
@@ -346,7 +347,7 @@ public class GatewayChatService {
                         requestedModelEffective,
                         systemPrompt,
                         userPrompt,
-                        maxOutputTokensOverride,
+                        buildEffectiveModelConfig(versionModelConfig, maxOutputTokensOverride),
                         deadlineNanos,
                         hasSecondaryModel(secondaryProvider, secondaryModel)
                 );
@@ -407,7 +408,7 @@ public class GatewayChatService {
                             secondaryModelEffective,
                             systemPrompt,
                             userPrompt,
-                            secondaryMaxTokens,
+                            buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens),
                             deadlineNanos,
                             false
                     );
@@ -807,7 +808,7 @@ public class GatewayChatService {
             String requestedModel,
             String systemPrompt,
             String userPrompt,
-            Integer maxOutputTokensOverride
+            ModelConfigOverride config
     ) {
         CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(resolved.providerType().getValue());
         return CircuitBreaker.decorateSupplier(circuitBreaker, () ->
@@ -816,9 +817,24 @@ public class GatewayChatService {
                         requestedModel,
                         systemPrompt,
                         userPrompt,
-                        ModelConfigOverride.ofMaxTokens(maxOutputTokensOverride)
+                        config
                 )
         ).get();
+    }
+
+    private static ModelConfigOverride buildEffectiveModelConfig(
+            ModelConfigOverride versionConfig,
+            Integer budgetMaxTokensOverride
+    ) {
+        if (versionConfig == null && budgetMaxTokensOverride == null) {
+            return null;
+        }
+        Double temperature = versionConfig != null ? versionConfig.temperature() : null;
+        Integer maxTokens = budgetMaxTokensOverride != null ? budgetMaxTokensOverride
+                : (versionConfig != null ? versionConfig.maxTokens() : null);
+        Double topP = versionConfig != null ? versionConfig.topP() : null;
+        Double frequencyPenalty = versionConfig != null ? versionConfig.frequencyPenalty() : null;
+        return new ModelConfigOverride(temperature, maxTokens, topP, frequencyPenalty);
     }
 
     private boolean hasSecondaryModel(ProviderType secondaryProvider, String secondaryModel) {
@@ -834,7 +850,7 @@ public class GatewayChatService {
             String requestedModel,
             String systemPrompt,
             String userPrompt,
-            Integer maxOutputTokensOverride,
+            ModelConfigOverride config,
             long deadlineNanos,
             boolean reserveFailoverBudget
     ) {
@@ -847,7 +863,7 @@ public class GatewayChatService {
                     requestedModel,
                     systemPrompt,
                     userPrompt,
-                    maxOutputTokensOverride,
+                    config,
                     deadlineNanos,
                     failoverReserveMs
             );
@@ -876,7 +892,7 @@ public class GatewayChatService {
                         requestedModel,
                         systemPrompt,
                         userPrompt,
-                        maxOutputTokensOverride,
+                        config,
                         deadlineNanos,
                         failoverReserveMs
                 );
@@ -903,7 +919,7 @@ public class GatewayChatService {
             String requestedModel,
             String systemPrompt,
             String userPrompt,
-            Integer maxOutputTokensOverride,
+            ModelConfigOverride config,
             long deadlineNanos,
             long reservedBudgetAfterCallMs
     ) throws Exception {
@@ -915,7 +931,7 @@ public class GatewayChatService {
 
         long attemptTimeoutMs = Math.max(1L, usableBudgetMs);
         Future<ChatResponse> future = providerCallExecutor.submit(() ->
-                callProvider(resolved, requestedModel, systemPrompt, userPrompt, maxOutputTokensOverride));
+                callProvider(resolved, requestedModel, systemPrompt, userPrompt, config));
 
         try {
             return future.get(attemptTimeoutMs, TimeUnit.MILLISECONDS);
