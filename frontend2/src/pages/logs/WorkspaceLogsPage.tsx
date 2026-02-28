@@ -9,6 +9,7 @@ import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
 const PAGE_SIZE = 20;
 
 type LogStatusFilter = 'ALL' | 'SUCCESS' | 'FAILOVER' | 'FAIL' | 'BLOCKED';
+type LogsListParams = NonNullable<Parameters<typeof logsApi.list>[1]>;
 
 const STATUS_OPTIONS: Array<{ value: LogStatusFilter; label: string }> = [
   { value: 'ALL', label: 'all' },
@@ -89,7 +90,7 @@ export function WorkspaceLogsPage() {
   }, [defaultPromptKey, promptKey]);
 
   const resolvedParams = useMemo(() => {
-    const params: Record<string, unknown> = {
+    const params: LogsListParams = {
       page,
       size: PAGE_SIZE,
     };
