@@ -4,6 +4,5 @@ public enum RequestLogStatus {
     IN_PROGRESS,
     SUCCESS,
     FAIL,
-    BLOCKED,
-    TIMEOUT
+    BLOCKED
 }

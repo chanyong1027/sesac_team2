@@ -29,7 +29,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 COUNT(*) as totalRequests,
                 COALESCE(SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END), 0) as successCount,
-                COALESCE(SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END), 0) as errorCount,
+                COALESCE(SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END), 0) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as totalTokens,
                 CAST(COALESCE(AVG(latency_ms), 0) AS int) as avgLatencyMs,
                 CAST(COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency_ms), 0) AS int) as p95LatencyMs,
@@ -53,7 +53,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 CAST(created_at AS date) as date,
                 COUNT(*) as requests,
-                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END) as errorCount,
+                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as tokens,
                 COALESCE(SUM(estimated_cost), 0) as cost
             FROM request_logs
@@ -76,7 +76,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 DATE_TRUNC('week', created_at)::date as date,
                 COUNT(*) as requests,
-                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END) as errorCount,
+                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as tokens,
                 COALESCE(SUM(estimated_cost), 0) as cost
             FROM request_logs
@@ -99,7 +99,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 DATE_TRUNC('month', created_at)::date as date,
                 COUNT(*) as requests,
-                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END) as errorCount,
+                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as tokens,
                 COALESCE(SUM(estimated_cost), 0) as cost
             FROM request_logs
@@ -171,7 +171,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             WHERE organization_id = :organizationId
               AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
               AND created_at BETWEEN :from AND :to
-              AND status IN ('FAIL', 'BLOCKED', 'TIMEOUT')
+              AND status IN ('FAIL', 'BLOCKED')
             GROUP BY status, error_code, fail_reason
             ORDER BY count DESC
             """, nativeQuery = true)
