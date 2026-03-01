@@ -10,6 +10,7 @@ const STATUS_OPTIONS: Array<{ value: 'ALL' | RequestLogStatus; label: string }> 
   { value: 'ALL', label: '전체' },
   { value: 'SUCCESS', label: '성공' },
   { value: 'FAIL', label: '실패' },
+  { value: 'TIMEOUT', label: '타임아웃' },
   { value: 'IN_PROGRESS', label: '진행 중' },
   { value: 'BLOCKED', label: '차단됨' },
 ];

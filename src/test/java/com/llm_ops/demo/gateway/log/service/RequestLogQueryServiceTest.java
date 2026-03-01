@@ -100,6 +100,24 @@ class RequestLogQueryServiceTest {
             // then
             assertThat(response.cost()).isEqualByComparingTo(estimatedCost);
         }
+
+        @Test
+        @DisplayName("상세_조회_응답에_requestPath와_rag_필드가_포함된다")
+        void 상세_조회_응답에_requestPath와_rag_필드가_포함된다() {
+            // given
+            String traceId = "trace-rag-mapping";
+            RequestLog log = createLog(traceId, WORKSPACE_ID, RequestLogStatus.SUCCESS);
+            log.fillRagMetrics(45, 3, 1200, false, "hash-1", 8, 0.15);
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogResponse response = requestLogQueryService.findByTraceId(WORKSPACE_ID, traceId);
+
+            // then
+            assertThat(response.requestPath()).isEqualTo("/v1/chat");
+            assertThat(response.ragTopK()).isEqualTo(8);
+            assertThat(response.ragSimilarityThreshold()).isEqualTo(0.15);
+        }
     }
 
     @Nested
