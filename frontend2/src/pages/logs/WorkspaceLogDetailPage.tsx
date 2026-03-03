@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
 
@@ -259,6 +259,141 @@ type FailureInsight = {
   reasonDescription: string;
 };
 
+type AttemptRouteKind = 'PRIMARY' | 'RETRY' | 'FAILOVER';
+type AttemptResultKind = 'SUCCESS' | 'FAIL' | 'TIMEOUT';
+
+type AttemptPreviewItem = {
+  attemptNo: number;
+  route: AttemptRouteKind;
+  provider: string;
+  model: string;
+  startedAt: string;
+  endedAt: string;
+  latencyMs: number;
+  result: AttemptResultKind;
+  errorCode: string | null;
+  failReason: string | null;
+  summary: string;
+  backoffAfterMs?: number;
+};
+
+function shiftIso(baseIso: string, deltaMs: number): string {
+  const base = parseApiDate(baseIso);
+  if (!base) return baseIso;
+  return new Date(base.getTime() + Math.max(0, deltaMs)).toISOString();
+}
+
+function toAttemptResult(status: RequestLogStatus): AttemptResultKind {
+  if (status === 'SUCCESS') return 'SUCCESS';
+  if (status === 'TIMEOUT') return 'TIMEOUT';
+  return 'FAIL';
+}
+
+function inferPrimaryFailureResult(log: RequestLogResponse): AttemptResultKind {
+  const signal = `${log.errorCode ?? ''} ${log.failReason ?? ''}`.toUpperCase();
+  if (signal.includes('TIMEOUT') || signal.includes('DEADLINE_EXCEEDED')) {
+    return 'TIMEOUT';
+  }
+  return 'FAIL';
+}
+
+function buildAttemptPreview(log: RequestLogResponse): AttemptPreviewItem[] {
+  const totalLatencyMs = Math.max(1, log.latencyMs ?? 1);
+  const startedAt = log.createdAt;
+  const endedAt = log.finishedAt ?? shiftIso(log.createdAt, totalLatencyMs);
+  const finalModel = log.usedModel || log.requestedModel || '-';
+  const finalProvider = log.provider || '-';
+  const finalResult = toAttemptResult(log.status);
+
+  if (!log.isFailover) {
+    return [
+      {
+        attemptNo: 1,
+        route: 'PRIMARY',
+        provider: finalProvider,
+        model: finalModel,
+        startedAt,
+        endedAt,
+        latencyMs: totalLatencyMs,
+        result: finalResult,
+        errorCode: log.errorCode ?? null,
+        failReason: log.failReason ?? null,
+        summary: finalResult === 'SUCCESS'
+          ? '기본 경로에서 단일 시도로 성공했습니다.'
+          : '기본 경로에서 실패/타임아웃이 발생했습니다.',
+      },
+    ];
+  }
+
+  const backoffMs = totalLatencyMs >= 1200
+    ? Math.min(800, Math.max(200, Math.round(totalLatencyMs * 0.08)))
+    : 120;
+  const optimisticPrimaryMs = totalLatencyMs >= 600
+    ? Math.max(250, Math.round(totalLatencyMs * 0.45))
+    : Math.max(120, Math.round(totalLatencyMs * 0.4));
+  const primaryMs = Math.min(optimisticPrimaryMs, Math.max(totalLatencyMs - backoffMs - 80, 80));
+  const failoverMs = Math.max(1, totalLatencyMs - primaryMs - backoffMs);
+
+  return [
+    {
+      attemptNo: 1,
+      route: 'PRIMARY',
+      provider: '초기 provider (미기록)',
+      model: log.requestedModel || '-',
+      startedAt,
+      endedAt: shiftIso(startedAt, primaryMs),
+      latencyMs: primaryMs,
+      result: inferPrimaryFailureResult(log),
+      errorCode: log.errorCode ?? null,
+      failReason: log.failReason ?? null,
+      summary: '기본 경로 실패 후 failover 경로로 전환되었습니다.',
+      backoffAfterMs: backoffMs,
+    },
+    {
+      attemptNo: 2,
+      route: 'FAILOVER',
+      provider: finalProvider,
+      model: finalModel,
+      startedAt: shiftIso(startedAt, primaryMs + backoffMs),
+      endedAt,
+      latencyMs: failoverMs,
+      result: finalResult,
+      errorCode: finalResult === 'SUCCESS' ? null : log.errorCode ?? null,
+      failReason: log.failReason ?? null,
+      summary: finalResult === 'SUCCESS'
+        ? '보조 경로에서 요청이 정상 완료되었습니다.'
+        : '보조 경로에서도 요청이 완료되지 못했습니다.',
+    },
+  ];
+}
+
+function attemptRouteBadge(route: AttemptRouteKind) {
+  const base = 'inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold tracking-wide border';
+  switch (route) {
+    case 'PRIMARY':
+      return `${base} border-slate-400/35 bg-slate-500/10 text-slate-600 dark:text-slate-300`;
+    case 'RETRY':
+      return `${base} border-blue-400/35 bg-blue-500/10 text-blue-700 dark:text-blue-300`;
+    case 'FAILOVER':
+      return `${base} border-amber-400/35 bg-amber-500/10 text-amber-700 dark:text-amber-300`;
+    default:
+      return `${base} border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]`;
+  }
+}
+
+function attemptResultBadge(result: AttemptResultKind) {
+  const base = 'inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold tracking-wide border';
+  switch (result) {
+    case 'SUCCESS':
+      return `${base} border-emerald-400/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300`;
+    case 'TIMEOUT':
+      return `${base} border-orange-400/35 bg-orange-500/10 text-orange-700 dark:text-orange-300`;
+    case 'FAIL':
+    default:
+      return `${base} border-rose-400/35 bg-rose-500/10 text-rose-700 dark:text-rose-300`;
+  }
+}
+
 const FAIL_REASON_DESCRIPTION: Record<string, string> = {
   PROVIDER_BUDGET_EXCEEDED: 'Provider 예산 한도에 도달해 호출이 차단되었습니다.',
   PRIMARY_PROVIDER_BUDGET_BLOCKED: '기본 Provider 예산이 차단되어 보조 경로로 우회했습니다.',
@@ -351,6 +486,7 @@ export function WorkspaceLogDetailPage() {
     workspaceId: string;
     traceId: string;
   }>();
+  const [searchParams] = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<'details' | 'raw'>('details');
 
@@ -395,6 +531,8 @@ export function WorkspaceLogDetailPage() {
       ? `conic-gradient(from -90deg, rgba(59,130,246,0.95) 0% ${ragRatio}%, rgba(168,85,247,0.95) ${ragRatio}% 100%)`
       : 'conic-gradient(from -90deg, rgba(168,85,247,0.95) 0% 100%)';
   const failureInsight = buildFailureInsight(log);
+  const showAttemptPreview = searchParams.get('attemptPreview') === '1';
+  const attemptPreview = log && showAttemptPreview ? buildAttemptPreview(log) : [];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20 text-[var(--foreground)]">
@@ -739,6 +877,64 @@ export function WorkspaceLogDetailPage() {
               <div className="mt-3 text-[11px] text-[var(--text-secondary)]">
                 현재 표시: 전체 요청, RAG 검색, LLM 생성(추정). 네트워크/DB 세부 시간은 백엔드 계측 추가 시 제공 가능합니다.
               </div>
+
+              {showAttemptPreview && (
+                <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-bold uppercase tracking-wide text-[var(--foreground)]">
+                      시도 단위 타임라인 (예상 UI)
+                    </div>
+                    <span className="rounded border border-indigo-400/35 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                      PREVIEW
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {attemptPreview.map((attempt, idx) => (
+                      <div key={`${attempt.attemptNo}-${attempt.route}`} className="space-y-2">
+                        <div className="rounded-lg border border-[var(--border)] bg-[var(--background-card)] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
+                                #{attempt.attemptNo}
+                              </span>
+                              <span className={attemptRouteBadge(attempt.route)}>{attempt.route}</span>
+                              <span className={attemptResultBadge(attempt.result)}>{attempt.result}</span>
+                            </div>
+                            <span className="text-xs font-mono text-[var(--text-secondary)]">{attempt.latencyMs}ms</span>
+                          </div>
+
+                          <div className="mt-2 grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+                            <div className="text-[var(--text-secondary)]">provider: <span className="font-mono text-[var(--foreground)]">{attempt.provider}</span></div>
+                            <div className="text-[var(--text-secondary)]">model: <span className="font-mono text-[var(--foreground)]">{attempt.model}</span></div>
+                            <div className="text-[var(--text-secondary)]">start: <span className="font-mono text-[var(--foreground)]">{formatKstDateTimeOrFallback(attempt.startedAt)}</span></div>
+                            <div className="text-[var(--text-secondary)]">end: <span className="font-mono text-[var(--foreground)]">{formatKstDateTimeOrFallback(attempt.endedAt)}</span></div>
+                          </div>
+
+                          {(attempt.errorCode || attempt.failReason) && (
+                            <div className="mt-2 rounded border border-rose-400/20 bg-rose-500/5 px-2 py-1 text-[11px] text-rose-700 dark:text-rose-200">
+                              {attempt.errorCode ? `errorCode=${attempt.errorCode}` : 'errorCode=-'}
+                              {attempt.failReason ? ` · failReason=${attempt.failReason}` : ''}
+                            </div>
+                          )}
+
+                          <div className="mt-2 text-[11px] text-[var(--text-secondary)]">{attempt.summary}</div>
+                        </div>
+
+                        {idx < attemptPreview.length - 1 && attempt.backoffAfterMs && (
+                          <div className="pl-2 text-[11px] text-[var(--text-secondary)]">
+                            ↳ retry backoff {attempt.backoffAfterMs}ms
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 text-[11px] text-[var(--text-secondary)]">
+                    현재는 프론트 예상안으로 계산한 preview입니다. 실제 시도별 정밀 값은 백엔드 attempt 로그 연동 후 정확히 표시됩니다.
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
