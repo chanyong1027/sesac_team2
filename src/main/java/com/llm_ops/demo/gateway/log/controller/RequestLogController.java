@@ -2,6 +2,7 @@ package com.llm_ops.demo.gateway.log.controller;
 
 import com.llm_ops.demo.auth.dto.response.ApiResponse;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
+import com.llm_ops.demo.gateway.log.dto.RequestLogAttemptTimelineResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogListResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogSearchCondition;
@@ -43,6 +44,16 @@ public class RequestLogController {
             @AuthenticationPrincipal Long userId) {
         workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
         RequestLogResponse response = requestLogQueryService.findByTraceId(workspaceId, traceId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{traceId}/attempts")
+    public ResponseEntity<ApiResponse<RequestLogAttemptTimelineResponse>> getAttempts(
+            @PathVariable Long workspaceId,
+            @PathVariable String traceId,
+            @AuthenticationPrincipal Long userId) {
+        workspaceAccessService.validateWorkspaceAccess(workspaceId, userId);
+        RequestLogAttemptTimelineResponse response = requestLogQueryService.findAttemptTimeline(workspaceId, traceId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

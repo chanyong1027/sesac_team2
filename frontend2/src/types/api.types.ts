@@ -11,6 +11,9 @@ export interface ApiResponse<T> {
 // Logs
 // ========================================
 export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED' | 'TIMEOUT';
+export type RequestLogAttemptRoute = 'PRIMARY' | 'FAILOVER';
+export type RequestLogAttemptResult = 'SUCCESS' | 'FAIL' | 'TIMEOUT';
+export type RequestLogAttemptCollectionMode = 'RECORDED' | 'DERIVED_SINGLE' | 'MISSING';
 
 export interface RetrievedDocument {
   id: number;
@@ -60,6 +63,29 @@ export interface RequestLogListResponse {
   size: number;
   totalElements: number;
   totalPages: number;
+}
+
+export interface RequestLogAttemptResponse {
+  attemptNo: number;
+  route: RequestLogAttemptRoute;
+  retry: boolean;
+  result: RequestLogAttemptResult;
+  provider: string | null;
+  requestedModel: string | null;
+  usedModel: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  latencyMs: number | null;
+  httpStatus: number | null;
+  errorCode: string | null;
+  failReason: string | null;
+  errorMessage: string | null;
+  backoffAfterMs: number | null;
+}
+
+export interface RequestLogAttemptTimelineResponse {
+  collectionMode: RequestLogAttemptCollectionMode;
+  attempts: RequestLogAttemptResponse[];
 }
 
 // ========================================

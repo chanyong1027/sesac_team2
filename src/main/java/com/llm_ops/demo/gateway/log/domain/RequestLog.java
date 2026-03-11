@@ -153,6 +153,9 @@ public class RequestLog {
     @OneToMany(mappedBy = "requestLog", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RetrievedDocument> retrievedDocuments = new ArrayList<>();
 
+    @OneToMany(mappedBy = "requestLog", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<RequestLogAttempt> attempts = new ArrayList<>();
+
     public static RequestLog loggingStart(
             UUID requestId,
             String traceId,
@@ -238,6 +241,12 @@ public class RequestLog {
     public void addRetrievedDocuments(List<RetrievedDocument> documents) {
         if (documents != null) {
             this.retrievedDocuments.addAll(documents);
+        }
+    }
+
+    public void addAttempts(List<RequestLogAttempt> attempts) {
+        if (attempts != null) {
+            this.attempts.addAll(attempts);
         }
     }
 

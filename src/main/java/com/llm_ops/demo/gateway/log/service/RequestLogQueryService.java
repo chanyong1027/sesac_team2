@@ -1,6 +1,9 @@
 package com.llm_ops.demo.gateway.log.service;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.dto.RequestLogAttemptCollectionMode;
+import com.llm_ops.demo.gateway.log.dto.RequestLogAttemptResponse;
+import com.llm_ops.demo.gateway.log.dto.RequestLogAttemptTimelineResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogListResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogSearchCondition;
@@ -8,6 +11,8 @@ import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.gateway.log.repository.RequestLogSpecification;
 import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
+import java.util.Comparator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,6 +36,27 @@ public class RequestLogQueryService {
         RequestLog log = requestLogRepository.findByWorkspaceIdAndTraceId(workspaceId, traceId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
         return RequestLogResponse.fromDetail(log);
+    }
+
+    public RequestLogAttemptTimelineResponse findAttemptTimeline(Long workspaceId, String traceId) {
+        RequestLog log = requestLogRepository.findWithAttemptsByWorkspaceIdAndTraceId(workspaceId, traceId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND));
+
+        if (log.getRequestSource() != null && !"GATEWAY".equalsIgnoreCase(log.getRequestSource())) {
+            return new RequestLogAttemptTimelineResponse(
+                    RequestLogAttemptCollectionMode.DERIVED_SINGLE,
+                    List.of(RequestLogAttemptResponse.derivedSingle(log)));
+        }
+
+        if (log.getAttempts() == null || log.getAttempts().isEmpty()) {
+            return new RequestLogAttemptTimelineResponse(RequestLogAttemptCollectionMode.MISSING, List.of());
+        }
+
+        List<RequestLogAttemptResponse> attempts = log.getAttempts().stream()
+                .sorted(Comparator.comparingInt(attempt -> attempt.getAttemptNo() != null ? attempt.getAttemptNo() : Integer.MAX_VALUE))
+                .map(RequestLogAttemptResponse::from)
+                .toList();
+        return new RequestLogAttemptTimelineResponse(RequestLogAttemptCollectionMode.RECORDED, attempts);
     }
 
     /**
