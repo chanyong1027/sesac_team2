@@ -8,7 +8,7 @@ import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
 
 const PAGE_SIZE = 20;
 
-type LogStatusFilter = 'ALL' | 'SUCCESS' | 'FAILOVER' | 'FAIL' | 'BLOCKED';
+type LogStatusFilter = 'ALL' | 'SUCCESS' | 'FAILOVER' | 'FAIL' | 'BLOCKED' | 'TIMEOUT';
 type LogsListParams = NonNullable<Parameters<typeof logsApi.list>[1]>;
 
 const STATUS_OPTIONS: Array<{ value: LogStatusFilter; label: string }> = [
@@ -17,6 +17,7 @@ const STATUS_OPTIONS: Array<{ value: LogStatusFilter; label: string }> = [
   { value: 'FAILOVER', label: 'failover' },
   { value: 'FAIL', label: 'fail' },
   { value: 'BLOCKED', label: 'blocked' },
+  { value: 'TIMEOUT', label: 'timeout' },
 ];
 
 function formatShortDateTime(iso: string) {
@@ -40,6 +41,8 @@ function statusBadge(status: RequestLogStatus) {
       return `${base} bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-400/35`;
     case 'BLOCKED':
       return `${base} bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-400/35`;
+    case 'TIMEOUT':
+      return `${base} bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-400/35`;
     case 'IN_PROGRESS':
     default:
       return `${base} bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border)]`;
@@ -350,7 +353,12 @@ export function WorkspaceLogsPage() {
                     </div>
                   </div>
 
-                  {log.status === 'FAIL' || log.errorCode || log.errorMessage ? (
+                  {log.status === 'FAIL' ||
+                  log.status === 'BLOCKED' ||
+                  log.status === 'TIMEOUT' ||
+                  log.errorCode ||
+                  log.errorMessage ||
+                  log.failReason ? (
                     <div className="mt-3 rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">
                       <span className="font-medium">Error</span>
                       <span className="ml-2">

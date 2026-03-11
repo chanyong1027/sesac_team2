@@ -1,6 +1,9 @@
 package com.llm_ops.demo.gateway.log.service;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttempt;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptResult;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import com.llm_ops.demo.gateway.log.domain.RetrievedDocument;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
@@ -88,6 +91,7 @@ public class RequestLogWriter {
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.SUCCESS)) {
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
                         }
                 } catch (Exception e) {
                         log.error("로그 성공 기록 실패: requestId={}", requestId, e);
@@ -140,6 +144,7 @@ public class RequestLogWriter {
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.FAIL)) {
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
                         }
                 } catch (Exception e) {
                         log.error("로그 실패 기록 실패: requestId={}", requestId, e);
@@ -192,6 +197,7 @@ public class RequestLogWriter {
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.BLOCKED)) {
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
                         }
                 } catch (Exception e) {
                         log.error("로그 차단 기록 실패: requestId={}", requestId, e);
@@ -215,6 +221,32 @@ public class RequestLogWriter {
                                                 info.ranking()))
                                 .toList();
                 requestLog.addRetrievedDocuments(entities);
+        }
+
+        private void saveAttemptLogs(RequestLog requestLog, List<AttemptLogInput> attemptLogs) {
+                if (attemptLogs == null || attemptLogs.isEmpty()) {
+                        return;
+                }
+                List<RequestLogAttempt> entities = attemptLogs.stream()
+                                .map(input -> RequestLogAttempt.create(
+                                                requestLog,
+                                                input.attemptNo(),
+                                                input.route(),
+                                                input.retry(),
+                                                input.result(),
+                                                input.provider(),
+                                                input.requestedModel(),
+                                                input.usedModel(),
+                                                input.startedAt(),
+                                                input.endedAt(),
+                                                input.latencyMs(),
+                                                input.httpStatus(),
+                                                input.errorCode(),
+                                                input.failReason(),
+                                                input.errorMessage(),
+                                                input.backoffAfterMs()))
+                                .toList();
+                requestLog.addAttempts(entities);
         }
 
         private static boolean hasTransitionedTo(
@@ -264,7 +296,8 @@ public class RequestLogWriter {
                         Double ragSimilarityThreshold,
                         String failReason,
                         String responsePayload,
-                        List<RetrievedDocumentInfo> retrievedDocuments) {
+                        List<RetrievedDocumentInfo> retrievedDocuments,
+                        List<AttemptLogInput> attemptLogs) {
         }
 
         public record FailUpdate(
@@ -292,7 +325,8 @@ public class RequestLogWriter {
                         Integer ragTopK,
                         Double ragSimilarityThreshold,
                         String responsePayload,
-                        List<RetrievedDocumentInfo> retrievedDocuments) {
+                        List<RetrievedDocumentInfo> retrievedDocuments,
+                        List<AttemptLogInput> attemptLogs) {
         }
 
         public record BlockUpdate(
@@ -320,7 +354,8 @@ public class RequestLogWriter {
                         Integer ragTopK,
                         Double ragSimilarityThreshold,
                         String responsePayload,
-                        List<RetrievedDocumentInfo> retrievedDocuments) {
+                        List<RetrievedDocumentInfo> retrievedDocuments,
+                        List<AttemptLogInput> attemptLogs) {
         }
 
         /**
@@ -332,5 +367,23 @@ public class RequestLogWriter {
                         String content,
                         Integer durationMs,
                         Integer ranking) {
+        }
+
+        public record AttemptLogInput(
+                        Integer attemptNo,
+                        RequestLogAttemptRoute route,
+                        boolean retry,
+                        RequestLogAttemptResult result,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        LocalDateTime startedAt,
+                        LocalDateTime endedAt,
+                        Integer latencyMs,
+                        Integer httpStatus,
+                        String errorCode,
+                        String failReason,
+                        String errorMessage,
+                        Integer backoffAfterMs) {
         }
 }

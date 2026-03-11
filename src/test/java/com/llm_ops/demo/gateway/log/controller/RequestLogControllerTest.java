@@ -58,4 +58,18 @@ class RequestLogControllerTest {
                                 .andDo(print())
                                 .andExpect(status().isForbidden());
         }
+
+        @Test
+        @DisplayName("시도_타임라인_조회시_워크스페이스_멤버가_아니면_403_을_반환한다")
+        void 시도_타임라인_조회시_워크스페이스_멤버가_아니면_403_을_반환한다() throws Exception {
+                // given
+                doThrow(new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 멤버가 아닙니다."))
+                                .when(workspaceAccessService)
+                                .validateWorkspaceAccess(any(), any());
+
+                // when & then
+                mockMvc.perform(get("/api/v1/workspaces/999/logs/trace-1/attempts"))
+                                .andDo(print())
+                                .andExpect(status().isForbidden());
+        }
 }

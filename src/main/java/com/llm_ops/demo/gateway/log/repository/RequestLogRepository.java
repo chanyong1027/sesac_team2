@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +23,12 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
 
     Optional<RequestLog> findByWorkspaceIdAndTraceId(Long workspaceId, String traceId);
 
+    @EntityGraph(attributePaths = "attempts")
+    @Query("SELECT r FROM RequestLog r WHERE r.workspaceId = :workspaceId AND r.traceId = :traceId")
+    Optional<RequestLog> findWithAttemptsByWorkspaceIdAndTraceId(
+            @Param("workspaceId") Long workspaceId,
+            @Param("traceId") String traceId);
+
     /**
      * Overview 통계 집계 (PostgreSQL Native Query - PERCENTILE_CONT 사용)
      */
@@ -29,7 +36,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 COUNT(*) as totalRequests,
                 COALESCE(SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END), 0) as successCount,
-                COALESCE(SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END), 0) as errorCount,
+                COALESCE(SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END), 0) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as totalTokens,
                 CAST(COALESCE(AVG(latency_ms), 0) AS int) as avgLatencyMs,
                 CAST(COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY latency_ms), 0) AS int) as p95LatencyMs,
@@ -53,7 +60,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 CAST(created_at AS date) as date,
                 COUNT(*) as requests,
-                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END) as errorCount,
+                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as tokens,
                 COALESCE(SUM(estimated_cost), 0) as cost
             FROM request_logs
@@ -76,7 +83,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 DATE_TRUNC('week', created_at)::date as date,
                 COUNT(*) as requests,
-                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END) as errorCount,
+                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as tokens,
                 COALESCE(SUM(estimated_cost), 0) as cost
             FROM request_logs
@@ -99,7 +106,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             SELECT
                 DATE_TRUNC('month', created_at)::date as date,
                 COUNT(*) as requests,
-                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED') THEN 1 ELSE 0 END) as errorCount,
+                SUM(CASE WHEN status IN ('FAIL', 'BLOCKED', 'TIMEOUT') THEN 1 ELSE 0 END) as errorCount,
                 COALESCE(SUM(total_tokens), 0) as tokens,
                 COALESCE(SUM(estimated_cost), 0) as cost
             FROM request_logs
@@ -171,7 +178,7 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
             WHERE organization_id = :organizationId
               AND (:workspaceId IS NULL OR workspace_id = :workspaceId)
               AND created_at BETWEEN :from AND :to
-              AND status IN ('FAIL', 'BLOCKED')
+              AND status IN ('FAIL', 'BLOCKED', 'TIMEOUT')
             GROUP BY status, error_code, fail_reason
             ORDER BY count DESC
             """, nativeQuery = true)

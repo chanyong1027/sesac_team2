@@ -1,5 +1,10 @@
 import api from './axios';
-import type { ApiResponse, RequestLogListResponse, RequestLogResponse } from '@/types/api.types';
+import type {
+  ApiResponse,
+  RequestLogAttemptTimelineResponse,
+  RequestLogListResponse,
+  RequestLogResponse,
+} from '@/types/api.types';
 
 export const logsApi = {
   list: async (
@@ -28,6 +33,13 @@ export const logsApi = {
   get: async (workspaceId: number, traceId: string): Promise<RequestLogResponse> => {
     const res = await api.get<ApiResponse<RequestLogResponse>>(
       `/workspaces/${workspaceId}/logs/${traceId}`
+    );
+    return res.data.data;
+  },
+
+  getAttempts: async (workspaceId: number, traceId: string): Promise<RequestLogAttemptTimelineResponse> => {
+    const res = await api.get<ApiResponse<RequestLogAttemptTimelineResponse>>(
+      `/workspaces/${workspaceId}/logs/${traceId}/attempts`
     );
     return res.data.data;
   },

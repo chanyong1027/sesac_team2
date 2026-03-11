@@ -254,7 +254,8 @@ public class PromptPlaygroundService {
                     ragSimilarityThreshold,
                     null,
                     answer,
-                    retrievedDocuments));
+                    retrievedDocuments,
+                    null));
 
             return new PlaygroundRunResponse(
                     traceId,
@@ -282,7 +283,8 @@ public class PromptPlaygroundService {
                     ragLatencyMs, ragChunksCount, ragContextChars,
                     ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
                     toBusinessErrorResponsePayload(e),
-                    retrievedDocuments));
+                    retrievedDocuments,
+                    null));
             throw e;
         } catch (Exception e) {
             log.error("Playground run failed: requestId={}", requestId, e);
@@ -302,7 +304,8 @@ public class PromptPlaygroundService {
                     ragLatencyMs, ragChunksCount, ragContextChars,
                     ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
                     UNHANDLED_EXCEPTION_PAYLOAD,
-                    retrievedDocuments));
+                    retrievedDocuments,
+                    null));
             HttpStatus httpStatus = HttpStatus.resolve(failure.httpStatus());
             throw new GatewayException(
                     failure.errorCode(),

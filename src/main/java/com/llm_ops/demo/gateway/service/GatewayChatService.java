@@ -11,6 +11,8 @@ import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
 import com.llm_ops.demo.gateway.service.LlmCallService.ModelConfigOverride;
 import com.llm_ops.demo.gateway.dto.GatewayChatUsage;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptResult;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.gateway.pricing.ModelPricing;
 import com.llm_ops.demo.global.error.BusinessException;
@@ -45,7 +47,9 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -181,6 +185,7 @@ public class GatewayChatService {
         boolean ragEnabledEffective = request.isRagEnabled();
         long providerCallStartNanos = 0;
         long providerCallEndNanos = 0;
+        AttemptTimelineCollector attemptCollector = new AttemptTimelineCollector();
 
         try {
             Workspace workspace = findWorkspace(organizationId, request.workspaceId());
@@ -332,7 +337,9 @@ public class GatewayChatService {
                         userPrompt,
                         buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens),
                         deadlineNanos,
-                        false
+                        false,
+                        RequestLogAttemptRoute.FAILOVER,
+                        attemptCollector
                 );
                 if (!secondaryOutcome.success()) {
                     lastProviderFailure = secondaryOutcome.failure();
@@ -349,7 +356,9 @@ public class GatewayChatService {
                         userPrompt,
                         buildEffectiveModelConfig(versionModelConfig, maxOutputTokensOverride),
                         deadlineNanos,
-                        hasSecondaryModel(secondaryProvider, secondaryModel)
+                        hasSecondaryModel(secondaryProvider, secondaryModel),
+                        RequestLogAttemptRoute.PRIMARY,
+                        attemptCollector
                 );
                 if (primaryOutcome.success()) {
                     response = primaryOutcome.response();
@@ -410,7 +419,9 @@ public class GatewayChatService {
                             userPrompt,
                             buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens),
                             deadlineNanos,
-                            false
+                            false,
+                            RequestLogAttemptRoute.FAILOVER,
+                            attemptCollector
                     );
                     if (!secondaryOutcome.success()) {
                         lastProviderFailure = secondaryOutcome.failure();
@@ -506,7 +517,8 @@ public class GatewayChatService {
                     ragSimilarityThreshold,
                     isFailover ? failoverReason : null,
                     answer,
-                    retrievedDocumentInfos));
+                    retrievedDocumentInfos,
+                    attemptCollector.toLogInputs()));
 
             // ── Metrics: success path ──
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
@@ -561,7 +573,8 @@ public class GatewayChatService {
                         ragTopK,
                         ragSimilarityThreshold,
                         toErrorResponsePayload(gatewayFailure),
-                        retrievedDocumentInfos));
+                        retrievedDocumentInfos,
+                        attemptCollector.toLogInputs()));
             } else {
                 requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
                         gatewayFailure.httpStatus(),
@@ -588,7 +601,8 @@ public class GatewayChatService {
                         ragTopK,
                         ragSimilarityThreshold,
                         toErrorResponsePayload(gatewayFailure),
-                        retrievedDocumentInfos));
+                        retrievedDocumentInfos,
+                        attemptCollector.toLogInputs()));
             }
             throw toGatewayException(gatewayFailure, e);
         } catch (Exception e) {
@@ -632,7 +646,8 @@ public class GatewayChatService {
                     ragTopK,
                     ragSimilarityThreshold,
                     toErrorResponsePayload(gatewayFailure),
-                    retrievedDocumentInfos));
+                    retrievedDocumentInfos,
+                    attemptCollector.toLogInputs()));
             throw toGatewayException(gatewayFailure, e);
         }
     }
@@ -852,11 +867,15 @@ public class GatewayChatService {
             String userPrompt,
             ModelConfigOverride config,
             long deadlineNanos,
-            boolean reserveFailoverBudget
+            boolean reserveFailoverBudget,
+            RequestLogAttemptRoute route,
+            AttemptTimelineCollector attemptCollector
     ) {
         long failoverReserveMs = reserveFailoverBudget
                 ? gatewayReliabilityProperties.resolvedMinFailoverBudgetMs() + FAILOVER_GUARD_BUFFER_MS
                 : 0L;
+        String provider = resolved.providerType() != null ? resolved.providerType().name().toLowerCase() : null;
+        int firstAttemptNo = attemptCollector.startAttempt(route, false, provider, requestedModel);
         try {
             ChatResponse first = callProviderWithDeadline(
                     resolved,
@@ -867,9 +886,11 @@ public class GatewayChatService {
                     deadlineNanos,
                     failoverReserveMs
             );
+            attemptCollector.markSuccess(firstAttemptNo, first);
             return ProviderCallOutcome.success(first);
         } catch (Exception firstException) {
             GatewayFailureClassifier.GatewayFailure firstFailure = classifyProviderFailure(firstException);
+            attemptCollector.markFailure(firstAttemptNo, firstFailure);
             if (!firstFailure.retrySameRouteOnce()) {
                 return ProviderCallOutcome.failure(toRuntimeException(firstException), firstFailure);
             }
@@ -879,13 +900,20 @@ public class GatewayChatService {
             }
 
             long retryBackoffMs = gatewayReliabilityProperties.resolvedRetryBackoffMs();
+            long actualBackoffMs = 0L;
             if (retryBackoffMs > 0) {
                 long maxSleepMs = Math.max(0L, remainingBudgetMs(deadlineNanos) - failoverReserveMs);
-                sleepQuietly(Math.min(retryBackoffMs, maxSleepMs));
+                actualBackoffMs = Math.min(retryBackoffMs, maxSleepMs);
+                sleepQuietly(actualBackoffMs);
+            }
+            if (actualBackoffMs > 0L) {
+                attemptCollector.markBackoffAfterMs(firstAttemptNo, actualBackoffMs);
             }
             if (!hasRemainingBudget(deadlineNanos, minimumRetryBudgetMs)) {
                 return ProviderCallOutcome.failure(toRuntimeException(firstException), firstFailure);
             }
+
+            int secondAttemptNo = attemptCollector.startAttempt(route, true, provider, requestedModel);
             try {
                 ChatResponse second = callProviderWithDeadline(
                         resolved,
@@ -896,9 +924,11 @@ public class GatewayChatService {
                         deadlineNanos,
                         failoverReserveMs
                 );
+                attemptCollector.markSuccess(secondAttemptNo, second);
                 return ProviderCallOutcome.success(second);
             } catch (Exception secondException) {
                 GatewayFailureClassifier.GatewayFailure secondFailure = classifyProviderFailure(secondException);
+                attemptCollector.markFailure(secondAttemptNo, secondFailure);
                 return ProviderCallOutcome.failure(toRuntimeException(secondException), secondFailure);
             }
         }
@@ -1026,6 +1056,149 @@ public class GatewayChatService {
             return runtimeException;
         }
         return new RuntimeException(exception);
+    }
+
+    private static final class AttemptTimelineCollector {
+
+        private final List<MutableAttempt> attempts = new ArrayList<>();
+        private int sequence = 0;
+
+        int startAttempt(
+                RequestLogAttemptRoute route,
+                boolean retry,
+                String provider,
+                String requestedModel
+        ) {
+            int attemptNo = ++sequence;
+            MutableAttempt attempt = new MutableAttempt(
+                    attemptNo,
+                    route,
+                    retry,
+                    provider,
+                    requestedModel,
+                    LocalDateTime.now(java.time.Clock.systemUTC()),
+                    System.nanoTime());
+            attempts.add(attempt);
+            return attemptNo;
+        }
+
+        void markSuccess(int attemptNo, ChatResponse response) {
+            MutableAttempt attempt = find(attemptNo);
+            attempt.result = RequestLogAttemptResult.SUCCESS;
+            attempt.usedModel = response != null && response.getMetadata() != null ? response.getMetadata().getModel() : null;
+            attempt.httpStatus = 200;
+            complete(attempt);
+        }
+
+        void markFailure(int attemptNo, GatewayFailureClassifier.GatewayFailure failure) {
+            MutableAttempt attempt = find(attemptNo);
+            attempt.result = toResult(failure);
+            attempt.httpStatus = failure != null ? failure.httpStatus() : null;
+            attempt.errorCode = failure != null ? failure.errorCode() : null;
+            attempt.failReason = failure != null ? failure.failReason() : null;
+            attempt.errorMessage = failure != null ? failure.errorMessage() : null;
+            complete(attempt);
+        }
+
+        void markBackoffAfterMs(int attemptNo, long backoffMs) {
+            if (backoffMs <= 0) {
+                return;
+            }
+            MutableAttempt attempt = find(attemptNo);
+            attempt.backoffAfterMs = backoffMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) backoffMs;
+        }
+
+        List<RequestLogWriter.AttemptLogInput> toLogInputs() {
+            if (attempts.isEmpty()) {
+                return List.of();
+            }
+            return attempts.stream()
+                    .map(attempt -> new RequestLogWriter.AttemptLogInput(
+                            attempt.attemptNo,
+                            attempt.route,
+                            attempt.retry,
+                            attempt.result != null ? attempt.result : RequestLogAttemptResult.FAIL,
+                            attempt.provider,
+                            attempt.requestedModel,
+                            attempt.usedModel,
+                            attempt.startedAt,
+                            attempt.endedAt != null ? attempt.endedAt : attempt.startedAt,
+                            attempt.latencyMs != null ? attempt.latencyMs : 0,
+                            attempt.httpStatus,
+                            attempt.errorCode,
+                            attempt.failReason,
+                            attempt.errorMessage,
+                            attempt.backoffAfterMs))
+                    .toList();
+        }
+
+        private void complete(MutableAttempt attempt) {
+            if (attempt.endedAt != null) {
+                return;
+            }
+            attempt.endedAt = LocalDateTime.now(java.time.Clock.systemUTC());
+            long elapsedNanos = Math.max(0L, System.nanoTime() - attempt.startedAtNanos);
+            long elapsedMs = elapsedNanos / 1_000_000L;
+            attempt.latencyMs = elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+        }
+
+        private MutableAttempt find(int attemptNo) {
+            return attempts.stream()
+                    .filter(attempt -> attempt.attemptNo == attemptNo)
+                    .findFirst()
+                    .orElseThrow();
+        }
+
+        private RequestLogAttemptResult toResult(GatewayFailureClassifier.GatewayFailure failure) {
+            if (failure == null) {
+                return RequestLogAttemptResult.FAIL;
+            }
+            String signal = ((failure.errorCode() != null ? failure.errorCode() : "")
+                    + " "
+                    + (failure.failReason() != null ? failure.failReason() : "")).toUpperCase();
+            if ("GW-UP-TIMEOUT".equals(failure.errorCode())
+                    || signal.contains("TIMEOUT")
+                    || signal.contains("DEADLINE_EXCEEDED")) {
+                return RequestLogAttemptResult.TIMEOUT;
+            }
+            return RequestLogAttemptResult.FAIL;
+        }
+
+        private static final class MutableAttempt {
+            private final int attemptNo;
+            private final RequestLogAttemptRoute route;
+            private final boolean retry;
+            private final String provider;
+            private final String requestedModel;
+            private final LocalDateTime startedAt;
+            private final long startedAtNanos;
+            private RequestLogAttemptResult result;
+            private String usedModel;
+            private LocalDateTime endedAt;
+            private Integer latencyMs;
+            private Integer httpStatus;
+            private String errorCode;
+            private String failReason;
+            private String errorMessage;
+            private Integer backoffAfterMs;
+
+            private MutableAttempt(
+                    int attemptNo,
+                    RequestLogAttemptRoute route,
+                    boolean retry,
+                    String provider,
+                    String requestedModel,
+                    LocalDateTime startedAt,
+                    long startedAtNanos) {
+                this.attemptNo = attemptNo;
+                this.route = route;
+                this.retry = retry;
+                this.provider = provider;
+                this.requestedModel = requestedModel;
+                this.startedAt = startedAt;
+                this.startedAtNanos = startedAtNanos;
+            }
+        }
     }
 
     private record ProviderCallOutcome(

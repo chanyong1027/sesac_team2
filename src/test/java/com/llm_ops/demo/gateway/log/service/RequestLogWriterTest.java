@@ -3,8 +3,12 @@ package com.llm_ops.demo.gateway.log.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptResult;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +75,7 @@ class RequestLogWriterTest {
                                 0.7,
                                 null,
                                 "Hello! I'm an AI assistant.",
+                                null,
                                 null));
 
                 // 비동기 처리 완료 대기
@@ -142,6 +147,7 @@ class RequestLogWriterTest {
                                 3,
                                 0.5,
                                 "Error: bad gateway",
+                                null,
                                 null));
 
                 // 비동기 처리 완료 대기
@@ -163,5 +169,112 @@ class RequestLogWriterTest {
                 assertThat(saved.getRagContextTruncated()).isFalse();
                 assertThat(saved.getRagContextHash()).isNull();
                 assertThat(saved.getResponsePayload()).isEqualTo("Error: bad gateway");
+        }
+
+        @Test
+        void markFail_호출시_attempt_이력을_함께_저장한다() throws InterruptedException {
+                // given
+                UUID requestId = requestLogWriter.start(new RequestLogWriter.StartRequest(
+                                null,
+                                "trace-attempt-writer",
+                                10L,
+                                20L,
+                                30L,
+                                "prefix-attempt",
+                                "/v1/chat/completions",
+                                "POST",
+                                "prompt-key",
+                                false,
+                                "{\"messages\":[{\"role\":\"user\",\"content\":\"attempt test\"}]}",
+                                "GATEWAY"));
+
+                LocalDateTime startedAt = LocalDateTime.now().minusNanos(2_000_000_000L);
+                RequestLogWriter.AttemptLogInput first = new RequestLogWriter.AttemptLogInput(
+                                1,
+                                RequestLogAttemptRoute.PRIMARY,
+                                false,
+                                RequestLogAttemptResult.FAIL,
+                                "openai",
+                                "gpt-4o-mini",
+                                null,
+                                startedAt,
+                                startedAt.plusNanos(700_000_000L),
+                                700,
+                                503,
+                                "GW-UP-UNAVAILABLE",
+                                "HTTP_503",
+                                "upstream unavailable",
+                                200);
+                RequestLogWriter.AttemptLogInput second = new RequestLogWriter.AttemptLogInput(
+                                2,
+                                RequestLogAttemptRoute.FAILOVER,
+                                false,
+                                RequestLogAttemptResult.TIMEOUT,
+                                "anthropic",
+                                "claude-3-5-haiku",
+                                null,
+                                startedAt.plusNanos(900_000_000L),
+                                startedAt.plusNanos(1_500_000_000L),
+                                600,
+                                504,
+                                "GW-UP-TIMEOUT",
+                                "REQUEST_DEADLINE_EXCEEDED",
+                                "timeout",
+                                null);
+
+                // when
+                requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                                502,
+                                1300,
+                                102L,
+                                202L,
+                                "openai",
+                                "gpt-4o-mini",
+                                null,
+                                true,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "GW-GW-ALL_PROVIDERS_FAILED",
+                                "all failed",
+                                "ALL_FAILED_REQUEST_DEADLINE_EXCEEDED",
+                                0,
+                                0,
+                                0,
+                                false,
+                                null,
+                                0,
+                                0.0,
+                                "error payload",
+                                null,
+                                List.of(first, second)));
+
+                Thread.sleep(1000);
+
+                // then
+                RequestLog saved = requestLogRepository.findWithAttemptsByWorkspaceIdAndTraceId(20L, "trace-attempt-writer")
+                                .orElseThrow();
+                assertThat(saved.getAttempts()).hasSize(2);
+                assertThat(saved.getAttempts())
+                                .extracting(attempt -> attempt.getAttemptNo())
+                                .containsExactlyInAnyOrder(1, 2);
+                assertThat(saved.getAttempts())
+                                .filteredOn(attempt -> attempt.getAttemptNo() == 1)
+                                .first()
+                                .satisfies(attempt -> {
+                                        assertThat(attempt.getRoute()).isEqualTo(RequestLogAttemptRoute.PRIMARY);
+                                        assertThat(attempt.getResult()).isEqualTo(RequestLogAttemptResult.FAIL);
+                                        assertThat(attempt.getBackoffAfterMs()).isEqualTo(200);
+                                });
+                assertThat(saved.getAttempts())
+                                .filteredOn(attempt -> attempt.getAttemptNo() == 2)
+                                .first()
+                                .satisfies(attempt -> {
+                                        assertThat(attempt.getRoute()).isEqualTo(RequestLogAttemptRoute.FAILOVER);
+                                        assertThat(attempt.getResult()).isEqualTo(RequestLogAttemptResult.TIMEOUT);
+                                        assertThat(attempt.getBackoffAfterMs()).isNull();
+                                });
         }
 }

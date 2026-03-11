@@ -13,7 +13,14 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { logsApi } from '@/api/logs.api';
-import type { RequestLogResponse, RequestLogStatus } from '@/types/api.types';
+import type {
+  RequestLogAttemptCollectionMode,
+  RequestLogAttemptResponse,
+  RequestLogAttemptResult,
+  RequestLogAttemptRoute,
+  RequestLogResponse,
+  RequestLogStatus,
+} from '@/types/api.types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -259,6 +266,74 @@ type FailureInsight = {
   reasonDescription: string;
 };
 
+type TimelinePhaseItem = {
+  key: 'rag' | 'llm';
+  label: string;
+  startMs: number;
+  latencyMs: number;
+  percent: number;
+  chipClass: string;
+  barClass: string;
+  textClass: string;
+  dotClass: string;
+};
+
+type AttemptRenderItem = RequestLogAttemptResponse & {
+  normalizedLatencyMs: number;
+  startMs: number;
+  backoffAfterMs: number;
+  summary: string;
+};
+
+function normalizeAttemptLatency(attempt: RequestLogAttemptResponse): number {
+  if (typeof attempt.latencyMs === 'number' && Number.isFinite(attempt.latencyMs)) {
+    return Math.max(0, attempt.latencyMs);
+  }
+  const start = parseApiDate(attempt.startedAt);
+  const end = parseApiDate(attempt.endedAt);
+  if (!start || !end) return 0;
+  return Math.max(0, end.getTime() - start.getTime());
+}
+
+function buildAttemptSummary(attempt: RequestLogAttemptResponse): string {
+  if (attempt.result === 'SUCCESS') {
+    return attempt.route === 'FAILOVER'
+      ? '보조 경로에서 정상 완료되었습니다.'
+      : '기본 경로에서 정상 완료되었습니다.';
+  }
+  if (attempt.result === 'TIMEOUT') {
+    return '시도 시간이 제한을 초과했습니다.';
+  }
+  return attempt.route === 'FAILOVER'
+    ? '보조 경로에서도 요청이 실패했습니다.'
+    : '기본 경로에서 실패해 다음 경로로 전환되었습니다.';
+}
+
+function attemptRouteBadge(route: RequestLogAttemptRoute) {
+  const base = 'inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold tracking-wide border';
+  switch (route) {
+    case 'PRIMARY':
+      return `${base} border-slate-400/35 bg-slate-500/10 text-slate-600 dark:text-slate-300`;
+    case 'FAILOVER':
+      return `${base} border-amber-400/35 bg-amber-500/10 text-amber-700 dark:text-amber-300`;
+    default:
+      return `${base} border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]`;
+  }
+}
+
+function attemptResultBadge(result: RequestLogAttemptResult) {
+  const base = 'inline-flex items-center rounded px-2 py-0.5 text-[10px] font-bold tracking-wide border';
+  switch (result) {
+    case 'SUCCESS':
+      return `${base} border-emerald-400/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300`;
+    case 'TIMEOUT':
+      return `${base} border-orange-400/35 bg-orange-500/10 text-orange-700 dark:text-orange-300`;
+    case 'FAIL':
+    default:
+      return `${base} border-rose-400/35 bg-rose-500/10 text-rose-700 dark:text-rose-300`;
+  }
+}
+
 const FAIL_REASON_DESCRIPTION: Record<string, string> = {
   PROVIDER_BUDGET_EXCEEDED: 'Provider 예산 한도에 도달해 호출이 차단되었습니다.',
   PRIMARY_PROVIDER_BUDGET_BLOCKED: '기본 Provider 예산이 차단되어 보조 경로로 우회했습니다.',
@@ -374,6 +449,18 @@ export function WorkspaceLogDetailPage() {
     retry: false,
   });
 
+  const {
+    data: attemptTimeline,
+    isLoading: attemptsLoading,
+    isError: attemptsError,
+    refetch: refetchAttempts,
+  } = useQuery({
+    queryKey: ['workspace-log-attempts', workspaceId, traceId],
+    queryFn: async () => logsApi.getAttempts(workspaceId, traceId!),
+    enabled: isValid,
+    retry: false,
+  });
+
   if (!isValid) {
     return <div className="p-8 text-[var(--text-secondary)]">유효하지 않은 요청입니다.</div>;
   }
@@ -384,17 +471,72 @@ export function WorkspaceLogDetailPage() {
     ? resolveResponsePayloadTimestamp(log.createdAt, log.finishedAt, log.latencyMs)
     : null;
   const totalLatencyMs = Math.max(0, log?.latencyMs ?? 0);
-  const ragLatencyMs = Math.max(0, log?.ragLatencyMs ?? 0);
+  const ragLatencyMs = log?.ragEnabled ? Math.max(0, Math.min(totalLatencyMs, log?.ragLatencyMs ?? 0)) : 0;
   const llmLatencyMs = Math.max(0, totalLatencyMs - ragLatencyMs);
   const ragPercent = totalLatencyMs > 0 ? Math.round((ragLatencyMs / totalLatencyMs) * 100) : 0;
   const llmPercent = totalLatencyMs > 0 ? Math.round((llmLatencyMs / totalLatencyMs) * 100) : 0;
-  const ragRatio = totalLatencyMs > 0 ? Math.max(0, Math.min(100, (ragLatencyMs / totalLatencyMs) * 100)) : 0;
-  const donutGradient = totalLatencyMs <= 0
-    ? 'conic-gradient(from -90deg, rgba(148,163,184,0.25) 0% 100%)'
-    : log?.ragEnabled
-      ? `conic-gradient(from -90deg, rgba(59,130,246,0.95) 0% ${ragRatio}%, rgba(168,85,247,0.95) ${ragRatio}% 100%)`
-      : 'conic-gradient(from -90deg, rgba(168,85,247,0.95) 0% 100%)';
   const failureInsight = buildFailureInsight(log);
+  const attemptCollectionMode: RequestLogAttemptCollectionMode = attemptTimeline?.collectionMode ?? 'MISSING';
+  const attempts: AttemptRenderItem[] = (() => {
+    if (!attemptTimeline?.attempts?.length) return [];
+
+    const logStartedAtMs = parseApiDate(log?.createdAt)?.getTime() ?? null;
+    let fallbackStartMs = 0;
+    return attemptTimeline.attempts.map((attempt) => {
+      const normalizedLatencyMs = normalizeAttemptLatency(attempt);
+      const startedAtMs = parseApiDate(attempt.startedAt)?.getTime() ?? null;
+      let startMs = 0;
+      if (logStartedAtMs != null && startedAtMs != null) {
+        startMs = Math.max(0, startedAtMs - logStartedAtMs);
+      } else {
+        startMs = Math.max(0, fallbackStartMs);
+      }
+      const backoffAfterMs = Math.max(0, attempt.backoffAfterMs ?? 0);
+      fallbackStartMs = startMs + normalizedLatencyMs + backoffAfterMs;
+
+      return {
+        ...attempt,
+        normalizedLatencyMs,
+        startMs,
+        backoffAfterMs,
+        summary: buildAttemptSummary(attempt),
+      };
+    });
+  })();
+
+  const attemptsLatencyMs = attempts.reduce((acc, attempt) => acc + attempt.normalizedLatencyMs, 0);
+  const attemptsBackoffMs = attempts.reduce((acc, attempt) => acc + attempt.backoffAfterMs, 0);
+  const knownTimelineMs = ragLatencyMs + attemptsLatencyMs + attemptsBackoffMs;
+  const overheadMs = Math.max(0, totalLatencyMs - knownTimelineMs);
+  const timelineTotalMs = Math.max(totalLatencyMs, knownTimelineMs, 1);
+  const timelinePhases: TimelinePhaseItem[] = [
+    ...(log?.ragEnabled && ragLatencyMs > 0
+      ? [
+          {
+            key: 'rag' as const,
+            label: 'RAG 검색',
+            startMs: 0,
+            latencyMs: ragLatencyMs,
+            percent: ragPercent,
+            chipClass: 'border-blue-500/25 bg-blue-500/10',
+            barClass: 'bg-blue-400/85',
+            textClass: 'text-blue-700 dark:text-blue-200',
+            dotClass: 'bg-blue-400/90',
+          },
+        ]
+      : []),
+    {
+      key: 'llm',
+      label: 'LLM 생성',
+      startMs: ragLatencyMs,
+      latencyMs: llmLatencyMs,
+      percent: llmPercent,
+      chipClass: 'border-purple-500/25 bg-purple-500/10',
+      barClass: 'bg-purple-400/85',
+      textClass: 'text-purple-700 dark:text-purple-200',
+      dotClass: 'bg-purple-400/90',
+    },
+  ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20 text-[var(--foreground)]">
@@ -459,7 +601,10 @@ export function WorkspaceLogDetailPage() {
               </button>
             </div>
             <button
-              onClick={() => refetch()}
+              onClick={() => {
+                void refetch();
+                void refetchAttempts();
+              }}
               className="group flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--text-secondary)] transition-colors hover:border-[var(--primary)]/40 hover:text-[var(--primary)]"
             >
               <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
@@ -572,11 +717,11 @@ export function WorkspaceLogDetailPage() {
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[var(--text-secondary)]">Top K</span>
-                  <span className="font-mono text-[var(--foreground)]">{log.ragTopK || '-'}</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragTopK ?? '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[var(--text-secondary)]">유사도 임계값</span>
-                  <span className="font-mono text-[var(--foreground)]">{log.ragSimilarityThreshold || '-'}</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragSimilarityThreshold ?? '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[var(--text-secondary)]">검색 청크 수</span>
@@ -619,7 +764,7 @@ export function WorkspaceLogDetailPage() {
                 <div className="space-y-1 border-t border-[var(--border)] pt-2">
                   <span className="text-xs text-[var(--text-secondary)]">요청 경로</span>
                   <div className="break-all font-mono text-xs leading-tight text-[var(--text-secondary)]">
-                    {log.requestPath || '/v1/models/chat'}
+                    {log.requestPath || '/v1/chat/completions'}
                   </div>
                 </div>
               </div>
@@ -682,28 +827,119 @@ export function WorkspaceLogDetailPage() {
                   <span className="h-2 w-2 rounded-full bg-slate-300/80" />
                   전체 요청
                 </span>
-                {log.ragEnabled && (
-                  <span className="inline-flex items-center gap-1.5 rounded border border-blue-500/25 bg-blue-500/10 px-2 py-1 text-blue-700 dark:text-blue-300">
-                    <span className="h-2 w-2 rounded-full bg-blue-400/90" />
-                    RAG 검색
+                {timelinePhases.map((phase) => (
+                  <span
+                    key={phase.key}
+                    className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 ${phase.chipClass} ${phase.textClass}`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${phase.dotClass}`} />
+                    {phase.label}
+                  </span>
+                ))}
+                {attempts.length > 0 && (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 rounded border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-200">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400/90" />
+                      Provider 시도
+                    </span>
+                    {attemptsBackoffMs > 0 && (
+                      <span className="inline-flex items-center gap-1.5 rounded border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-amber-700 dark:text-amber-200">
+                        <span className="h-2 w-2 rounded-full bg-amber-400/90" />
+                        Retry Backoff
+                      </span>
+                    )}
+                  </>
+                )}
+                {overheadMs > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded border border-slate-400/25 bg-slate-500/10 px-2 py-1 text-slate-700 dark:text-slate-300">
+                    <span className="h-2 w-2 rounded-full bg-slate-300/90" />
+                    기타 오버헤드
                   </span>
                 )}
-                <span className="inline-flex items-center gap-1.5 rounded border border-purple-500/25 bg-purple-500/10 px-2 py-1 text-purple-700 dark:text-purple-300">
-                  <span className="h-2 w-2 rounded-full bg-purple-400/90" />
-                  LLM 생성
-                </span>
               </div>
 
-              <div className="mx-auto max-w-[460px]">
-                <div className="relative mx-auto h-44 w-44 rounded-full border border-[var(--border)] bg-[var(--surface-subtle)] p-[1px]">
-                  <div
-                    className="absolute inset-0 rounded-full"
-                    style={{ background: donutGradient }}
-                  />
-                  <div className="absolute inset-[16px] flex flex-col items-center justify-center rounded-full border border-[var(--border)] bg-[var(--background-card)] text-center dark:bg-[#0b0d1d]/95">
-                    <span className="text-[11px] text-[var(--text-secondary)]">총 지연</span>
-                    <span className="font-mono text-2xl font-bold leading-none text-[var(--foreground)]">{totalLatencyMs}ms</span>
-                    <span className="mt-1 font-mono text-[11px] text-[var(--text-secondary)]">{formatSeconds(totalLatencyMs)}</span>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--background-card)] p-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-[var(--text-secondary)]">총 지연</div>
+                    <div className="font-mono text-2xl font-bold leading-none text-[var(--foreground)]">
+                      {totalLatencyMs}ms
+                    </div>
+                    <div className="mt-1 font-mono text-[11px] text-[var(--text-secondary)]">
+                      {formatSeconds(totalLatencyMs)}
+                    </div>
+                  </div>
+                  <div className="space-y-0.5 text-right text-[11px] text-[var(--text-secondary)]">
+                    <div>
+                      start <span className="font-mono text-[var(--foreground)]">{formatKstDateTimeOrFallback(log.createdAt)}</span>
+                    </div>
+                    <div>
+                      end <span className="font-mono text-[var(--foreground)]">{formatKstDateTimeOrFallback(responsePayloadTimestamp)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <div className="relative h-4 overflow-hidden rounded-full border border-[var(--border)] bg-[var(--surface-subtle)]">
+                    {timelinePhases.map((phase) => {
+                      if (timelineTotalMs <= 0 || phase.latencyMs <= 0) return null;
+                      const rawLeft = (phase.startMs / timelineTotalMs) * 100;
+                      const rawWidth = (phase.latencyMs / timelineTotalMs) * 100;
+                      const left = Math.max(0, Math.min(100, rawLeft));
+                      const width = Math.max(0, Math.min(100 - left, Math.max(rawWidth, 3)));
+                      return (
+                        <div
+                          key={`${phase.key}-bar`}
+                          className={`absolute inset-y-0 ${phase.barClass}`}
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                        />
+                      );
+                    })}
+                    {attempts.map((attempt) => {
+                      if (timelineTotalMs <= 0 || attempt.normalizedLatencyMs <= 0) return null;
+                      const start = ragLatencyMs + attempt.startMs;
+                      const rawLeft = (start / timelineTotalMs) * 100;
+                      const rawWidth = (attempt.normalizedLatencyMs / timelineTotalMs) * 100;
+                      const left = Math.max(0, Math.min(100, rawLeft));
+                      const width = Math.max(0, Math.min(100 - left, Math.max(rawWidth, 1.8)));
+                      return (
+                        <div
+                          key={`attempt-bar-${attempt.attemptNo}`}
+                          className="absolute inset-y-0 border-r border-r-emerald-300/50 bg-emerald-400/75"
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                        />
+                      );
+                    })}
+                    {attempts.map((attempt) => {
+                      if (!attempt.backoffAfterMs || timelineTotalMs <= 0) return null;
+                      const start = ragLatencyMs + attempt.startMs + attempt.normalizedLatencyMs;
+                      const rawLeft = (start / timelineTotalMs) * 100;
+                      const rawWidth = (attempt.backoffAfterMs / timelineTotalMs) * 100;
+                      const left = Math.max(0, Math.min(100, rawLeft));
+                      const width = Math.max(0, Math.min(100 - left, rawWidth));
+                      if (width <= 0) return null;
+                      return (
+                        <div
+                          key={`attempt-backoff-${attempt.attemptNo}`}
+                          className="absolute inset-y-0 bg-amber-400/70"
+                          style={{ left: `${left}%`, width: `${width}%` }}
+                        />
+                      );
+                    })}
+                    {overheadMs > 0 && timelineTotalMs > 0 && (
+                      <div
+                        className="absolute inset-y-0 bg-slate-400/40"
+                        style={{
+                          left: `${Math.max(0, ((timelineTotalMs - overheadMs) / timelineTotalMs) * 100)}%`,
+                          width: `${Math.min(100, (overheadMs / timelineTotalMs) * 100)}%`,
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="mt-1 grid grid-cols-3 text-[10px] text-[var(--text-secondary)]">
+                    <span>0ms</span>
+                    <span className="text-center font-mono">{Math.round(timelineTotalMs / 2)}ms</span>
+                    <span className="text-right font-mono">{timelineTotalMs}ms</span>
                   </div>
                 </div>
 
@@ -716,28 +952,127 @@ export function WorkspaceLogDetailPage() {
                     <span className="text-xs font-mono text-[var(--foreground)]">{totalLatencyMs}ms</span>
                   </div>
 
-                  {log.ragEnabled && (
-                    <div className="flex items-center justify-between rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2">
-                      <span className="inline-flex items-center gap-2 text-xs text-blue-700 dark:text-blue-200">
-                        <span className="h-2 w-2 rounded-full bg-blue-400/90" />
-                        RAG 검색
+                  {timelinePhases.map((phase) => (
+                    <div key={`${phase.key}-row`} className={`flex items-center justify-between rounded-lg border px-3 py-2 ${phase.chipClass}`}>
+                      <span className={`inline-flex items-center gap-2 text-xs ${phase.textClass}`}>
+                        <span className={`h-2 w-2 rounded-full ${phase.dotClass}`} />
+                        {phase.label}
                       </span>
-                      <span className="text-xs font-mono text-blue-700 dark:text-blue-200">{ragLatencyMs}ms · {ragPercent}%</span>
+                      <span className={`text-xs font-mono ${phase.textClass}`}>{phase.latencyMs}ms · {phase.percent}%</span>
+                    </div>
+                  ))}
+                  {attempts.length > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
+                      <span className="inline-flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-200">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400/90" />
+                        Provider 시도 누적
+                      </span>
+                      <span className="text-xs font-mono text-emerald-700 dark:text-emerald-200">{attemptsLatencyMs}ms</span>
                     </div>
                   )}
-
-                  <div className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/10 px-3 py-2">
-                    <span className="inline-flex items-center gap-2 text-xs text-purple-700 dark:text-purple-200">
-                      <span className="h-2 w-2 rounded-full bg-purple-400/90" />
-                      LLM 생성
-                    </span>
-                    <span className="text-xs font-mono text-purple-700 dark:text-purple-200">{llmLatencyMs}ms · {llmPercent}%</span>
-                  </div>
+                  {attemptsBackoffMs > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+                      <span className="inline-flex items-center gap-2 text-xs text-amber-700 dark:text-amber-200">
+                        <span className="h-2 w-2 rounded-full bg-amber-400/90" />
+                        Retry backoff 누적
+                      </span>
+                      <span className="text-xs font-mono text-amber-700 dark:text-amber-200">{attemptsBackoffMs}ms</span>
+                    </div>
+                  )}
+                  {overheadMs > 0 && (
+                    <div className="flex items-center justify-between rounded-lg border border-slate-400/25 bg-slate-500/10 px-3 py-2">
+                      <span className="inline-flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                        <span className="h-2 w-2 rounded-full bg-slate-300/90" />
+                        기타 오버헤드(보정)
+                      </span>
+                      <span className="text-xs font-mono text-slate-700 dark:text-slate-300">{overheadMs}ms</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="mt-3 text-[11px] text-[var(--text-secondary)]">
-                현재 표시: 전체 요청, RAG 검색, LLM 생성(추정). 네트워크/DB 세부 시간은 백엔드 계측 추가 시 제공 가능합니다.
+                현재 표시: 전체 요청, RAG 검색, LLM 생성(추정), provider 시도/재시도(backoff) 누적.
+              </div>
+
+              <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)]/60 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-bold uppercase tracking-wide text-[var(--foreground)]">
+                    실행 내역 (시도 단위)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {attemptCollectionMode === 'DERIVED_SINGLE' && (
+                      <span className="rounded border border-blue-400/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:text-blue-200">
+                        파생 데이터
+                      </span>
+                    )}
+                    <span className="rounded border border-[var(--border)] bg-[var(--background-card)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
+                      {attemptCollectionMode}
+                    </span>
+                  </div>
+                </div>
+
+                {attemptsLoading ? (
+                  <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                    시도 타임라인을 불러오는 중입니다...
+                  </div>
+                ) : attemptsError ? (
+                  <div className="mt-3 rounded border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">
+                    시도 타임라인을 불러오지 못했습니다. 새로고침 후 다시 확인해 주세요.
+                  </div>
+                ) : attempts.length === 0 ? (
+                  <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                    {attemptCollectionMode === 'MISSING'
+                      ? '이 로그는 attempt 수집 배포 이전 데이터입니다. 상단 요약(총 지연/RAG/LLM)만 제공합니다.'
+                      : '표시할 시도 내역이 없습니다.'}
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {attempts.map((attempt, idx) => (
+                      <div key={`${attempt.attemptNo}-${attempt.route}-${idx}`} className="space-y-2">
+                        <div className="rounded-lg border border-[var(--border)] bg-[var(--background-card)] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded border border-[var(--border)] bg-[var(--surface-subtle)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
+                                #{attempt.attemptNo}
+                              </span>
+                              <span className={attemptRouteBadge(attempt.route)}>{attempt.route}</span>
+                              {attempt.retry && (
+                                <span className="inline-flex items-center rounded border border-blue-400/35 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-blue-700 dark:text-blue-300">
+                                  RETRY
+                                </span>
+                              )}
+                              <span className={attemptResultBadge(attempt.result)}>{attempt.result}</span>
+                            </div>
+                            <span className="text-xs font-mono text-[var(--text-secondary)]">{attempt.normalizedLatencyMs}ms</span>
+                          </div>
+
+                          <div className="mt-2 grid grid-cols-1 gap-1 text-xs sm:grid-cols-2">
+                            <div className="text-[var(--text-secondary)]">provider: <span className="font-mono text-[var(--foreground)]">{attempt.provider ?? '-'}</span></div>
+                            <div className="text-[var(--text-secondary)]">model: <span className="font-mono text-[var(--foreground)]">{attempt.usedModel ?? attempt.requestedModel ?? '-'}</span></div>
+                            <div className="text-[var(--text-secondary)]">start: <span className="font-mono text-[var(--foreground)]">{formatKstDateTimeOrFallback(attempt.startedAt)}</span></div>
+                            <div className="text-[var(--text-secondary)]">end: <span className="font-mono text-[var(--foreground)]">{formatKstDateTimeOrFallback(attempt.endedAt)}</span></div>
+                          </div>
+
+                          {(attempt.errorCode || attempt.failReason) && (
+                            <div className="mt-2 rounded border border-rose-400/20 bg-rose-500/5 px-2 py-1 text-[11px] text-rose-700 dark:text-rose-200">
+                              {attempt.errorCode ? `errorCode=${attempt.errorCode}` : 'errorCode=-'}
+                              {attempt.failReason ? ` · failReason=${attempt.failReason}` : ''}
+                            </div>
+                          )}
+
+                          <div className="mt-2 text-[11px] text-[var(--text-secondary)]">{attempt.summary}</div>
+                        </div>
+
+                        {attempt.backoffAfterMs > 0 && (
+                          <div className="pl-2 text-[11px] text-[var(--text-secondary)]">
+                            ↳ retry backoff {attempt.backoffAfterMs}ms
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
