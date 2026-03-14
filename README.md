@@ -1,39 +1,77 @@
 # LuminaOps
 
-> 조직 단위로 LLM 호출을 표준화하고, 프롬프트 배포/롤백과 운영 관측을 연결하는 LLMOps 플랫폼
+> 조직 단위로 LLM 호출을 표준화하고, 프롬프트를 안전하게 배포·롤백하며, 요청 단위의 비용·지연·오류를 추적할 수 있도록 설계한 LLMOps 플랫폼입니다.
 
-LuminaOps는 여러 LLM provider를 하나의 Gateway로 통합하고, 프롬프트를 안전하게 배포하며, 요청 단위 로그와 대시보드로 장애를 추적할 수 있도록 만든 팀 프로젝트입니다.
+## Demo & Links
 
-## 왜 만들었나
+- 서비스 소개: 준비 중
+- 시연 영상: 준비 중
+- 발표 자료: 준비 중
+- API 문서: [사용자 가이드](./docs/USER_GUIDE.md)
 
-LLM을 실제 서비스에 붙이면 기능 구현보다 운영 문제가 먼저 드러납니다.
+## Preview
 
-- provider마다 API와 오류 형식이 달라 호출 계층이 빠르게 복잡해짐
-- 프롬프트 수정 후 어떤 버전이 실제 서비스에 반영됐는지 추적하기 어려움
-- timeout, 429, 5xx가 발생했을 때 원인 파악과 롤백이 느려짐
-- 비용, 지연, 실패율을 한 번에 보는 운영 화면이 부족함
+현재 레포에 커밋된 데모 자산 기준으로 Logs 화면을 우선 노출합니다. 발표용 GIF, 메인 화면 캡처, Dashboard 대표 이미지는 정리 후 추가하는 구성이 가장 자연스럽습니다.
 
-LuminaOps는 이 문제를 해결하기 위해 다음 3축에 집중했습니다.
+### Logs / Timeout 대응 화면
 
-- `One Gateway`: `/v1/chat/completions` 단일 진입점으로 모델 호출 표준화
-- `Prompt Ops`: Playground, 버전 저장, Release, Rollback
-- `Logs & Dashboard`: `traceId` 기반 추적, 비용/지연/오류 관측
+![Logs timeout view](./ppt/logs-timeout-after.png)
 
-## 핵심 기능
+## Why LuminaOps
 
-| 영역 | 제공 기능 | 구현 포인트 |
-| --- | --- | --- |
-| Gateway | OpenAI 호환 단일 엔드포인트 | `/v1/chat/completions`, `X-API-Key` 기반 호출 |
-| Reliability | retry, failover, circuit breaker, request budget | timeout/429/5xx 상황별 재시도 및 provider 우회 |
-| Prompt Ops | 프롬프트 생성, 버전 관리, release/rollback, playground | 실제 서비스 반영 버전을 안전하게 전환 |
-| Observability | 요청 로그, trace 상세, 대시보드, Prometheus/Grafana | 성공률, 오류율, latency, token, cost 추적 |
-| Optional RAG | 문서 업로드, chunking, pgvector 검색, hybrid search | 운영 중심 MVP를 해치지 않는 확장 기능 |
+여러 팀이 OpenAI, Claude, Gemini를 각자 다른 방식으로 호출하면
 
-## 아키텍처
+- 장애 대응 로직이 서비스마다 중복되고
+- 프롬프트 배포와 롤백 이력이 분산되며
+- 비용, 지연, 오류를 trace 단위로 추적하기 어려워집니다.
+
+LuminaOps는 이 문제를 해결하기 위해 다음 3가지를 하나의 운영 흐름으로 묶었습니다.
+
+- `One Gateway`
+- `Prompt Versioning`
+- `Logs & Dashboard`
+
+즉, 프롬프트를 실험하고 배포한 뒤 실제 요청을 Gateway에서 안정적으로 처리하고, 문제가 생기면 로그와 대시보드로 원인을 추적해 다시 롤백할 수 있는 운영 루프를 만드는 것이 목표입니다.
+
+## Core Features
+
+### 1. One Gateway
+
+- OpenAI 호환 단일 엔드포인트 `POST /v1/chat/completions`
+- `X-API-Key` 기반의 워크스페이스 인증
+- provider/model 단위 circuit breaker 적용
+- timeout, 5xx는 same-provider retry 후 failover
+- 429, model not found는 즉시 failover
+- `error_code`, `fail_reason`, `traceId` 기반의 표준 오류 응답
+
+### 2. Prompt Playground & Versioning
+
+- Prompt 생성 및 버전 관리
+- Playground에서 프롬프트/파라미터 실험
+- Release를 통한 active 버전 전환
+- Rollback을 통한 이전 버전 복구
+- 확장 기능으로 Prompt 평가 탭 제공
+
+### 3. Logs & Dashboard
+
+- 요청/응답/오류/토큰/비용/지연 추적
+- `traceId` 기준 로그 상세 조회
+- Workspace 최근 요청, 예산 사용량, 운영 상태 확인
+- Prometheus/Grafana 기반 지표 관측
+- 실패 원인 분류를 위한 표준 error code 정책 적용
+
+### 4. Optional RAG
+
+- 문서 업로드와 미리보기
+- Tika 기반 추출 및 청킹
+- pgvector + keyword 기반 hybrid search
+- Workspace 단위 RAG 설정 관리
+
+## Architecture
 
 ```mermaid
 graph TD
-    A["Client or Service"] --> B["Gateway API<br/>/v1/chat/completions"]
+    A["Client Service"] --> B["Gateway API<br/>/v1/chat/completions"]
     H["Frontend Console<br/>frontend2"] --> C["Spring Boot Backend"]
     B --> C
     C --> D["Prompt Version & Release"]
@@ -47,90 +85,106 @@ graph TD
     L --> I
 ```
 
-## 운영 흐름
+### Request Flow
 
 1. 콘솔에서 프롬프트를 생성하고 버전을 저장합니다.
 2. Release로 활성 버전을 전환합니다.
 3. 외부 서비스는 `X-API-Key`와 함께 Gateway를 호출합니다.
-4. Gateway는 요청 예산 안에서 retry/failover를 수행합니다.
-5. 모든 요청은 `traceId` 기준으로 로그와 대시보드에 축적됩니다.
-6. 장애가 발생하면 로그 상세와 에러 코드로 원인을 추적하고, 필요 시 prompt release를 rollback 합니다.
+4. Gateway는 요청 시간 예산 안에서 retry와 failover를 수행합니다.
+5. 결과는 `traceId` 기준으로 로그와 대시보드에 연결됩니다.
+6. 이상 징후가 보이면 로그 상세를 보고 원인을 추적한 뒤 롤백합니다.
 
-## 기술 스택
+## Tech Stack
 
-| 구분 | 스택 |
-| --- | --- |
-| Backend | Java 17, Spring Boot 3.5.9, Spring Data JPA, Spring Security, Flyway |
-| AI / Gateway | Spring AI, Google GenAI SDK, Resilience4j |
-| Frontend | React 19, TypeScript, Vite, React Query, Tailwind CSS |
-| Database | PostgreSQL, pgvector, H2(test) |
-| Observability | Micrometer, Prometheus, Grafana, Alertmanager |
-| Storage | S3-compatible object storage, Apache Tika |
-| Test / Perf | JUnit 5, Mockito, Vitest, Artillery |
+### Backend
 
-## 주요 포인트
+- Java 17
+- Spring Boot 3.5.9
+- Spring Data JPA
+- Spring Security
+- Flyway
+- Resilience4j
+- Spring AI
+- Google GenAI SDK
 
-### 1. One Gateway
+### Frontend
 
-- OpenAI 호환 API 하나로 여러 provider를 라우팅합니다.
-- 오류를 `error_code`, `fail_reason`, `error_message`로 표준화합니다.
-- 전체 요청 시간 예산 안에서 same-provider retry와 secondary failover를 수행합니다.
-- provider/model 단위 circuit breaker로 장애 구간을 빠르게 우회합니다.
+- React 19
+- TypeScript
+- Vite
+- React Query
+- Tailwind CSS
 
-### 2. Prompt Playground + Versioning
+### Infra / Observability
 
-- 프롬프트 단위를 만들고 버전을 누적 관리합니다.
-- release 상태를 통해 실제 서비스 반영 버전을 분리합니다.
-- Playground에서 system prompt, user template, model config를 실험할 수 있습니다.
-- 평가 탭과 문서 기능은 확장 기능으로 함께 제공됩니다.
+- PostgreSQL
+- pgvector
+- Prometheus
+- Grafana
+- Alertmanager
+- S3-compatible storage
+- Apache Tika
+- Docker Compose
 
-### 3. Logs + Dashboard
+### Test / Performance
 
-- 각 요청은 `traceId`로 연결되어 로그 상세에서 추적됩니다.
-- latency, token, provider, model, RAG 여부, 비용 정보를 함께 확인할 수 있습니다.
-- Workspace 대시보드에서 최근 요청, 예산 사용량, 운영 상태를 한 번에 볼 수 있습니다.
-- Prometheus/Grafana와 연결해 운영 지표를 별도로 시각화할 수 있습니다.
+- JUnit 5
+- Mockito
+- Vitest
+- Artillery
 
-## 주요 화면
+## Team & Role
 
-### Logs 화면 예시
+팀 프로젝트 README인 만큼 이 섹션은 유지하되, 실제 제출 전에는 팀 내 합의된 이름/역할 기준으로 반드시 치환하는 것이 좋습니다.
 
-장애 상황에서 timeout, upstream error, provider, model, trace 정보를 빠르게 확인할 수 있도록 구성했습니다.
+| 이름 | 역할 | 담당 |
+| --- | --- | --- |
+| 팀원 A | Backend | Gateway, Logging |
+| 팀원 B | Frontend | Dashboard, Logs UI |
+| 팀원 C | Backend | Prompt, Performance Test |
 
-![Logs timeout view](./ppt/logs-timeout-after.png)
+## My Contributions
 
-## API 예시
+이 섹션은 이력서와 연결되는 핵심이라, 아래 예시 중 실제로 담당한 내용만 남기는 방식이 가장 좋습니다.
 
-```bash
-curl -X POST http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_WORKSPACE_API_KEY" \
-  -d '{
-    "model": "customer-support-bot",
-    "messages": [
-      { "role": "user", "content": "환불 정책을 알려줘" }
-    ]
-  }'
-```
+- Gateway 장애 대응 정책 설계 및 구현
+- 표준 에러 코드 체계 적용
+- 요청 로그 적재 구조 및 trace 기반 조회 구현
+- Dashboard 지표 조회 API 구현
+- 성능 테스트 시나리오 작성 및 병목 분석
+- Prompt release / rollback 흐름 구현
 
-## 빠른 실행
+## Reliability & Performance
 
-### 1. Backend
+### Reliability Policy
+
+- `429`, `MODEL_NOT_FOUND`: immediate failover
+- `timeout`, `5xx`, 일시적 네트워크 오류: same-provider retry 후 failover
+- `400`, `401`, `403`, `413`, `415`, `422`, 정책 위반: fail-fast
+- 전역 요청 시간 예산과 provider/model 단위 circuit breaker 적용
+
+### Performance Test
+
+- 도구: Artillery
+- 대상: `/v1/chat/completions`
+- 기준선 시나리오: `1 -> 5 -> 10 rps`, 총 11분
+- 스파이크 시나리오: `1 -> 20 rps`
+- 지속 부하와 budget/failover 검증 시나리오 포함
+
+자세한 시나리오와 해석 기준은 [성능 테스트 가이드](./performance-tests/README.md)에서 확인할 수 있습니다.
+
+## Run Locally
 
 ```bash
 set -a; source .env.local; set +a
 ./gradlew bootRun --args='--spring.profiles.active=local'
-```
 
-### 2. Frontend
-
-```bash
 cd frontend2
 npm install
 npm run dev
 ```
 
-### 3. Test
+### Test
 
 ```bash
 ./gradlew clean test
@@ -140,34 +194,29 @@ npm run test
 npm run build
 ```
 
-### 4. Monitoring
+### Monitoring
 
 ```bash
 docker compose -f docker-compose.monitoring.yml up -d
 ```
 
-## 레포 구성
-
-```text
-.
-├── src/                  # Spring Boot backend
-├── frontend2/            # 메인 React 프론트엔드
-├── frontend/             # 레거시 프론트엔드
-├── monitoring/           # Prometheus / Grafana / Alertmanager 설정
-├── performance-tests/    # Artillery 성능 테스트 시나리오
-├── docs/                 # 사용자 가이드 및 운영 문서
-└── ppt/                  # 발표 자료 및 데모 이미지
-```
-
-## 참고 문서
+## Docs
 
 - [사용자 가이드](./docs/USER_GUIDE.md)
 - [Gateway 로그 흐름](./docs/request-log-flow.md)
 - [Gateway 오류 코드 정책](./docs/gateway-error-code-policy.md)
 - [성능 테스트 가이드](./performance-tests/README.md)
 
-## 프로젝트 메모
+## Retrospective
 
-- 메인 프론트엔드는 `frontend2`이며 `frontend`는 레거시 디렉토리입니다.
-- MVP의 중심은 RAG 챗봇 자체보다 `Gateway`, `Prompt Ops`, `Logs + Dashboard`입니다.
-- RAG와 Prompt 평가는 확장 기능으로 제공됩니다.
+### 왜 이런 구조를 선택했는가
+
+- LLM 기능 자체보다 운영 안정성과 관측 가능성을 우선해야 실제 서비스에 붙일 수 있다고 판단했습니다.
+- Gateway, Prompt, Logs를 분리된 기능이 아니라 하나의 운영 루프로 연결하는 데 집중했습니다.
+- RAG는 핵심 가치가 아니라 확장 기능으로 배치해 MVP 범위를 통제했습니다.
+
+### 상용화 전 보완 포인트
+
+- Demo 링크와 대표 화면을 더 정리해 첫 인상을 강화할 필요가 있습니다.
+- Team / My Contributions 섹션을 실제 참여 기준으로 확정해야 합니다.
+- 운영 지표에 대한 정량 결과와 회고를 추가하면 채용용 문서로 더 강해집니다.
