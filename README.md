@@ -135,24 +135,19 @@ graph TD
 
 ## Team & Role
 
-팀 프로젝트 README인 만큼 이 섹션은 유지하되, 실제 제출 전에는 팀 내 합의된 이름/역할 기준으로 반드시 치환하는 것이 좋습니다.
-
 | 이름 | 역할 | 담당 |
 | --- | --- | --- |
-| 팀원 A | Backend | Gateway, Logging |
-| 팀원 B | Frontend | Dashboard, Logs UI |
-| 팀원 C | Backend | Prompt, Performance Test |
+| 허지우 | 팀장 · Backend | Gateway / LLM·RAG, 외부 API 게이트웨이 구현, RAG 컨텍스트 검색·주입, Provider 키/게이트웨이 키 관리 |
+| 홍찬용 | Frontend · Console Ops | 조직·워크스페이스 관리, 프롬프트 생성 / 버전 / 배포, CI/CD · AWS 배포 구성 |
+| 박준하 | Backend · Observability | 로그인/회원가입 + Spring Security(JWT), 요청 로그/Trace 조회, 비용/사용량 대시보드(통계) |
 
 ## My Contributions
 
-이 섹션은 이력서와 연결되는 핵심이라, 아래 예시 중 실제로 담당한 내용만 남기는 방식이 가장 좋습니다.
-
-- Gateway 장애 대응 정책 설계 및 구현
-- 표준 에러 코드 체계 적용
-- 요청 로그 적재 구조 및 trace 기반 조회 구현
-- Dashboard 지표 조회 API 구현
-- 성능 테스트 시나리오 작성 및 병목 분석
-- Prompt release / rollback 흐름 구현
+- 팀장 및 백엔드 개발 담당
+- LLM 단일 게이트웨이 구조 설계 및 공급자 통합 호출 흐름 구현
+- 프롬프트 평가 시스템 및 운영 로그 추적 구조 설계
+- 장애 대응 흐름 및 예산 제한 정책 설계
+- 팀 내 설계 의도와 코드 맥락 공유, 구현 방향 조율
 
 ## Reliability & Performance
 
