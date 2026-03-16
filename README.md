@@ -125,5 +125,5 @@ Logs 화면에서는 정상 요청과 failover 요청을 같은 목록 안에서
 | 이름 | 역할 | 담당 |
 | --- | --- | --- |
 | 허지우 | 팀장 · Backend | Gateway 호출 흐름, Retry/Failover 정책, Prompt 운영 구조, LLM Provider 연동 |
-| 홍찬용 | Frontend · Console Ops | Console UI, Prompt 생성/버전/배포 화면, 운영 UX, 배포 구성 |
+| 홍찬용 | Backend · Infra | Prompt·Workspace·Organization 도메인 설계·구현, AWS EC2·RDS·ALB 배포 |
 | 박준하 | Backend · Observability | 요청 로그/Trace 조회, 통계 대시보드, 인증 및 보안 영역 |
