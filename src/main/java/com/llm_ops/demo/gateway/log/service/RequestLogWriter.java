@@ -160,26 +160,6 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
-                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
-                        requestLog.fillModelUsage(
-                                        update.provider(),
-                                        update.requestedModel(),
-                                        update.usedModel(),
-                                        update.isFailover(),
-                                        update.inputTokens(),
-                                        update.outputTokens(),
-                                        update.totalTokens(),
-                                        update.estimatedCost(),
-                                        update.pricingVersion());
-                        requestLog.fillRagMetrics(
-                                        update.ragLatencyMs(),
-                                        update.ragChunksCount(),
-                                        update.ragContextChars(),
-                                        update.ragContextTruncated(),
-                                        update.ragContextHash(),
-                                        update.ragTopK(),
-                                        update.ragSimilarityThreshold());
-
                         RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markTimeout(
                                         LocalDateTime.now(clock),
@@ -191,6 +171,25 @@ public class RequestLogWriter {
                                         update.responsePayload());
 
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.TIMEOUT)) {
+                                requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
+                                requestLog.fillModelUsage(
+                                                update.provider(),
+                                                update.requestedModel(),
+                                                update.usedModel(),
+                                                update.isFailover(),
+                                                update.inputTokens(),
+                                                update.outputTokens(),
+                                                update.totalTokens(),
+                                                update.estimatedCost(),
+                                                update.pricingVersion());
+                                requestLog.fillRagMetrics(
+                                                update.ragLatencyMs(),
+                                                update.ragChunksCount(),
+                                                update.ragContextChars(),
+                                                update.ragContextTruncated(),
+                                                update.ragContextHash(),
+                                                update.ragTopK(),
+                                                update.ragSimilarityThreshold());
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
                                 saveAttemptLogs(requestLog, update.attemptLogs());
                         }
@@ -350,6 +349,10 @@ public class RequestLogWriter {
                         String responsePayload,
                         List<RetrievedDocumentInfo> retrievedDocuments,
                         List<AttemptLogInput> attemptLogs) {
+                public SuccessUpdate {
+                        retrievedDocuments = snapshotList(retrievedDocuments);
+                        attemptLogs = snapshotList(attemptLogs);
+                }
         }
 
         public record FailUpdate(
@@ -379,6 +382,10 @@ public class RequestLogWriter {
                         String responsePayload,
                         List<RetrievedDocumentInfo> retrievedDocuments,
                         List<AttemptLogInput> attemptLogs) {
+                public FailUpdate {
+                        retrievedDocuments = snapshotList(retrievedDocuments);
+                        attemptLogs = snapshotList(attemptLogs);
+                }
         }
 
         public record BlockUpdate(
@@ -408,6 +415,14 @@ public class RequestLogWriter {
                         String responsePayload,
                         List<RetrievedDocumentInfo> retrievedDocuments,
                         List<AttemptLogInput> attemptLogs) {
+                public BlockUpdate {
+                        retrievedDocuments = snapshotList(retrievedDocuments);
+                        attemptLogs = snapshotList(attemptLogs);
+                }
+        }
+
+        private static <T> List<T> snapshotList(List<T> source) {
+                return source == null ? null : List.copyOf(source);
         }
 
         /**

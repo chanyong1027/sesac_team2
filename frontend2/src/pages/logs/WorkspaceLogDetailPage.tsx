@@ -897,7 +897,7 @@ export function WorkspaceLogDetailPage() {
                     })}
                     {attempts.map((attempt) => {
                       if (timelineTotalMs <= 0 || attempt.normalizedLatencyMs <= 0) return null;
-                      const start = ragLatencyMs + attempt.startMs;
+                      const start = attempt.startMs;
                       const rawLeft = (start / timelineTotalMs) * 100;
                       const rawWidth = (attempt.normalizedLatencyMs / timelineTotalMs) * 100;
                       const left = Math.max(0, Math.min(100, rawLeft));
@@ -905,6 +905,7 @@ export function WorkspaceLogDetailPage() {
                       return (
                         <div
                           key={`attempt-bar-${attempt.attemptNo}`}
+                          data-testid={`attempt-bar-${attempt.attemptNo}`}
                           className="absolute inset-y-0 border-r border-r-emerald-300/50 bg-emerald-400/75"
                           style={{ left: `${left}%`, width: `${width}%` }}
                         />
@@ -912,7 +913,7 @@ export function WorkspaceLogDetailPage() {
                     })}
                     {attempts.map((attempt) => {
                       if (!attempt.backoffAfterMs || timelineTotalMs <= 0) return null;
-                      const start = ragLatencyMs + attempt.startMs + attempt.normalizedLatencyMs;
+                      const start = attempt.startMs + attempt.normalizedLatencyMs;
                       const rawLeft = (start / timelineTotalMs) * 100;
                       const rawWidth = (attempt.backoffAfterMs / timelineTotalMs) * 100;
                       const left = Math.max(0, Math.min(100, rawLeft));
@@ -921,6 +922,7 @@ export function WorkspaceLogDetailPage() {
                       return (
                         <div
                           key={`attempt-backoff-${attempt.attemptNo}`}
+                          data-testid={`attempt-backoff-${attempt.attemptNo}`}
                           className="absolute inset-y-0 bg-amber-400/70"
                           style={{ left: `${left}%`, width: `${width}%` }}
                         />

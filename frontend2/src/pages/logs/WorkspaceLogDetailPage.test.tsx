@@ -128,6 +128,46 @@ describe('WorkspaceLogDetailPage attempt timeline', () => {
     expect(await screen.findByText('RETRY')).toBeInTheDocument();
   });
 
+  it('RAG 지연이 있어도 attempt bar 위치를 중복 보정하지 않는다', async () => {
+    mockedLogsApi.get.mockResolvedValue({
+      ...baseLog,
+      ragEnabled: true,
+      ragLatencyMs: 200,
+      latencyMs: 900,
+      finishedAt: '2026-03-01T00:00:00.900Z',
+    });
+    mockedLogsApi.getAttempts.mockResolvedValue({
+      collectionMode: 'RECORDED',
+      attempts: [
+        {
+          attemptNo: 1,
+          route: 'PRIMARY',
+          retry: false,
+          result: 'FAIL',
+          provider: 'openai',
+          requestedModel: 'gpt-4o-mini',
+          usedModel: null,
+          startedAt: '2026-03-01T00:00:00.200Z',
+          endedAt: '2026-03-01T00:00:00.500Z',
+          latencyMs: 300,
+          httpStatus: 503,
+          errorCode: 'GW-UP-TIMEOUT',
+          failReason: 'REQUEST_DEADLINE_EXCEEDED',
+          errorMessage: 'timeout',
+          backoffAfterMs: 100,
+        },
+      ],
+    });
+
+    renderPage();
+
+    const attemptBar = await screen.findByTestId('attempt-bar-1');
+    const backoffBar = await screen.findByTestId('attempt-backoff-1');
+
+    expect(Number.parseFloat((attemptBar as HTMLElement).style.left)).toBeCloseTo(22.2, 1);
+    expect(Number.parseFloat((backoffBar as HTMLElement).style.left)).toBeCloseTo(55.6, 1);
+  });
+
   it('MISSING 모드에서 과거 로그 안내 문구를 표시한다', async () => {
     mockedLogsApi.get.mockResolvedValue(baseLog);
     mockedLogsApi.getAttempts.mockResolvedValue({
