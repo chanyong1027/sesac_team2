@@ -434,6 +434,166 @@ class RequestLogWriterTest {
         }
 
         @Test
+        void markFail_종료된_로그에는_metadata를_덮어쓰지_않는다() {
+                // given
+                UUID requestId = UUID.randomUUID();
+                RequestLogRepository repository = mock(RequestLogRepository.class);
+                RequestLogWriter writer = new RequestLogWriter(repository);
+                RequestLog requestLog = RequestLog.loggingStart(
+                                requestId,
+                                "trace-terminal-fail",
+                                10L,
+                                20L,
+                                30L,
+                                "prefix-terminal",
+                                "/v1/chat/completions",
+                                "POST",
+                                "prompt-key",
+                                true,
+                                "{\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}",
+                                "GATEWAY");
+                requestLog.fillPromptInfo(101L, 201L);
+                requestLog.fillModelUsage(
+                                "openai",
+                                "gpt-4o-mini",
+                                "gpt-4o-mini",
+                                false,
+                                10,
+                                20,
+                                30,
+                                null,
+                                "v1");
+                requestLog.fillRagMetrics(50, 2, 123, false, "hash-before", 3, 0.7);
+                requestLog.markSuccess(LocalDateTime.now(), 200, 400, null, "ok");
+                when(repository.findById(requestId)).thenReturn(Optional.of(requestLog));
+
+                // when
+                writer.markFail(requestId, new RequestLogWriter.FailUpdate(
+                                500,
+                                900,
+                                999L,
+                                888L,
+                                "anthropic",
+                                "claude-3-5-haiku",
+                                "claude-3-5-haiku",
+                                true,
+                                1,
+                                2,
+                                3,
+                                null,
+                                "v2",
+                                "GW-UP-UNAVAILABLE",
+                                "late failure",
+                                "HTTP_503",
+                                999,
+                                9,
+                                9999,
+                                true,
+                                "hash-after",
+                                9,
+                                0.9,
+                                "error payload",
+                                null,
+                                List.of(new RequestLogWriter.AttemptLogInput(
+                                                1,
+                                                RequestLogAttemptRoute.PRIMARY,
+                                                false,
+                                                RequestLogAttemptResult.FAIL,
+                                                "anthropic",
+                                                "claude-3-5-haiku",
+                                                null,
+                                                LocalDateTime.now().minusSeconds(1),
+                                                LocalDateTime.now(),
+                                                1000,
+                                                500,
+                                                "GW-UP-UNAVAILABLE",
+                                                "HTTP_503",
+                                                "late failure",
+                                                null))));
+
+                // then
+                assertThat(requestLog.getStatus()).isEqualTo(RequestLogStatus.SUCCESS);
+                assertThat(requestLog.getProvider()).isEqualTo("openai");
+                assertThat(requestLog.getRequestedModel()).isEqualTo("gpt-4o-mini");
+                assertThat(requestLog.getUsedModel()).isEqualTo("gpt-4o-mini");
+                assertThat(requestLog.getRagLatencyMs()).isEqualTo(50);
+                assertThat(requestLog.getRagChunksCount()).isEqualTo(2);
+                assertThat(requestLog.getRagContextHash()).isEqualTo("hash-before");
+                assertThat(requestLog.getAttempts()).isEmpty();
+        }
+
+        @Test
+        void markFail_잘못된_attemptLog가_와도_collection_state를_오염시키지_않는다() {
+                // given
+                UUID requestId = UUID.randomUUID();
+                RequestLogRepository repository = mock(RequestLogRepository.class);
+                RequestLogWriter writer = new RequestLogWriter(repository);
+                RequestLog requestLog = RequestLog.loggingStart(
+                                requestId,
+                                "trace-invalid-attempt-log",
+                                10L,
+                                20L,
+                                30L,
+                                "prefix-invalid",
+                                "/v1/chat/completions",
+                                "POST",
+                                "prompt-key",
+                                false,
+                                "{\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}",
+                                "GATEWAY");
+                when(repository.findById(requestId)).thenReturn(Optional.of(requestLog));
+
+                // when
+                writer.markFail(requestId, new RequestLogWriter.FailUpdate(
+                                500,
+                                900,
+                                101L,
+                                201L,
+                                "openai",
+                                "gpt-4o-mini",
+                                null,
+                                false,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "v1",
+                                "GW-UP-UNAVAILABLE",
+                                "broken attempt",
+                                "HTTP_503",
+                                10,
+                                1,
+                                100,
+                                false,
+                                "hash",
+                                3,
+                                0.7,
+                                "error payload",
+                                null,
+                                List.of(new RequestLogWriter.AttemptLogInput(
+                                                1,
+                                                null,
+                                                false,
+                                                RequestLogAttemptResult.FAIL,
+                                                "openai",
+                                                "gpt-4o-mini",
+                                                null,
+                                                LocalDateTime.now().minusSeconds(1),
+                                                LocalDateTime.now(),
+                                                1000,
+                                                500,
+                                                "GW-UP-UNAVAILABLE",
+                                                "HTTP_503",
+                                                "broken attempt",
+                                                null))));
+
+                // then
+                assertThat(requestLog.getStatus()).isEqualTo(RequestLogStatus.FAIL);
+                assertThat(requestLog.getAttempts()).isEmpty();
+                assertThat(requestLog.getAttemptsExplicitlyEmpty()).isNull();
+        }
+
+        @Test
         void update_records가_mutable_list를_snapshot한다() {
                 // given
                 ArrayList<RequestLogWriter.RetrievedDocumentInfo> retrievedDocuments = new ArrayList<>();

@@ -126,6 +126,7 @@ describe('WorkspaceLogDetailPage attempt timeline', () => {
     expect(await screen.findByText('PRIMARY')).toBeInTheDocument();
     expect(await screen.findByText('FAILOVER')).toBeInTheDocument();
     expect(await screen.findByText('RETRY')).toBeInTheDocument();
+    expect(await screen.findByText('기본 경로에서 실패해 다음 경로로 전환되었습니다.')).toBeInTheDocument();
   });
 
   it('RAG 지연이 있어도 attempt bar 위치를 중복 보정하지 않는다', async () => {
@@ -179,6 +180,50 @@ describe('WorkspaceLogDetailPage attempt timeline', () => {
 
     expect(await screen.findByText('MISSING')).toBeInTheDocument();
     expect(await screen.findByText(/attempt 수집 배포 이전 데이터입니다/)).toBeInTheDocument();
+  });
+
+  it('다음 failover 시도가 없으면 PRIMARY 실패를 중립 문구로 표시한다', async () => {
+    mockedLogsApi.get.mockResolvedValue(baseLog);
+    mockedLogsApi.getAttempts.mockResolvedValue({
+      collectionMode: 'RECORDED',
+      attempts: [
+        {
+          attemptNo: 1,
+          route: 'PRIMARY',
+          retry: false,
+          result: 'FAIL',
+          provider: 'openai',
+          requestedModel: 'gpt-4o-mini',
+          usedModel: null,
+          startedAt: '2026-03-01T00:00:00Z',
+          endedAt: '2026-03-01T00:00:00.400Z',
+          latencyMs: 400,
+          httpStatus: 503,
+          errorCode: 'GW-UP-UNAVAILABLE',
+          failReason: 'HTTP_503',
+          errorMessage: 'unavailable',
+          backoffAfterMs: null,
+        },
+      ],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('기본 경로에서 요청이 실패했습니다.')).toBeInTheDocument();
+    expect(screen.queryByText('기본 경로에서 실패해 다음 경로로 전환되었습니다.')).not.toBeInTheDocument();
+  });
+
+  it('attempt 타임라인 로딩 중에는 MISSING 배지를 미리 표시하지 않는다', async () => {
+    mockedLogsApi.get.mockResolvedValue(baseLog);
+    mockedLogsApi.getAttempts.mockImplementation(
+      () => new Promise<RequestLogAttemptTimelineResponse>(() => {}),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText('시도 타임라인을 불러오는 중입니다...')).toBeInTheDocument();
+    expect(screen.queryByText('MISSING')).not.toBeInTheDocument();
+    expect(screen.queryByText('EMPTY')).not.toBeInTheDocument();
   });
 
   it('DERIVED_SINGLE 모드에서 파생 데이터 라벨을 표시한다', async () => {

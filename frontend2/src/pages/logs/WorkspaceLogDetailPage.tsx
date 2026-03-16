@@ -295,7 +295,10 @@ function normalizeAttemptLatency(attempt: RequestLogAttemptResponse): number {
   return Math.max(0, end.getTime() - start.getTime());
 }
 
-function buildAttemptSummary(attempt: RequestLogAttemptResponse): string {
+function buildAttemptSummary(
+  attempt: RequestLogAttemptResponse,
+  nextAttempt?: RequestLogAttemptResponse,
+): string {
   if (attempt.result === 'SUCCESS') {
     return attempt.route === 'FAILOVER'
       ? '보조 경로에서 정상 완료되었습니다.'
@@ -306,7 +309,9 @@ function buildAttemptSummary(attempt: RequestLogAttemptResponse): string {
   }
   return attempt.route === 'FAILOVER'
     ? '보조 경로에서도 요청이 실패했습니다.'
-    : '기본 경로에서 실패해 다음 경로로 전환되었습니다.';
+    : nextAttempt?.route === 'FAILOVER'
+      ? '기본 경로에서 실패해 다음 경로로 전환되었습니다.'
+      : '기본 경로에서 요청이 실패했습니다.';
 }
 
 function attemptRouteBadge(route: RequestLogAttemptRoute) {
@@ -476,13 +481,16 @@ export function WorkspaceLogDetailPage() {
   const ragPercent = totalLatencyMs > 0 ? Math.round((ragLatencyMs / totalLatencyMs) * 100) : 0;
   const llmPercent = totalLatencyMs > 0 ? Math.round((llmLatencyMs / totalLatencyMs) * 100) : 0;
   const failureInsight = buildFailureInsight(log);
-  const attemptCollectionMode: RequestLogAttemptCollectionMode = attemptTimeline?.collectionMode ?? 'MISSING';
+  const resolvedAttemptTimeline =
+    !attemptsLoading && !attemptsError ? attemptTimeline : null;
+  const attemptCollectionMode: RequestLogAttemptCollectionMode | null =
+    resolvedAttemptTimeline?.collectionMode ?? null;
   const attempts: AttemptRenderItem[] = (() => {
-    if (!attemptTimeline?.attempts?.length) return [];
+    if (!resolvedAttemptTimeline?.attempts?.length) return [];
 
     const logStartedAtMs = parseApiDate(log?.createdAt)?.getTime() ?? null;
     let fallbackStartMs = 0;
-    return attemptTimeline.attempts.map((attempt) => {
+    return resolvedAttemptTimeline.attempts.map((attempt, index) => {
       const normalizedLatencyMs = normalizeAttemptLatency(attempt);
       const startedAtMs = parseApiDate(attempt.startedAt)?.getTime() ?? null;
       let startMs = 0;
@@ -499,15 +507,19 @@ export function WorkspaceLogDetailPage() {
         normalizedLatencyMs,
         startMs,
         backoffAfterMs,
-        summary: buildAttemptSummary(attempt),
+        summary: buildAttemptSummary(attempt, resolvedAttemptTimeline.attempts[index + 1]),
       };
     });
   })();
 
   const attemptsLatencyMs = attempts.reduce((acc, attempt) => acc + attempt.normalizedLatencyMs, 0);
   const attemptsBackoffMs = attempts.reduce((acc, attempt) => acc + attempt.backoffAfterMs, 0);
-  const knownTimelineMs = ragLatencyMs + attemptsLatencyMs + attemptsBackoffMs;
-  const overheadMs = Math.max(0, totalLatencyMs - knownTimelineMs);
+  const knownTimelineMs = resolvedAttemptTimeline
+    ? ragLatencyMs + attemptsLatencyMs + attemptsBackoffMs
+    : totalLatencyMs;
+  const overheadMs = resolvedAttemptTimeline
+    ? Math.max(0, totalLatencyMs - knownTimelineMs)
+    : 0;
   const timelineTotalMs = Math.max(totalLatencyMs, knownTimelineMs, 1);
   const timelinePhases: TimelinePhaseItem[] = [
     ...(log?.ragEnabled && ragLatencyMs > 0
@@ -1008,9 +1020,11 @@ export function WorkspaceLogDetailPage() {
                         파생 데이터
                       </span>
                     )}
-                    <span className="rounded border border-[var(--border)] bg-[var(--background-card)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
-                      {attemptCollectionMode}
-                    </span>
+                    {attemptCollectionMode && (
+                      <span className="rounded border border-[var(--border)] bg-[var(--background-card)] px-2 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
+                        {attemptCollectionMode}
+                      </span>
+                    )}
                   </div>
                 </div>
 
