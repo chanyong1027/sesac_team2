@@ -10,6 +10,7 @@ import com.llm_ops.demo.gateway.log.dto.RequestLogResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogSearchCondition;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.global.error.BusinessException;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -81,6 +82,23 @@ class RequestLogQueryServiceTest {
             // when & then
             assertThatThrownBy(() -> requestLogQueryService.findByTraceId(WORKSPACE_ID, traceId))
                     .isInstanceOf(BusinessException.class);
+        }
+
+        @Test
+        @DisplayName("상세_조회_응답에_비용이_포함된다")
+        void 상세_조회_응답에_비용이_포함된다() {
+            // given
+            String traceId = "trace-cost-detail";
+            BigDecimal estimatedCost = new BigDecimal("0.00123456");
+            RequestLog log = createLog(traceId, WORKSPACE_ID, RequestLogStatus.SUCCESS);
+            log.fillModelUsage("openai", "gpt-4.1-mini", "gpt-4.1-mini", false, 10, 20, 30, estimatedCost, "v1");
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogResponse response = requestLogQueryService.findByTraceId(WORKSPACE_ID, traceId);
+
+            // then
+            assertThat(response.cost()).isEqualByComparingTo(estimatedCost);
         }
     }
 
