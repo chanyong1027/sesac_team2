@@ -201,6 +201,7 @@ public class RequestLog {
             String failReason, String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS
                 || this.status == RequestLogStatus.FAIL
+                || this.status == RequestLogStatus.BLOCKED
                 || this.status == RequestLogStatus.TIMEOUT) {
             return;
         }
@@ -216,6 +217,7 @@ public class RequestLog {
             String errorMessage, String failReason, String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS
                 || this.status == RequestLogStatus.FAIL
+                || this.status == RequestLogStatus.BLOCKED
                 || this.status == RequestLogStatus.TIMEOUT) {
             return;
         }

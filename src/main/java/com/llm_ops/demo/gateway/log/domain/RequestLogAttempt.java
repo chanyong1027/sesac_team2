@@ -100,6 +100,10 @@ public class RequestLogAttempt {
             String failReason,
             String errorMessage,
             Integer backoffAfterMs) {
+        Objects.requireNonNull(requestLog, "requestLog는 필수입니다");
+        Objects.requireNonNull(attemptNo, "attemptNo는 필수입니다");
+        Objects.requireNonNull(route, "route는 필수입니다");
+        Objects.requireNonNull(result, "result는 필수입니다");
         Objects.requireNonNull(startedAt, "startedAt는 필수입니다");
         Objects.requireNonNull(endedAt, "endedAt는 필수입니다");
         RequestLogAttempt attempt = new RequestLogAttempt();
