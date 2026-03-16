@@ -15,6 +15,7 @@ import com.llm_ops.demo.gateway.log.dto.RequestLogResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogSearchCondition;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.global.error.BusinessException;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -105,6 +106,23 @@ class RequestLogQueryServiceTest {
             assertThat(response.requestPath()).isEqualTo("/v1/chat");
             assertThat(response.ragTopK()).isEqualTo(8);
             assertThat(response.ragSimilarityThreshold()).isEqualTo(0.15);
+        }
+
+        @Test
+        @DisplayName("상세_조회_응답에_비용이_포함된다")
+        void 상세_조회_응답에_비용이_포함된다() {
+            // given
+            String traceId = "trace-cost-detail";
+            BigDecimal estimatedCost = new BigDecimal("0.00123456");
+            RequestLog log = createLog(traceId, WORKSPACE_ID, RequestLogStatus.SUCCESS);
+            log.fillModelUsage("openai", "gpt-4.1-mini", "gpt-4.1-mini", false, 10, 20, 30, estimatedCost, "v1");
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogResponse response = requestLogQueryService.findByTraceId(WORKSPACE_ID, traceId);
+
+            // then
+            assertThat(response.cost()).isEqualByComparingTo(estimatedCost);
         }
     }
 
