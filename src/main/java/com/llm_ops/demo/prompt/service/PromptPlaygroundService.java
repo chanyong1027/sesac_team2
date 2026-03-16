@@ -289,7 +289,7 @@ public class PromptPlaygroundService {
         } catch (Exception e) {
             log.error("Playground run failed: requestId={}", requestId, e);
             GatewayFailureClassifier.GatewayFailure failure = FAILURE_CLASSIFIER.classifyProvider(e);
-            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+            RequestLogWriter.FailUpdate update = new RequestLogWriter.FailUpdate(
                     failure.httpStatus(),
                     toLatencyMs(startedAtNanos),
                     promptId,
@@ -305,7 +305,12 @@ public class PromptPlaygroundService {
                     ragContextTruncated, ragContextHash, ragTopK, ragSimilarityThreshold,
                     UNHANDLED_EXCEPTION_PAYLOAD,
                     retrievedDocuments,
-                    null));
+                    null);
+            if ("GW-UP-TIMEOUT".equals(failure.errorCode())) {
+                requestLogWriter.markTimeout(requestId, update);
+            } else {
+                requestLogWriter.markFail(requestId, update);
+            }
             HttpStatus httpStatus = HttpStatus.resolve(failure.httpStatus());
             throw new GatewayException(
                     failure.errorCode(),

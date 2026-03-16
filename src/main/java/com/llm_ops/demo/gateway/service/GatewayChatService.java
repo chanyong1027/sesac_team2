@@ -576,7 +576,7 @@ public class GatewayChatService {
                         retrievedDocumentInfos,
                         attemptCollector.toLogInputs()));
             } else {
-                requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+                RequestLogWriter.FailUpdate update = new RequestLogWriter.FailUpdate(
                         gatewayFailure.httpStatus(),
                         toLatencyMs(startedAtNanos),
                         promptId,
@@ -602,7 +602,8 @@ public class GatewayChatService {
                         ragSimilarityThreshold,
                         toErrorResponsePayload(gatewayFailure),
                         retrievedDocumentInfos,
-                        attemptCollector.toLogInputs()));
+                        attemptCollector.toLogInputs());
+                writeFailureLog(requestId, gatewayFailure, update);
             }
             throw toGatewayException(gatewayFailure, e);
         } catch (Exception e) {
@@ -621,7 +622,7 @@ public class GatewayChatService {
             } else {
                 gatewayFailure = lastProviderFailure != null ? lastProviderFailure : classifyProviderFailure(e);
             }
-            requestLogWriter.markFail(requestId, new RequestLogWriter.FailUpdate(
+            RequestLogWriter.FailUpdate update = new RequestLogWriter.FailUpdate(
                     gatewayFailure.httpStatus(),
                     toLatencyMs(startedAtNanos),
                     promptId,
@@ -647,7 +648,8 @@ public class GatewayChatService {
                     ragSimilarityThreshold,
                     toErrorResponsePayload(gatewayFailure),
                     retrievedDocumentInfos,
-                    attemptCollector.toLogInputs()));
+                    attemptCollector.toLogInputs());
+            writeFailureLog(requestId, gatewayFailure, update);
             throw toGatewayException(gatewayFailure, e);
         }
     }
@@ -875,6 +877,7 @@ public class GatewayChatService {
                 ? gatewayReliabilityProperties.resolvedMinFailoverBudgetMs() + FAILOVER_GUARD_BUFFER_MS
                 : 0L;
         String provider = resolved.providerType() != null ? resolved.providerType().name().toLowerCase() : null;
+        long firstAttemptTimeoutMs = resolveAttemptTimeoutMs(deadlineNanos, failoverReserveMs);
         int firstAttemptNo = attemptCollector.startAttempt(route, false, provider, requestedModel);
         try {
             ChatResponse first = callProviderWithDeadline(
@@ -883,8 +886,7 @@ public class GatewayChatService {
                     systemPrompt,
                     userPrompt,
                     config,
-                    deadlineNanos,
-                    failoverReserveMs
+                    firstAttemptTimeoutMs
             );
             attemptCollector.markSuccess(firstAttemptNo, first);
             return ProviderCallOutcome.success(first);
@@ -913,6 +915,7 @@ public class GatewayChatService {
                 return ProviderCallOutcome.failure(toRuntimeException(firstException), firstFailure);
             }
 
+            long secondAttemptTimeoutMs = resolveAttemptTimeoutMs(deadlineNanos, failoverReserveMs);
             int secondAttemptNo = attemptCollector.startAttempt(route, true, provider, requestedModel);
             try {
                 ChatResponse second = callProviderWithDeadline(
@@ -921,8 +924,7 @@ public class GatewayChatService {
                         systemPrompt,
                         userPrompt,
                         config,
-                        deadlineNanos,
-                        failoverReserveMs
+                        secondAttemptTimeoutMs
                 );
                 attemptCollector.markSuccess(secondAttemptNo, second);
                 return ProviderCallOutcome.success(second);
@@ -950,16 +952,8 @@ public class GatewayChatService {
             String systemPrompt,
             String userPrompt,
             ModelConfigOverride config,
-            long deadlineNanos,
-            long reservedBudgetAfterCallMs
+            long attemptTimeoutMs
     ) throws Exception {
-        long remainingMs = remainingBudgetMs(deadlineNanos);
-        long usableBudgetMs = remainingMs - Math.max(0L, reservedBudgetAfterCallMs);
-        if (usableBudgetMs <= 0) {
-            throw new RequestDeadlineExhaustedException();
-        }
-
-        long attemptTimeoutMs = Math.max(1L, usableBudgetMs);
         Future<ChatResponse> future = providerCallExecutor.submit(() ->
                 callProvider(resolved, requestedModel, systemPrompt, userPrompt, config));
 
@@ -979,6 +973,15 @@ public class GatewayChatService {
             }
             throw new RuntimeException(cause);
         }
+    }
+
+    private long resolveAttemptTimeoutMs(long deadlineNanos, long reservedBudgetAfterCallMs) {
+        long remainingMs = remainingBudgetMs(deadlineNanos);
+        long usableBudgetMs = remainingMs - Math.max(0L, reservedBudgetAfterCallMs);
+        if (usableBudgetMs <= 0) {
+            throw new RequestDeadlineExhaustedException();
+        }
+        return Math.max(1L, usableBudgetMs);
     }
 
     // ── 실패 분류 / 에러 처리 ────────────────────────────────────────────────
@@ -1038,6 +1041,18 @@ public class GatewayChatService {
                 gatewayFailure.errorMessage(),
                 cause
         );
+    }
+
+    private void writeFailureLog(
+            UUID requestId,
+            GatewayFailureClassifier.GatewayFailure gatewayFailure,
+            RequestLogWriter.FailUpdate update
+    ) {
+        if (gatewayFailure != null && "GW-UP-TIMEOUT".equals(gatewayFailure.errorCode())) {
+            requestLogWriter.markTimeout(requestId, update);
+            return;
+        }
+        requestLogWriter.markFail(requestId, update);
     }
 
     private static void sleepQuietly(long millis) {
@@ -1153,12 +1168,7 @@ public class GatewayChatService {
             if (failure == null) {
                 return RequestLogAttemptResult.FAIL;
             }
-            String signal = ((failure.errorCode() != null ? failure.errorCode() : "")
-                    + " "
-                    + (failure.failReason() != null ? failure.failReason() : "")).toUpperCase();
-            if ("GW-UP-TIMEOUT".equals(failure.errorCode())
-                    || signal.contains("TIMEOUT")
-                    || signal.contains("DEADLINE_EXCEEDED")) {
+            if (failure.timeoutLike()) {
                 return RequestLogAttemptResult.TIMEOUT;
             }
             return RequestLogAttemptResult.FAIL;

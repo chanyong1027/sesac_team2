@@ -151,6 +151,54 @@ public class RequestLogWriter {
                 }
         }
 
+        @Async("logExecutor")
+        @Transactional
+        public void markTimeout(UUID requestId, FailUpdate update) {
+                try {
+                        RequestLog requestLog = requestLogRepository.findById(requestId).orElse(null);
+                        if (requestLog == null) {
+                                log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
+                                return;
+                        }
+                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
+                        requestLog.fillModelUsage(
+                                        update.provider(),
+                                        update.requestedModel(),
+                                        update.usedModel(),
+                                        update.isFailover(),
+                                        update.inputTokens(),
+                                        update.outputTokens(),
+                                        update.totalTokens(),
+                                        update.estimatedCost(),
+                                        update.pricingVersion());
+                        requestLog.fillRagMetrics(
+                                        update.ragLatencyMs(),
+                                        update.ragChunksCount(),
+                                        update.ragContextChars(),
+                                        update.ragContextTruncated(),
+                                        update.ragContextHash(),
+                                        update.ragTopK(),
+                                        update.ragSimilarityThreshold());
+
+                        RequestLogStatus previousStatus = requestLog.getStatus();
+                        requestLog.markTimeout(
+                                        LocalDateTime.now(clock),
+                                        update.httpStatus(),
+                                        update.latencyMs(),
+                                        update.errorCode(),
+                                        update.errorMessage(),
+                                        update.failReason(),
+                                        update.responsePayload());
+
+                        if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.TIMEOUT)) {
+                                saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
+                        }
+                } catch (Exception e) {
+                        log.error("로그 타임아웃 기록 실패: requestId={}", requestId, e);
+                }
+        }
+
         /**
          * 차단 로그를 비동기로 업데이트합니다.
          * (예: 예산 초과 등)
@@ -224,7 +272,11 @@ public class RequestLogWriter {
         }
 
         private void saveAttemptLogs(RequestLog requestLog, List<AttemptLogInput> attemptLogs) {
-                if (attemptLogs == null || attemptLogs.isEmpty()) {
+                if (attemptLogs == null) {
+                        return;
+                }
+                requestLog.updateAttemptCollectionState(attemptLogs.isEmpty());
+                if (attemptLogs.isEmpty()) {
                         return;
                 }
                 List<RequestLogAttempt> entities = attemptLogs.stream()

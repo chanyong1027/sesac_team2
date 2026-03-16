@@ -174,4 +174,20 @@ describe('WorkspaceLogDetailPage attempt timeline', () => {
     expect(await screen.findByText('DERIVED_SINGLE')).toBeInTheDocument();
     expect(await screen.findByText('파생 데이터')).toBeInTheDocument();
   });
+
+  it('EMPTY 모드에서 zero-attempt 안내 문구를 표시한다', async () => {
+    mockedLogsApi.get.mockResolvedValue({
+      ...baseLog,
+      status: 'TIMEOUT',
+    });
+    mockedLogsApi.getAttempts.mockResolvedValue({
+      collectionMode: 'EMPTY',
+      attempts: [],
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('EMPTY')).toBeInTheDocument();
+    expect(await screen.findByText(/provider 호출 전에 종료되어 시도 내역이 없습니다/)).toBeInTheDocument();
+  });
 });

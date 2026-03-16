@@ -13,7 +13,7 @@ export interface ApiResponse<T> {
 export type RequestLogStatus = 'IN_PROGRESS' | 'SUCCESS' | 'FAIL' | 'BLOCKED' | 'TIMEOUT';
 export type RequestLogAttemptRoute = 'PRIMARY' | 'FAILOVER';
 export type RequestLogAttemptResult = 'SUCCESS' | 'FAIL' | 'TIMEOUT';
-export type RequestLogAttemptCollectionMode = 'RECORDED' | 'DERIVED_SINGLE' | 'MISSING';
+export type RequestLogAttemptCollectionMode = 'RECORDED' | 'DERIVED_SINGLE' | 'EMPTY' | 'MISSING';
 
 export interface RetrievedDocument {
   id: number;

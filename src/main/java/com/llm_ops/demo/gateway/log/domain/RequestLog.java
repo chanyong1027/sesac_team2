@@ -150,6 +150,9 @@ public class RequestLog {
     @Column(name = "request_source", nullable = false, length = 16)
     private String requestSource;
 
+    @Column(name = "attempts_explicitly_empty")
+    private Boolean attemptsExplicitlyEmpty;
+
     @OneToMany(mappedBy = "requestLog", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<RetrievedDocument> retrievedDocuments = new ArrayList<>();
 
@@ -196,7 +199,9 @@ public class RequestLog {
 
     public void markSuccess(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs,
             String failReason, String responsePayload) {
-        if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
+        if (this.status == RequestLogStatus.SUCCESS
+                || this.status == RequestLogStatus.FAIL
+                || this.status == RequestLogStatus.TIMEOUT) {
             return;
         }
         this.status = RequestLogStatus.SUCCESS;
@@ -209,7 +214,9 @@ public class RequestLog {
 
     public void markFail(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode,
             String errorMessage, String failReason, String responsePayload) {
-        if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL) {
+        if (this.status == RequestLogStatus.SUCCESS
+                || this.status == RequestLogStatus.FAIL
+                || this.status == RequestLogStatus.TIMEOUT) {
             return;
         }
         this.status = RequestLogStatus.FAIL;
@@ -225,10 +232,29 @@ public class RequestLog {
     public void markBlocked(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode,
             String errorMessage, String failReason, String responsePayload) {
         if (this.status == RequestLogStatus.SUCCESS || this.status == RequestLogStatus.FAIL
-                || this.status == RequestLogStatus.BLOCKED) {
+                || this.status == RequestLogStatus.BLOCKED
+                || this.status == RequestLogStatus.TIMEOUT) {
             return;
         }
         this.status = RequestLogStatus.BLOCKED;
+        this.finishedAt = finishedAt;
+        this.httpStatus = httpStatus;
+        this.latencyMs = latencyMs;
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        this.failReason = failReason;
+        this.responsePayload = responsePayload;
+    }
+
+    public void markTimeout(LocalDateTime finishedAt, Integer httpStatus, Integer latencyMs, String errorCode,
+            String errorMessage, String failReason, String responsePayload) {
+        if (this.status == RequestLogStatus.SUCCESS
+                || this.status == RequestLogStatus.FAIL
+                || this.status == RequestLogStatus.BLOCKED
+                || this.status == RequestLogStatus.TIMEOUT) {
+            return;
+        }
+        this.status = RequestLogStatus.TIMEOUT;
         this.finishedAt = finishedAt;
         this.httpStatus = httpStatus;
         this.latencyMs = latencyMs;
@@ -248,6 +274,10 @@ public class RequestLog {
         if (attempts != null) {
             this.attempts.addAll(attempts);
         }
+    }
+
+    public void updateAttemptCollectionState(boolean explicitlyEmpty) {
+        this.attemptsExplicitlyEmpty = explicitlyEmpty;
     }
 
     public void fillPromptInfo(Long promptId, Long promptVersionId) {

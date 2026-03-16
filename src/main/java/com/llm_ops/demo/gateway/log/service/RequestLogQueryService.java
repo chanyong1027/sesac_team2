@@ -49,6 +49,9 @@ public class RequestLogQueryService {
         }
 
         if (log.getAttempts() == null || log.getAttempts().isEmpty()) {
+            if (Boolean.TRUE.equals(log.getAttemptsExplicitlyEmpty())) {
+                return new RequestLogAttemptTimelineResponse(RequestLogAttemptCollectionMode.EMPTY, List.of());
+            }
             return new RequestLogAttemptTimelineResponse(RequestLogAttemptCollectionMode.MISSING, List.of());
         }
 

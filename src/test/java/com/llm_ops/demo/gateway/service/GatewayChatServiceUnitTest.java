@@ -65,10 +65,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * GatewayChatService의 순수 단위 테스트입니다.
@@ -855,15 +856,14 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(thrown).isInstanceOf(GatewayException.class);
             assertThat(((GatewayException) thrown).getCode()).isEqualTo("GW-UP-TIMEOUT");
+            verify(llmCallService, never()).callProvider(any(), anyString(), any(), anyString(), any());
 
             ArgumentCaptor<RequestLogWriter.FailUpdate> captor = ArgumentCaptor.forClass(RequestLogWriter.FailUpdate.class);
-            verify(requestLogWriter).markFail(eq(requestId), captor.capture());
+            verify(requestLogWriter).markTimeout(eq(requestId), captor.capture());
             RequestLogWriter.FailUpdate update = captor.getValue();
             assertThat(update.errorCode()).isEqualTo("GW-UP-TIMEOUT");
             assertThat(update.failReason()).isEqualTo("REQUEST_DEADLINE_EXCEEDED");
-            assertThat(update.attemptLogs()).hasSize(1);
-            assertThat(update.attemptLogs().get(0).route()).isEqualTo(RequestLogAttemptRoute.PRIMARY);
-            assertThat(update.attemptLogs().get(0).result()).isEqualTo(RequestLogAttemptResult.TIMEOUT);
+            assertThat(update.attemptLogs()).isEmpty();
         }
 
         @Test

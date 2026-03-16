@@ -351,8 +351,8 @@ class RequestLogQueryServiceTest {
         }
 
         @Test
-        @DisplayName("gateway 로그에 시도 이력이 없으면 MISSING으로 반환한다")
-        void gateway_시도이력_없으면_missing() {
+        @DisplayName("gateway 로그에 시도 수집 신호가 없으면 MISSING으로 반환한다")
+        void gateway_시도수집_신호가_없으면_missing() {
             // given
             RequestLog log = createLog("trace-attempt-missing", WORKSPACE_ID, RequestLogStatus.FAIL);
             requestLogRepository.save(log);
@@ -362,6 +362,22 @@ class RequestLogQueryServiceTest {
 
             // then
             assertThat(response.collectionMode()).isEqualTo(RequestLogAttemptCollectionMode.MISSING);
+            assertThat(response.attempts()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("gateway 로그가 명시적으로 zero-attempt면 EMPTY로 반환한다")
+        void gateway_명시적_zero_attempt면_empty() {
+            // given
+            RequestLog log = createLog("trace-attempt-empty", WORKSPACE_ID, RequestLogStatus.TIMEOUT);
+            log.updateAttemptCollectionState(true);
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogAttemptTimelineResponse response = requestLogQueryService.findAttemptTimeline(WORKSPACE_ID, "trace-attempt-empty");
+
+            // then
+            assertThat(response.collectionMode()).isEqualTo(RequestLogAttemptCollectionMode.EMPTY);
             assertThat(response.attempts()).isEmpty();
         }
 
@@ -420,6 +436,10 @@ class RequestLogQueryServiceTest {
             log.markSuccess(java.time.LocalDateTime.now(), 200, 100, null, null);
         } else if (status == RequestLogStatus.FAIL) {
             log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR", null);
+        } else if (status == RequestLogStatus.BLOCKED) {
+            log.markBlocked(java.time.LocalDateTime.now(), 429, 100, "GW-REQ-QUOTA_EXCEEDED", "blocked", "BUDGET_EXCEEDED", null);
+        } else if (status == RequestLogStatus.TIMEOUT) {
+            log.markTimeout(java.time.LocalDateTime.now(), 504, 100, "GW-UP-TIMEOUT", "timeout", "REQUEST_DEADLINE_EXCEEDED", null);
         }
         return log;
     }

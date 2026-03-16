@@ -6,7 +6,7 @@
 
 1. 시작 시 `start()`로 `IN_PROGRESS` 동기 INSERT
 2. 처리 성공 시 `markSuccess()` 비동기 UPDATE
-3. 실패/차단 시 `markFail()/markBlocked()` 비동기 UPDATE
+3. 실패/타임아웃/차단 시 `markFail()/markTimeout()/markBlocked()` 비동기 UPDATE
 4. 실패 표준화 규칙:
 5. `error_code`: 표준 Gateway 코드 (예: `GW-UP-RATE_LIMIT`)
 6. `fail_reason`: 상세 원인 (예: `HTTP_503`, `SOCKET_TIMEOUT`, `MODEL_404`)
@@ -41,6 +41,15 @@
 5. 가능한 경우 `provider/requested_model/used_model/is_failover`
 6. 가능한 경우 토큰/비용/RAG 메트릭
 
+### C-1. 타임아웃 UPDATE (`RequestLogWriter.markTimeout`)
+
+채움:
+1. `status = TIMEOUT`, `http_status`, `finished_at`, `latency_ms`
+2. `error_code = GW-UP-TIMEOUT`
+3. `fail_reason` (예: `REQUEST_DEADLINE_EXCEEDED`, `SOCKET_TIMEOUT`)
+4. `error_message` (사용자 안내 문구)
+5. 가능한 경우 `provider/requested_model/used_model/is_failover`
+
 ### D. 차단 UPDATE (`RequestLogWriter.markBlocked`)
 
 채움:
@@ -66,6 +75,12 @@
 3. `error_code = GW-UP-TIMEOUT`
 4. `fail_reason = REQUEST_DEADLINE_EXCEEDED`
 5. `error_message = 요청 전체 처리 시간 한도를 초과했습니다.`
+
+## 3-2) zero-attempt 수집 신호
+
+1. Gateway 요청이라도 provider 호출 전에 종료되면 `request_log_attempts`는 비어 있을 수 있다.
+2. 이 경우 `request_logs.attempts_explicitly_empty = true`로 저장해 과거 미수집(`MISSING`)과 구분한다.
+3. `/logs/{traceId}/attempts` 응답에서는 `collectionMode = EMPTY`로 내려간다.
 
 ## 4) 시퀀스
 
@@ -101,7 +116,7 @@ sequenceDiagram
         GW->>Log: markSuccess(...) (UPDATE)
         GW-->>Client: GatewayChatResponse
     else fail/blocked
-        GW->>Log: markFail/markBlocked(...) (UPDATE)
+        GW->>Log: markFail/markTimeout/markBlocked(...) (UPDATE)
         GW-->>Client: error response
     end
 ```

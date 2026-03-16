@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -99,6 +100,8 @@ public class RequestLogAttempt {
             String failReason,
             String errorMessage,
             Integer backoffAfterMs) {
+        Objects.requireNonNull(startedAt, "startedAt는 필수입니다");
+        Objects.requireNonNull(endedAt, "endedAt는 필수입니다");
         RequestLogAttempt attempt = new RequestLogAttempt();
         attempt.requestLog = requestLog;
         attempt.attemptNo = attemptNo;
@@ -119,4 +122,3 @@ public class RequestLogAttempt {
         return attempt;
     }
 }
-

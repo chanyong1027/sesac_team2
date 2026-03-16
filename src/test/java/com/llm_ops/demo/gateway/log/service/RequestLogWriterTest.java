@@ -10,6 +10,7 @@ import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,9 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("test")
 class RequestLogWriterTest {
+
+        private static final long ASYNC_WAIT_TIMEOUT_MS = 3_000L;
+        private static final long ASYNC_WAIT_INTERVAL_MS = 50L;
 
         @Autowired
         private RequestLogWriter requestLogWriter;
@@ -78,10 +82,9 @@ class RequestLogWriterTest {
                                 null,
                                 null));
 
-                // 비동기 처리 완료 대기
-                Thread.sleep(1000);
-
-                RequestLog saved = requestLogRepository.findById(requestId).orElseThrow();
+                RequestLog saved = awaitRequestLog(
+                                requestId,
+                                log -> log.getFinishedAt() != null && log.getStatus() == RequestLogStatus.SUCCESS);
                 assertThat(saved.getStatus()).isEqualTo(RequestLogStatus.SUCCESS);
                 assertThat(saved.getHttpStatus()).isEqualTo(200);
                 assertThat(saved.getLatencyMs()).isEqualTo(123);
@@ -150,10 +153,9 @@ class RequestLogWriterTest {
                                 null,
                                 null));
 
-                // 비동기 처리 완료 대기
-                Thread.sleep(1000);
-
-                RequestLog saved = requestLogRepository.findById(requestId).orElseThrow();
+                RequestLog saved = awaitRequestLog(
+                                requestId,
+                                log -> log.getFinishedAt() != null && log.getStatus() == RequestLogStatus.FAIL);
                 assertThat(saved.getStatus()).isEqualTo(RequestLogStatus.FAIL);
                 assertThat(saved.getHttpStatus()).isEqualTo(502);
                 assertThat(saved.getErrorCode()).isEqualTo("UPSTREAM_5XX");
@@ -169,6 +171,64 @@ class RequestLogWriterTest {
                 assertThat(saved.getRagContextTruncated()).isFalse();
                 assertThat(saved.getRagContextHash()).isNull();
                 assertThat(saved.getResponsePayload()).isEqualTo("Error: bad gateway");
+        }
+
+        @Test
+        void markTimeout_호출시_timeout_상태와_empty_signal을_저장한다() throws InterruptedException {
+                // given
+                UUID requestId = requestLogWriter.start(new RequestLogWriter.StartRequest(
+                                null,
+                                "trace-timeout-empty",
+                                10L,
+                                20L,
+                                30L,
+                                "prefix-timeout",
+                                "/v1/chat/completions",
+                                "POST",
+                                "prompt-key",
+                                false,
+                                "{\"messages\":[{\"role\":\"user\",\"content\":\"timeout test\"}]}",
+                                "GATEWAY"));
+
+                // when
+                requestLogWriter.markTimeout(requestId, new RequestLogWriter.FailUpdate(
+                                504,
+                                321,
+                                102L,
+                                202L,
+                                "openai",
+                                "gpt-4o-mini",
+                                null,
+                                false,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                "GW-UP-TIMEOUT",
+                                "timeout",
+                                "REQUEST_DEADLINE_EXCEEDED",
+                                0,
+                                0,
+                                0,
+                                false,
+                                null,
+                                null,
+                                null,
+                                "timeout payload",
+                                null,
+                                List.of()));
+
+                // then
+                RequestLog saved = awaitRequestLogByTraceId(
+                                "trace-timeout-empty",
+                                log -> log.getFinishedAt() != null
+                                                && log.getStatus() == RequestLogStatus.TIMEOUT
+                                                && Boolean.TRUE.equals(log.getAttemptsExplicitlyEmpty()));
+                assertThat(saved.getStatus()).isEqualTo(RequestLogStatus.TIMEOUT);
+                assertThat(saved.getAttemptsExplicitlyEmpty()).isTrue();
+                assertThat(saved.getAttempts()).isEmpty();
+                assertThat(saved.getResponsePayload()).isEqualTo("timeout payload");
         }
 
         @Test
@@ -251,12 +311,13 @@ class RequestLogWriterTest {
                                 null,
                                 List.of(first, second)));
 
-                Thread.sleep(1000);
-
                 // then
-                RequestLog saved = requestLogRepository.findWithAttemptsByWorkspaceIdAndTraceId(20L, "trace-attempt-writer")
-                                .orElseThrow();
+                RequestLog saved = awaitRequestLogByTraceId(
+                                "trace-attempt-writer",
+                                log -> Boolean.FALSE.equals(log.getAttemptsExplicitlyEmpty())
+                                                && log.getAttempts().size() == 2);
                 assertThat(saved.getAttempts()).hasSize(2);
+                assertThat(saved.getAttemptsExplicitlyEmpty()).isFalse();
                 assertThat(saved.getAttempts())
                                 .extracting(attempt -> attempt.getAttemptNo())
                                 .containsExactlyInAnyOrder(1, 2);
@@ -276,5 +337,37 @@ class RequestLogWriterTest {
                                         assertThat(attempt.getResult()).isEqualTo(RequestLogAttemptResult.TIMEOUT);
                                         assertThat(attempt.getBackoffAfterMs()).isNull();
                                 });
+        }
+
+        private RequestLog awaitRequestLog(UUID requestId, Predicate<RequestLog> condition) throws InterruptedException {
+                long deadline = System.currentTimeMillis() + ASYNC_WAIT_TIMEOUT_MS;
+                RequestLog latest = null;
+                while (System.currentTimeMillis() < deadline) {
+                        latest = requestLogRepository.findById(requestId).orElse(null);
+                        if (latest != null && condition.test(latest)) {
+                                return latest;
+                        }
+                        Thread.sleep(ASYNC_WAIT_INTERVAL_MS);
+                }
+
+                assertThat(latest).isNotNull();
+                assertThat(condition.test(latest)).isTrue();
+                return latest;
+        }
+
+        private RequestLog awaitRequestLogByTraceId(String traceId, Predicate<RequestLog> condition) throws InterruptedException {
+                long deadline = System.currentTimeMillis() + ASYNC_WAIT_TIMEOUT_MS;
+                RequestLog latest = null;
+                while (System.currentTimeMillis() < deadline) {
+                        latest = requestLogRepository.findWithAttemptsByWorkspaceIdAndTraceId(20L, traceId).orElse(null);
+                        if (latest != null && condition.test(latest)) {
+                                return latest;
+                        }
+                        Thread.sleep(ASYNC_WAIT_INTERVAL_MS);
+                }
+
+                assertThat(latest).isNotNull();
+                assertThat(condition.test(latest)).isTrue();
+                return latest;
         }
 }

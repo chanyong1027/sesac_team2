@@ -1024,7 +1024,9 @@ export function WorkspaceLogDetailPage() {
                   <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-card)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                     {attemptCollectionMode === 'MISSING'
                       ? '이 로그는 attempt 수집 배포 이전 데이터입니다. 상단 요약(총 지연/RAG/LLM)만 제공합니다.'
-                      : '표시할 시도 내역이 없습니다.'}
+                      : attemptCollectionMode === 'EMPTY'
+                        ? '이 요청은 provider 호출 전에 종료되어 시도 내역이 없습니다.'
+                        : '표시할 시도 내역이 없습니다.'}
                   </div>
                 ) : (
                   <div className="mt-3 space-y-3">
