@@ -4,6 +4,8 @@ import com.google.genai.errors.ApiException;
 import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptResult;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetGuardrailService;
@@ -63,10 +65,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * GatewayChatService의 순수 단위 테스트입니다.
@@ -365,6 +368,10 @@ class GatewayChatServiceUnitTest {
             assertThat(update.ragContextHash()).isEqualTo(expectedHash);
             assertThat(update.ragTopK()).isEqualTo(RAG_TOP_K);
             assertThat(update.ragSimilarityThreshold()).isEqualTo(RAG_SIMILARITY_THRESHOLD);
+            assertThat(update.attemptLogs()).hasSize(1);
+            assertThat(update.attemptLogs().get(0).route()).isEqualTo(RequestLogAttemptRoute.PRIMARY);
+            assertThat(update.attemptLogs().get(0).retry()).isFalse();
+            assertThat(update.attemptLogs().get(0).result()).isEqualTo(RequestLogAttemptResult.SUCCESS);
         }
 
         private String invokeSha256HexOrNull(String value) throws Exception {
@@ -849,12 +856,14 @@ class GatewayChatServiceUnitTest {
             // then
             assertThat(thrown).isInstanceOf(GatewayException.class);
             assertThat(((GatewayException) thrown).getCode()).isEqualTo("GW-UP-TIMEOUT");
+            verify(llmCallService, never()).callProvider(any(), anyString(), any(), anyString(), any());
 
             ArgumentCaptor<RequestLogWriter.FailUpdate> captor = ArgumentCaptor.forClass(RequestLogWriter.FailUpdate.class);
-            verify(requestLogWriter).markFail(eq(requestId), captor.capture());
+            verify(requestLogWriter).markTimeout(eq(requestId), captor.capture());
             RequestLogWriter.FailUpdate update = captor.getValue();
             assertThat(update.errorCode()).isEqualTo("GW-UP-TIMEOUT");
             assertThat(update.failReason()).isEqualTo("REQUEST_DEADLINE_EXCEEDED");
+            assertThat(update.attemptLogs()).isEmpty();
         }
 
         @Test
@@ -929,6 +938,11 @@ class GatewayChatServiceUnitTest {
             RequestLogWriter.FailUpdate update = captor.getValue();
             assertThat(update.errorCode()).isEqualTo("GW-GW-ALL_PROVIDERS_FAILED");
             assertThat(update.failReason()).contains("ALL_FAILED");
+            assertThat(update.attemptLogs()).hasSize(2);
+            assertThat(update.attemptLogs().get(0).route()).isEqualTo(RequestLogAttemptRoute.PRIMARY);
+            assertThat(update.attemptLogs().get(1).route()).isEqualTo(RequestLogAttemptRoute.FAILOVER);
+            assertThat(update.attemptLogs().get(0).result()).isEqualTo(RequestLogAttemptResult.FAIL);
+            assertThat(update.attemptLogs().get(1).result()).isEqualTo(RequestLogAttemptResult.FAIL);
         }
 
         private boolean invokeIsRetryableException(Exception exception) throws Exception {

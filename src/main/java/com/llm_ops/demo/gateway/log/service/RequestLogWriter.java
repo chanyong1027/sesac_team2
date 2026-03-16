@@ -1,6 +1,9 @@
 package com.llm_ops.demo.gateway.log.service;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttempt;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptResult;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
 import com.llm_ops.demo.gateway.log.domain.RetrievedDocument;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
@@ -61,33 +64,34 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
-                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
-                        requestLog.fillModelUsage(
-                                        update.provider(),
-                                        update.requestedModel(),
-                                        update.usedModel(),
-                                        update.isFailover(),
-                                        update.inputTokens(),
-                                        update.outputTokens(),
-                                        update.totalTokens(),
-                                        update.estimatedCost(),
-                                        update.pricingVersion());
-                        requestLog.fillRagMetrics(
-                                        update.ragLatencyMs(),
-                                        update.ragChunksCount(),
-                                        update.ragContextChars(),
-                                        update.ragContextTruncated(),
-                                        update.ragContextHash(),
-                                        update.ragTopK(),
-                                        update.ragSimilarityThreshold());
-
                         RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markSuccess(LocalDateTime.now(clock), update.httpStatus(), update.latencyMs(),
                                         update.failReason(), update.responsePayload());
 
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.SUCCESS)) {
+                                fillRequestMetadata(
+                                                requestLog,
+                                                update.promptId(),
+                                                update.promptVersionId(),
+                                                update.provider(),
+                                                update.requestedModel(),
+                                                update.usedModel(),
+                                                update.isFailover(),
+                                                update.inputTokens(),
+                                                update.outputTokens(),
+                                                update.totalTokens(),
+                                                update.estimatedCost(),
+                                                update.pricingVersion(),
+                                                update.ragLatencyMs(),
+                                                update.ragChunksCount(),
+                                                update.ragContextChars(),
+                                                update.ragContextTruncated(),
+                                                update.ragContextHash(),
+                                                update.ragTopK(),
+                                                update.ragSimilarityThreshold());
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
                         }
                 } catch (Exception e) {
                         log.error("로그 성공 기록 실패: requestId={}", requestId, e);
@@ -107,26 +111,6 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
-                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
-                        requestLog.fillModelUsage(
-                                        update.provider(),
-                                        update.requestedModel(),
-                                        update.usedModel(),
-                                        update.isFailover(),
-                                        update.inputTokens(),
-                                        update.outputTokens(),
-                                        update.totalTokens(),
-                                        update.estimatedCost(),
-                                        update.pricingVersion());
-                        requestLog.fillRagMetrics(
-                                        update.ragLatencyMs(),
-                                        update.ragChunksCount(),
-                                        update.ragContextChars(),
-                                        update.ragContextTruncated(),
-                                        update.ragContextHash(),
-                                        update.ragTopK(),
-                                        update.ragSimilarityThreshold());
-
                         RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markFail(
                                         LocalDateTime.now(clock),
@@ -139,10 +123,79 @@ public class RequestLogWriter {
 
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.FAIL)) {
+                                fillRequestMetadata(
+                                                requestLog,
+                                                update.promptId(),
+                                                update.promptVersionId(),
+                                                update.provider(),
+                                                update.requestedModel(),
+                                                update.usedModel(),
+                                                update.isFailover(),
+                                                update.inputTokens(),
+                                                update.outputTokens(),
+                                                update.totalTokens(),
+                                                update.estimatedCost(),
+                                                update.pricingVersion(),
+                                                update.ragLatencyMs(),
+                                                update.ragChunksCount(),
+                                                update.ragContextChars(),
+                                                update.ragContextTruncated(),
+                                                update.ragContextHash(),
+                                                update.ragTopK(),
+                                                update.ragSimilarityThreshold());
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
                         }
                 } catch (Exception e) {
                         log.error("로그 실패 기록 실패: requestId={}", requestId, e);
+                }
+        }
+
+        @Async("logExecutor")
+        @Transactional
+        public void markTimeout(UUID requestId, FailUpdate update) {
+                try {
+                        RequestLog requestLog = requestLogRepository.findById(requestId).orElse(null);
+                        if (requestLog == null) {
+                                log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
+                                return;
+                        }
+                        RequestLogStatus previousStatus = requestLog.getStatus();
+                        requestLog.markTimeout(
+                                        LocalDateTime.now(clock),
+                                        update.httpStatus(),
+                                        update.latencyMs(),
+                                        update.errorCode(),
+                                        update.errorMessage(),
+                                        update.failReason(),
+                                        update.responsePayload());
+
+                        if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.TIMEOUT)) {
+                                fillRequestMetadata(
+                                                requestLog,
+                                                update.promptId(),
+                                                update.promptVersionId(),
+                                                update.provider(),
+                                                update.requestedModel(),
+                                                update.usedModel(),
+                                                update.isFailover(),
+                                                update.inputTokens(),
+                                                update.outputTokens(),
+                                                update.totalTokens(),
+                                                update.estimatedCost(),
+                                                update.pricingVersion(),
+                                                update.ragLatencyMs(),
+                                                update.ragChunksCount(),
+                                                update.ragContextChars(),
+                                                update.ragContextTruncated(),
+                                                update.ragContextHash(),
+                                                update.ragTopK(),
+                                                update.ragSimilarityThreshold());
+                                saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
+                        }
+                } catch (Exception e) {
+                        log.error("로그 타임아웃 기록 실패: requestId={}", requestId, e);
                 }
         }
 
@@ -159,26 +212,6 @@ public class RequestLogWriter {
                                 log.error("RequestLog를 찾을 수 없음: requestId={}", requestId);
                                 return;
                         }
-                        requestLog.fillPromptInfo(update.promptId(), update.promptVersionId());
-                        requestLog.fillModelUsage(
-                                        update.provider(),
-                                        update.requestedModel(),
-                                        update.usedModel(),
-                                        update.isFailover(),
-                                        update.inputTokens(),
-                                        update.outputTokens(),
-                                        update.totalTokens(),
-                                        update.estimatedCost(),
-                                        update.pricingVersion());
-                        requestLog.fillRagMetrics(
-                                        update.ragLatencyMs(),
-                                        update.ragChunksCount(),
-                                        update.ragContextChars(),
-                                        update.ragContextTruncated(),
-                                        update.ragContextHash(),
-                                        update.ragTopK(),
-                                        update.ragSimilarityThreshold());
-
                         RequestLogStatus previousStatus = requestLog.getStatus();
                         requestLog.markBlocked(
                                         LocalDateTime.now(clock),
@@ -191,7 +224,28 @@ public class RequestLogWriter {
 
                         // 상태 전이가 실제로 일어난 경우에만 RetrievedDocument를 저장합니다.
                         if (hasTransitionedTo(previousStatus, requestLog.getStatus(), RequestLogStatus.BLOCKED)) {
+                                fillRequestMetadata(
+                                                requestLog,
+                                                update.promptId(),
+                                                update.promptVersionId(),
+                                                update.provider(),
+                                                update.requestedModel(),
+                                                update.usedModel(),
+                                                update.isFailover(),
+                                                update.inputTokens(),
+                                                update.outputTokens(),
+                                                update.totalTokens(),
+                                                update.estimatedCost(),
+                                                update.pricingVersion(),
+                                                update.ragLatencyMs(),
+                                                update.ragChunksCount(),
+                                                update.ragContextChars(),
+                                                update.ragContextTruncated(),
+                                                update.ragContextHash(),
+                                                update.ragTopK(),
+                                                update.ragSimilarityThreshold());
                                 saveRetrievedDocuments(requestLog, update.retrievedDocuments());
+                                saveAttemptLogs(requestLog, update.attemptLogs());
                         }
                 } catch (Exception e) {
                         log.error("로그 차단 기록 실패: requestId={}", requestId, e);
@@ -215,6 +269,78 @@ public class RequestLogWriter {
                                                 info.ranking()))
                                 .toList();
                 requestLog.addRetrievedDocuments(entities);
+        }
+
+        private void saveAttemptLogs(RequestLog requestLog, List<AttemptLogInput> attemptLogs) {
+                if (attemptLogs == null) {
+                        return;
+                }
+                if (attemptLogs.isEmpty()) {
+                        requestLog.updateAttemptCollectionState(true);
+                        return;
+                }
+                List<RequestLogAttempt> entities = attemptLogs.stream()
+                                .map(input -> RequestLogAttempt.create(
+                                                requestLog,
+                                                input.attemptNo(),
+                                                input.route(),
+                                                input.retry(),
+                                                input.result(),
+                                                input.provider(),
+                                                input.requestedModel(),
+                                                input.usedModel(),
+                                                input.startedAt(),
+                                                input.endedAt(),
+                                                input.latencyMs(),
+                                                input.httpStatus(),
+                                                input.errorCode(),
+                                                input.failReason(),
+                                                input.errorMessage(),
+                                                input.backoffAfterMs()))
+                                .toList();
+                requestLog.addAttempts(entities);
+                requestLog.updateAttemptCollectionState(false);
+        }
+
+        private void fillRequestMetadata(
+                        RequestLog requestLog,
+                        Long promptId,
+                        Long promptVersionId,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        boolean isFailover,
+                        Integer inputTokens,
+                        Integer outputTokens,
+                        Integer totalTokens,
+                        java.math.BigDecimal estimatedCost,
+                        String pricingVersion,
+                        Integer ragLatencyMs,
+                        Integer ragChunksCount,
+                        Integer ragContextChars,
+                        Boolean ragContextTruncated,
+                        String ragContextHash,
+                        Integer ragTopK,
+                        Double ragSimilarityThreshold) {
+                requestLog.fillPromptInfo(promptId, promptVersionId);
+                requestLog.fillModelUsage(
+                                provider,
+                                requestedModel,
+                                usedModel,
+                                isFailover,
+                                inputTokens,
+                                outputTokens,
+                                totalTokens,
+                                estimatedCost,
+                                pricingVersion);
+                requestLog.fillRagMetrics(
+                                ragLatencyMs,
+                                ragChunksCount,
+                                ragContextChars,
+                                ragContextTruncated,
+                                ragContextHash,
+                                ragTopK,
+                                ragSimilarityThreshold);
         }
 
         private static boolean hasTransitionedTo(
@@ -264,7 +390,12 @@ public class RequestLogWriter {
                         Double ragSimilarityThreshold,
                         String failReason,
                         String responsePayload,
-                        List<RetrievedDocumentInfo> retrievedDocuments) {
+                        List<RetrievedDocumentInfo> retrievedDocuments,
+                        List<AttemptLogInput> attemptLogs) {
+                public SuccessUpdate {
+                        retrievedDocuments = snapshotList(retrievedDocuments);
+                        attemptLogs = snapshotList(attemptLogs);
+                }
         }
 
         public record FailUpdate(
@@ -292,7 +423,12 @@ public class RequestLogWriter {
                         Integer ragTopK,
                         Double ragSimilarityThreshold,
                         String responsePayload,
-                        List<RetrievedDocumentInfo> retrievedDocuments) {
+                        List<RetrievedDocumentInfo> retrievedDocuments,
+                        List<AttemptLogInput> attemptLogs) {
+                public FailUpdate {
+                        retrievedDocuments = snapshotList(retrievedDocuments);
+                        attemptLogs = snapshotList(attemptLogs);
+                }
         }
 
         public record BlockUpdate(
@@ -320,7 +456,16 @@ public class RequestLogWriter {
                         Integer ragTopK,
                         Double ragSimilarityThreshold,
                         String responsePayload,
-                        List<RetrievedDocumentInfo> retrievedDocuments) {
+                        List<RetrievedDocumentInfo> retrievedDocuments,
+                        List<AttemptLogInput> attemptLogs) {
+                public BlockUpdate {
+                        retrievedDocuments = snapshotList(retrievedDocuments);
+                        attemptLogs = snapshotList(attemptLogs);
+                }
+        }
+
+        private static <T> List<T> snapshotList(List<T> source) {
+                return source == null ? null : List.copyOf(source);
         }
 
         /**
@@ -332,5 +477,23 @@ public class RequestLogWriter {
                         String content,
                         Integer durationMs,
                         Integer ranking) {
+        }
+
+        public record AttemptLogInput(
+                        Integer attemptNo,
+                        RequestLogAttemptRoute route,
+                        boolean retry,
+                        RequestLogAttemptResult result,
+                        String provider,
+                        String requestedModel,
+                        String usedModel,
+                        LocalDateTime startedAt,
+                        LocalDateTime endedAt,
+                        Integer latencyMs,
+                        Integer httpStatus,
+                        String errorCode,
+                        String failReason,
+                        String errorMessage,
+                        Integer backoffAfterMs) {
         }
 }

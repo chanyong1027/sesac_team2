@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,12 @@ public interface RequestLogRepository extends JpaRepository<RequestLog, UUID>, J
     Optional<RequestLog> findByTraceId(String traceId);
 
     Optional<RequestLog> findByWorkspaceIdAndTraceId(Long workspaceId, String traceId);
+
+    @EntityGraph(attributePaths = "attempts")
+    @Query("SELECT r FROM RequestLog r WHERE r.workspaceId = :workspaceId AND r.traceId = :traceId")
+    Optional<RequestLog> findWithAttemptsByWorkspaceIdAndTraceId(
+            @Param("workspaceId") Long workspaceId,
+            @Param("traceId") String traceId);
 
     /**
      * Overview 통계 집계 (PostgreSQL Native Query - PERCENTILE_CONT 사용)

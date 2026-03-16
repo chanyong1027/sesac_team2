@@ -4,13 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttempt;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptResult;
+import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
+import com.llm_ops.demo.gateway.log.dto.RequestLogAttemptCollectionMode;
+import com.llm_ops.demo.gateway.log.dto.RequestLogAttemptTimelineResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogListResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogResponse;
 import com.llm_ops.demo.gateway.log.dto.RequestLogSearchCondition;
 import com.llm_ops.demo.gateway.log.repository.RequestLogRepository;
 import com.llm_ops.demo.global.error.BusinessException;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -327,6 +334,103 @@ class RequestLogQueryServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("시도 타임라인 조회")
+    class AttemptTimelineTest {
+
+        @Test
+        @DisplayName("gateway 로그에 시도 이력이 있으면 RECORDED로 반환한다")
+        void gateway_시도이력이_있으면_recorded() {
+            // given
+            RequestLog log = createLog("trace-attempt-recorded", WORKSPACE_ID, RequestLogStatus.SUCCESS);
+            LocalDateTime start = LocalDateTime.now().minusSeconds(3);
+            RequestLogAttempt first = RequestLogAttempt.create(
+                    log, 1, RequestLogAttemptRoute.PRIMARY, false, RequestLogAttemptResult.FAIL,
+                    "openai", "gpt-4.1-mini", null,
+                    start, start.plusNanos(900_000_000L), 900, 503,
+                    "GW-UP-UNAVAILABLE", "HTTP_503", "업스트림 일시 장애", 200);
+            RequestLogAttempt second = RequestLogAttempt.create(
+                    log, 2, RequestLogAttemptRoute.FAILOVER, false, RequestLogAttemptResult.SUCCESS,
+                    "anthropic", "claude-3-5-haiku", "claude-3-5-haiku",
+                    start.plusNanos(1_100_000_000L), start.plusNanos(1_700_000_000L), 600, 200,
+                    null, null, null, null);
+            log.addAttempts(List.of(first, second));
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogAttemptTimelineResponse response = requestLogQueryService.findAttemptTimeline(WORKSPACE_ID, "trace-attempt-recorded");
+
+            // then
+            assertThat(response.collectionMode()).isEqualTo(RequestLogAttemptCollectionMode.RECORDED);
+            assertThat(response.attempts()).hasSize(2);
+            assertThat(response.attempts().get(0).attemptNo()).isEqualTo(1);
+            assertThat(response.attempts().get(0).route()).isEqualTo(RequestLogAttemptRoute.PRIMARY);
+            assertThat(response.attempts().get(1).route()).isEqualTo(RequestLogAttemptRoute.FAILOVER);
+        }
+
+        @Test
+        @DisplayName("gateway 로그에 시도 수집 신호가 없으면 MISSING으로 반환한다")
+        void gateway_시도수집_신호가_없으면_missing() {
+            // given
+            RequestLog log = createLog("trace-attempt-missing", WORKSPACE_ID, RequestLogStatus.FAIL);
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogAttemptTimelineResponse response = requestLogQueryService.findAttemptTimeline(WORKSPACE_ID, "trace-attempt-missing");
+
+            // then
+            assertThat(response.collectionMode()).isEqualTo(RequestLogAttemptCollectionMode.MISSING);
+            assertThat(response.attempts()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("gateway 로그가 명시적으로 zero-attempt면 EMPTY로 반환한다")
+        void gateway_명시적_zero_attempt면_empty() {
+            // given
+            RequestLog log = createLog("trace-attempt-empty", WORKSPACE_ID, RequestLogStatus.TIMEOUT);
+            log.updateAttemptCollectionState(true);
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogAttemptTimelineResponse response = requestLogQueryService.findAttemptTimeline(WORKSPACE_ID, "trace-attempt-empty");
+
+            // then
+            assertThat(response.collectionMode()).isEqualTo(RequestLogAttemptCollectionMode.EMPTY);
+            assertThat(response.attempts()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("non-gateway 로그는 DERIVED_SINGLE로 단일 시도를 반환한다")
+        void non_gateway는_derived_single() {
+            // given
+            RequestLog log = RequestLog.loggingStart(
+                    UUID.randomUUID(),
+                    "trace-attempt-derived",
+                    1L,
+                    WORKSPACE_ID,
+                    1L,
+                    "prefix",
+                    "/v1/chat",
+                    "POST",
+                    "test-prompt",
+                    false,
+                    "{\"question\":\"q\"}",
+                    "PLAYGROUND");
+            log.fillModelUsage("openai", "gpt-4.1-mini", "gpt-4.1-mini", false, 10, 20, 30, null, null);
+            log.markFail(LocalDateTime.now(), 500, 320, "GW-UP-TIMEOUT", "timeout", "REQUEST_DEADLINE_EXCEEDED", null);
+            requestLogRepository.save(log);
+
+            // when
+            RequestLogAttemptTimelineResponse response = requestLogQueryService.findAttemptTimeline(WORKSPACE_ID, "trace-attempt-derived");
+
+            // then
+            assertThat(response.collectionMode()).isEqualTo(RequestLogAttemptCollectionMode.DERIVED_SINGLE);
+            assertThat(response.attempts()).hasSize(1);
+            assertThat(response.attempts().get(0).attemptNo()).isEqualTo(1);
+            assertThat(response.attempts().get(0).result()).isEqualTo(RequestLogAttemptResult.TIMEOUT);
+        }
+    }
+
     private RequestLog fillProviderInfo(RequestLog log, String provider, String model) {
         log.fillModelUsage(provider, model, model, false, 10, 20, 30, null, null);
         return log;
@@ -350,6 +454,10 @@ class RequestLogQueryServiceTest {
             log.markSuccess(java.time.LocalDateTime.now(), 200, 100, null, null);
         } else if (status == RequestLogStatus.FAIL) {
             log.markFail(java.time.LocalDateTime.now(), 500, 100, "ERROR", "error message", "INTERNAL_ERROR", null);
+        } else if (status == RequestLogStatus.BLOCKED) {
+            log.markBlocked(java.time.LocalDateTime.now(), 429, 100, "GW-REQ-QUOTA_EXCEEDED", "blocked", "BUDGET_EXCEEDED", null);
+        } else if (status == RequestLogStatus.TIMEOUT) {
+            log.markTimeout(java.time.LocalDateTime.now(), 504, 100, "GW-UP-TIMEOUT", "timeout", "REQUEST_DEADLINE_EXCEEDED", null);
         }
         return log;
     }

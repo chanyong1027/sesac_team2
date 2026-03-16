@@ -39,6 +39,14 @@ public final class GatewayFailureClassifier {
         public boolean retrySameRouteOnce() {
             return policy == FailoverPolicy.RETRY_ONCE_THEN_FAILOVER;
         }
+
+        public boolean timeoutLike() {
+            String signal = ((errorCode != null ? errorCode : "") + " " + (failReason != null ? failReason : ""))
+                    .toUpperCase();
+            return "GW-UP-TIMEOUT".equals(errorCode)
+                    || signal.contains("TIMEOUT")
+                    || signal.contains("DEADLINE_EXCEEDED");
+        }
     }
 
     public GatewayFailure classifyProvider(Exception exception) {
