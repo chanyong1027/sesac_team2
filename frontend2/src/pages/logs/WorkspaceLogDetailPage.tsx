@@ -572,11 +572,11 @@ export function WorkspaceLogDetailPage() {
               <div className="space-y-3 relative z-10">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[var(--text-secondary)]">Top K</span>
-                  <span className="font-mono text-[var(--foreground)]">{log.ragTopK || '-'}</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragTopK ?? '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[var(--text-secondary)]">유사도 임계값</span>
-                  <span className="font-mono text-[var(--foreground)]">{log.ragSimilarityThreshold || '-'}</span>
+                  <span className="font-mono text-[var(--foreground)]">{log.ragSimilarityThreshold ?? '-'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-[var(--text-secondary)]">검색 청크 수</span>
@@ -619,7 +619,7 @@ export function WorkspaceLogDetailPage() {
                 <div className="space-y-1 border-t border-[var(--border)] pt-2">
                   <span className="text-xs text-[var(--text-secondary)]">요청 경로</span>
                   <div className="break-all font-mono text-xs leading-tight text-[var(--text-secondary)]">
-                    {log.requestPath || '/v1/models/chat'}
+                    {log.requestPath || '/v1/chat/completions'}
                   </div>
                 </div>
               </div>
