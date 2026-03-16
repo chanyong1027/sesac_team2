@@ -2,6 +2,7 @@ package com.llm_ops.demo.gateway.log.dto;
 
 import com.llm_ops.demo.gateway.log.domain.RequestLog;
 import com.llm_ops.demo.gateway.log.domain.RequestLogStatus;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +38,8 @@ public record RequestLogResponse(
         String requestPayload,
         String responsePayload,
         String requestSource,
-        List<RetrievedDocumentResponse> retrievedDocuments) {
+        List<RetrievedDocumentResponse> retrievedDocuments,
+        BigDecimal cost) {
 
     public static RequestLogResponse from(RequestLog log) {
         return fromDetail(log);
@@ -92,6 +94,7 @@ public record RequestLogResponse(
                 includePayload ? log.getRequestPayload() : null,
                 includePayload ? log.getResponsePayload() : null,
                 log.getRequestSource(),
-                docs);
+                docs,
+                log.getEstimatedCost());
     }
 }
