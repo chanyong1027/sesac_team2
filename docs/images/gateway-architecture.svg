@@ -1,0 +1,103 @@
+<svg width="1800" height="1350" viewBox="0 0 1800 1350" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">게이트웨이 아키텍처</title>
+  <desc id="desc">LuminaOps가 외부 서비스 요청을 게이트웨이와 Spring 애플리케이션을 통해 처리하고, 장애 복구와 로그 저장까지 수행하는 구조</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1800" y2="1350" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FCFCFD"/>
+      <stop offset="1" stop-color="#F8FAFC"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#0F172A" flood-opacity="0.08"/>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#94A3B8"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0 0L10 5L0 10V0Z" fill="#FB7185"/>
+    </marker>
+    <style>
+      .title { font: 800 52px 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; fill: #0F172A; }
+      .subtitle { font: 600 22px 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; fill: #64748B; }
+      .box-title { font: 800 22px 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; fill: #0F172A; }
+      .box-text { font: 600 17px 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; fill: #334155; }
+      .small-pill { font: 700 15px 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; fill: #475569; }
+      .provider-text { font: 800 18px 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; fill: #0F172A; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1350" rx="32" fill="url(#bg)"/>
+
+  <text x="64" y="98" class="title">게이트웨이 아키텍처</text>
+  <text x="64" y="146" class="subtitle">LuminaOps가 LLM 요청을 처리하고, 장애에 대응하고, 로그를 기록하는 구조</text>
+
+  <g filter="url(#shadow)">
+    <rect x="60" y="190" width="360" height="150" rx="28" fill="#F8FBFF" stroke="#60A5FA" stroke-width="4"/>
+    <circle cx="112" cy="242" r="24" fill="#EFF6FF"/>
+    <text x="150" y="252" class="box-title" fill="#1D4ED8">외부 서비스</text>
+    <text x="90" y="307" class="box-text" fill="#1D4ED8">• POST /v1/chat/completions</text>
+
+    <rect x="540" y="190" width="500" height="160" rx="28" fill="#FDF7FF" stroke="#D8B4FE" stroke-width="4"/>
+    <circle cx="592" cy="242" r="24" fill="#F3E8FF"/>
+    <text x="634" y="252" class="box-title" fill="#7E22CE">Gateway</text>
+    <text x="570" y="308" class="box-text" fill="#7E22CE">• X-API-Key 검증</text>
+    <text x="570" y="344" class="box-text" fill="#7E22CE">• traceId 생성</text>
+
+    <rect x="520" y="470" width="540" height="210" rx="28" fill="#F3FDF9" stroke="#34D399" stroke-width="4"/>
+    <circle cx="572" cy="522" r="24" fill="#E7F9F0"/>
+    <text x="614" y="532" class="box-title" fill="#065F46">Spring 애플리케이션</text>
+    <text x="550" y="592" class="box-text" fill="#065F46">• Prompt / Version 조회</text>
+    <text x="550" y="632" class="box-text" fill="#065F46">• Spring AI Provider 호출</text>
+    <text x="550" y="672" class="box-text" fill="#065F46">• 성공 여부 판단</text>
+
+    <rect x="1300" y="470" width="360" height="250" rx="28" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="4"/>
+    <circle cx="1352" cy="522" r="24" fill="#F8FAFC"/>
+    <text x="1394" y="532" class="box-title">LLM Providers</text>
+    <rect x="1340" y="580" width="280" height="48" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <text x="1480" y="611" text-anchor="middle" class="provider-text">OpenAI</text>
+    <rect x="1340" y="646" width="280" height="48" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <text x="1480" y="677" text-anchor="middle" class="provider-text">Anthropic</text>
+    <rect x="1340" y="712" width="280" height="48" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <text x="1480" y="743" text-anchor="middle" class="provider-text">Gemini</text>
+
+    <rect x="540" y="840" width="500" height="180" rx="28" fill="#F8FAFC" stroke="#94A3B8" stroke-width="4"/>
+    <circle cx="592" cy="892" r="24" fill="#EEF2F7"/>
+    <text x="634" y="902" class="box-title">응답 매핑 및 로그 기록</text>
+    <text x="570" y="958" class="box-text">• 표준 응답 매핑</text>
+    <text x="570" y="998" class="box-text">• traceId 기반 요청 로그 저장</text>
+
+    <rect x="1240" y="840" width="430" height="190" rx="28" fill="#FFF5F7" stroke="#FB7185" stroke-width="4"/>
+    <circle cx="1292" cy="892" r="24" fill="#FFE4E6"/>
+    <text x="1334" y="902" class="box-title" fill="#BE123C">장애 복구 처리</text>
+    <text x="1270" y="960" class="box-text" fill="#BE123C">• timeout / 5xx 재시도</text>
+    <text x="1270" y="1000" class="box-text" fill="#BE123C">• 429 / model not found 발생 시</text>
+    <text x="1296" y="1032" class="box-text" fill="#BE123C">failover 수행</text>
+
+    <rect x="900" y="1120" width="500" height="190" rx="28" fill="#FFFDF4" stroke="#FACC15" stroke-width="4"/>
+    <circle cx="952" cy="1172" r="24" fill="#FEF3C7"/>
+    <text x="994" y="1182" class="box-title" fill="#92400E">저장소</text>
+    <text x="930" y="1238" class="box-text" fill="#92400E">• prompt_versions</text>
+    <text x="930" y="1276" class="box-text" fill="#92400E">• request_logs</text>
+    <text x="930" y="1314" class="box-text" fill="#92400E">• request_log_attempts</text>
+
+    <rect x="1112" y="566" width="110" height="42" rx="21" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <text x="1167" y="593" text-anchor="middle" class="small-pill">주 호출</text>
+
+    <rect x="580" y="724" width="110" height="42" rx="21" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <text x="635" y="751" text-anchor="middle" class="small-pill">응답 반환</text>
+
+    <rect x="1080" y="748" width="110" height="42" rx="21" fill="#FFFFFF" stroke="#FBCFE8" stroke-width="2"/>
+    <text x="1135" y="775" text-anchor="middle" class="small-pill" fill="#BE123C">실패 경로</text>
+
+    <rect x="812" y="1064" width="96" height="38" rx="19" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2"/>
+    <text x="860" y="1089" text-anchor="middle" class="small-pill">로그 저장</text>
+  </g>
+
+  <path d="M420 265H540" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M790 350V470" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M1060 575H1300" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M790 680V840" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M1060 628H1145V730H1145V840H1240" stroke="#FB7185" stroke-width="5" stroke-dasharray="12 10" fill="none" marker-end="url(#arrow-red)"/>
+  <path d="M1240 935H1040" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M860 1020V1120" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M1455 1030V1120" stroke="#94A3B8" stroke-width="5" marker-end="url(#arrow)"/>
+</svg>
