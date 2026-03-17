@@ -111,8 +111,49 @@ Logs 화면에서는 정상 요청과 failover 요청을 같은 목록 안에서
 
 ## 팀 소개 및 역할
 
-| 이름 | 역할 | 담당 |
-| --- | --- | --- |
-| 허지우 | 팀장 · Backend | Gateway 호출 흐름, Retry/Failover 정책, Prompt 운영 구조, LLM Provider 연동 |
-| 홍찬용 | Backend · Infra | Prompt·Workspace·Organization 도메인 설계·구현, AWS EC2·RDS·ALB 배포 |
-| 박준하 | Backend · Observability | 요청 로그/Trace 조회, 통계 대시보드, 인증 및 보안 영역 |
+<table width="100%">
+  <tr>
+    <th width="33.33%">Backend · Team Lead</th>
+    <th width="33.33%">Backend · Infra</th>
+    <th width="33.33%">Backend · Observability</th>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/itsjiwootime">
+        <img src="https://github.com/itsjiwootime.png?size=120" width="120" height="120" alt="허지우">
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/chanyong1027">
+        <img src="https://github.com/chanyong1027.png?size=120" width="120" height="120" alt="홍찬용">
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/Joooooonha">
+        <img src="https://github.com/Joooooonha.png?size=120" width="120" height="120" alt="박준하">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/itsjiwootime"><strong>허지우</strong></a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/chanyong1027"><strong>홍찬용</strong></a>
+    </td>
+    <td align="center">
+      <a href="https://github.com/Joooooonha"><strong>박준하</strong></a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <sub>Gateway 호출 흐름, Retry/Failover 정책, Prompt 운영 구조, LLM Provider 연동</sub>
+    </td>
+    <td align="center">
+      <sub>Prompt·Workspace·Organization 도메인 설계·구현, AWS EC2·RDS·ALB 배포</sub>
+    </td>
+    <td align="center">
+      <sub>요청 로그/Trace 조회, 통계 대시보드, 인증 및 보안 영역</sub>
+    </td>
+  </tr>
+</table>
