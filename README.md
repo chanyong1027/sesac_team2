@@ -70,18 +70,7 @@ Logs 화면에서는 정상 요청과 failover 요청을 같은 목록 안에서
 
 ### 서비스 아키텍처
 
-![Gateway architecture](./docs/images/gateway-architecture.svg)
-
-### Gateway Request Flow
-
-![Gateway request flow](./docs/images/gateway-request-flow.svg)
-
-1. 외부 서비스가 `X-API-Key`와 함께 Gateway를 호출합니다.
-2. Gateway는 API Key를 검증하고 `traceId`를 생성합니다.
-3. active prompt version과 provider/model 정책을 조회합니다.
-4. primary provider를 먼저 호출합니다.
-5. timeout, 5xx, 429, model not found 같은 실패 유형에 따라 retry 또는 failover를 수행합니다.
-6. 결과는 `request_logs`, `request_log_attempts`와 함께 저장되고 최종 응답으로 반환됩니다.
+![게이트웨이 아키텍처](./docs/images/gateway-architecture.jpg)
 
 ## 기술 스택
 
