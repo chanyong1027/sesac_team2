@@ -18,8 +18,8 @@ import org.springframework.context.annotation.Configuration;
 public class EvalExecutionConfig {
 
     private final EvalProperties evalProperties;
-    private ExecutorService evalRunExecutor;
-    private ExecutorService evalCaseExecutor;
+    private ThreadPoolExecutor evalRunExecutor;
+    private ThreadPoolExecutor evalCaseExecutor;
 
     public EvalExecutionConfig(EvalProperties evalProperties) {
         this.evalProperties = evalProperties;
@@ -44,7 +44,7 @@ public class EvalExecutionConfig {
                 threadFactory,
                 new ThreadPoolExecutor.AbortPolicy()
         );
-        return (ThreadPoolExecutor) this.evalRunExecutor;
+        return this.evalRunExecutor;
     }
 
     @Bean(name = "evalCaseExecutor")
@@ -68,7 +68,7 @@ public class EvalExecutionConfig {
                 threadFactory,
                 new ThreadPoolExecutor.AbortPolicy()
         );
-        return (ThreadPoolExecutor) this.evalCaseExecutor;
+        return this.evalCaseExecutor;
     }
 
     @PreDestroy
