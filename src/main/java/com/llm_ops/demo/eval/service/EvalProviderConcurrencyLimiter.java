@@ -16,9 +16,9 @@ public class EvalProviderConcurrencyLimiter {
 
     public EvalProviderConcurrencyLimiter(EvalProperties evalProperties) {
         EvalProperties.ProviderLimits providerLimits = evalProperties.getRunner().getProviderLimits();
-        permits.put(ProviderType.OPENAI, new Semaphore(Math.max(1, providerLimits.getOpenaiMaxConcurrentCalls()), true));
-        permits.put(ProviderType.ANTHROPIC, new Semaphore(Math.max(1, providerLimits.getAnthropicMaxConcurrentCalls()), true));
-        permits.put(ProviderType.GEMINI, new Semaphore(Math.max(1, providerLimits.getGeminiMaxConcurrentCalls()), true));
+        permits.put(ProviderType.OPENAI, new Semaphore(providerLimits.getOpenaiMaxConcurrentCalls(), true));
+        permits.put(ProviderType.ANTHROPIC, new Semaphore(providerLimits.getAnthropicMaxConcurrentCalls(), true));
+        permits.put(ProviderType.GEMINI, new Semaphore(providerLimits.getGeminiMaxConcurrentCalls(), true));
     }
 
     public Permit acquire(ProviderType providerType) {

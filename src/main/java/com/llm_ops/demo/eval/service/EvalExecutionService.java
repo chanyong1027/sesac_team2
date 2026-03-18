@@ -162,7 +162,7 @@ public class EvalExecutionService {
             PromptVersion baselineVersion,
             Duration runLeaseDuration
     ) throws InterruptedException, ExecutionException {
-        int perRunConcurrency = Math.max(1, evalProperties.getExecution().getMaxConcurrentCasesPerRun());
+        int perRunConcurrency = evalProperties.getExecution().getMaxConcurrentCasesPerRun();
         CompletionService<CaseExecutionResult> completionService = new ExecutorCompletionService<>(evalCaseExecutor);
         java.util.Iterator<Long> iterator = queuedCaseIds.iterator();
         int inFlight = 0;
