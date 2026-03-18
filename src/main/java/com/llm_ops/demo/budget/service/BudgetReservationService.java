@@ -61,7 +61,11 @@ public class BudgetReservationService {
         }
 
         int yearMonthInt = BudgetUsageService.toYearMonthInt(yearMonth);
-        budgetMonthlyUsageRepository.ensureUsageRow(scopeType.name(), scopeId, yearMonthInt);
+        try {
+            budgetMonthlyUsageRepository.ensureUsageRow(scopeType.name(), scopeId, yearMonthInt);
+        } catch (DataIntegrityViolationException ignored) {
+            // 동시 생성 경쟁으로 unique 충돌이 나도 다음 reserve 단계에서 동일 row를 사용하면 된다.
+        }
 
         int reserved = budgetMonthlyUsageRepository.reserveCostIfWithinLimit(
             scopeType.name(),

@@ -26,17 +26,27 @@ public interface BudgetMonthlyUsageRepository extends JpaRepository<BudgetMonthl
                 cost_usd,
                 total_tokens,
                 request_count,
-                reserved_cost_usd
-            ) VALUES (
+                reserved_cost_usd,
+                created_at,
+                updated_at
+            )
+            SELECT
                 :scopeType,
                 :scopeId,
                 :yearMonth,
                 0,
                 0,
                 0,
-                0
+                0,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM budget_monthly_usage
+                WHERE scope_type = :scopeType
+                  AND scope_id = :scopeId
+                  AND year_month = :yearMonth
             )
-            ON CONFLICT (scope_type, scope_id, year_month) DO NOTHING
             """,
         nativeQuery = true
     )
