@@ -229,12 +229,20 @@
 
 ```sql
 INSERT INTO budget_monthly_usage (
-    scope_type, scope_id, year_month, cost_usd, total_tokens, request_count, reserved_cost_usd
-) VALUES (
-    :scopeType, :scopeId, :yearMonth, 0, 0, 0, 0
+    scope_type, scope_id, year_month, cost_usd, total_tokens, request_count, reserved_cost_usd, created_at, updated_at
 )
-ON CONFLICT (scope_type, scope_id, year_month) DO NOTHING;
+SELECT
+    :scopeType, :scopeId, :yearMonth, 0, 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM budget_monthly_usage
+    WHERE scope_type = :scopeType
+      AND scope_id = :scopeId
+      AND year_month = :yearMonth
+);
 ```
+
+현재 repository 구현은 H2 기반 테스트 환경까지 같이 통과시키기 위해 위와 같은 조건부 insert를 사용하고, 동시 생성 경합은 unique 제약과 `DataIntegrityViolationException` 흡수로 마무리합니다. 실제 hard-limit 승인/거절의 일관성은 아래 `reserve update`가 담당합니다.
 
 ### 9-2) 예약 승인
 
@@ -456,12 +464,12 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 - 완료 조건: migration이 로컬/테스트 DB에 정상 적용된다.
 - 검증: Flyway migration 실행.
 
-### [ ] E21-3 Repository와 원자적 SQL 도입
+### [x] E21-3 Repository와 원자적 SQL 도입
 
 - 목표: reserve/settle/release를 native query로 구현한다.
 - 범위: usage upsert, reserve update, settle update, release update, stale reservation 조회.
 - 완료 조건: lost update 없이 row count 기반 예약 결과를 얻는다.
-- 검증: repository 단위 테스트.
+- 검증: `BudgetMonthlyUsageRepositoryTest`, `BudgetReservationRepositoryTest`, `BudgetReservationServiceTest`, `BudgetGuardrailServiceTest`.
 
 ### [ ] E21-4 최대 비용 상한 계산기 도입
 
