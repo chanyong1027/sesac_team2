@@ -28,8 +28,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -47,6 +53,8 @@ public class EvalExecutionService {
     private final EvalJudgeService evalJudgeService;
     private final EvalReleaseCriteriaService evalReleaseCriteriaService;
     private final EvalReleaseDecisionCalculator evalReleaseDecisionCalculator;
+    private final EvalCaseExecutionService evalCaseExecutionService;
+    private final ThreadPoolExecutor evalCaseExecutor;
     private final ObjectMapper objectMapper;
     private final EvalMetrics evalMetrics;
     private final EvalProperties evalProperties;
@@ -62,6 +70,8 @@ public class EvalExecutionService {
             EvalJudgeService evalJudgeService,
             EvalReleaseCriteriaService evalReleaseCriteriaService,
             EvalReleaseDecisionCalculator evalReleaseDecisionCalculator,
+            EvalCaseExecutionService evalCaseExecutionService,
+            @Qualifier("evalCaseExecutor") ThreadPoolExecutor evalCaseExecutor,
             ObjectMapper objectMapper,
             EvalProperties evalProperties,
             EvalMetrics evalMetrics
@@ -76,6 +86,8 @@ public class EvalExecutionService {
         this.evalJudgeService = evalJudgeService;
         this.evalReleaseCriteriaService = evalReleaseCriteriaService;
         this.evalReleaseDecisionCalculator = evalReleaseDecisionCalculator;
+        this.evalCaseExecutionService = evalCaseExecutionService;
+        this.evalCaseExecutor = evalCaseExecutor;
         this.objectMapper = objectMapper;
         this.evalProperties = evalProperties;
         this.evalMetrics = evalMetrics;
@@ -86,22 +98,29 @@ public class EvalExecutionService {
         if (run == null) {
             return;
         }
-        if (run.status() != EvalRunStatus.QUEUED && run.status() != EvalRunStatus.RUNNING) {
+        if (run.status() != EvalRunStatus.QUEUED
+                && run.status() != EvalRunStatus.CLAIMED
+                && run.status() != EvalRunStatus.RUNNING
+                && run.status() != EvalRunStatus.CANCEL_REQUESTED) {
             return;
         }
         long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
         Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
+        Duration runLeaseDuration = Duration.ofSeconds(Math.max(30L, evalProperties.getWorker().getRunLeaseSeconds()));
         if (run.status() == EvalRunStatus.QUEUED) {
-            run.markRunningWithTimeout(timeoutDuration);
+            run.markClaimed("INLINE", runLeaseDuration);
+            run.markRunningWithTimeout(timeoutDuration, runLeaseDuration);
             evalRunRepository.save(run);
-        } else if (run.ensureTimeoutIfMissing(timeoutDuration)) {
+        } else if (run.status() == EvalRunStatus.CLAIMED) {
+            run.markRunningWithTimeout(timeoutDuration, runLeaseDuration);
+            evalRunRepository.save(run);
+        } else if (run.ensureTimeoutIfMissing(timeoutDuration, runLeaseDuration)) {
             evalRunRepository.save(run);
         }
 
         if (failRunIfTimedOut(run, "at start")) {
             return;
         }
-        CostAccumulator costAccumulator = new CostAccumulator();
 
         try {
             ResolvedRubricConfig rubric = evalRubricTemplateRegistry.resolve(
@@ -111,40 +130,90 @@ public class EvalExecutionService {
 
             PromptVersion baselineVersion = resolveBaselineVersion(run);
             boolean compareBaselineAvailable = run.mode() != EvalMode.COMPARE_ACTIVE || baselineVersion != null;
-            List<EvalCaseResult> caseResults = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(run.getId());
+            List<Long> queuedCaseIds = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(run.getId())
+                    .stream()
+                    .filter(caseResult -> caseResult.status() == EvalCaseStatus.QUEUED)
+                    .map(EvalCaseResult::getId)
+                    .toList();
 
-            for (EvalCaseResult caseResult : caseResults) {
-                if (isRunCancelled(run.getId())) {
-                    log.info("Eval run cancelled while processing. runId={}", run.getId());
-                    return;
-                }
-                if (caseResult.status() != EvalCaseStatus.QUEUED) {
-                    continue;
-                }
-
-                EvalRun currentRun = evalRunRepository.findById(run.getId()).orElseThrow();
-                if (failRunIfTimedOut(currentRun, "during case processing")) {
-                    return;
-                }
-                long caseStartNanos = System.nanoTime();
-                String caseStatus = "unknown";
-                try {
-                    processCase(run, caseResult, rubric, baselineVersion, costAccumulator);
-                    caseStatus = caseResult.status() != null ? caseResult.status().name() : "unknown";
-                } finally {
-                    evalMetrics.recordCaseExecution(caseStatus, System.nanoTime() - caseStartNanos);
-                }
-            }
+            runCasesInParallel(run.getId(), queuedCaseIds, rubric, baselineVersion, runLeaseDuration);
 
             EvalRun finalRun = evalRunRepository.findById(run.getId()).orElseThrow();
             if (failRunIfTimedOut(finalRun, "before finalize")) {
                 return;
             }
-            finishRun(run.getId(), costAccumulator, compareBaselineAvailable);
+            if (finalRun.status() == EvalRunStatus.CANCEL_REQUESTED || finalRun.status() == EvalRunStatus.CANCELLED) {
+                cancelRun(run.getId());
+                return;
+            }
+            finishRun(run.getId(), compareBaselineAvailable);
         } catch (Exception e) {
             log.error("Eval run failed. runId={}", runId, e);
-            failRun(runId, costAccumulator, e.getMessage());
+            failRun(runId, e.getMessage());
         }
+    }
+
+    private void runCasesInParallel(
+            Long runId,
+            List<Long> queuedCaseIds,
+            ResolvedRubricConfig rubric,
+            PromptVersion baselineVersion,
+            Duration runLeaseDuration
+    ) throws InterruptedException, ExecutionException {
+        int perRunConcurrency = Math.max(1, evalProperties.getExecution().getMaxConcurrentCasesPerRun());
+        CompletionService<CaseExecutionResult> completionService = new ExecutorCompletionService<>(evalCaseExecutor);
+        java.util.Iterator<Long> iterator = queuedCaseIds.iterator();
+        int inFlight = 0;
+
+        while (iterator.hasNext() && inFlight < perRunConcurrency && !isRunCancellationRequested(runId)) {
+            submitCaseTask(completionService, runId, iterator.next(), rubric, baselineVersion, runLeaseDuration);
+            inFlight++;
+        }
+
+        while (inFlight > 0) {
+            Future<CaseExecutionResult> future = completionService.take();
+            CaseExecutionResult result = future.get();
+            inFlight--;
+            evalMetrics.recordCaseExecution(result.caseStatus(), result.elapsedNanos());
+            refreshRunLease(runId, runLeaseDuration);
+
+            EvalRun currentRun = evalRunRepository.findById(runId).orElseThrow();
+            if (failRunIfTimedOut(currentRun, "during case processing")) {
+                return;
+            }
+
+            while (iterator.hasNext() && inFlight < perRunConcurrency && !isRunCancellationRequested(runId)) {
+                submitCaseTask(completionService, runId, iterator.next(), rubric, baselineVersion, runLeaseDuration);
+                inFlight++;
+            }
+        }
+
+        if (isRunCancellationRequested(runId)) {
+            skipQueuedCases(runId);
+        }
+    }
+
+    private void submitCaseTask(
+            CompletionService<CaseExecutionResult> completionService,
+            Long runId,
+            Long caseResultId,
+            ResolvedRubricConfig rubric,
+            PromptVersion baselineVersion,
+            Duration runLeaseDuration
+    ) {
+        completionService.submit(() -> {
+            long caseStartNanos = System.nanoTime();
+            evalCaseExecutionService.executeCase(
+                    runId,
+                    caseResultId,
+                    rubric,
+                    baselineVersion != null ? baselineVersion.getId() : null,
+                    runLeaseDuration
+            );
+            EvalCaseResult updated = evalCaseResultRepository.findById(caseResultId).orElse(null);
+            String caseStatus = updated != null && updated.status() != null ? updated.status().name() : "unknown";
+            return new CaseExecutionResult(caseStatus, System.nanoTime() - caseStartNanos);
+        });
     }
 
     private boolean failRunIfTimedOut(EvalRun run, String phase) {
@@ -156,6 +225,36 @@ public class EvalExecutionService {
         evalRunRepository.save(run);
         log.warn("Eval run timed out {}. runId={}", phase, run.getId());
         return true;
+    }
+
+    private void refreshRunLease(Long runId, Duration runLeaseDuration) {
+        EvalRun run = evalRunRepository.findById(runId).orElse(null);
+        if (run == null) {
+            return;
+        }
+        if (run.status() != EvalRunStatus.RUNNING && run.status() != EvalRunStatus.CANCEL_REQUESTED) {
+            return;
+        }
+        run.heartbeat(runLeaseDuration);
+        evalRunRepository.save(run);
+    }
+
+    private boolean isRunCancellationRequested(Long runId) {
+        return evalRunRepository.findById(runId)
+                .map(EvalRun::isCancellationRequested)
+                .orElse(true);
+    }
+
+    private void skipQueuedCases(Long runId) {
+        List<EvalCaseResult> queuedCases = evalCaseResultRepository.findByEvalRunIdAndStatusOrderByIdAsc(
+                runId,
+                EvalCaseStatus.QUEUED.name()
+        );
+        if (queuedCases.isEmpty()) {
+            return;
+        }
+        queuedCases.forEach(caseResult -> caseResult.markSkipped("RUN_CANCELLED", "실행 중 취소되어 시작되지 않은 케이스입니다."));
+        evalCaseResultRepository.saveAll(queuedCases);
     }
 
     private void processCase(
@@ -406,16 +505,24 @@ public class EvalExecutionService {
                 .orElse(true);
     }
 
-    private void finishRun(Long runId, CostAccumulator costAccumulator, boolean compareBaselineAvailable) {
+    private void finishRun(Long runId, boolean compareBaselineAvailable) {
         EvalRun run = evalRunRepository.findById(runId).orElse(null);
         if (run == null || run.status() == EvalRunStatus.CANCELLED) {
             return;
         }
 
         List<EvalCaseResult> allResults = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(runId);
+        CaseCountSummary caseCounts = summarizeCaseCounts(allResults);
+        run.syncCaseCounts(
+                caseCounts.processedCases(),
+                caseCounts.passedCases(),
+                caseCounts.failedCases(),
+                caseCounts.errorCases()
+        );
         List<EvalCaseResult> okResults = allResults.stream()
                 .filter(result -> result.status() == EvalCaseStatus.OK)
                 .toList();
+        CostAccumulator costAccumulator = aggregateCaseCosts(allResults);
 
         double avgScore = okResults.stream()
                 .map(EvalCaseResult::getOverallScore)
@@ -424,11 +531,11 @@ public class EvalExecutionService {
                 .average()
                 .orElse(0.0);
 
-        double passRate = run.getProcessedCases() > 0
-                ? (run.getPassedCases() * 100.0) / run.getProcessedCases()
+        double passRate = caseCounts.processedCases() > 0
+                ? (caseCounts.passedCases() * 100.0) / caseCounts.processedCases()
                 : 0.0;
-        double errorRate = run.getProcessedCases() > 0
-                ? (run.getErrorCases() * 100.0) / run.getProcessedCases()
+        double errorRate = caseCounts.processedCases() > 0
+                ? (caseCounts.errorCases() * 100.0) / caseCounts.processedCases()
                 : 0.0;
         Double avgScoreDelta = run.mode() == EvalMode.COMPARE_ACTIVE
                 ? computeAvgScoreDelta(okResults)
@@ -459,10 +566,11 @@ public class EvalExecutionService {
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("totalCases", run.getTotalCases());
-        summary.put("processedCases", run.getProcessedCases());
-        summary.put("passedCases", run.getPassedCases());
-        summary.put("failedCases", run.getFailedCases());
-        summary.put("errorCases", run.getErrorCases());
+        summary.put("processedCases", caseCounts.processedCases());
+        summary.put("passedCases", caseCounts.passedCases());
+        summary.put("failedCases", caseCounts.failedCases());
+        summary.put("errorCases", caseCounts.errorCases());
+        summary.put("skippedCases", caseCounts.skippedCases());
         summary.put("passRate", round(passRate));
         summary.put("avgOverallScore", round(avgScore));
         summary.put("errorRate", round(errorRate));
@@ -509,35 +617,74 @@ public class EvalExecutionService {
         );
         summary.put("topIssues", topIssues);
         summary.put("plainSummary", buildPlainSummary(releaseDecision, passRate, avgScore, avgScoreDelta, topIssues));
-        appendRunOverallReview(run, summary, allResults, costAccumulator);
+        Map<String, Object> reviewMeta = appendRunOverallReview(run, summary, allResults);
+        costAccumulator.add(reviewMeta);
 
         run.finish(summary, costAccumulator.asMap());
         evalRunRepository.save(run);
     }
 
-    private void failRun(Long runId, CostAccumulator costAccumulator, String reason) {
+    private void failRun(Long runId, String reason) {
         EvalRun run = evalRunRepository.findById(runId).orElse(null);
         if (run == null || run.status() == EvalRunStatus.CANCELLED) {
             return;
         }
 
+        List<EvalCaseResult> allResults = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(runId);
+        CaseCountSummary caseCounts = summarizeCaseCounts(allResults);
+        run.syncCaseCounts(
+                caseCounts.processedCases(),
+                caseCounts.passedCases(),
+                caseCounts.failedCases(),
+                caseCounts.errorCases()
+        );
+        CostAccumulator costAccumulator = aggregateCaseCosts(allResults);
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("totalCases", run.getTotalCases());
-        summary.put("processedCases", run.getProcessedCases());
-        summary.put("passedCases", run.getPassedCases());
-        summary.put("failedCases", run.getFailedCases());
-        summary.put("errorCases", run.getErrorCases());
+        summary.put("processedCases", caseCounts.processedCases());
+        summary.put("passedCases", caseCounts.passedCases());
+        summary.put("failedCases", caseCounts.failedCases());
+        summary.put("errorCases", caseCounts.errorCases());
+        summary.put("skippedCases", caseCounts.skippedCases());
         summary.put("failReason", sanitizeMessage(reason));
 
         run.fail(summary, costAccumulator.asMap());
         evalRunRepository.save(run);
     }
 
-    private void appendRunOverallReview(
+    private void cancelRun(Long runId) {
+        EvalRun run = evalRunRepository.findById(runId).orElse(null);
+        if (run == null) {
+            return;
+        }
+
+        List<EvalCaseResult> allResults = evalCaseResultRepository.findByEvalRunIdOrderByIdAsc(runId);
+        CaseCountSummary caseCounts = summarizeCaseCounts(allResults);
+        run.syncCaseCounts(
+                caseCounts.processedCases(),
+                caseCounts.passedCases(),
+                caseCounts.failedCases(),
+                caseCounts.errorCases()
+        );
+        CostAccumulator costAccumulator = aggregateCaseCosts(allResults);
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalCases", run.getTotalCases());
+        summary.put("processedCases", caseCounts.processedCases());
+        summary.put("passedCases", caseCounts.passedCases());
+        summary.put("failedCases", caseCounts.failedCases());
+        summary.put("errorCases", caseCounts.errorCases());
+        summary.put("skippedCases", caseCounts.skippedCases());
+        summary.put("failReason", "사용자 요청으로 실행이 취소되었습니다.");
+
+        run.cancel(summary, costAccumulator.asMap());
+        evalRunRepository.save(run);
+    }
+
+    private Map<String, Object> appendRunOverallReview(
             EvalRun run,
             Map<String, Object> summary,
-            List<EvalCaseResult> allResults,
-            CostAccumulator costAccumulator
+            List<EvalCaseResult> allResults
     ) {
         try {
             Long organizationId = run.getPrompt().getWorkspace().getOrganization().getId();
@@ -549,10 +696,11 @@ public class EvalExecutionService {
                     caseHighlights
             );
             summary.put("llmOverallReview", reviewResult.review());
-            costAccumulator.add(reviewResult.meta());
+            return reviewResult.meta();
         } catch (Exception e) {
             log.warn("Run overall review generation failed. runId={}", run.getId(), e);
             summary.put("llmOverallReview", fallbackRunOverallReview(sanitizeMessage(e.getMessage())));
+            return Map.of();
         }
     }
 
@@ -811,6 +959,42 @@ public class EvalExecutionService {
         return sortCountsDesc(counts);
     }
 
+    private CaseCountSummary summarizeCaseCounts(List<EvalCaseResult> allResults) {
+        int processed = 0;
+        int passed = 0;
+        int failed = 0;
+        int error = 0;
+        int skipped = 0;
+
+        for (EvalCaseResult result : allResults) {
+            if (result.status() == EvalCaseStatus.OK) {
+                processed++;
+                if (Boolean.TRUE.equals(result.getPass())) {
+                    passed++;
+                } else {
+                    failed++;
+                }
+            } else if (result.status() == EvalCaseStatus.ERROR) {
+                processed++;
+                error++;
+            } else if (result.status() == EvalCaseStatus.SKIPPED) {
+                skipped++;
+            }
+        }
+        return new CaseCountSummary(processed, passed, failed, error, skipped);
+    }
+
+    private CostAccumulator aggregateCaseCosts(List<EvalCaseResult> allResults) {
+        CostAccumulator accumulator = new CostAccumulator();
+        for (EvalCaseResult result : allResults) {
+            accumulator.add(result.getCandidateMetaJson());
+            accumulator.add(result.getBaselineMetaJson());
+            accumulator.add(extractJudgeMeta(result.getJudgeOutputJson()));
+            accumulator.add(extractBaselineJudgeMeta(result.getJudgeOutputJson()));
+        }
+        return accumulator;
+    }
+
     private List<Map<String, Object>> collectMetaMaps(List<EvalCaseResult> results, boolean candidate) {
         List<Map<String, Object>> metas = new ArrayList<>();
         for (EvalCaseResult result : results) {
@@ -821,6 +1005,32 @@ public class EvalExecutionService {
             metas.add(meta);
         }
         return metas;
+    }
+
+    private Map<String, Object> extractJudgeMeta(Map<String, Object> judgeOutput) {
+        if (judgeOutput == null) {
+            return Map.of();
+        }
+        Object judgeMeta = judgeOutput.get("judgeMeta");
+        if (!(judgeMeta instanceof Map<?, ?> judgeMetaMap)) {
+            return Map.of();
+        }
+        return castObjectMap(judgeMetaMap);
+    }
+
+    private Map<String, Object> extractBaselineJudgeMeta(Map<String, Object> judgeOutput) {
+        if (judgeOutput == null) {
+            return Map.of();
+        }
+        Object baseline = judgeOutput.get("baseline");
+        if (!(baseline instanceof Map<?, ?> baselineMap)) {
+            return Map.of();
+        }
+        Object judgeMeta = baselineMap.get("judgeMeta");
+        if (!(judgeMeta instanceof Map<?, ?> judgeMetaMap)) {
+            return Map.of();
+        }
+        return castObjectMap(judgeMetaMap);
     }
 
     private Map<String, Object> extractCandidateRuleChecks(Map<String, Object> ruleChecks) {
@@ -934,6 +1144,18 @@ public class EvalExecutionService {
 
     private static double round(double value) {
         return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    private record CaseExecutionResult(String caseStatus, long elapsedNanos) {
+    }
+
+    private record CaseCountSummary(
+            int processedCases,
+            int passedCases,
+            int failedCases,
+            int errorCases,
+            int skippedCases
+    ) {
     }
 
     private static final class CostAccumulator {

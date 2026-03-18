@@ -17,6 +17,9 @@ import com.llm_ops.demo.prompt.repository.PromptReleaseRepository;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +39,13 @@ class EvalExecutionServiceTest {
         EvalCaseResultRepository evalCaseResultRepository = mock(EvalCaseResultRepository.class);
         EvalProperties evalProperties = new EvalProperties();
         evalProperties.setRunTimeoutMinutes(30L);
+        ThreadPoolExecutor evalCaseExecutor = new ThreadPoolExecutor(
+                1,
+                1,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>()
+        );
 
         EvalExecutionService service = new EvalExecutionService(
                 evalRunRepository,
@@ -48,6 +58,8 @@ class EvalExecutionServiceTest {
                 mock(EvalJudgeService.class),
                 mock(EvalReleaseCriteriaService.class),
                 mock(EvalReleaseDecisionCalculator.class),
+                mock(EvalCaseExecutionService.class),
+                evalCaseExecutor,
                 new ObjectMapper(),
                 evalProperties,
                 mock(EvalMetrics.class)
@@ -80,5 +92,6 @@ class EvalExecutionServiceTest {
         assertThat(timedOutRun.getFailReasonCode()).isEqualTo("RUN_TIMEOUT");
         verify(evalRunRepository).save(timedOutRun);
         verifyNoInteractions(evalCaseResultRepository);
+        evalCaseExecutor.shutdownNow();
     }
 }

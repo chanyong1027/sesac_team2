@@ -5,8 +5,12 @@ import com.llm_ops.demo.eval.service.EvalExecutionService;
 import com.llm_ops.demo.eval.service.EvalMetrics;
 import com.llm_ops.demo.eval.service.EvalRunService;
 import java.time.Duration;
+import java.util.UUID;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,17 +25,21 @@ public class EvalWorker {
     private final EvalExecutionService evalExecutionService;
     private final EvalProperties evalProperties;
     private final EvalMetrics evalMetrics;
+    private final ThreadPoolExecutor evalRunExecutor;
+    private final String leaseOwner = "eval-worker-" + UUID.randomUUID();
 
     public EvalWorker(
             EvalRunService evalRunService,
             EvalExecutionService evalExecutionService,
             EvalProperties evalProperties,
-            EvalMetrics evalMetrics
+            EvalMetrics evalMetrics,
+            @Qualifier("evalRunExecutor") ThreadPoolExecutor evalRunExecutor
     ) {
         this.evalRunService = evalRunService;
         this.evalExecutionService = evalExecutionService;
         this.evalProperties = evalProperties;
         this.evalMetrics = evalMetrics;
+        this.evalRunExecutor = evalRunExecutor;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -48,22 +56,31 @@ public class EvalWorker {
 
     @Scheduled(fixedDelayString = "${eval.worker.poll-interval-ms:3000}")
     public void pollQueuedRuns() {
-        int batchSize = Math.max(1, evalProperties.getWorker().getBatchSize());
-        evalRunService.pickQueuedRuns(batchSize)
+        int availableSlots = Math.max(0, evalRunExecutor.getMaximumPoolSize() - evalRunExecutor.getActiveCount());
+        if (availableSlots == 0) {
+            return;
+        }
+
+        Duration claimLeaseDuration = Duration.ofSeconds(Math.max(5L, evalProperties.getWorker().getClaimLeaseSeconds()));
+        evalRunService.claimQueuedRuns(availableSlots, leaseOwner, claimLeaseDuration)
                 .forEach(run -> {
-                    long startNanos = System.nanoTime();
                     try {
-                        evalExecutionService.processRun(run.getId());
-                        evalMetrics.recordRunExecution(
-                                run.mode() != null ? run.mode().name() : "unknown",
-                                "WORKER",
-                                System.nanoTime() - startNanos);
-                    } catch (Exception e) {
-                        evalMetrics.recordRunExecution(
-                                run.mode() != null ? run.mode().name() : "unknown",
-                                "WORKER",
-                                System.nanoTime() - startNanos);
-                        log.error("Eval run processing failed. runId={}", run.getId(), e);
+                        evalRunExecutor.submit(() -> {
+                            long startNanos = System.nanoTime();
+                            try {
+                                evalExecutionService.processRun(run.getId());
+                            } catch (Exception e) {
+                                log.error("Eval run processing failed. runId={}", run.getId(), e);
+                            } finally {
+                                evalMetrics.recordRunExecution(
+                                        run.mode() != null ? run.mode().name() : "unknown",
+                                        "WORKER",
+                                        System.nanoTime() - startNanos);
+                            }
+                        });
+                    } catch (RejectedExecutionException exception) {
+                        log.warn("Eval run executor rejected submission. runId={}", run.getId(), exception);
+                        evalRunService.releaseClaimToQueue(run.getId(), leaseOwner);
                     }
                 });
     }

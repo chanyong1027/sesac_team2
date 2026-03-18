@@ -59,17 +59,20 @@ public class EvalModelRunnerService {
     private final ProviderCredentialService providerCredentialService;
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final EvalProviderConcurrencyLimiter evalProviderConcurrencyLimiter;
 
     public EvalModelRunnerService(
             EvalProperties evalProperties,
             ProviderCredentialService providerCredentialService,
             GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
-            CircuitBreakerRegistry circuitBreakerRegistry
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            EvalProviderConcurrencyLimiter evalProviderConcurrencyLimiter
     ) {
         this.evalProperties = evalProperties;
         this.providerCredentialService = providerCredentialService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
+        this.evalProviderConcurrencyLimiter = evalProviderConcurrencyLimiter;
     }
 
     public ModelExecution run(
@@ -97,11 +100,14 @@ public class EvalModelRunnerService {
         long startedAtNanos = System.nanoTime();
         for (int attempt = 1; attempt <= sameProviderTotalAttempts; attempt++) {
             try {
-                ChatResponse response = circuitBreaker.executeCallable(() -> switch (provider) {
-                    case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-                    case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-                    case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-                });
+                ChatResponse response;
+                try (EvalProviderConcurrencyLimiter.Permit ignored = evalProviderConcurrencyLimiter.acquire(provider)) {
+                    response = circuitBreaker.executeCallable(() -> switch (provider) {
+                        case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                        case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                        case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                    });
+                }
                 int retryCount = attempt - 1;
                 return toExecution(provider, model, response, startedAtNanos, retryCount);
             } catch (Exception exception) {

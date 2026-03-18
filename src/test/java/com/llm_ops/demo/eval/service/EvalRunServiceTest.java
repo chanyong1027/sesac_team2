@@ -263,13 +263,15 @@ class EvalRunServiceTest {
     }
 
     @Test
-    @DisplayName("pickQueuedRuns는 조회한 QUEUED run을 RUNNING으로 선점한다")
-    void pickQueuedRuns는_조회한_queued_run을_running으로_선점한다() {
+    @DisplayName("claimQueuedRuns는 조회한 QUEUED run을 CLAIMED로 선점한다")
+    void claimQueuedRuns는_조회한_queued_run을_claimed로_선점한다() {
         // given
         EvalRunRepository evalRunRepository = mock(EvalRunRepository.class);
+        EvalProperties properties = new EvalProperties();
+        properties.getWorker().setClaimBatchSize(3);
         EvalRunService service = new EvalRunService(
                 mock(EvalAccessService.class),
-                new EvalProperties(),
+                properties,
                 evalRunRepository,
                 mock(EvalCaseResultRepository.class),
                 mock(EvalTestCaseRepository.class),
@@ -296,25 +298,22 @@ class EvalRunServiceTest {
                 1L
         );
 
-        when(evalRunRepository.findQueuedRunsForUpdate(eq(EvalRunStatus.QUEUED.name()), any(Pageable.class)))
-                .thenReturn(List.of(queuedRun));
+        when(evalRunRepository.findQueuedRunIdsForClaim(eq(EvalRunStatus.QUEUED.name()), eq(3)))
+                .thenReturn(List.of(1L));
+        when(evalRunRepository.findByIdInOrderByCreatedAtAsc(List.of(1L))).thenReturn(List.of(queuedRun));
         when(evalRunRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // when
-        List<EvalRun> picked = service.pickQueuedRuns(3);
+        List<EvalRun> picked = service.claimQueuedRuns(3, "worker-1", Duration.ofSeconds(30));
 
         // then
         assertThat(picked).hasSize(1);
-        assertThat(picked.get(0).status()).isEqualTo(EvalRunStatus.RUNNING);
-        assertThat(picked.get(0).getStartedAt()).isNotNull();
-        assertThat(picked.get(0).getTimeoutAt()).isNotNull();
-        assertThat(picked.get(0).getTimeoutAt()).isAfterOrEqualTo(picked.get(0).getStartedAt());
+        assertThat(picked.get(0).status()).isEqualTo(EvalRunStatus.CLAIMED);
+        assertThat(picked.get(0).getClaimedAt()).isNotNull();
+        assertThat(picked.get(0).getLeaseOwner()).isEqualTo("worker-1");
+        assertThat(picked.get(0).getLeaseExpiresAt()).isAfterOrEqualTo(picked.get(0).getClaimedAt());
         verify(evalRunRepository).saveAll(picked);
-
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(evalRunRepository).findQueuedRunsForUpdate(eq(EvalRunStatus.QUEUED.name()), pageableCaptor.capture());
-        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(0);
-        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(3);
+        verify(evalRunRepository).findQueuedRunIdsForClaim(EvalRunStatus.QUEUED.name(), 3);
     }
 
     @Test
@@ -351,13 +350,19 @@ class EvalRunServiceTest {
                 1,
                 1L
         );
-        stuckRun.markRunningWithTimeout(Duration.ofMinutes(30));
+        stuckRun.markClaimed("worker-1", Duration.ofSeconds(-1));
+        stuckRun.markRunningWithTimeout(Duration.ofMinutes(30), Duration.ofMinutes(5));
 
         EvalCaseResult runningCase = EvalCaseResult.queue(stuckRun, mock(EvalTestCase.class));
         runningCase.markRunning();
 
-        when(evalRunRepository.findStuckRunsForUpdate(
-                eq(EvalRunStatus.RUNNING.name()),
+        when(evalRunRepository.findRecoverableRunsForUpdate(
+                eq(List.of(
+                        EvalRunStatus.CLAIMED.name(),
+                        EvalRunStatus.RUNNING.name(),
+                        EvalRunStatus.CANCEL_REQUESTED.name()
+                )),
+                any(LocalDateTime.class),
                 any(LocalDateTime.class),
                 any(Pageable.class)
         )).thenReturn(List.of(stuckRun), List.of());

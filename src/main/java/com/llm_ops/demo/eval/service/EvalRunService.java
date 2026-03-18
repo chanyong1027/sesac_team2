@@ -285,7 +285,7 @@ public class EvalRunService {
     public EvalCancelResponse cancelRun(Long workspaceId, Long promptId, Long runId, Long userId) {
         EvalAccessService.PromptScope scope = evalAccessService.requirePromptScope(workspaceId, promptId, userId);
         EvalRun run = evalAccessService.requireRun(scope.prompt(), runId);
-        run.markCancelled();
+        run.requestCancel();
         return new EvalCancelResponse(run.getId(), run.status().name());
     }
 
@@ -430,21 +430,38 @@ public class EvalRunService {
     }
 
     @Transactional
-    public List<EvalRun> pickQueuedRuns(int batchSize) {
-        int safeBatchSize = Math.max(batchSize, 1);
-        List<EvalRun> queuedRuns = evalRunRepository.findQueuedRunsForUpdate(
-                EvalRunStatus.QUEUED.name(),
-                PageRequest.of(0, safeBatchSize)
-        );
-
-        if (queuedRuns.isEmpty()) {
-            return queuedRuns;
+    public List<EvalRun> claimQueuedRuns(int desiredCount, String leaseOwner, Duration claimLeaseDuration) {
+        int safeCount = Math.max(desiredCount, 0);
+        if (safeCount == 0) {
+            return List.of();
         }
 
-        long timeoutMinutes = evalProperties.getRunTimeoutMinutes();
-        Duration timeoutDuration = Duration.ofMinutes(timeoutMinutes);
-        queuedRuns.forEach(run -> run.markRunningWithTimeout(timeoutDuration));
+        int claimBatchSize = Math.max(1, evalProperties.getWorker().getClaimBatchSize());
+        int limit = Math.min(safeCount, claimBatchSize);
+        List<Long> runIds = evalRunRepository.findQueuedRunIdsForClaim(EvalRunStatus.QUEUED.name(), limit);
+        if (runIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<EvalRun> queuedRuns = evalRunRepository.findByIdInOrderByCreatedAtAsc(runIds);
+        queuedRuns.forEach(run -> run.markClaimed(leaseOwner, claimLeaseDuration));
         return evalRunRepository.saveAll(queuedRuns);
+    }
+
+    @Transactional
+    public void releaseClaimToQueue(Long runId, String leaseOwner) {
+        EvalRun run = evalRunRepository.findById(runId).orElse(null);
+        if (run == null) {
+            return;
+        }
+        if (run.status() != EvalRunStatus.CLAIMED) {
+            return;
+        }
+        if (leaseOwner != null && run.getLeaseOwner() != null && !leaseOwner.equals(run.getLeaseOwner())) {
+            return;
+        }
+        run.resetToQueued();
+        evalRunRepository.save(run);
     }
 
     private PromptVersion resolveBaselineVersionForEstimate(Prompt prompt, PromptVersion candidateVersion, EvalMode mode) {
@@ -693,15 +710,21 @@ public class EvalRunService {
 
     @Transactional
     public int recoverStuckRuns(Duration timeout) {
-        LocalDateTime cutoffTime = LocalDateTime.now().minus(timeout);
+        LocalDateTime claimCutoffTime = LocalDateTime.now();
+        LocalDateTime runTimeoutCutoff = LocalDateTime.now().minus(timeout);
         int totalRecovered = 0;
         int batchSize = 50;
         List<EvalRun> stuckRuns;
 
         do {
-            stuckRuns = evalRunRepository.findStuckRunsForUpdate(
-                    EvalRunStatus.RUNNING.name(),
-                    cutoffTime,
+            stuckRuns = evalRunRepository.findRecoverableRunsForUpdate(
+                    List.of(
+                            EvalRunStatus.CLAIMED.name(),
+                            EvalRunStatus.RUNNING.name(),
+                            EvalRunStatus.CANCEL_REQUESTED.name()
+                    ),
+                    claimCutoffTime,
+                    runTimeoutCutoff,
                     PageRequest.of(0, batchSize)
             );
 
