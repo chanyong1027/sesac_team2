@@ -100,14 +100,11 @@ public class EvalModelRunnerService {
         long startedAtNanos = System.nanoTime();
         for (int attempt = 1; attempt <= sameProviderTotalAttempts; attempt++) {
             try {
-                ChatResponse response;
-                try (EvalProviderConcurrencyLimiter.Permit ignored = evalProviderConcurrencyLimiter.acquire(provider)) {
-                    response = circuitBreaker.executeCallable(() -> switch (provider) {
-                        case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-                        case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-                        case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
-                    });
-                }
+                ChatResponse response = circuitBreaker.executeCallable(() -> switch (provider) {
+                    case OPENAI -> callOpenAi(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                    case ANTHROPIC -> callAnthropic(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                    case GEMINI -> callGemini(resolved.apiKey(), model, prompt, temperature, maxOutputTokens);
+                });
                 int retryCount = attempt - 1;
                 return toExecution(provider, model, response, startedAtNanos, retryCount);
             } catch (Exception exception) {
@@ -373,7 +370,11 @@ public class EvalModelRunnerService {
             java.util.concurrent.Callable<ChatResponse> providerCall
     ) {
         long timeoutMs = Math.max(1_000L, evalProperties.getRunner().getRequestTimeoutMs());
-        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(providerCall);
+        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(() -> {
+            try (EvalProviderConcurrencyLimiter.Permit ignored = evalProviderConcurrencyLimiter.acquire(providerType)) {
+                return providerCall.call();
+            }
+        });
         try {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException timeoutException) {

@@ -53,7 +53,7 @@ class EvalPropertiesTest {
         assertThat(worker.getPollIntervalMs()).isEqualTo(3000L);
         assertThat(worker.getBatchSize()).isEqualTo(3);
         assertThat(worker.getMaxConcurrentRuns()).isEqualTo(3);
-        assertThat(worker.getClaimBatchSize()).isEqualTo(2);
+        assertThat(worker.getClaimBatchSize()).isEqualTo(3);
         assertThat(worker.getClaimLeaseSeconds()).isEqualTo(30L);
         assertThat(worker.getRunLeaseSeconds()).isEqualTo(900L);
     }
@@ -162,13 +162,13 @@ class EvalPropertiesTest {
 
         // when
         runner.setRequestTimeoutMs(30000L);
-        runner.getProviderLimits().setOpenaiMaxConcurrentCalls(6);
+        runner.getProviderLimits().setOpenaiMaxConcurrentCalls(8);
         runner.getProviderLimits().setAnthropicMaxConcurrentCalls(4);
         runner.getProviderLimits().setGeminiMaxConcurrentCalls(5);
 
         // then
         assertThat(runner.getRequestTimeoutMs()).isEqualTo(30000L);
-        assertThat(runner.getProviderLimits().getOpenaiMaxConcurrentCalls()).isEqualTo(6);
+        assertThat(runner.getProviderLimits().getOpenaiMaxConcurrentCalls()).isEqualTo(8);
         assertThat(runner.getProviderLimits().getAnthropicMaxConcurrentCalls()).isEqualTo(4);
         assertThat(runner.getProviderLimits().getGeminiMaxConcurrentCalls()).isEqualTo(5);
     }

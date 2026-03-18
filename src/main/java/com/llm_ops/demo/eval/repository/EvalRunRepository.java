@@ -56,7 +56,9 @@ public interface EvalRunRepository extends JpaRepository<EvalRun, Long> {
             WHERE r.status IN :statuses
               AND (
                     (r.status = 'CLAIMED' AND r.leaseExpiresAt < :cutoffTime)
-                 OR (r.status IN ('RUNNING', 'CANCEL_REQUESTED') AND r.startedAt < :runTimeoutCutoff)
+                 OR (r.status = 'RUNNING' AND r.startedAt < :runTimeoutCutoff)
+                 OR (r.status = 'CANCEL_REQUESTED'
+                     AND (r.leaseExpiresAt < :cutoffTime OR r.startedAt < :runTimeoutCutoff))
               )
             ORDER BY r.createdAt ASC
             """)

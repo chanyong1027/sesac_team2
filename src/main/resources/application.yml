@@ -192,7 +192,7 @@ eval:
     poll-interval-ms: 3000
     batch-size: 3
     max-concurrent-runs: 3
-    claim-batch-size: 2
+    claim-batch-size: 3
     claim-lease-seconds: 30
     run-lease-seconds: 900
   execution:

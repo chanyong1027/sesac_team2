@@ -66,7 +66,7 @@ public class EvalExecutionConfig {
                 TimeUnit.MILLISECONDS,
                 queue,
                 threadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
+                new ThreadPoolExecutor.AbortPolicy()
         );
         return (ThreadPoolExecutor) this.evalCaseExecutor;
     }

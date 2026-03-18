@@ -32,7 +32,9 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -166,8 +168,9 @@ public class EvalExecutionService {
         int inFlight = 0;
 
         while (iterator.hasNext() && inFlight < perRunConcurrency && !isRunCancellationRequested(runId)) {
-            submitCaseTask(completionService, runId, iterator.next(), rubric, baselineVersion, runLeaseDuration);
-            inFlight++;
+            if (submitCaseTask(completionService, runId, iterator.next(), rubric, baselineVersion, runLeaseDuration)) {
+                inFlight++;
+            }
         }
 
         while (inFlight > 0) {
@@ -183,8 +186,9 @@ public class EvalExecutionService {
             }
 
             while (iterator.hasNext() && inFlight < perRunConcurrency && !isRunCancellationRequested(runId)) {
-                submitCaseTask(completionService, runId, iterator.next(), rubric, baselineVersion, runLeaseDuration);
-                inFlight++;
+                if (submitCaseTask(completionService, runId, iterator.next(), rubric, baselineVersion, runLeaseDuration)) {
+                    inFlight++;
+                }
             }
         }
 
@@ -193,27 +197,40 @@ public class EvalExecutionService {
         }
     }
 
-    private void submitCaseTask(
+    private boolean submitCaseTask(
             CompletionService<CaseExecutionResult> completionService,
             Long runId,
             Long caseResultId,
             ResolvedRubricConfig rubric,
             PromptVersion baselineVersion,
             Duration runLeaseDuration
-    ) {
-        completionService.submit(() -> {
-            long caseStartNanos = System.nanoTime();
-            evalCaseExecutionService.executeCase(
-                    runId,
-                    caseResultId,
-                    rubric,
-                    baselineVersion != null ? baselineVersion.getId() : null,
-                    runLeaseDuration
-            );
-            EvalCaseResult updated = evalCaseResultRepository.findById(caseResultId).orElse(null);
-            String caseStatus = updated != null && updated.status() != null ? updated.status().name() : "unknown";
-            return new CaseExecutionResult(caseStatus, System.nanoTime() - caseStartNanos);
-        });
+    ) throws InterruptedException {
+        while (true) {
+            if (isRunCancellationRequested(runId)) {
+                return false;
+            }
+            try {
+                completionService.submit(() -> {
+                    long caseStartNanos = System.nanoTime();
+                    evalCaseExecutionService.executeCase(
+                            runId,
+                            caseResultId,
+                            rubric,
+                            baselineVersion != null ? baselineVersion.getId() : null,
+                            runLeaseDuration
+                    );
+                    EvalCaseResult updated = evalCaseResultRepository.findById(caseResultId).orElse(null);
+                    String caseStatus = updated != null && updated.status() != null ? updated.status().name() : "unknown";
+                    return new CaseExecutionResult(caseStatus, System.nanoTime() - caseStartNanos);
+                });
+                return true;
+            } catch (RejectedExecutionException exception) {
+                if (evalCaseExecutor.isShutdown()) {
+                    throw new IllegalStateException("evalCaseExecutor is shutting down", exception);
+                }
+                TimeUnit.MILLISECONDS.sleep(10L);
+            }
+        }
     }
 
     private boolean failRunIfTimedOut(EvalRun run, String phase) {
