@@ -141,7 +141,7 @@ public class EvalRunService {
         int caseCount = testCases.size();
         int judgeAttemptsMin = 1;
         int judgeAttemptsMax = evalProperties.getJudge().isRejudgeOnFail()
-                ? Math.max(1, evalProperties.getJudge().getMaxAttempts())
+                ? evalProperties.getJudge().getMaxAttempts()
                 : 1;
 
         long generationCallsPerCase = request.mode() == EvalMode.COMPARE_ACTIVE ? 2L : 1L;
@@ -436,7 +436,7 @@ public class EvalRunService {
             return List.of();
         }
 
-        int claimBatchSize = Math.max(1, evalProperties.getWorker().getClaimBatchSize());
+        int claimBatchSize = evalProperties.getWorker().getClaimBatchSize();
         int limit = Math.min(safeCount, claimBatchSize);
         List<Long> runIds = evalRunRepository.findQueuedRunIdsForClaim(EvalRunStatus.QUEUED.name(), limit);
         if (runIds.isEmpty()) {

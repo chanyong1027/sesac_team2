@@ -27,7 +27,7 @@ public class EvalExecutionConfig {
 
     @Bean(name = "evalRunExecutor")
     public ThreadPoolExecutor evalRunExecutor() {
-        int maxConcurrentRuns = Math.max(1, evalProperties.getWorker().getMaxConcurrentRuns());
+        int maxConcurrentRuns = evalProperties.getWorker().getMaxConcurrentRuns();
         AtomicInteger sequence = new AtomicInteger(1);
         ThreadFactory threadFactory = runnable -> {
             Thread thread = new Thread(runnable);
@@ -49,7 +49,7 @@ public class EvalExecutionConfig {
 
     @Bean(name = "evalCaseExecutor")
     public ThreadPoolExecutor evalCaseExecutor() {
-        int maxActiveCases = Math.max(1, evalProperties.getExecution().getMaxActiveCasesGlobal());
+        int maxActiveCases = evalProperties.getExecution().getMaxActiveCasesGlobal();
         int queueCapacity = Math.max(maxActiveCases, evalProperties.getExecution().getMaxCaseQueueCapacity());
         AtomicInteger sequence = new AtomicInteger(1);
         ThreadFactory threadFactory = runnable -> {

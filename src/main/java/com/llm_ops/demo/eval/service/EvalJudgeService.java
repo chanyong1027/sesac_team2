@@ -154,8 +154,7 @@ public class EvalJudgeService {
     }
 
     private int resolveMaxAttempts() {
-        int configured = evalProperties.getJudge().getMaxAttempts();
-        return Math.max(1, configured);
+        return evalProperties.getJudge().getMaxAttempts();
     }
 
     private AttemptEvaluation fallbackAttemptEvaluation() {
