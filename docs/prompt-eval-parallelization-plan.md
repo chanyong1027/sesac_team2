@@ -464,12 +464,12 @@ finalization 단계:
 운영 첫 배포 기준 보수적 시작값:
 
 - `max-concurrent-runs = 3`
-- `max-concurrent-cases-per-run = 2`
-- `max-active-cases-global = 6`
-- `openai.max-concurrent-calls = 4`
+- `max-concurrent-cases-per-run = 3`
+- `max-active-cases-global = 9`
+- `openai.max-concurrent-calls = 6`
 - `dispatch-interval-ms = 1000`
 
-`2 -> 3 -> 4` 재벤치마크 결과, 현재 limiter 조합에서는 `3`이 가장 균형이 좋았다.
+`2 -> 3 -> 4` 재벤치마크 후 run 기본값을 `3`으로 올렸고, 추가 `10건 burst` 실험에서 case/global/provider limiter를 함께 올린 조합이 더 좋은 completion을 보였다.
 
 ## 17. 결론
 
@@ -526,7 +526,8 @@ finalization 단계:
 
 - 초기 재측정 기준 `max-concurrent-runs = 2`에서는 3건 burst 시 세 번째 run 대기가 컸다.
 - 후속 튜닝 결과 `max-concurrent-runs = 3`이 현재 limiter 조합에서 가장 안정적이었다.
-- 이제 주요 병목은 run 슬롯보다 `max-active-cases-global = 6`과 `openai-max-concurrent-calls = 4` 쪽으로 이동했다.
+- `10건 burst` 기준으로는 `max-active-cases-global = 6`과 `openai-max-concurrent-calls = 4`가 실제 병목이었다.
+- 이를 `case=3`, `global=9`, `openai=6`으로 올렸을 때 평균/최대 completion이 일관되게 개선됐다.
 
 ### 후속 튜닝 결과 (`max-concurrent-runs` 3 vs 4)
 
@@ -548,6 +549,20 @@ finalization 단계:
 
 ### 다음 튜닝 순서
 
-- `max-concurrent-cases-per-run` 상향 시 provider 429 / 비용 추이 재측정
-- `max-active-cases-global`과 provider permit 동시 상향 여부 검토
-- 동일 시나리오로 `10건` burst 추가 측정
+10건 burst 추가 결과:
+
+- 기본값(`run=3`, `case=2`, `global=6`, `openai=4`): 평균 queue `27.538s`, 평균 완료 `48.564s`, 최대 완료 `79.854s`
+- 튜닝값 1차(`run=3`, `case=3`, `global=9`, `openai=6`): 평균 queue `17.541s`, 평균 완료 `32.064s`, 최대 완료 `54.004s`
+- 튜닝값 2차(`run=3`, `case=3`, `global=9`, `openai=6`): 평균 queue `18.013s`, 평균 완료 `33.529s`, 최대 완료 `53.414s`
+
+판단:
+
+- 장기 적체 구간에서는 `case/global/provider` 상향이 실효성이 있었다.
+- 2회 반복 측정에서 개선 방향이 동일했고, 두 번 모두 `10/10 COMPLETED`였다.
+- 따라서 현재 권장 운영 기본값은 `run=3`, `case=3`, `global=9`, `openai=6`이다.
+
+### 다음 튜닝 순서
+
+- 동일 조합으로 `20건` burst 재측정
+- OpenAI 429/timeout 증가 여부 확인
+- Hikari pool 사용량과 DB 경합 지표 확인

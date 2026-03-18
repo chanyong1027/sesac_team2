@@ -314,23 +314,57 @@
 - 5건 burst에서는 `4`가 평균 queue 대기만 줄였고, 평균/최대 완료 시간은 `3`보다 약 `10%` 나빴다.
 - 원인은 현재 `case per run = 2`, `global active cases = 6`, `openai permits = 4` 상한이 먼저 걸리기 때문이다. run만 더 열면 completion 단계에서 경합이 늘어난다.
 
-권장 기본값:
+중간 결론(3건/5건 burst 기준):
 
 - `eval.worker.max-concurrent-runs = 3`
 - `eval.execution.max-concurrent-cases-per-run = 2`
 - `eval.execution.max-active-cases-global = 6`
 - `eval.runner.provider-limits.openai-max-concurrent-calls = 4`
 
-## 17. 남은 튜닝 포인트
+## 17. 후속 튜닝: `10건 burst` + case/provider limiter 상향
+
+추가 튜닝 목적:
+
+- `run=3`까지는 정리됐지만, 10건 burst에서는 여전히 뒤 run 대기가 컸다.
+- 그래서 `case/global/provider` limiter를 함께 올렸을 때 실제 completion이 줄어드는지 확인했다.
+
+비교 설정:
+
+- 기본값: `run=3`, `case=2`, `global=6`, `openai=4`
+- 튜닝값: `run=3`, `case=3`, `global=9`, `openai=6`
+
+### 10건 burst 비교
+
+| 설정 | 평균 queue 대기 | 최대 queue 대기 | 평균 완료 시간 | 최대 완료 시간 | 평균 비용 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 기본값 | 27.538s | 62.179s | 48.564s | 79.854s | $0.005266 |
+| 튜닝값 1차 | 17.541s | 40.524s | 32.064s | 54.004s | $0.005114 |
+| 튜닝값 2차 | 18.013s | 41.582s | 33.529s | 53.414s | $0.005054 |
+
+해석:
+
+- 튜닝값은 10건 burst에서 평균 queue 대기 `-34% ~ -36%`, 평균 완료 시간 `-31% ~ -34%` 수준으로 일관되게 개선됐다.
+- 최대 완료 시간도 `79.854s -> 54.004s / 53.414s`로 `약 32%` 줄었다.
+- 두 번 모두 `10/10 COMPLETED`였고, 이번 측정에서는 run 실패나 429 증가가 관찰되지 않았다.
+- 즉 현재 장기 적체 구간에서는 `run 슬롯`보다 `case/global/provider` limiter가 실제 병목으로 작동하고 있었다.
+
+권장 운영 기본값:
+
+- `eval.worker.max-concurrent-runs = 3`
+- `eval.execution.max-concurrent-cases-per-run = 3`
+- `eval.execution.max-active-cases-global = 9`
+- `eval.runner.provider-limits.openai-max-concurrent-calls = 6`
+
+## 18. 남은 튜닝 포인트
 
 - `max-concurrent-runs`는 `3`으로 올리는 것이 현재 설정 조합에서 가장 균형이 좋다.
-- 다음 병목 후보는 `run 슬롯`보다 `global case limiter`와 `provider permit`이다.
-- `max-concurrent-cases-per-run` 또는 provider permit 상향은 429 / 비용 / completion 분산을 같이 보면서 별도로 확인해야 한다.
-- 동일 시나리오로 `10건` burst를 추가 측정하면 장기 적체 구간을 더 잘 볼 수 있다.
+- `case/global/provider`를 올린 현재 권장값 기준으로는 다음 검증 포인트가 `20건` 이상 장기 burst와 provider 에러율이다.
+- OpenAI permit을 `6`으로 올린 상태에서 더 큰 burst를 걸면 429/timeout이 다시 생길 수 있으니 상한 탐색은 점진적으로 해야 한다.
+- provider별 비용 변화와 Hikari/DB 경합도 함께 보면서 조정해야 한다.
 
-## 18. 최종 결론
+## 19. 최종 결론
 
 - 병렬화 적용 후 Prompt Eval은 단건 기준 평균 완료 시간이 `32.988s -> 22.418s`로 줄었다.
-- 후속 튜닝까지 포함하면 운영 기본값은 `max-concurrent-runs = 3`이 가장 적절하다.
-- 3건 enqueue burst 기준 평균 완료 시간은 `44.115s -> 21.520s`, 최대 완료 시간은 `56.666s -> 22.852s`까지 추가 개선됐다.
-- 현재 병목의 중심은 더 이상 HTTP ingress가 아니라 `global case limiter`, `provider concurrency`, 그리고 외부 LLM 호출 시간이다.
+- 후속 튜닝까지 포함하면 운영 기본값은 `run=3 / case=3 / global=9 / openai=6` 조합이 가장 적절했다.
+- 10건 burst 기준 평균 완료 시간은 `48.564s -> 32.064s`, 최대 완료 시간은 `79.854s -> 54.004s`까지 추가 개선됐다.
+- 현재 병목의 중심은 HTTP ingress가 아니라 `global case limiter`, `provider concurrency`, 그리고 외부 LLM 호출 시간이다.

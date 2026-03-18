@@ -104,8 +104,8 @@ public class EvalProperties {
     @Getter
     @Setter
     public static class Execution {
-        private int maxConcurrentCasesPerRun = 2;
-        private int maxActiveCasesGlobal = 6;
+        private int maxConcurrentCasesPerRun = 3;
+        private int maxActiveCasesGlobal = 9;
         private int maxCaseQueueCapacity = 24;
     }
 
@@ -121,7 +121,7 @@ public class EvalProperties {
     @Getter
     @Setter
     public static class ProviderLimits {
-        private int openaiMaxConcurrentCalls = 4;
+        private int openaiMaxConcurrentCalls = 6;
         private int anthropicMaxConcurrentCalls = 3;
         private int geminiMaxConcurrentCalls = 3;
     }

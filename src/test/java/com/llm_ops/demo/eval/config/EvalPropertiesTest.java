@@ -68,8 +68,8 @@ class EvalPropertiesTest {
         EvalProperties.Execution execution = properties.getExecution();
 
         // then
-        assertThat(execution.getMaxConcurrentCasesPerRun()).isEqualTo(2);
-        assertThat(execution.getMaxActiveCasesGlobal()).isEqualTo(6);
+        assertThat(execution.getMaxConcurrentCasesPerRun()).isEqualTo(3);
+        assertThat(execution.getMaxActiveCasesGlobal()).isEqualTo(9);
         assertThat(execution.getMaxCaseQueueCapacity()).isEqualTo(24);
     }
 
@@ -84,7 +84,7 @@ class EvalPropertiesTest {
 
         // then
         assertThat(runner.getRequestTimeoutMs()).isEqualTo(20000L);
-        assertThat(runner.getProviderLimits().getOpenaiMaxConcurrentCalls()).isEqualTo(4);
+        assertThat(runner.getProviderLimits().getOpenaiMaxConcurrentCalls()).isEqualTo(6);
         assertThat(runner.getProviderLimits().getAnthropicMaxConcurrentCalls()).isEqualTo(3);
         assertThat(runner.getProviderLimits().getGeminiMaxConcurrentCalls()).isEqualTo(3);
     }
