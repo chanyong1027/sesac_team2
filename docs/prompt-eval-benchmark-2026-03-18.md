@@ -192,7 +192,7 @@
 - Dataset: 5 cases
 - 실행 설정:
   - `eval.worker.poll-interval-ms = 3000`
-  - `eval.worker.max-concurrent-runs = 2`
+  - `eval.worker.max-concurrent-runs = 2` (초기 재측정 시점)
   - `eval.execution.max-concurrent-cases-per-run = 2`
   - `eval.execution.max-active-cases-global = 6`
   - `eval.runner.provider-limits.openai-max-concurrent-calls = 4`
@@ -278,21 +278,59 @@
 - 단건 처리 시간도 같이 줄어들었고, 3건 burst 시 평균/최대 완료 시간이 모두 유의미하게 내려갔다.
 - 비용은 run당 `~$0.0050` 수준으로 유지되어, 성능 개선이 비용 급증으로 이어지지는 않았다.
 
-## 16. 남은 병목과 다음 튜닝 포인트
+## 16. 후속 튜닝: `max-concurrent-runs` 3 vs 4
 
-- 현재 `eval.worker.max-concurrent-runs = 2`라서 3건 burst에서 세 번째 run(`223`)은 여전히 대기한다.
-- `223`의 `Created -> Started = 35.821s`는 run 슬롯 2개가 먼저 차면서 발생한 대기다.
-- 즉 "완전한 병렬 소화"가 아니라 "제한된 병렬 처리"로 개선된 상태다.
+추가 튜닝 목적:
 
-다음 튜닝 후보:
+- `max-concurrent-runs = 2`에서는 3건 burst에서 세 번째 run(`223`)이 `35.821s` 대기했다.
+- 그래서 운영 기본값 후보로 `3`, `4`를 같은 조건에서 다시 비교했다.
 
-- `max-concurrent-runs` 상향 여부 검토
-- `max-concurrent-cases-per-run` 상향 시 provider 429 / 비용 변화 재확인
-- 동일 시나리오로 `5건`, `10건` burst 추가 측정
+측정 환경:
 
-## 17. 최종 결론
+- 프로필: `prod`
+- 데이터셋: `5 cases`
+- 모델: `OPENAI / gpt-4.1-mini`
+- burst 간격: `1초`
+
+### 3건 burst 비교
+
+| 설정 | 평균 queue 대기 | 최대 queue 대기 | 평균 완료 시간 | 최대 완료 시간 |
+| --- | ---: | ---: | ---: | ---: |
+| `max-concurrent-runs = 2` | 12.780s | 35.821s | 44.115s | 56.666s |
+| `max-concurrent-runs = 3` | 2.738s | 3.693s | 21.520s | 22.852s |
+| `max-concurrent-runs = 4` | 2.329s | 3.286s | 22.053s | 23.489s |
+
+### 5건 burst 비교
+
+| 설정 | 평균 queue 대기 | 최대 queue 대기 | 평균 완료 시간 | 최대 완료 시간 |
+| --- | ---: | ---: | ---: | ---: |
+| `max-concurrent-runs = 3` | 8.178s | 17.360s | 23.532s | 32.126s |
+| `max-concurrent-runs = 4` | 6.143s | 19.713s | 26.016s | 35.459s |
+
+해석:
+
+- `2 -> 3`은 분명한 개선이다. 3건 burst 기준 평균 완료 시간이 `44.115s -> 21.520s`로 절반 가까이 줄었다.
+- `3 -> 4`는 시작 대기는 소폭 줄지만, 완료 시간은 오히려 약간 악화됐다.
+- 5건 burst에서는 `4`가 평균 queue 대기만 줄였고, 평균/최대 완료 시간은 `3`보다 약 `10%` 나빴다.
+- 원인은 현재 `case per run = 2`, `global active cases = 6`, `openai permits = 4` 상한이 먼저 걸리기 때문이다. run만 더 열면 completion 단계에서 경합이 늘어난다.
+
+권장 기본값:
+
+- `eval.worker.max-concurrent-runs = 3`
+- `eval.execution.max-concurrent-cases-per-run = 2`
+- `eval.execution.max-active-cases-global = 6`
+- `eval.runner.provider-limits.openai-max-concurrent-calls = 4`
+
+## 17. 남은 튜닝 포인트
+
+- `max-concurrent-runs`는 `3`으로 올리는 것이 현재 설정 조합에서 가장 균형이 좋다.
+- 다음 병목 후보는 `run 슬롯`보다 `global case limiter`와 `provider permit`이다.
+- `max-concurrent-cases-per-run` 또는 provider permit 상향은 429 / 비용 / completion 분산을 같이 보면서 별도로 확인해야 한다.
+- 동일 시나리오로 `10건` burst를 추가 측정하면 장기 적체 구간을 더 잘 볼 수 있다.
+
+## 18. 최종 결론
 
 - 병렬화 적용 후 Prompt Eval은 단건 기준 평균 완료 시간이 `32.988s -> 22.418s`로 줄었다.
-- 3건 enqueue burst 기준 최대 완료 시간은 `96.569s -> 56.666s`로 크게 감소했다.
-- queue 적체는 여전히 존재하지만, 이전의 순차 실행 구조 대비 병목이 분명히 완화됐다.
-- 현재 병목의 중심은 "HTTP ingress"가 아니라 "제한된 run 슬롯 수"와 "외부 LLM 호출 시간"이다.
+- 후속 튜닝까지 포함하면 운영 기본값은 `max-concurrent-runs = 3`이 가장 적절하다.
+- 3건 enqueue burst 기준 평균 완료 시간은 `44.115s -> 21.520s`, 최대 완료 시간은 `56.666s -> 22.852s`까지 추가 개선됐다.
+- 현재 병목의 중심은 더 이상 HTTP ingress가 아니라 `global case limiter`, `provider concurrency`, 그리고 외부 LLM 호출 시간이다.

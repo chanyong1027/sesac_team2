@@ -146,7 +146,7 @@ HTTP createRun
 
 권장 설정 예시:
 
-- `eval.worker.max-concurrent-runs = 2~4`
+- `eval.worker.max-concurrent-runs = 3~4`
 - `eval.worker.dispatch-interval-ms = 500~1000`
 
 역할:
@@ -463,13 +463,13 @@ finalization 단계:
 
 운영 첫 배포 기준 보수적 시작값:
 
-- `max-concurrent-runs = 2`
+- `max-concurrent-runs = 3`
 - `max-concurrent-cases-per-run = 2`
 - `max-active-cases-global = 6`
 - `openai.max-concurrent-calls = 4`
 - `dispatch-interval-ms = 1000`
 
-초기에는 낮은 값으로 배포하고, 재벤치마크 후 단계적으로 올리는 것이 안전하다.
+`2 -> 3 -> 4` 재벤치마크 결과, 현재 limiter 조합에서는 `3`이 가장 균형이 좋았다.
 
 ## 17. 결론
 
@@ -524,11 +524,30 @@ finalization 단계:
 
 ### 남은 병목
 
-- 현재 운영 기본값이 `max-concurrent-runs = 2`라서, 3건 burst 시 세 번째 run은 여전히 대기한다.
-- 실제 측정에서도 세 번째 run(`223`)은 `Created -> Started = 35.821s`가 나왔고, 이 값이 현재 최대 완료 시간의 주된 원인이다.
+- 초기 재측정 기준 `max-concurrent-runs = 2`에서는 3건 burst 시 세 번째 run 대기가 컸다.
+- 후속 튜닝 결과 `max-concurrent-runs = 3`이 현재 limiter 조합에서 가장 안정적이었다.
+- 이제 주요 병목은 run 슬롯보다 `max-active-cases-global = 6`과 `openai-max-concurrent-calls = 4` 쪽으로 이동했다.
+
+### 후속 튜닝 결과 (`max-concurrent-runs` 3 vs 4)
+
+3건 burst:
+
+- `max=3`: 평균 queue `2.738s`, 평균 완료 `21.520s`, 최대 완료 `22.852s`
+- `max=4`: 평균 queue `2.329s`, 평균 완료 `22.053s`, 최대 완료 `23.489s`
+
+5건 burst:
+
+- `max=3`: 평균 queue `8.178s`, 평균 완료 `23.532s`, 최대 완료 `32.126s`
+- `max=4`: 평균 queue `6.143s`, 평균 완료 `26.016s`, 최대 완료 `35.459s`
+
+판단:
+
+- `2 -> 3`은 큰 개선이다.
+- `3 -> 4`는 queue wait 일부만 줄이고 completion은 악화됐다.
+- 따라서 현재 기본 운영값은 `max-concurrent-runs = 3`으로 두는 것이 적절하다.
 
 ### 다음 튜닝 순서
 
-- `max-concurrent-runs`를 올릴지 검토
 - `max-concurrent-cases-per-run` 상향 시 provider 429 / 비용 추이 재측정
-- 동일 시나리오로 `5건`, `10건` burst 추가 측정
+- `max-active-cases-global`과 provider permit 동시 상향 여부 검토
+- 동일 시나리오로 `10건` burst 추가 측정

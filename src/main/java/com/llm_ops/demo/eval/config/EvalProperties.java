@@ -95,7 +95,7 @@ public class EvalProperties {
     public static class Worker {
         private long pollIntervalMs = 3000L;
         private int batchSize = 3;
-        private int maxConcurrentRuns = 2;
+        private int maxConcurrentRuns = 3;
         private int claimBatchSize = 2;
         private long claimLeaseSeconds = 30L;
         private long runLeaseSeconds = 900L;

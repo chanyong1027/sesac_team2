@@ -52,7 +52,7 @@ class EvalPropertiesTest {
         // then
         assertThat(worker.getPollIntervalMs()).isEqualTo(3000L);
         assertThat(worker.getBatchSize()).isEqualTo(3);
-        assertThat(worker.getMaxConcurrentRuns()).isEqualTo(2);
+        assertThat(worker.getMaxConcurrentRuns()).isEqualTo(3);
         assertThat(worker.getClaimBatchSize()).isEqualTo(2);
         assertThat(worker.getClaimLeaseSeconds()).isEqualTo(30L);
         assertThat(worker.getRunLeaseSeconds()).isEqualTo(900L);
