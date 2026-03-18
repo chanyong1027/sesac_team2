@@ -73,8 +73,8 @@ public class EvalExecutionConfig {
 
     @PreDestroy
     public void shutdownExecutors() {
-        shutdownExecutor(evalCaseExecutor, "evalCaseExecutor");
         shutdownExecutor(evalRunExecutor, "evalRunExecutor");
+        shutdownExecutor(evalCaseExecutor, "evalCaseExecutor");
     }
 
     private void shutdownExecutor(ExecutorService executorService, String name) {
