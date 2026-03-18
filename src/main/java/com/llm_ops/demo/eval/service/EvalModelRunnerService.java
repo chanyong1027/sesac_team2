@@ -59,17 +59,20 @@ public class EvalModelRunnerService {
     private final ProviderCredentialService providerCredentialService;
     private final GatewayChatOptionsCreateService gatewayChatOptionsCreateService;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final EvalProviderConcurrencyLimiter evalProviderConcurrencyLimiter;
 
     public EvalModelRunnerService(
             EvalProperties evalProperties,
             ProviderCredentialService providerCredentialService,
             GatewayChatOptionsCreateService gatewayChatOptionsCreateService,
-            CircuitBreakerRegistry circuitBreakerRegistry
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            EvalProviderConcurrencyLimiter evalProviderConcurrencyLimiter
     ) {
         this.evalProperties = evalProperties;
         this.providerCredentialService = providerCredentialService;
         this.gatewayChatOptionsCreateService = gatewayChatOptionsCreateService;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
+        this.evalProviderConcurrencyLimiter = evalProviderConcurrencyLimiter;
     }
 
     public ModelExecution run(
@@ -367,7 +370,11 @@ public class EvalModelRunnerService {
             java.util.concurrent.Callable<ChatResponse> providerCall
     ) {
         long timeoutMs = Math.max(1_000L, evalProperties.getRunner().getRequestTimeoutMs());
-        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(providerCall);
+        Future<ChatResponse> future = PROVIDER_CALL_EXECUTOR.submit(() -> {
+            try (EvalProviderConcurrencyLimiter.Permit ignored = evalProviderConcurrencyLimiter.acquire(providerType)) {
+                return providerCall.call();
+            }
+        });
         try {
             return future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException timeoutException) {

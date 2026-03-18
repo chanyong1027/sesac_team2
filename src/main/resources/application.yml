@@ -191,7 +191,19 @@ eval:
   worker:
     poll-interval-ms: 3000
     batch-size: 3
+    max-concurrent-runs: 3
+    claim-batch-size: 3
+    claim-lease-seconds: 30
+    run-lease-seconds: 900
+  execution:
+    max-concurrent-cases-per-run: 3
+    max-active-cases-global: 9
+    max-case-queue-capacity: 24
   runner:
     request-timeout-ms: 120000
     same-provider-retry-max-attempts: 1
     same-provider-retry-backoff-ms: 200
+    provider-limits:
+      openai-max-concurrent-calls: 6
+      anthropic-max-concurrent-calls: 3
+      gemini-max-concurrent-calls: 3

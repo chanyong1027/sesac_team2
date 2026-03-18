@@ -254,6 +254,13 @@ public class EvalCaseResult {
         this.completedAt = LocalDateTime.now();
     }
 
+    public void markSkipped(String errorCode, String errorMessage) {
+        this.status = EvalCaseStatus.SKIPPED.name();
+        this.errorCode = errorCode;
+        this.errorMessage = errorMessage;
+        this.completedAt = LocalDateTime.now();
+    }
+
     public void resetToQueuedForRecovery() {
         if (!EvalCaseStatus.RUNNING.name().equals(this.status)) {
             return;

@@ -46,7 +46,8 @@ class EvalModelRunnerServiceTest {
                 evalProperties,
                 providerCredentialService,
                 gatewayChatOptionsCreateService,
-                circuitBreakerRegistry
+                circuitBreakerRegistry,
+                new EvalProviderConcurrencyLimiter(evalProperties)
         );
 
         when(providerCredentialService.resolveApiKey(1L, ProviderType.OPENAI))

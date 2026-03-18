@@ -100,11 +100,26 @@ public class EvalRun {
     @Column(name = "started_at")
     private LocalDateTime startedAt;
 
+    @Column(name = "claimed_at")
+    private LocalDateTime claimedAt;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     @Column(name = "timeout_at")
     private LocalDateTime timeoutAt;
+
+    @Column(name = "lease_owner", length = 120)
+    private String leaseOwner;
+
+    @Column(name = "lease_expires_at")
+    private LocalDateTime leaseExpiresAt;
+
+    @Column(name = "last_heartbeat_at")
+    private LocalDateTime lastHeartbeatAt;
+
+    @Column(name = "cancel_requested_at")
+    private LocalDateTime cancelRequestedAt;
 
     @Column(name = "fail_reason_code", length = 50)
     private String failReasonCode;
@@ -174,27 +189,87 @@ public class EvalRun {
         return RubricTemplateCode.valueOf(rubricTemplateCode);
     }
 
-    public void markRunning() {
+    public LocalDateTime getClaimedAt() {
+        return claimedAt;
+    }
+
+    public String getLeaseOwner() {
+        return leaseOwner;
+    }
+
+    public LocalDateTime getLeaseExpiresAt() {
+        return leaseExpiresAt;
+    }
+
+    public LocalDateTime getLastHeartbeatAt() {
+        return lastHeartbeatAt;
+    }
+
+    public LocalDateTime getCancelRequestedAt() {
+        return cancelRequestedAt;
+    }
+
+    public void markClaimed(String leaseOwner, Duration leaseDuration) {
         if (status() == EvalRunStatus.QUEUED) {
+            LocalDateTime now = LocalDateTime.now();
+            status = EvalRunStatus.CLAIMED.name();
+            claimedAt = now;
+            this.leaseOwner = leaseOwner;
+            leaseExpiresAt = leaseDuration != null ? now.plus(leaseDuration) : null;
+            lastHeartbeatAt = now;
+        }
+    }
+
+    public void markRunning() {
+        markRunningWithTimeout(null, null);
+    }
+
+    public void markRunningWithTimeout(Duration maxDuration, Duration leaseDuration) {
+        EvalRunStatus currentStatus = status();
+        if (currentStatus == EvalRunStatus.CLAIMED || currentStatus == EvalRunStatus.QUEUED) {
+            LocalDateTime now = LocalDateTime.now();
             status = EvalRunStatus.RUNNING.name();
-            startedAt = LocalDateTime.now();
+            startedAt = now;
+            timeoutAt = maxDuration != null ? now.plus(maxDuration) : null;
+            lastHeartbeatAt = now;
+            leaseExpiresAt = leaseDuration != null ? now.plus(leaseDuration) : leaseExpiresAt;
         }
     }
 
     public void markRunningWithTimeout(Duration maxDuration) {
-        if (status() == EvalRunStatus.QUEUED) {
-            status = EvalRunStatus.RUNNING.name();
-            startedAt = LocalDateTime.now();
-            timeoutAt = startedAt.plus(maxDuration);
-        }
+        markRunningWithTimeout(maxDuration, null);
     }
 
-    public boolean ensureTimeoutIfMissing(Duration maxDuration) {
-        if (status() == EvalRunStatus.RUNNING && startedAt != null && timeoutAt == null) {
+    public boolean ensureTimeoutIfMissing(Duration maxDuration, Duration leaseDuration) {
+        if ((status() == EvalRunStatus.RUNNING || status() == EvalRunStatus.CANCEL_REQUESTED)
+                && startedAt != null
+                && timeoutAt == null) {
+            LocalDateTime now = LocalDateTime.now();
             timeoutAt = startedAt.plus(maxDuration);
+            lastHeartbeatAt = now;
+            if (leaseDuration != null) {
+                leaseExpiresAt = now.plus(leaseDuration);
+            }
             return true;
         }
         return false;
+    }
+
+    public boolean ensureTimeoutIfMissing(Duration maxDuration) {
+        return ensureTimeoutIfMissing(maxDuration, null);
+    }
+
+    public void heartbeat(Duration leaseDuration) {
+        LocalDateTime now = LocalDateTime.now();
+        lastHeartbeatAt = now;
+        if (leaseDuration != null) {
+            leaseExpiresAt = now.plus(leaseDuration);
+        }
+    }
+
+    public boolean isCancellationRequested() {
+        EvalRunStatus currentStatus = status();
+        return currentStatus == EvalRunStatus.CANCEL_REQUESTED || currentStatus == EvalRunStatus.CANCELLED;
     }
 
     public boolean isTimedOut() {
@@ -209,14 +284,29 @@ public class EvalRun {
         this.failReasonCode = reasonCode;
         this.failReason = reasonMessage;
         this.completedAt = LocalDateTime.now();
+        clearExecutionLease();
     }
 
 
-    public void markCancelled() {
-        if (status() == EvalRunStatus.QUEUED || status() == EvalRunStatus.RUNNING) {
+    public void requestCancel() {
+        EvalRunStatus currentStatus = status();
+        if (currentStatus == EvalRunStatus.QUEUED || currentStatus == EvalRunStatus.CLAIMED) {
             status = EvalRunStatus.CANCELLED.name();
             completedAt = LocalDateTime.now();
+            failReasonCode = "RUN_CANCELLED";
+            failReason = "사용자 요청으로 취소되었습니다.";
+            clearExecutionLease();
+            return;
         }
+
+        if (currentStatus == EvalRunStatus.RUNNING) {
+            status = EvalRunStatus.CANCEL_REQUESTED.name();
+            cancelRequestedAt = LocalDateTime.now();
+        }
+    }
+
+    public void markCancelled() {
+        requestCancel();
     }
 
     public void onCaseOk(boolean pass) {
@@ -238,6 +328,7 @@ public class EvalRun {
         this.costJson = costJson;
         this.status = EvalRunStatus.COMPLETED.name();
         this.completedAt = LocalDateTime.now();
+        clearExecutionLease();
     }
 
     public void fail(Map<String, Object> summaryJson, Map<String, Object> costJson) {
@@ -245,12 +336,42 @@ public class EvalRun {
         this.costJson = costJson;
         this.status = EvalRunStatus.FAILED.name();
         this.completedAt = LocalDateTime.now();
+        clearExecutionLease();
+    }
+
+    public void cancel(Map<String, Object> summaryJson, Map<String, Object> costJson) {
+        this.summaryJson = summaryJson;
+        this.costJson = costJson;
+        this.status = EvalRunStatus.CANCELLED.name();
+        this.completedAt = LocalDateTime.now();
+        this.failReasonCode = "RUN_CANCELLED";
+        this.failReason = "사용자 요청으로 취소되었습니다.";
+        clearExecutionLease();
+    }
+
+    public void syncCaseCounts(int processedCases, int passedCases, int failedCases, int errorCases) {
+        this.processedCases = processedCases;
+        this.passedCases = passedCases;
+        this.failedCases = failedCases;
+        this.errorCases = errorCases;
     }
 
     public void resetToQueued() {
         this.status = EvalRunStatus.QUEUED.name();
+        this.claimedAt = null;
         this.startedAt = null;
         this.timeoutAt = null;
+        this.completedAt = null;
+        this.failReasonCode = null;
+        this.failReason = null;
+        this.cancelRequestedAt = null;
+        clearExecutionLease();
+    }
+
+    private void clearExecutionLease() {
+        leaseOwner = null;
+        leaseExpiresAt = null;
+        lastHeartbeatAt = null;
     }
 
 }

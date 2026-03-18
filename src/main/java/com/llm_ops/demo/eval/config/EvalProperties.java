@@ -15,6 +15,7 @@ public class EvalProperties {
     private long runTimeoutMinutes = 30L;
     private Judge judge = new Judge();
     private Worker worker = new Worker();
+    private Execution execution = new Execution();
     private Runner runner = new Runner();
 
     public long getRunTimeoutMinutes() {
@@ -36,6 +37,10 @@ public class EvalProperties {
 
     public Runner getRunner() {
         return runner;
+    }
+
+    public Execution getExecution() {
+        return execution;
     }
 
     public static class Judge {
@@ -90,6 +95,18 @@ public class EvalProperties {
     public static class Worker {
         private long pollIntervalMs = 3000L;
         private int batchSize = 3;
+        private int maxConcurrentRuns = 3;
+        private int claimBatchSize = 3;
+        private long claimLeaseSeconds = 30L;
+        private long runLeaseSeconds = 900L;
+    }
+
+    @Getter
+    @Setter
+    public static class Execution {
+        private int maxConcurrentCasesPerRun = 3;
+        private int maxActiveCasesGlobal = 9;
+        private int maxCaseQueueCapacity = 24;
     }
 
     @Getter
@@ -98,5 +115,14 @@ public class EvalProperties {
         private long requestTimeoutMs = 20000L;
         private int sameProviderRetryMaxAttempts = 1;
         private long sameProviderRetryBackoffMs = 200L;
+        private ProviderLimits providerLimits = new ProviderLimits();
+    }
+
+    @Getter
+    @Setter
+    public static class ProviderLimits {
+        private int openaiMaxConcurrentCalls = 6;
+        private int anthropicMaxConcurrentCalls = 3;
+        private int geminiMaxConcurrentCalls = 3;
     }
 }

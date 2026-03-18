@@ -19,6 +19,7 @@ class EvalPropertiesTest {
         // then
         assertThat(properties.getJudge()).isNotNull();
         assertThat(properties.getWorker()).isNotNull();
+        assertThat(properties.getExecution()).isNotNull();
         assertThat(properties.getRunner()).isNotNull();
     }
 
@@ -51,6 +52,25 @@ class EvalPropertiesTest {
         // then
         assertThat(worker.getPollIntervalMs()).isEqualTo(3000L);
         assertThat(worker.getBatchSize()).isEqualTo(3);
+        assertThat(worker.getMaxConcurrentRuns()).isEqualTo(3);
+        assertThat(worker.getClaimBatchSize()).isEqualTo(3);
+        assertThat(worker.getClaimLeaseSeconds()).isEqualTo(30L);
+        assertThat(worker.getRunLeaseSeconds()).isEqualTo(900L);
+    }
+
+    @Test
+    @DisplayName("Execution 기본값이 올바르게 설정된다")
+    void execution_기본값을_확인한다() {
+        // given
+
+        // when
+        EvalProperties properties = new EvalProperties();
+        EvalProperties.Execution execution = properties.getExecution();
+
+        // then
+        assertThat(execution.getMaxConcurrentCasesPerRun()).isEqualTo(3);
+        assertThat(execution.getMaxActiveCasesGlobal()).isEqualTo(9);
+        assertThat(execution.getMaxCaseQueueCapacity()).isEqualTo(24);
     }
 
     @Test
@@ -64,6 +84,9 @@ class EvalPropertiesTest {
 
         // then
         assertThat(runner.getRequestTimeoutMs()).isEqualTo(20000L);
+        assertThat(runner.getProviderLimits().getOpenaiMaxConcurrentCalls()).isEqualTo(6);
+        assertThat(runner.getProviderLimits().getAnthropicMaxConcurrentCalls()).isEqualTo(3);
+        assertThat(runner.getProviderLimits().getGeminiMaxConcurrentCalls()).isEqualTo(3);
     }
 
     @Test
@@ -98,10 +121,36 @@ class EvalPropertiesTest {
         // when
         worker.setPollIntervalMs(5000L);
         worker.setBatchSize(5);
+        worker.setMaxConcurrentRuns(4);
+        worker.setClaimBatchSize(6);
+        worker.setClaimLeaseSeconds(45L);
+        worker.setRunLeaseSeconds(1200L);
 
         // then
         assertThat(worker.getPollIntervalMs()).isEqualTo(5000L);
         assertThat(worker.getBatchSize()).isEqualTo(5);
+        assertThat(worker.getMaxConcurrentRuns()).isEqualTo(4);
+        assertThat(worker.getClaimBatchSize()).isEqualTo(6);
+        assertThat(worker.getClaimLeaseSeconds()).isEqualTo(45L);
+        assertThat(worker.getRunLeaseSeconds()).isEqualTo(1200L);
+    }
+
+    @Test
+    @DisplayName("Execution 설정을 변경할 수 있다")
+    void execution_설정을_변경한다() {
+        // given
+        EvalProperties properties = new EvalProperties();
+        EvalProperties.Execution execution = properties.getExecution();
+
+        // when
+        execution.setMaxConcurrentCasesPerRun(4);
+        execution.setMaxActiveCasesGlobal(10);
+        execution.setMaxCaseQueueCapacity(40);
+
+        // then
+        assertThat(execution.getMaxConcurrentCasesPerRun()).isEqualTo(4);
+        assertThat(execution.getMaxActiveCasesGlobal()).isEqualTo(10);
+        assertThat(execution.getMaxCaseQueueCapacity()).isEqualTo(40);
     }
 
     @Test
@@ -113,8 +162,14 @@ class EvalPropertiesTest {
 
         // when
         runner.setRequestTimeoutMs(30000L);
+        runner.getProviderLimits().setOpenaiMaxConcurrentCalls(8);
+        runner.getProviderLimits().setAnthropicMaxConcurrentCalls(4);
+        runner.getProviderLimits().setGeminiMaxConcurrentCalls(5);
 
         // then
         assertThat(runner.getRequestTimeoutMs()).isEqualTo(30000L);
+        assertThat(runner.getProviderLimits().getOpenaiMaxConcurrentCalls()).isEqualTo(8);
+        assertThat(runner.getProviderLimits().getAnthropicMaxConcurrentCalls()).isEqualTo(4);
+        assertThat(runner.getProviderLimits().getGeminiMaxConcurrentCalls()).isEqualTo(5);
     }
 }

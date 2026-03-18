@@ -1,8 +1,12 @@
 package com.llm_ops.demo.eval.worker;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -14,6 +18,9 @@ import com.llm_ops.demo.eval.service.EvalMetrics;
 import com.llm_ops.demo.eval.service.EvalRunService;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -24,12 +31,19 @@ class EvalWorkerTest {
     void 배치_내_단일_run_처리_실패가_발생해도_다음_run_처리를_계속한다() {
         // given
         EvalProperties evalProperties = new EvalProperties();
-        evalProperties.getWorker().setBatchSize(3);
+        evalProperties.getWorker().setMaxConcurrentRuns(3);
 
         EvalRunService evalRunService = mock(EvalRunService.class);
         EvalExecutionService evalExecutionService = mock(EvalExecutionService.class);
         EvalMetrics evalMetrics = mock(EvalMetrics.class);
-        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                3,
+                3,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>()
+        );
+        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics, executor);
 
         EvalRun firstRun = mock(EvalRun.class);
         EvalRun secondRun = mock(EvalRun.class);
@@ -40,17 +54,19 @@ class EvalWorkerTest {
         when(secondRun.mode()).thenReturn(EvalMode.CANDIDATE_ONLY);
         when(thirdRun.getId()).thenReturn(3L);
         when(thirdRun.mode()).thenReturn(EvalMode.CANDIDATE_ONLY);
-        when(evalRunService.pickQueuedRuns(3)).thenReturn(List.of(firstRun, secondRun, thirdRun));
+        when(evalRunService.claimQueuedRuns(anyInt(), anyString(), any(Duration.class)))
+                .thenReturn(List.of(firstRun, secondRun, thirdRun));
         doThrow(new RuntimeException("boom")).when(evalExecutionService).processRun(2L);
 
         // when
         worker.pollQueuedRuns();
 
         // then
-        verify(evalRunService).pickQueuedRuns(3);
-        verify(evalExecutionService).processRun(1L);
-        verify(evalExecutionService).processRun(2L);
-        verify(evalExecutionService).processRun(3L);
+        verify(evalRunService).claimQueuedRuns(anyInt(), anyString(), any(Duration.class));
+        verify(evalExecutionService, timeout(1000)).processRun(1L);
+        verify(evalExecutionService, timeout(1000)).processRun(2L);
+        verify(evalExecutionService, timeout(1000)).processRun(3L);
+        executor.shutdownNow();
     }
 
     @Test
@@ -63,7 +79,14 @@ class EvalWorkerTest {
         EvalRunService evalRunService = mock(EvalRunService.class);
         EvalExecutionService evalExecutionService = mock(EvalExecutionService.class);
         EvalMetrics evalMetrics = mock(EvalMetrics.class);
-        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                1,
+                1,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>()
+        );
+        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics, executor);
 
         when(evalRunService.recoverStuckRuns(Duration.ofMinutes(45L))).thenReturn(2);
 
@@ -72,6 +95,7 @@ class EvalWorkerTest {
 
         // then
         verify(evalRunService).recoverStuckRuns(Duration.ofMinutes(45L));
+        executor.shutdownNow();
     }
 
     @Test
@@ -84,7 +108,14 @@ class EvalWorkerTest {
         EvalRunService evalRunService = mock(EvalRunService.class);
         EvalExecutionService evalExecutionService = mock(EvalExecutionService.class);
         EvalMetrics evalMetrics = mock(EvalMetrics.class);
-        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics);
+        ThreadPoolExecutor executor = new ThreadPoolExecutor(
+                1,
+                1,
+                0L,
+                TimeUnit.MILLISECONDS,
+                new LinkedBlockingQueue<>()
+        );
+        EvalWorker worker = new EvalWorker(evalRunService, evalExecutionService, evalProperties, evalMetrics, executor);
 
         doThrow(new RuntimeException("db unavailable"))
                 .when(evalRunService)
@@ -93,5 +124,6 @@ class EvalWorkerTest {
         // when // then
         assertDoesNotThrow(worker::onStartupRecovery);
         verify(evalRunService).recoverStuckRuns(Duration.ofMinutes(30L));
+        executor.shutdownNow();
     }
 }

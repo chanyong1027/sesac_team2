@@ -82,6 +82,16 @@ public interface EvalCaseResultRepository extends JpaRepository<EvalCaseResult, 
     @EntityGraph(attributePaths = {"evalRun", "evalRun.prompt", "evalRun.promptVersion", "testCase"})
     Optional<EvalCaseResult> findByIdAndEvalRunId(Long id, Long evalRunId);
 
+    @EntityGraph(attributePaths = {
+            "evalRun",
+            "evalRun.prompt",
+            "evalRun.prompt.workspace",
+            "evalRun.prompt.workspace.organization",
+            "evalRun.promptVersion",
+            "testCase"
+    })
+    Optional<EvalCaseResult> findById(Long id);
+
     Optional<PassProjection> findPassProjectionByIdAndEvalRunId(Long id, Long evalRunId);
 
     @EntityGraph(attributePaths = {"evalRun", "evalRun.prompt", "evalRun.promptVersion", "testCase"})
