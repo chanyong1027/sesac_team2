@@ -35,6 +35,9 @@ class BudgetReservationServiceTest {
     private BudgetReservationRepository budgetReservationRepository;
 
     @Mock
+    private BudgetUsageRowInitializer budgetUsageRowInitializer;
+
+    @Mock
     private BudgetReservationMetrics budgetReservationMetrics;
 
     @InjectMocks
@@ -81,7 +84,7 @@ class BudgetReservationServiceTest {
         assertThat(result.get().getTraceId()).isEqualTo(traceId);
         assertThat(result.get().getStatus()).isEqualTo(BudgetReservationStatus.RESERVED);
         assertThat(result.get().getReservedCostUsd()).isEqualByComparingTo(reserveAmount);
-        verify(budgetMonthlyUsageRepository).ensureUsageRow(BudgetScopeType.PROVIDER_CREDENTIAL.name(), 10L, 202603);
+        verify(budgetUsageRowInitializer).ensureUsageRow(BudgetScopeType.PROVIDER_CREDENTIAL.name(), 10L, 202603);
         verify(budgetReservationMetrics).incrementReserve(BudgetScopeType.PROVIDER_CREDENTIAL);
     }
 
