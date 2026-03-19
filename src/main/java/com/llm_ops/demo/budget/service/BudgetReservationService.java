@@ -31,6 +31,7 @@ public class BudgetReservationService {
 
     private final BudgetMonthlyUsageRepository budgetMonthlyUsageRepository;
     private final BudgetReservationRepository budgetReservationRepository;
+    private final BudgetReservationMetrics budgetReservationMetrics;
     private final Clock clock = Clock.systemUTC();
 
     @Transactional
@@ -75,6 +76,7 @@ public class BudgetReservationService {
             monthLimitUsd
         );
         if (reserved <= 0) {
+            budgetReservationMetrics.incrementReserveFailed(scopeType, "LIMIT_EXCEEDED");
             return Optional.empty();
         }
 
@@ -93,7 +95,9 @@ public class BudgetReservationService {
         );
 
         try {
-            return Optional.of(budgetReservationRepository.save(reservation));
+            BudgetReservation saved = budgetReservationRepository.save(reservation);
+            budgetReservationMetrics.incrementReserve(scopeType);
+            return Optional.of(saved);
         } catch (DataIntegrityViolationException exception) {
             budgetMonthlyUsageRepository.releaseReservedCost(scopeType.name(), scopeId, yearMonthInt, normalizedReserveAmount);
             return budgetReservationRepository.findByTraceIdAndScopeTypeAndScopeId(traceId, scopeType, scopeId);
@@ -122,6 +126,7 @@ public class BudgetReservationService {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 정산에 실패했습니다.");
         }
         reservation.markSettled(normalizedActualCost);
+        budgetReservationMetrics.incrementSettle(reservation.getScopeType());
     }
 
     @Transactional
@@ -153,6 +158,7 @@ public class BudgetReservationService {
                 throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "만료된 예산 예약 복구에 실패했습니다.");
             }
             reservation.markExpired();
+            budgetReservationMetrics.incrementExpired(reservation.getScopeType());
             expiredCount++;
         }
         return expiredCount;
@@ -185,6 +191,7 @@ public class BudgetReservationService {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 반환에 실패했습니다.");
         }
         reservation.markReleased(releaseReason);
+        budgetReservationMetrics.incrementRelease(reservation.getScopeType(), releaseReason);
     }
 
     private BudgetReservation getReservationOrThrow(Long reservationId) {

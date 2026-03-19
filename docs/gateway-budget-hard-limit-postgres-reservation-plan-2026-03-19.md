@@ -492,12 +492,12 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 - 완료 조건: stale reservation이 일정 시간 후 반환된다.
 - 검증: `BudgetReservationServiceTest`, `BudgetReservationRecoveryJobTest`, `GatewayChatServiceUnitTest`.
 
-### [ ] E21-7 관측성 보강
+### [x] E21-7 관측성 보강
 
 - 목표: 운영자가 reservation 상태를 관측할 수 있게 한다.
 - 범위: metrics, log fields, fail reason 정리.
 - 완료 조건: reserve/settle/release/expire 이벤트가 메트릭으로 보인다.
-- 검증: actuator metrics 확인.
+- 검증: `BudgetReservationMetricsTest`, `BudgetReservationServiceTest`, `BudgetReservationRecoveryJobTest`, `GatewayChatServiceUnitTest`.
 
 ### [ ] E21-8 동시성 테스트 확대
 

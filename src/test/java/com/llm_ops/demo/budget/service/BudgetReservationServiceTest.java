@@ -34,6 +34,9 @@ class BudgetReservationServiceTest {
     @Mock
     private BudgetReservationRepository budgetReservationRepository;
 
+    @Mock
+    private BudgetReservationMetrics budgetReservationMetrics;
+
     @InjectMocks
     private BudgetReservationService budgetReservationService;
 
@@ -79,6 +82,7 @@ class BudgetReservationServiceTest {
         assertThat(result.get().getStatus()).isEqualTo(BudgetReservationStatus.RESERVED);
         assertThat(result.get().getReservedCostUsd()).isEqualByComparingTo(reserveAmount);
         verify(budgetMonthlyUsageRepository).ensureUsageRow(BudgetScopeType.PROVIDER_CREDENTIAL.name(), 10L, 202603);
+        verify(budgetReservationMetrics).incrementReserve(BudgetScopeType.PROVIDER_CREDENTIAL);
     }
 
     @Test
@@ -111,6 +115,7 @@ class BudgetReservationServiceTest {
 
         // then
         assertThat(result).isEmpty();
+        verify(budgetReservationMetrics).incrementReserveFailed(BudgetScopeType.WORKSPACE, "LIMIT_EXCEEDED");
     }
 
     @Test
@@ -148,6 +153,7 @@ class BudgetReservationServiceTest {
         // then
         assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.SETTLED);
         assertThat(reservation.getSettledCostUsd()).isEqualByComparingTo("0.42");
+        verify(budgetReservationMetrics).incrementSettle(BudgetScopeType.PROVIDER_CREDENTIAL);
     }
 
     @Test
@@ -182,6 +188,7 @@ class BudgetReservationServiceTest {
         // then
         assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.RELEASED);
         assertThat(reservation.getReleaseReason()).isEqualTo("PRIMARY_ROUTE_FAILED");
+        verify(budgetReservationMetrics).incrementRelease(BudgetScopeType.WORKSPACE, "PRIMARY_ROUTE_FAILED");
     }
 
     @Test
@@ -219,5 +226,6 @@ class BudgetReservationServiceTest {
         assertThat(expiredCount).isEqualTo(1);
         assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.EXPIRED);
         assertThat(reservation.getReleaseReason()).isEqualTo("RESERVATION_EXPIRED");
+        verify(budgetReservationMetrics).incrementExpired(BudgetScopeType.PROVIDER_CREDENTIAL);
     }
 }
