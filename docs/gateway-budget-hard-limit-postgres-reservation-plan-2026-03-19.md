@@ -499,19 +499,19 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 - 완료 조건: reserve/settle/release/expire 이벤트가 메트릭으로 보인다.
 - 검증: `BudgetReservationMetricsTest`, `BudgetReservationServiceTest`, `BudgetReservationRecoveryJobTest`, `GatewayChatServiceUnitTest`.
 
-### [ ] E21-8 동시성 테스트 확대
+### [x] E21-8 동시성 테스트 확대
 
 - 목표: hard-limit 일관성을 자동 테스트로 고정한다.
 - 범위: repository concurrency test, integration test, failover + reservation test.
 - 완료 조건: 같은 scope에서 허용 수만 통과하고 나머지는 차단된다.
-- 검증: targeted gradle tests.
+- 검증: `BudgetMonthlyUsageRepositoryTest`, `BudgetReservationServiceConcurrencyTest`, `BudgetReservationServiceTest`, `GatewayChatServiceUnitTest`.
 
-### [ ] E21-9 문서 동기화
+### [x] E21-9 문서 동기화
 
 - 목표: 구현 변경이 제품/DB/API 문서에 반영되게 한다.
 - 범위: `.ai/features.md`, `.ai/api-implemented.md`, `.ai/database.md`, `.ai/tasklist.md`.
 - 완료 조건: hard-limit 설명이 `사전 예약 + 사후 정산` 기준으로 정렬된다.
-- 검증: 문서 리뷰.
+- 검증: `docs/gateway-budget-hard-limit-postgres-reservation-plan-2026-03-19.md` 및 `.ai/*` 문서 리뷰.
 
 ## 16) 테스트 전략
 
@@ -547,7 +547,13 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 2. 결과: 정확히 1건만 reserve 성공
 3. 다른 1건은 budget blocked
 
-이 테스트가 이번 변경의 핵심 acceptance criteria다.
+고정된 회귀 테스트:
+
+1. `BudgetMonthlyUsageRepositoryTest`: 같은 scope에서 동시 reserve 2건 중 1건만 성공
+2. `BudgetReservationServiceConcurrencyTest`: service 계층에서 reservation row 1건만 생성되고 `reserved_cost_usd`가 정확히 유지되는지 검증
+3. `GatewayChatServiceUnitTest`: hard-limit 차단 시 provider call이 발생하지 않고, failover 재예약 경로가 release 이후 다시 수행되는지 검증
+
+이 테스트 묶음이 이번 변경의 핵심 acceptance criteria다.
 
 ## 17) 운영 메트릭 및 로그
 
