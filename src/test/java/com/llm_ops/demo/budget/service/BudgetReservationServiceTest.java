@@ -7,7 +7,9 @@ import com.llm_ops.demo.budget.repository.BudgetMonthlyUsageRepository;
 import com.llm_ops.demo.budget.repository.BudgetReservationRepository;
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -180,5 +182,42 @@ class BudgetReservationServiceTest {
         // then
         assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.RELEASED);
         assertThat(reservation.getReleaseReason()).isEqualTo("PRIMARY_ROUTE_FAILED");
+    }
+
+    @Test
+    @DisplayName("만료된 reservation이 있으면 EXPIRED로 복구한다")
+    void 만료된_reservation이_있으면_EXPIRED로_복구한다() {
+        // given
+        BudgetReservation reservation = BudgetReservation.reserve(
+            UUID.randomUUID(),
+            "trace-expired",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            12L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            new BigDecimal("0.33"),
+            700,
+            256,
+            LocalDateTime.now().minusMinutes(1)
+        );
+        when(budgetReservationRepository.findTop100ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(
+            eq(BudgetReservationStatus.RESERVED),
+            any(LocalDateTime.class)
+        )).thenReturn(List.of(reservation));
+        when(budgetMonthlyUsageRepository.releaseReservedCost(
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL.name()),
+            eq(12L),
+            eq(202603),
+            eq(new BigDecimal("0.33"))
+        )).thenReturn(1);
+
+        // when
+        int expiredCount = budgetReservationService.expireStaleReservations();
+
+        // then
+        assertThat(expiredCount).isEqualTo(1);
+        assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.EXPIRED);
+        assertThat(reservation.getReleaseReason()).isEqualTo("RESERVATION_EXPIRED");
     }
 }

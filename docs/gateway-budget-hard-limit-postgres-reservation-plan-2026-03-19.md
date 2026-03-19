@@ -485,12 +485,12 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 - 완료 조건: 예약 성공한 요청만 provider call을 수행한다.
 - 검증: `GatewayChatServiceUnitTest`, `BudgetReservationEstimatorTest`, `BudgetReservationServiceTest`, `BudgetGuardrailServiceTest`.
 
-### [ ] E21-6 TTL 복구 작업 도입
+### [x] E21-6 TTL 복구 작업 도입
 
 - 목표: orphan reservation을 자동 복구한다.
 - 범위: sweeper job, expire 정책, 메트릭 추가.
 - 완료 조건: stale reservation이 일정 시간 후 반환된다.
-- 검증: expire recovery 테스트.
+- 검증: `BudgetReservationServiceTest`, `BudgetReservationRecoveryJobTest`, `GatewayChatServiceUnitTest`.
 
 ### [ ] E21-7 관측성 보강
 

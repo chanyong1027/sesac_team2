@@ -131,6 +131,7 @@ budget:
   reservation:
     default-max-output-tokens: 2048
     input-token-safety-multiplier: 1.10
+    expire-sweep-fixed-delay-ms: 30000
 
 gateway:
   reliability:
