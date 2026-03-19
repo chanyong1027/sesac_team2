@@ -127,6 +127,11 @@ jwt:
   expiration-sec: ${JWT_EXPIRATION:900}
   refresh-expiration-sec: 1209600
 
+budget:
+  reservation:
+    default-max-output-tokens: 2048
+    input-token-safety-multiplier: 1.10
+
 gateway:
   reliability:
     request-timeout-ms: 60000

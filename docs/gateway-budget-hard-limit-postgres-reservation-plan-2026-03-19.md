@@ -193,7 +193,7 @@
 
 1. 기본 tokenizer는 `CL100K_BASE`를 사용한다.
 2. provider별 tokenizer 차이는 우선 안전계수로 흡수한다.
-3. 1차 rollout에서는 `input_tokens * 1.10` 정도의 safety multiplier를 둔다.
+3. 1차 rollout에서는 `budget.reservation.input-token-safety-multiplier` 기본값 `1.10`을 사용한다.
 
 ### 8-2) 출력 토큰 상한
 
@@ -207,7 +207,7 @@
 
 1. `2048`
 
-이 값은 설정으로 뺄 수 있도록 한다.
+현재 구현은 `budget.reservation.default-max-output-tokens` 설정으로 이 값을 외부화한다.
 
 ### 8-3) 비용 계산식
 
@@ -471,12 +471,12 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 - 완료 조건: lost update 없이 row count 기반 예약 결과를 얻는다.
 - 검증: `BudgetMonthlyUsageRepositoryTest`, `BudgetReservationRepositoryTest`, `BudgetReservationServiceTest`, `BudgetGuardrailServiceTest`.
 
-### [ ] E21-4 최대 비용 상한 계산기 도입
+### [x] E21-4 최대 비용 상한 계산기 도입
 
 - 목표: 예약액을 deterministic하게 계산한다.
 - 범위: jtokkit 기반 token estimate, effective max tokens, unknown model 정책.
 - 완료 조건: reserve amount가 provider/model별로 재현 가능하다.
-- 검증: estimator 단위 테스트.
+- 검증: `BudgetReservationEstimatorTest`, `BudgetReservationServiceTest`, `BudgetGuardrailServiceTest`.
 
 ### [ ] E21-5 Gateway 흐름 통합
 
