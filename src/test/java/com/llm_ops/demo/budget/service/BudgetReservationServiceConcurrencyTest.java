@@ -1,5 +1,6 @@
 package com.llm_ops.demo.budget.service;
 
+import com.llm_ops.demo.budget.domain.BudgetMonthlyUsage;
 import com.llm_ops.demo.budget.domain.BudgetReservation;
 import com.llm_ops.demo.budget.domain.BudgetReservationStatus;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
@@ -115,6 +116,47 @@ class BudgetReservationServiceConcurrencyTest {
         assertThat(released.getReleaseReason()).isEqualTo("TEST_RELEASE");
     }
 
+    @Test
+    @DisplayName("settle과 release가 동시에 실행돼도 reservation은 한 번만 최종 처리된다")
+    void settle과_release가_동시에_실행돼도_reservation은_한_번만_최종_처리된다() throws Exception {
+        // given
+        BudgetReservation reservation = reserveSingle("trace-settle-release-race", 33L, new BigDecimal("1.00"), new BigDecimal("0.40"));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Void> settleFuture = executorService.submit(() -> {
+                ready.countDown();
+                start.await(5, TimeUnit.SECONDS);
+                budgetReservationService.settle(reservation.getId(), new BigDecimal("0.18"), 123L);
+                return null;
+            });
+            Future<Void> releaseFuture = executorService.submit(() -> {
+                ready.countDown();
+                start.await(5, TimeUnit.SECONDS);
+                budgetReservationService.release(reservation.getId(), "TEST_RACE");
+                return null;
+            });
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            start.countDown();
+            settleFuture.get(5, TimeUnit.SECONDS);
+            releaseFuture.get(5, TimeUnit.SECONDS);
+
+            // then
+            BudgetReservation finalizedReservation = budgetReservationRepository.findById(reservation.getId()).orElseThrow();
+            assertThat(finalizedReservation.getStatus())
+                .isIn(BudgetReservationStatus.SETTLED, BudgetReservationStatus.RELEASED);
+
+            assertUsageMatchesTerminalState(finalizedReservation, 33L);
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
     private Optional<BudgetReservation> reserveConcurrently(
         String traceId,
         YearMonth yearMonth,
@@ -159,5 +201,28 @@ class BudgetReservationServiceConcurrencyTest {
             256,
             Duration.ofSeconds(60)
         ).orElseThrow();
+    }
+
+    private void assertUsageMatchesTerminalState(BudgetReservation finalizedReservation, Long scopeId) {
+        BudgetMonthlyUsage usage = budgetMonthlyUsageRepository.findByScopeTypeAndScopeIdAndYearMonth(
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            scopeId,
+            202603
+        ).orElseThrow();
+
+        assertThat(usage.getReservedCostUsd()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        if (finalizedReservation.getStatus() == BudgetReservationStatus.SETTLED) {
+            assertThat(finalizedReservation.getSettledCostUsd()).isEqualByComparingTo(new BigDecimal("0.18"));
+            assertThat(usage.getCostUsd()).isEqualByComparingTo(new BigDecimal("0.18"));
+            assertThat(usage.getTotalTokens()).isEqualTo(123L);
+            assertThat(usage.getRequestCount()).isEqualTo(1L);
+            return;
+        }
+
+        assertThat(finalizedReservation.getReleaseReason()).isEqualTo("TEST_RACE");
+        assertThat(usage.getCostUsd()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(usage.getTotalTokens()).isEqualTo(0L);
+        assertThat(usage.getRequestCount()).isEqualTo(0L);
     }
 }

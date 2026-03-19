@@ -13,11 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Transactional
 class BudgetReservationRepositoryTest {
 
     @Autowired
@@ -115,5 +117,70 @@ class BudgetReservationRepositoryTest {
         // then
         assertThat(staleReservations).hasSize(1);
         assertThat(staleReservations.get(0).getTraceId()).isEqualTo("trace-old");
+    }
+
+    @Test
+    @DisplayName("RESERVED reservation은 조건부 정산 상태 전이가 한 번만 성공한다")
+    void RESERVED_reservation은_조건부_정산_상태_전이가_한_번만_성공한다() {
+        // given
+        BudgetReservation reservation = budgetReservationRepository.save(BudgetReservation.reserve(
+            UUID.randomUUID(),
+            "trace-settle-transition",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            40L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            new BigDecimal("0.50"),
+            200,
+            128,
+            LocalDateTime.now().plusMinutes(1)
+        ));
+
+        // when
+        int firstTransition = budgetReservationRepository.markSettledIfReserved(
+            reservation.getId(),
+            new BigDecimal("0.32")
+        );
+        int secondTransition = budgetReservationRepository.markSettledIfReserved(
+            reservation.getId(),
+            new BigDecimal("0.32")
+        );
+
+        // then
+        BudgetReservation settled = budgetReservationRepository.findById(reservation.getId()).orElseThrow();
+        assertThat(firstTransition).isEqualTo(1);
+        assertThat(secondTransition).isEqualTo(0);
+        assertThat(settled.getStatus()).isEqualTo(BudgetReservationStatus.SETTLED);
+        assertThat(settled.getSettledCostUsd()).isEqualByComparingTo(new BigDecimal("0.32"));
+    }
+
+    @Test
+    @DisplayName("이미 종료된 reservation은 조건부 반환 상태 전이가 실패한다")
+    void 이미_종료된_reservation은_조건부_반환_상태_전이가_실패한다() {
+        // given
+        BudgetReservation reservation = budgetReservationRepository.save(BudgetReservation.reserve(
+            UUID.randomUUID(),
+            "trace-release-transition",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            41L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            new BigDecimal("0.45"),
+            200,
+            128,
+            LocalDateTime.now().plusMinutes(1)
+        ));
+        budgetReservationRepository.markReleasedIfReserved(reservation.getId(), "TEST_RELEASE");
+
+        // when
+        int transition = budgetReservationRepository.markReleasedIfReserved(reservation.getId(), "TEST_RELEASE");
+
+        // then
+        BudgetReservation released = budgetReservationRepository.findById(reservation.getId()).orElseThrow();
+        assertThat(transition).isEqualTo(0);
+        assertThat(released.getStatus()).isEqualTo(BudgetReservationStatus.RELEASED);
+        assertThat(released.getReleaseReason()).isEqualTo("TEST_RELEASE");
     }
 }

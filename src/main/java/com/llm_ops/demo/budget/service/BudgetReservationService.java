@@ -114,6 +114,14 @@ public class BudgetReservationService {
 
         BigDecimal normalizedActualCost = normalizeUsd(actualCostUsd);
         long normalizedTokens = totalTokensDelta != null ? Math.max(0L, totalTokensDelta) : 0L;
+        int transitioned = budgetReservationRepository.markSettledIfReserved(reservationId, normalizedActualCost);
+        if (transitioned <= 0) {
+            if (isAlreadyFinalized(reservationId)) {
+                return;
+            }
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 정산 상태 전이에 실패했습니다.");
+        }
+
         int updated = budgetMonthlyUsageRepository.settleReservation(
             reservation.getScopeType().name(),
             reservation.getScopeId(),
@@ -126,8 +134,6 @@ public class BudgetReservationService {
         if (updated <= 0) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 정산에 실패했습니다.");
         }
-        reservation.markSettled(normalizedActualCost);
-        budgetReservationRepository.save(reservation);
         budgetReservationMetrics.incrementSettle(reservation.getScopeType());
     }
 
@@ -150,6 +156,13 @@ public class BudgetReservationService {
             if (!reservation.isReserved()) {
                 continue;
             }
+            int transitioned = budgetReservationRepository.markExpiredIfReserved(reservation.getId(), EXPIRED_REASON);
+            if (transitioned <= 0) {
+                if (isAlreadyFinalized(reservation.getId())) {
+                    continue;
+                }
+                throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "만료된 예산 예약 상태 전이에 실패했습니다.");
+            }
             int updated = budgetMonthlyUsageRepository.releaseReservedCost(
                 reservation.getScopeType().name(),
                 reservation.getScopeId(),
@@ -159,8 +172,6 @@ public class BudgetReservationService {
             if (updated <= 0) {
                 throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "만료된 예산 예약 복구에 실패했습니다.");
             }
-            reservation.markExpired();
-            budgetReservationRepository.save(reservation);
             budgetReservationMetrics.incrementExpired(reservation.getScopeType());
             expiredCount++;
         }
@@ -184,6 +195,14 @@ public class BudgetReservationService {
             return;
         }
 
+        int transitioned = budgetReservationRepository.markReleasedIfReserved(reservation.getId(), releaseReason);
+        if (transitioned <= 0) {
+            if (isAlreadyFinalized(reservation.getId())) {
+                return;
+            }
+            throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 반환 상태 전이에 실패했습니다.");
+        }
+
         int updated = budgetMonthlyUsageRepository.releaseReservedCost(
             reservation.getScopeType().name(),
             reservation.getScopeId(),
@@ -193,9 +212,16 @@ public class BudgetReservationService {
         if (updated <= 0) {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 반환에 실패했습니다.");
         }
-        reservation.markReleased(releaseReason);
-        budgetReservationRepository.save(reservation);
         budgetReservationMetrics.incrementRelease(reservation.getScopeType(), releaseReason);
+    }
+
+    private boolean isAlreadyFinalized(Long reservationId) {
+        return budgetReservationRepository.findById(reservationId)
+            .map(BudgetReservation::getStatus)
+            .filter(status -> status == BudgetReservationStatus.SETTLED
+                || status == BudgetReservationStatus.RELEASED
+                || status == BudgetReservationStatus.EXPIRED)
+            .isPresent();
     }
 
     private BudgetReservation getReservationOrThrow(Long reservationId) {

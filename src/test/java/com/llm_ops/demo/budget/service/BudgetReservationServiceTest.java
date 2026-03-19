@@ -18,10 +18,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -125,7 +127,7 @@ class BudgetReservationServiceTest {
     @DisplayName("reservation이 RESERVED 상태이면 settle한다")
     void reservation이_RESERVED_상태이면_settle한다() {
         // given
-        BudgetReservation reservation = BudgetReservation.reserve(
+        when(budgetReservationRepository.findById(1L)).thenReturn(Optional.of(BudgetReservation.reserve(
             UUID.randomUUID(),
             "trace-3",
             BudgetScopeType.PROVIDER_CREDENTIAL,
@@ -137,9 +139,9 @@ class BudgetReservationServiceTest {
             900,
             256,
             java.time.LocalDateTime.now().plusMinutes(1)
-        );
+        )));
 
-        when(budgetReservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
+        when(budgetReservationRepository.markSettledIfReserved(1L, new BigDecimal("0.42"))).thenReturn(1);
         when(budgetMonthlyUsageRepository.settleReservation(
             eq(BudgetScopeType.PROVIDER_CREDENTIAL.name()),
             eq(11L),
@@ -154,8 +156,7 @@ class BudgetReservationServiceTest {
         budgetReservationService.settle(1L, new BigDecimal("0.42"), 777L);
 
         // then
-        assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.SETTLED);
-        assertThat(reservation.getSettledCostUsd()).isEqualByComparingTo("0.42");
+        verify(budgetReservationRepository).markSettledIfReserved(1L, new BigDecimal("0.42"));
         verify(budgetReservationMetrics).incrementSettle(BudgetScopeType.PROVIDER_CREDENTIAL);
     }
 
@@ -176,8 +177,11 @@ class BudgetReservationServiceTest {
             256,
             java.time.LocalDateTime.now().plusMinutes(1)
         );
+        ReflectionTestUtils.setField(reservation, "id", 2L);
 
         when(budgetReservationRepository.findById(2L)).thenReturn(Optional.of(reservation));
+
+        when(budgetReservationRepository.markReleasedIfReserved(2L, "PRIMARY_ROUTE_FAILED")).thenReturn(1);
         when(budgetMonthlyUsageRepository.releaseReservedCost(
             eq(BudgetScopeType.WORKSPACE.name()),
             eq(8L),
@@ -189,8 +193,7 @@ class BudgetReservationServiceTest {
         budgetReservationService.release(2L, "PRIMARY_ROUTE_FAILED");
 
         // then
-        assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.RELEASED);
-        assertThat(reservation.getReleaseReason()).isEqualTo("PRIMARY_ROUTE_FAILED");
+        verify(budgetReservationRepository).markReleasedIfReserved(2L, "PRIMARY_ROUTE_FAILED");
         verify(budgetReservationMetrics).incrementRelease(BudgetScopeType.WORKSPACE, "PRIMARY_ROUTE_FAILED");
     }
 
@@ -211,10 +214,12 @@ class BudgetReservationServiceTest {
             256,
             LocalDateTime.now().minusMinutes(1)
         );
+        ReflectionTestUtils.setField(reservation, "id", 1L);
         when(budgetReservationRepository.findTop100ByStatusAndExpiresAtBeforeOrderByExpiresAtAsc(
             eq(BudgetReservationStatus.RESERVED),
             any(LocalDateTime.class)
         )).thenReturn(List.of(reservation));
+        when(budgetReservationRepository.markExpiredIfReserved(1L, "RESERVATION_EXPIRED")).thenReturn(1);
         when(budgetMonthlyUsageRepository.releaseReservedCost(
             eq(BudgetScopeType.PROVIDER_CREDENTIAL.name()),
             eq(12L),
@@ -227,8 +232,52 @@ class BudgetReservationServiceTest {
 
         // then
         assertThat(expiredCount).isEqualTo(1);
-        assertThat(reservation.getStatus()).isEqualTo(BudgetReservationStatus.EXPIRED);
-        assertThat(reservation.getReleaseReason()).isEqualTo("RESERVATION_EXPIRED");
+        verify(budgetReservationRepository).markExpiredIfReserved(1L, "RESERVATION_EXPIRED");
         verify(budgetReservationMetrics).incrementExpired(BudgetScopeType.PROVIDER_CREDENTIAL);
+    }
+
+    @Test
+    @DisplayName("정산 도중 다른 경로가 먼저 종료한 reservation이면 조용히 종료한다")
+    void 정산_도중_다른_경로가_먼저_종료한_reservation이면_조용히_종료한다() {
+        // given
+        BudgetReservation reservedReservation = BudgetReservation.reserve(
+            UUID.randomUUID(),
+            "trace-race",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            13L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            new BigDecimal("0.25"),
+            100,
+            64,
+            LocalDateTime.now().plusMinutes(1)
+        );
+        BudgetReservation releasedReservation = BudgetReservation.reserve(
+            UUID.randomUUID(),
+            "trace-race",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            13L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            new BigDecimal("0.25"),
+            100,
+            64,
+            LocalDateTime.now().plusMinutes(1)
+        );
+        releasedReservation.markReleased("PRIMARY_ROUTE_FAILED");
+
+        when(budgetReservationRepository.findById(3L))
+            .thenReturn(Optional.of(reservedReservation))
+            .thenReturn(Optional.of(releasedReservation));
+        when(budgetReservationRepository.markSettledIfReserved(3L, new BigDecimal("0.10"))).thenReturn(0);
+
+        // when
+        budgetReservationService.settle(3L, new BigDecimal("0.10"), 77L);
+
+        // then
+        verify(budgetMonthlyUsageRepository, never()).settleReservation(any(), any(), any(), any(), any(), any(), any());
+        verify(budgetReservationMetrics, never()).incrementSettle(any());
     }
 }
