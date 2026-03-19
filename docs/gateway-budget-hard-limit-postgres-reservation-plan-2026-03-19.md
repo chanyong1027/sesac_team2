@@ -478,12 +478,12 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 - 완료 조건: reserve amount가 provider/model별로 재현 가능하다.
 - 검증: `BudgetReservationEstimatorTest`, `BudgetReservationServiceTest`, `BudgetGuardrailServiceTest`.
 
-### [ ] E21-5 Gateway 흐름 통합
+### [x] E21-5 Gateway 흐름 통합
 
 - 목표: provider call 전에 reserve, 종료 후 settle/release가 되도록 바꾼다.
 - 범위: primary, failover, blocked, timeout, unexpected exception 경로.
 - 완료 조건: 예약 성공한 요청만 provider call을 수행한다.
-- 검증: `GatewayChatServiceUnitTest`.
+- 검증: `GatewayChatServiceUnitTest`, `BudgetReservationEstimatorTest`, `BudgetReservationServiceTest`, `BudgetGuardrailServiceTest`.
 
 ### [ ] E21-6 TTL 복구 작업 도입
 

@@ -1,6 +1,8 @@
 package com.llm_ops.demo.gateway.service;
 
 import com.google.genai.errors.ApiException;
+import com.llm_ops.demo.budget.domain.BudgetPolicy;
+import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
 import com.llm_ops.demo.gateway.dto.GatewayChatResponse;
@@ -9,6 +11,10 @@ import com.llm_ops.demo.gateway.log.domain.RequestLogAttemptRoute;
 import com.llm_ops.demo.gateway.log.service.RequestLogWriter;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetGuardrailService;
+import com.llm_ops.demo.budget.service.BudgetPolicyService;
+import com.llm_ops.demo.budget.service.BudgetReservationEstimate;
+import com.llm_ops.demo.budget.service.BudgetReservationEstimator;
+import com.llm_ops.demo.budget.service.BudgetReservationService;
 import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.global.error.GatewayException;
 import com.llm_ops.demo.keys.domain.ProviderType;
@@ -107,6 +113,15 @@ class GatewayChatServiceUnitTest {
     private BudgetGuardrailService budgetGuardrailService;
 
     @Mock
+    private BudgetPolicyService budgetPolicyService;
+
+    @Mock
+    private BudgetReservationEstimator budgetReservationEstimator;
+
+    @Mock
+    private BudgetReservationService budgetReservationService;
+
+    @Mock
     private BudgetUsageService budgetUsageService;
 
     @Mock
@@ -151,6 +166,8 @@ class GatewayChatServiceUnitTest {
                                 invocation.getArgument(0),
                                 CircuitBreaker::ofDefaults
                         ));
+        lenient().when(budgetPolicyService.findPolicy(eq(BudgetScopeType.PROVIDER_CREDENTIAL), any()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
@@ -950,6 +967,240 @@ class GatewayChatServiceUnitTest {
             method.setAccessible(true);
             return (boolean) method.invoke(gatewayChatService, exception);
         }
+    }
+
+    @Test
+    @DisplayName("Provider 예산 정책이 있으면 reserve 후 settle하고 provider usage는 중복 기록하지 않는다")
+    void provider_예산_정책이_있으면_reserve_후_settle하고_provider_usage는_중복_기록하지_않는다() {
+        // given
+        String apiKey = "lum_test";
+        Long organizationId = 1L;
+        Long workspaceId = 1L;
+        UUID requestId = UUID.randomUUID();
+
+        OrganizationApiKeyAuthService.AuthResult authResult =
+            new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+        when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+        when(requestLogWriter.start(any())).thenReturn(requestId);
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        when(workspace.getId()).thenReturn(workspaceId);
+        when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+            .thenReturn(Optional.of(workspace));
+
+        com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+        when(promptEntity.getId()).thenReturn(100L);
+        when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+            .thenReturn(Optional.of(promptEntity));
+
+        PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+        when(activeVersion.getUserTemplate()).thenReturn("hello");
+        when(activeVersion.getSystemPrompt()).thenReturn(null);
+        when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+        when(activeVersion.getModel()).thenReturn("gpt-4.1-mini");
+
+        PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+        when(release.getActiveVersion()).thenReturn(activeVersion);
+        when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+        when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+            .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"));
+        when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+        when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+        when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+
+        BudgetPolicy policy = BudgetPolicy.createDefault(BudgetScopeType.PROVIDER_CREDENTIAL, 10L);
+        policy.update(new java.math.BigDecimal("10.00"), null, null, null, null, null, true);
+        when(budgetPolicyService.findPolicy(BudgetScopeType.PROVIDER_CREDENTIAL, 10L)).thenReturn(Optional.of(policy));
+        when(budgetReservationEstimator.estimate(eq("gpt-4.1-mini"), any(), any(), any()))
+            .thenReturn(BudgetReservationEstimate.reservable(
+                "gpt-4.1-mini",
+                120,
+                512,
+                new java.math.BigDecimal("0.50")
+            ));
+
+        com.llm_ops.demo.budget.domain.BudgetReservation reservation = org.mockito.Mockito.mock(com.llm_ops.demo.budget.domain.BudgetReservation.class);
+        when(reservation.getId()).thenReturn(33L);
+        when(budgetReservationService.reserve(
+            eq(requestId),
+            anyString(),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(10L),
+            eq(YearMonth.of(2026, 2)),
+            eq(new java.math.BigDecimal("10.00")),
+            eq(new java.math.BigDecimal("0.50")),
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(120),
+            eq(512),
+            any()
+        )).thenReturn(Optional.of(reservation));
+
+        ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+            .withModel("gpt-4.1-mini")
+            .withUsage(new DefaultUsage(100L, 50L, 150L))
+            .build();
+        ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+        when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any())).thenReturn(chatResponse);
+
+        GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+        // when
+        gatewayChatService.chat(apiKey, request);
+
+        // then
+        verify(budgetReservationService).settle(
+            33L,
+            com.llm_ops.demo.gateway.pricing.ModelPricing.calculateCost("gpt-4.1-mini", 100, 50),
+            150L
+        );
+        verify(budgetUsageService).recordUsage(
+            eq(BudgetScopeType.WORKSPACE),
+            eq(workspaceId),
+            eq(YearMonth.of(2026, 2)),
+            eq(com.llm_ops.demo.gateway.pricing.ModelPricing.calculateCost("gpt-4.1-mini", 100, 50)),
+            eq(150L)
+        );
+        verify(budgetUsageService, never()).recordUsage(
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(10L),
+            eq(YearMonth.of(2026, 2)),
+            any(),
+            any()
+        );
+    }
+
+    @Test
+    @DisplayName("Primary 실패 후 secondary failover면 primary reservation을 release하고 secondary reservation을 settle한다")
+    void primary_실패_후_secondary_failover면_primary_reservation을_release하고_secondary_reservation을_settle한다() {
+        // given
+        String apiKey = "lum_test";
+        Long organizationId = 1L;
+        Long workspaceId = 1L;
+        UUID requestId = UUID.randomUUID();
+
+        OrganizationApiKeyAuthService.AuthResult authResult =
+            new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+        when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+        when(requestLogWriter.start(any())).thenReturn(requestId);
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        when(workspace.getId()).thenReturn(workspaceId);
+        when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+            .thenReturn(Optional.of(workspace));
+
+        com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+        when(promptEntity.getId()).thenReturn(100L);
+        when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+            .thenReturn(Optional.of(promptEntity));
+
+        PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+        when(activeVersion.getUserTemplate()).thenReturn("hello");
+        when(activeVersion.getSystemPrompt()).thenReturn(null);
+        when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+        when(activeVersion.getModel()).thenReturn("gpt-4.1-mini");
+        when(activeVersion.getSecondaryProvider()).thenReturn(ProviderType.ANTHROPIC);
+        when(activeVersion.getSecondaryModel()).thenReturn("claude-3-5-haiku");
+
+        PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+        when(release.getActiveVersion()).thenReturn(activeVersion);
+        when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+        when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+            .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "primary-key"));
+        when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.ANTHROPIC)))
+            .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(11L, ProviderType.ANTHROPIC, "secondary-key"));
+        when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+        when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+        when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+        when(budgetGuardrailService.evaluateProviderCredential(eq(11L))).thenReturn(BudgetDecision.allow());
+
+        BudgetPolicy primaryPolicy = BudgetPolicy.createDefault(BudgetScopeType.PROVIDER_CREDENTIAL, 10L);
+        primaryPolicy.update(new java.math.BigDecimal("10.00"), null, null, null, null, null, true);
+        BudgetPolicy secondaryPolicy = BudgetPolicy.createDefault(BudgetScopeType.PROVIDER_CREDENTIAL, 11L);
+        secondaryPolicy.update(new java.math.BigDecimal("10.00"), null, null, null, null, null, true);
+        when(budgetPolicyService.findPolicy(BudgetScopeType.PROVIDER_CREDENTIAL, 10L)).thenReturn(Optional.of(primaryPolicy));
+        when(budgetPolicyService.findPolicy(BudgetScopeType.PROVIDER_CREDENTIAL, 11L)).thenReturn(Optional.of(secondaryPolicy));
+
+        when(budgetReservationEstimator.estimate(eq("gpt-4.1-mini"), any(), any(), any()))
+            .thenReturn(BudgetReservationEstimate.reservable(
+                "gpt-4.1-mini",
+                100,
+                512,
+                new java.math.BigDecimal("0.50")
+            ));
+        when(budgetReservationEstimator.estimate(eq("claude-3-5-haiku"), any(), any(), any()))
+            .thenReturn(BudgetReservationEstimate.reservable(
+                "claude-3-5-haiku",
+                100,
+                512,
+                new java.math.BigDecimal("0.40")
+            ));
+
+        com.llm_ops.demo.budget.domain.BudgetReservation primaryReservation =
+            org.mockito.Mockito.mock(com.llm_ops.demo.budget.domain.BudgetReservation.class);
+        when(primaryReservation.getId()).thenReturn(101L);
+        com.llm_ops.demo.budget.domain.BudgetReservation secondaryReservation =
+            org.mockito.Mockito.mock(com.llm_ops.demo.budget.domain.BudgetReservation.class);
+        when(secondaryReservation.getId()).thenReturn(202L);
+        when(budgetReservationService.reserve(
+            eq(requestId),
+            anyString(),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(10L),
+            eq(YearMonth.of(2026, 2)),
+            eq(new java.math.BigDecimal("10.00")),
+            eq(new java.math.BigDecimal("0.50")),
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(100),
+            eq(512),
+            any()
+        )).thenReturn(Optional.of(primaryReservation));
+        when(budgetReservationService.reserve(
+            eq(requestId),
+            anyString(),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(11L),
+            eq(YearMonth.of(2026, 2)),
+            eq(new java.math.BigDecimal("10.00")),
+            eq(new java.math.BigDecimal("0.40")),
+            eq("anthropic"),
+            eq("claude-3-5-haiku"),
+            eq(100),
+            eq(512),
+            any()
+        )).thenReturn(Optional.of(secondaryReservation));
+
+        HttpClientErrorException tooManyRequests = HttpClientErrorException.create(
+            HttpStatusCode.valueOf(429),
+            "Too Many Requests",
+            HttpHeaders.EMPTY,
+            new byte[0],
+            StandardCharsets.UTF_8
+        );
+        ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+            .withModel("claude-3-5-haiku")
+            .withUsage(new DefaultUsage(100L, 50L, 150L))
+            .build();
+        ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+        when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any()))
+            .thenThrow(tooManyRequests)
+            .thenReturn(chatResponse);
+
+        GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+        // when
+        gatewayChatService.chat(apiKey, request);
+
+        // then
+        verify(budgetReservationService).release(101L, "PRIMARY_ROUTE_FAILED");
+        verify(budgetReservationService).settle(
+            202L,
+            com.llm_ops.demo.gateway.pricing.ModelPricing.calculateCost("claude-3-5-haiku", 100, 50),
+            150L
+        );
     }
 
     @Test
