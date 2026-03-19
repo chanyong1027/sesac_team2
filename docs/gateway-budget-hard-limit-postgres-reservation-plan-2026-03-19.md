@@ -48,6 +48,7 @@
 3. 모델 단가 DB 이관
 4. 모든 provider 과금 규칙의 완전한 실시간 정밀 재현
 5. Playground 비용 경로까지 이번에 동시에 전환
+6. Workspace soft-limit에 hard-limit 수준의 strict concurrency 보장 부여
 
 ## 4) 핵심 결정 요약
 
@@ -95,11 +96,12 @@
 3. effective model / effective max tokens 결정
 4. 최대 가능 비용 상한 계산
 5. Provider credential hard-limit 예약 시도
-6. 필요 시 workspace hard-limit 예약 시도
-7. 예약 성공 시 provider 호출
-8. 성공하면 settle
-9. 실패하면 release
-10. timeout 또는 프로세스 중단으로 누락된 reservation은 sweeper가 expire
+6. 예약 성공 시 provider 호출
+7. 성공하면 settle
+8. 실패하면 release
+9. timeout 또는 프로세스 중단으로 누락된 reservation은 sweeper가 expire
+
+현재 rollout 기준으로 strict reservation 대상은 `PROVIDER_CREDENTIAL` scope만 포함합니다. `WORKSPACE`는 soft-limit `DEGRADE` 판단용 scope이며, 동시 in-flight 요청까지 hard-limit 수준으로 선점하지는 않습니다.
 
 핵심 원칙은 다음과 같습니다.
 
@@ -334,12 +336,10 @@ TTL 기준:
 1. workspace soft-limit 평가
 2. effective model / max tokens 결정
 3. provider credential 예산 예약
-4. workspace hard-limit 예약
-5. provider call
-6. 실제 비용 계산
-7. provider reservation settle
-8. workspace reservation settle
-9. success log 기록
+4. provider call
+5. 실제 비용 계산
+6. provider reservation settle
+7. success log 기록
 
 ### 11-2) primary blocked 경로
 
@@ -375,6 +375,8 @@ soft-limit는 hard-limit처럼 차단보다 `DEGRADE`가 목적입니다.
 이렇게 하면 이미 진행 중인 요청까지 반영해 더 일찍 degrade가 걸릴 수 있습니다.
 
 정책상 soft-limit는 약간 보수적으로 반응해도 문제가 적기 때문에, projected spend 기준이 더 운영 친화적입니다.
+
+다만 현재 구현과 rollout 범위에서는 reservation을 `PROVIDER_CREDENTIAL` scope에만 생성합니다. 따라서 `WORKSPACE` soft-limit는 hard-limit처럼 strict consistency를 보장하는 장치가 아니라, 운영상 더 이른 `DEGRADE`를 유도하는 advisory 신호로 해석해야 합니다. 동시에 여러 workspace 요청이 들어오면 일부 in-flight 요청은 soft-limit 평가 시점에 완전히 반영되지 않을 수 있으며, 이것은 현재 정책상 허용된 trade-off입니다.
 
 ## 13) 트랜잭션 경계
 
@@ -701,7 +703,7 @@ Gateway hard-limit는 PostgreSQL 기반 원자적 예약-정산 방식으로 구
 ### 결정 상세
 
 1. hard-limit 승인 조건은 `spent + reserved + reserveAmount <= monthLimit`로 정의한다.
-2. soft-limit degrade는 `spent + reserved` 기준으로 평가한다.
+2. soft-limit degrade는 `spent + reserved` 기준을 우선 사용하되, 현재 rollout에서는 `PROVIDER_CREDENTIAL` reservation만 strict하게 생성하므로 `WORKSPACE` soft-limit는 advisory/best-effort guardrail로 본다.
 3. 예약 금액은 평균 예상치가 아니라 최대 가능 비용 상한으로 계산한다.
 4. 모델 단가를 모르면 hard-limit는 fail-closed 한다.
 5. primary와 secondary failover는 서로 다른 provider/model 예산 경로로 보며, failover 시 새 reservation을 생성한다.
@@ -785,7 +787,8 @@ Gateway hard-limit는 PostgreSQL 기반 원자적 예약-정산 방식으로 구
 
 1. 구현 복잡도는 증가하지만, 현재 스택과 운영 요구사항을 고려하면 가장 균형이 좋다.
 2. 1차 적용은 provider credential hard-limit에 우선 도입한다.
-3. 안정화 후 workspace hard-limit까지 동일 엔진으로 확장한다.
+3. workspace soft-limit는 advisory/best-effort guardrail로 유지하며, hard-limit 수준의 strict reservation은 현재 범위에 포함하지 않는다.
+4. 필요 시 안정화 이후 workspace hard-limit를 별도 정책으로 추가하고 동일 reservation 엔진을 재사용할 수 있다.
 
 ## 23) 팀 공유용 요약
 
