@@ -127,6 +127,7 @@ public class BudgetReservationService {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 정산에 실패했습니다.");
         }
         reservation.markSettled(normalizedActualCost);
+        budgetReservationRepository.save(reservation);
         budgetReservationMetrics.incrementSettle(reservation.getScopeType());
     }
 
@@ -159,6 +160,7 @@ public class BudgetReservationService {
                 throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "만료된 예산 예약 복구에 실패했습니다.");
             }
             reservation.markExpired();
+            budgetReservationRepository.save(reservation);
             budgetReservationMetrics.incrementExpired(reservation.getScopeType());
             expiredCount++;
         }
@@ -192,6 +194,7 @@ public class BudgetReservationService {
             throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "예산 예약 반환에 실패했습니다.");
         }
         reservation.markReleased(releaseReason);
+        budgetReservationRepository.save(reservation);
         budgetReservationMetrics.incrementRelease(reservation.getScopeType(), releaseReason);
     }
 

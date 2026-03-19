@@ -1,6 +1,7 @@
 package com.llm_ops.demo.budget.service;
 
 import com.llm_ops.demo.budget.domain.BudgetReservation;
+import com.llm_ops.demo.budget.domain.BudgetReservationStatus;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.repository.BudgetMonthlyUsageRepository;
 import com.llm_ops.demo.budget.repository.BudgetReservationRepository;
@@ -84,6 +85,36 @@ class BudgetReservationServiceConcurrencyTest {
         }
     }
 
+    @Test
+    @DisplayName("settle 이후 reservation 상태가 SETTLED로 저장된다")
+    void settle_이후_reservation_상태가_SETTLED로_저장된다() {
+        // given
+        BudgetReservation reservation = reserveSingle("trace-settle", 31L, new BigDecimal("1.00"), new BigDecimal("0.40"));
+
+        // when
+        budgetReservationService.settle(reservation.getId(), BigDecimal.ZERO, 0L);
+
+        // then
+        BudgetReservation settled = budgetReservationRepository.findById(reservation.getId()).orElseThrow();
+        assertThat(settled.getStatus()).isEqualTo(BudgetReservationStatus.SETTLED);
+        assertThat(settled.getSettledCostUsd()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    @DisplayName("release 이후 reservation 상태가 RELEASED로 저장된다")
+    void release_이후_reservation_상태가_RELEASED로_저장된다() {
+        // given
+        BudgetReservation reservation = reserveSingle("trace-release", 32L, new BigDecimal("1.00"), new BigDecimal("0.40"));
+
+        // when
+        budgetReservationService.release(reservation.getId(), "TEST_RELEASE");
+
+        // then
+        BudgetReservation released = budgetReservationRepository.findById(reservation.getId()).orElseThrow();
+        assertThat(released.getStatus()).isEqualTo(BudgetReservationStatus.RELEASED);
+        assertThat(released.getReleaseReason()).isEqualTo("TEST_RELEASE");
+    }
+
     private Optional<BudgetReservation> reserveConcurrently(
         String traceId,
         YearMonth yearMonth,
@@ -106,5 +137,27 @@ class BudgetReservationServiceConcurrencyTest {
             256,
             Duration.ofSeconds(60)
         );
+    }
+
+    private BudgetReservation reserveSingle(
+        String traceId,
+        Long scopeId,
+        BigDecimal monthLimitUsd,
+        BigDecimal reserveAmount
+    ) {
+        return budgetReservationService.reserve(
+            UUID.randomUUID(),
+            traceId,
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            scopeId,
+            YearMonth.of(2026, 3),
+            monthLimitUsd,
+            reserveAmount,
+            "openai",
+            "gpt-4.1-mini",
+            100,
+            256,
+            Duration.ofSeconds(60)
+        ).orElseThrow();
     }
 }
