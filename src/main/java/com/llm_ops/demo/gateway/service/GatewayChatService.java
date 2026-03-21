@@ -1,10 +1,16 @@
 package com.llm_ops.demo.gateway.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.llm_ops.demo.budget.domain.BudgetPolicy;
+import com.llm_ops.demo.budget.domain.BudgetReservation;
 import com.llm_ops.demo.budget.domain.BudgetScopeType;
 import com.llm_ops.demo.budget.service.BudgetDecision;
 import com.llm_ops.demo.budget.service.BudgetDecisionAction;
 import com.llm_ops.demo.budget.service.BudgetGuardrailService;
+import com.llm_ops.demo.budget.service.BudgetPolicyService;
+import com.llm_ops.demo.budget.service.BudgetReservationEstimate;
+import com.llm_ops.demo.budget.service.BudgetReservationEstimator;
+import com.llm_ops.demo.budget.service.BudgetReservationService;
 import com.llm_ops.demo.budget.service.BudgetUsageService;
 import com.llm_ops.demo.gateway.config.GatewayReliabilityProperties;
 import com.llm_ops.demo.gateway.dto.GatewayChatRequest;
@@ -47,6 +53,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
@@ -94,6 +101,9 @@ public class GatewayChatService {
     private final PromptRepository promptRepository;
     private final PromptReleaseRepository promptReleaseRepository;
     private final BudgetGuardrailService budgetGuardrailService;
+    private final BudgetPolicyService budgetPolicyService;
+    private final BudgetReservationEstimator budgetReservationEstimator;
+    private final BudgetReservationService budgetReservationService;
     private final BudgetUsageService budgetUsageService;
     private final ExecutorService providerCallExecutor;
     private final GatewayMetrics gatewayMetrics;
@@ -112,6 +122,9 @@ public class GatewayChatService {
             PromptRepository promptRepository,
             PromptReleaseRepository promptReleaseRepository,
             BudgetGuardrailService budgetGuardrailService,
+            BudgetPolicyService budgetPolicyService,
+            BudgetReservationEstimator budgetReservationEstimator,
+            BudgetReservationService budgetReservationService,
             BudgetUsageService budgetUsageService,
             @Qualifier("providerCallExecutor") ExecutorService providerCallExecutor,
             GatewayMetrics gatewayMetrics,
@@ -128,6 +141,9 @@ public class GatewayChatService {
         this.promptRepository = promptRepository;
         this.promptReleaseRepository = promptReleaseRepository;
         this.budgetGuardrailService = budgetGuardrailService;
+        this.budgetPolicyService = budgetPolicyService;
+        this.budgetReservationEstimator = budgetReservationEstimator;
+        this.budgetReservationService = budgetReservationService;
         this.budgetUsageService = budgetUsageService;
         this.providerCallExecutor = providerCallExecutor;
         this.gatewayMetrics = gatewayMetrics;
@@ -176,6 +192,8 @@ public class GatewayChatService {
         String failoverReason = null;
         boolean failoverAttempted = false;
         Long usedProviderCredentialId = null;
+        BudgetReservation activeReservation = null;
+        BudgetReservation settlementReservation = null;
         String budgetFailReason = null;
         GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
@@ -278,16 +296,34 @@ public class GatewayChatService {
             }
 
             ChatResponse response;
+            ModelConfigOverride primaryConfig = buildEffectiveModelConfig(versionModelConfig, maxOutputTokensOverride);
             ResolvedProviderApiKey primaryKey = providerCredentialService.resolveApiKey(organizationId, providerType);
             usedProviderCredentialId = primaryKey.credentialId();
 
             long provBudgetStartNanos = System.nanoTime();
             BudgetDecision providerDecision = budgetGuardrailService.evaluateProviderCredential(primaryKey.credentialId());
             gatewayMetrics.recordBudgetEval("provider_credential", System.nanoTime() - provBudgetStartNanos);
-            if (providerDecision.action() == BudgetDecisionAction.BLOCK) {
+            ProviderBudgetReservationResult primaryReservation = ProviderBudgetReservationResult.notRequired();
+            if (providerDecision.action() != BudgetDecisionAction.BLOCK) {
+                primaryReservation = reserveProviderBudget(
+                    requestId,
+                    traceId,
+                    budgetMonth,
+                    primaryKey,
+                    requestedModelEffective,
+                    systemPrompt,
+                    userPrompt,
+                    primaryConfig
+                );
+            }
+
+            if (providerDecision.action() == BudgetDecisionAction.BLOCK || primaryReservation.blocked()) {
+                String primaryBudgetBlockReason = providerDecision.action() == BudgetDecisionAction.BLOCK
+                    ? "PROVIDER_BUDGET_EXCEEDED"
+                    : primaryReservation.blockReason();
                 if (!hasSecondaryModel(secondaryProvider, secondaryModel)) {
                     gatewayMetrics.incrementBudgetBlocked("PROVIDER_CREDENTIAL");
-                    budgetFailReason = "PROVIDER_BUDGET_EXCEEDED";
+                    budgetFailReason = primaryBudgetBlockReason;
                     throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
                 }
                 ResolvedProviderApiKey secondaryKey = providerCredentialService.resolveApiKey(organizationId, secondaryProvider);
@@ -306,14 +342,14 @@ public class GatewayChatService {
                 failoverReason = "PRIMARY_PROVIDER_BUDGET_BLOCKED";
                 failoverAttempted = true;
                 gatewayMetrics.incrementFailover(
-                        providerType != null ? providerType.name().toLowerCase() : "unknown",
-                        secondaryProvider != null ? secondaryProvider.name().toLowerCase() : "unknown");
+                    providerType != null ? providerType.name().toLowerCase() : "unknown",
+                    secondaryProvider != null ? secondaryProvider.name().toLowerCase() : "unknown");
                 usedProvider = secondaryProvider;
                 usedProviderCredentialId = secondaryKey.credentialId();
 
                 BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
-                        workspace.getId(),
-                        secondaryProvider != null ? secondaryProvider.getValue() : null
+                    workspace.getId(),
+                    secondaryProvider != null ? secondaryProvider.getValue() : null
                 );
                 String secondaryOverride = null;
                 Integer secondaryMaxTokens = maxOutputTokensOverride;
@@ -326,20 +362,37 @@ public class GatewayChatService {
                         secondaryMaxTokens = o2.maxOutputTokens();
                     }
                 }
+                ModelConfigOverride secondaryConfig = buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens);
                 String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                 usedRequestedModel = secondaryModelEffective;
+                ProviderBudgetReservationResult secondaryReservation = reserveProviderBudget(
+                    requestId,
+                    traceId,
+                    budgetMonth,
+                    secondaryKey,
+                    secondaryModelEffective,
+                    systemPrompt,
+                    userPrompt,
+                    secondaryConfig
+                );
+                if (secondaryReservation.blocked()) {
+                    gatewayMetrics.incrementBudgetBlocked("PROVIDER_CREDENTIAL");
+                    budgetFailReason = secondaryReservation.blockReason();
+                    throw new BusinessException(ErrorCode.BUDGET_EXCEEDED, "예산 한도 초과로 요청이 차단되었습니다.");
+                }
+                activeReservation = secondaryReservation.reservation();
 
                 providerCallStartNanos = System.nanoTime();
                 ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
-                        secondaryKey,
-                        secondaryModelEffective,
-                        systemPrompt,
-                        userPrompt,
-                        buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens),
-                        deadlineNanos,
-                        false,
-                        RequestLogAttemptRoute.FAILOVER,
-                        attemptCollector
+                    secondaryKey,
+                    secondaryModelEffective,
+                    systemPrompt,
+                    userPrompt,
+                    secondaryConfig,
+                    deadlineNanos,
+                    false,
+                    RequestLogAttemptRoute.FAILOVER,
+                    attemptCollector
                 );
                 if (!secondaryOutcome.success()) {
                     lastProviderFailure = secondaryOutcome.failure();
@@ -348,17 +401,18 @@ public class GatewayChatService {
                 response = secondaryOutcome.response();
                 providerCallEndNanos = System.nanoTime();
             } else {
+                activeReservation = primaryReservation.reservation();
                 providerCallStartNanos = System.nanoTime();
                 ProviderCallOutcome primaryOutcome = callProviderWithPolicy(
-                        primaryKey,
-                        requestedModelEffective,
-                        systemPrompt,
-                        userPrompt,
-                        buildEffectiveModelConfig(versionModelConfig, maxOutputTokensOverride),
-                        deadlineNanos,
-                        hasSecondaryModel(secondaryProvider, secondaryModel),
-                        RequestLogAttemptRoute.PRIMARY,
-                        attemptCollector
+                    primaryKey,
+                    requestedModelEffective,
+                    systemPrompt,
+                    userPrompt,
+                    primaryConfig,
+                    deadlineNanos,
+                    hasSecondaryModel(secondaryProvider, secondaryModel),
+                    RequestLogAttemptRoute.PRIMARY,
+                    attemptCollector
                 );
                 if (primaryOutcome.success()) {
                     response = primaryOutcome.response();
@@ -382,20 +436,20 @@ public class GatewayChatService {
 
                     isFailover = true;
                     failoverReason = (lastProviderFailure != null
-                            && lastProviderFailure.failReason() != null
-                            && !lastProviderFailure.failReason().isBlank())
-                            ? lastProviderFailure.failReason()
-                            : "PRIMARY_ROUTE_FAILED";
+                        && lastProviderFailure.failReason() != null
+                        && !lastProviderFailure.failReason().isBlank())
+                        ? lastProviderFailure.failReason()
+                        : "PRIMARY_ROUTE_FAILED";
                     failoverAttempted = true;
                     gatewayMetrics.incrementFailover(
-                            providerType != null ? providerType.name().toLowerCase() : "unknown",
-                            secondaryProvider != null ? secondaryProvider.name().toLowerCase() : "unknown");
+                        providerType != null ? providerType.name().toLowerCase() : "unknown",
+                        secondaryProvider != null ? secondaryProvider.name().toLowerCase() : "unknown");
                     usedProvider = secondaryProvider;
                     usedProviderCredentialId = secondaryKey.credentialId();
 
                     BudgetDecision wsDecisionSecondary = budgetGuardrailService.evaluateWorkspaceDegrade(
-                            workspace.getId(),
-                            secondaryProvider != null ? secondaryProvider.getValue() : null
+                        workspace.getId(),
+                        secondaryProvider != null ? secondaryProvider.getValue() : null
                     );
                     String secondaryOverride = null;
                     Integer secondaryMaxTokens = maxOutputTokensOverride;
@@ -408,20 +462,37 @@ public class GatewayChatService {
                             secondaryMaxTokens = o2.maxOutputTokens();
                         }
                     }
+                    ModelConfigOverride secondaryConfig = buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens);
                     String secondaryModelEffective = secondaryOverride != null ? secondaryOverride : secondaryModel;
                     usedRequestedModel = secondaryModelEffective;
+                    releaseReservationQuietly(activeReservation, "PRIMARY_ROUTE_FAILED");
+                    activeReservation = null;
+                    ProviderBudgetReservationResult secondaryReservation = reserveProviderBudget(
+                        requestId,
+                        traceId,
+                        budgetMonth,
+                        secondaryKey,
+                        secondaryModelEffective,
+                        systemPrompt,
+                        userPrompt,
+                        secondaryConfig
+                    );
+                    if (secondaryReservation.blocked()) {
+                        throw primaryException;
+                    }
+                    activeReservation = secondaryReservation.reservation();
 
                     providerCallStartNanos = System.nanoTime();
                     ProviderCallOutcome secondaryOutcome = callProviderWithPolicy(
-                            secondaryKey,
-                            secondaryModelEffective,
-                            systemPrompt,
-                            userPrompt,
-                            buildEffectiveModelConfig(versionModelConfig, secondaryMaxTokens),
-                            deadlineNanos,
-                            false,
-                            RequestLogAttemptRoute.FAILOVER,
-                            attemptCollector
+                        secondaryKey,
+                        secondaryModelEffective,
+                        systemPrompt,
+                        userPrompt,
+                        secondaryConfig,
+                        deadlineNanos,
+                        false,
+                        RequestLogAttemptRoute.FAILOVER,
+                        attemptCollector
                     );
                     if (!secondaryOutcome.success()) {
                         lastProviderFailure = secondaryOutcome.failure();
@@ -431,6 +502,9 @@ public class GatewayChatService {
                     providerCallEndNanos = System.nanoTime();
                 }
             }
+
+            settlementReservation = activeReservation;
+            activeReservation = null;
 
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
@@ -478,17 +552,26 @@ public class GatewayChatService {
                     totalTokens != null ? totalTokens.longValue() : null,
                     estimatedCost);
 
+            // provider accounting을 먼저 확정해 성공 응답이 후처리 catch에서 release되지 않게 합니다.
+            if (settlementReservation != null) {
+                budgetReservationService.settle(
+                    settlementReservation.getId(),
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+                );
+            } else {
+                budgetUsageService.recordUsage(
+                    BudgetScopeType.PROVIDER_CREDENTIAL,
+                    usedProviderCredentialId,
+                    budgetMonth,
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+                );
+            }
             // 예산 집계는 로그 async에 의존하지 않고 요청 스레드에서 동기 기록합니다.
             budgetUsageService.recordUsage(
                     BudgetScopeType.WORKSPACE,
                     request.workspaceId(),
-                    budgetMonth,
-                    estimatedCost,
-                    totalTokens != null ? totalTokens.longValue() : null
-            );
-            budgetUsageService.recordUsage(
-                    BudgetScopeType.PROVIDER_CREDENTIAL,
-                    usedProviderCredentialId,
                     budgetMonth,
                     estimatedCost,
                     totalTokens != null ? totalTokens.longValue() : null
@@ -539,6 +622,7 @@ public class GatewayChatService {
                     usedModel,
                     usage);
         } catch (BusinessException e) {
+            releaseReservationQuietly(activeReservation, budgetFailReason != null ? budgetFailReason : e.getErrorCode().name());
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             String failReason = budgetFailReason != null ? budgetFailReason : e.getErrorCode().name();
             gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
@@ -607,6 +691,7 @@ public class GatewayChatService {
             }
             throw toGatewayException(gatewayFailure, e);
         } catch (Exception e) {
+            releaseReservationQuietly(activeReservation, lastProviderFailure != null ? lastProviderFailure.failReason() : e.getClass().getSimpleName());
             String providerTag = usedProvider != null ? usedProvider.name().toLowerCase() : "unknown";
             String exFailReason = lastProviderFailure != null ? lastProviderFailure.failReason() : e.getClass().getSimpleName();
             gatewayMetrics.recordRequest(providerTag, usedRequestedModel, ragEnabledEffective, isFailover, "error", System.nanoTime() - startedAtNanos);
@@ -709,6 +794,67 @@ public class GatewayChatService {
         return infos;
     }
 
+    private ProviderBudgetReservationResult reserveProviderBudget(
+        UUID requestId,
+        String traceId,
+        YearMonth budgetMonth,
+        ResolvedProviderApiKey providerKey,
+        String requestedModel,
+        String systemPrompt,
+        String userPrompt,
+        ModelConfigOverride config
+    ) {
+        if (providerKey == null || providerKey.credentialId() == null || providerKey.credentialId() <= 0) {
+            return ProviderBudgetReservationResult.notRequired();
+        }
+
+        BudgetPolicy policy = budgetPolicyService.findPolicy(BudgetScopeType.PROVIDER_CREDENTIAL, providerKey.credentialId())
+            .filter(p -> Boolean.TRUE.equals(p.getEnabled()))
+            .filter(p -> p.getMonthLimitUsd() != null)
+            .orElse(null);
+        if (policy == null) {
+            return ProviderBudgetReservationResult.notRequired();
+        }
+
+        BudgetReservationEstimate estimate = budgetReservationEstimator.estimate(
+            requestedModel,
+            systemPrompt,
+            userPrompt,
+            config != null ? config.maxTokens() : null
+        );
+        if (!estimate.reservable()) {
+            return ProviderBudgetReservationResult.blocked(estimate.rejectionReason());
+        }
+
+        return budgetReservationService.reserve(
+            requestId,
+            traceId,
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            providerKey.credentialId(),
+            budgetMonth,
+            policy.getMonthLimitUsd(),
+            estimate.reserveAmountUsd(),
+            providerKey.providerType() != null ? providerKey.providerType().getValue() : null,
+            requestedModel,
+            estimate.reservedInputTokens(),
+            estimate.reservedOutputTokens(),
+            Duration.ofMillis(gatewayReliabilityProperties.resolvedRequestTimeoutMs() + 1_000L)
+        )
+            .map(ProviderBudgetReservationResult::reserved)
+            .orElseGet(() -> ProviderBudgetReservationResult.blocked("PROVIDER_BUDGET_EXCEEDED"));
+    }
+
+    private void releaseReservationQuietly(BudgetReservation reservation, String releaseReason) {
+        if (reservation == null || reservation.getId() == null) {
+            return;
+        }
+        try {
+            budgetReservationService.release(reservation.getId(), releaseReason);
+        } catch (Exception ignored) {
+            // cleanup 실패는 원래 gateway 실패를 덮어쓰지 않도록 삼킨다.
+        }
+    }
+
 
     private static String sha256HexOrNull(String value) {
         if (value == null || value.isBlank()) {
@@ -756,6 +902,24 @@ public class GatewayChatService {
         return workspaceRepository
                 .findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.FORBIDDEN, "워크스페이스 접근 권한이 없습니다."));
+    }
+
+    private record ProviderBudgetReservationResult(BudgetReservation reservation, String blockReason) {
+        static ProviderBudgetReservationResult notRequired() {
+            return new ProviderBudgetReservationResult(null, null);
+        }
+
+        static ProviderBudgetReservationResult reserved(BudgetReservation reservation) {
+            return new ProviderBudgetReservationResult(reservation, null);
+        }
+
+        static ProviderBudgetReservationResult blocked(String blockReason) {
+            return new ProviderBudgetReservationResult(null, blockReason != null ? blockReason : "PROVIDER_BUDGET_EXCEEDED");
+        }
+
+        boolean blocked() {
+            return blockReason != null;
+        }
     }
 
     private record ActiveVersionResolution(Long promptId, Long promptVersionId, PromptVersion version) {

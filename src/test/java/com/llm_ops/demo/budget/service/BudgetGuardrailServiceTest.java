@@ -85,6 +85,31 @@ class BudgetGuardrailServiceTest {
     }
 
     @Test
+    @DisplayName("Provider credential 예약 금액까지 합산해 하드리밋 이상이면 BLOCK을 반환한다")
+    void provider_예약_금액까지_합산해_하드리밋_이상이면_BLOCK을_반환한다() {
+        // given
+        Long credentialId = 10L;
+        YearMonth ym = YearMonth.of(2026, 2);
+        BudgetPolicy policy = BudgetPolicy.createDefault(BudgetScopeType.PROVIDER_CREDENTIAL, credentialId);
+        policy.update(new BigDecimal("50.00"), null, null, null, null, null, true);
+        BudgetMonthlyUsage usage = BudgetMonthlyUsage.create(BudgetScopeType.PROVIDER_CREDENTIAL, credentialId, 202602);
+        usage.addUsage(new BigDecimal("49.60"), 100L, 1L);
+        usage.reserveCost(new BigDecimal("0.50"));
+
+        when(budgetPolicyService.findPolicy(BudgetScopeType.PROVIDER_CREDENTIAL, credentialId))
+            .thenReturn(Optional.of(policy));
+        when(budgetUsageService.currentUtcYearMonth()).thenReturn(ym);
+        when(budgetUsageService.findUsage(BudgetScopeType.PROVIDER_CREDENTIAL, credentialId, ym))
+            .thenReturn(Optional.of(usage));
+
+        // when
+        BudgetDecision decision = budgetGuardrailService.evaluateProviderCredential(credentialId);
+
+        // then
+        assertThat(decision.action()).isEqualTo(BudgetDecisionAction.BLOCK);
+    }
+
+    @Test
     @DisplayName("Workspace 월 사용량이 soft-limit 이상이면 DEGRADE를 반환한다")
     void workspace_월_사용량이_soft_limit_이상이면_DEGRADE를_반환한다() {
         // given
@@ -140,6 +165,33 @@ class BudgetGuardrailServiceTest {
         // then
         assertThat(decision.action()).isEqualTo(BudgetDecisionAction.ALLOW);
         verify(budgetPolicyService, never()).parseDegradeProviderModelMapOrEmpty(eq(policy));
+    }
+
+    @Test
+    @DisplayName("Workspace 예약 금액까지 합산해 soft-limit 이상이면 DEGRADE를 반환한다")
+    void workspace_예약_금액까지_합산해_soft_limit_이상이면_DEGRADE를_반환한다() {
+        // given
+        Long workspaceId = 7L;
+        YearMonth ym = YearMonth.of(2026, 2);
+        BudgetPolicy policy = BudgetPolicy.createDefault(BudgetScopeType.WORKSPACE, workspaceId);
+        policy.update(null, new BigDecimal("10.00"), BudgetSoftAction.DEGRADE, "{}", 256, false, true);
+        BudgetMonthlyUsage usage = BudgetMonthlyUsage.create(BudgetScopeType.WORKSPACE, workspaceId, 202602);
+        usage.addUsage(new BigDecimal("9.80"), 500L, 2L);
+        usage.reserveCost(new BigDecimal("0.30"));
+
+        when(budgetPolicyService.findPolicy(BudgetScopeType.WORKSPACE, workspaceId))
+            .thenReturn(Optional.of(policy));
+        when(budgetUsageService.currentUtcYearMonth()).thenReturn(ym);
+        when(budgetUsageService.findUsage(BudgetScopeType.WORKSPACE, workspaceId, ym))
+            .thenReturn(Optional.of(usage));
+        when(budgetPolicyService.parseDegradeProviderModelMapOrEmpty(policy))
+            .thenReturn(Map.of("openai", "gpt-4o-mini"));
+
+        // when
+        BudgetDecision decision = budgetGuardrailService.evaluateWorkspaceDegrade(workspaceId, "openai");
+
+        // then
+        assertThat(decision.action()).isEqualTo(BudgetDecisionAction.DEGRADE);
     }
 
     @Test

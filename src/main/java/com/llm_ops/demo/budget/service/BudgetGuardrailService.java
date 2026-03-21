@@ -33,12 +33,16 @@ public class BudgetGuardrailService {
         }
 
         YearMonth ym = budgetUsageService.currentUtcYearMonth();
-        BigDecimal used = budgetUsageService
+        BigDecimal projectedSpend = budgetUsageService
             .findUsage(BudgetScopeType.PROVIDER_CREDENTIAL, providerCredentialId, ym)
-            .map(u -> u.getCostUsd())
+            .map(u -> {
+                BigDecimal spent = u.getCostUsd() != null ? u.getCostUsd() : BigDecimal.ZERO;
+                BigDecimal reserved = u.getReservedCostUsd() != null ? u.getReservedCostUsd() : BigDecimal.ZERO;
+                return spent.add(reserved);
+            })
             .orElse(BigDecimal.ZERO);
 
-        if (used.compareTo(policy.getMonthLimitUsd()) >= 0) {
+        if (projectedSpend.compareTo(policy.getMonthLimitUsd()) >= 0) {
             return new BudgetDecision(
                 BudgetDecisionAction.BLOCK,
                 BudgetScopeType.PROVIDER_CREDENTIAL,
@@ -65,12 +69,16 @@ public class BudgetGuardrailService {
         }
 
         YearMonth ym = budgetUsageService.currentUtcYearMonth();
-        BigDecimal used = budgetUsageService
+        BigDecimal projectedSpend = budgetUsageService
             .findUsage(BudgetScopeType.WORKSPACE, workspaceId, ym)
-            .map(u -> u.getCostUsd())
+            .map(u -> {
+                BigDecimal spent = u.getCostUsd() != null ? u.getCostUsd() : BigDecimal.ZERO;
+                BigDecimal reserved = u.getReservedCostUsd() != null ? u.getReservedCostUsd() : BigDecimal.ZERO;
+                return spent.add(reserved);
+            })
             .orElse(BigDecimal.ZERO);
 
-        if (used.compareTo(policy.getSoftLimitUsd()) < 0) {
+        if (projectedSpend.compareTo(policy.getSoftLimitUsd()) < 0) {
             return BudgetDecision.allow();
         }
 

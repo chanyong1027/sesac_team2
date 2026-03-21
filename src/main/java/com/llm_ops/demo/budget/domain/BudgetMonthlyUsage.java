@@ -49,6 +49,9 @@ public class BudgetMonthlyUsage {
     @Column(name = "request_count", nullable = false)
     private Long requestCount;
 
+    @Column(name = "reserved_cost_usd", nullable = false, precision = 18, scale = 8)
+    private BigDecimal reservedCostUsd;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -65,6 +68,7 @@ public class BudgetMonthlyUsage {
         usage.costUsd = BigDecimal.ZERO;
         usage.totalTokens = 0L;
         usage.requestCount = 0L;
+        usage.reservedCostUsd = BigDecimal.ZERO;
         return usage;
     }
 
@@ -75,5 +79,16 @@ public class BudgetMonthlyUsage {
         this.totalTokens = (this.totalTokens != null ? this.totalTokens : 0L) + normalizedTokens;
         this.requestCount = (this.requestCount != null ? this.requestCount : 0L) + requestDelta;
     }
-}
 
+    public void reserveCost(BigDecimal amount) {
+        BigDecimal normalized = amount != null ? amount : BigDecimal.ZERO;
+        this.reservedCostUsd = (this.reservedCostUsd != null ? this.reservedCostUsd : BigDecimal.ZERO).add(normalized);
+    }
+
+    public void releaseReservedCost(BigDecimal amount) {
+        BigDecimal normalized = amount != null ? amount : BigDecimal.ZERO;
+        BigDecimal currentReserved = this.reservedCostUsd != null ? this.reservedCostUsd : BigDecimal.ZERO;
+        BigDecimal nextReserved = currentReserved.subtract(normalized);
+        this.reservedCostUsd = nextReserved.signum() >= 0 ? nextReserved : BigDecimal.ZERO;
+    }
+}

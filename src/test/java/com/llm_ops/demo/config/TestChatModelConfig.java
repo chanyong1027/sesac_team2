@@ -23,6 +23,7 @@ public class TestChatModelConfig {
     ChatModel openAiChatModel(TestChatModelState testChatModelState) {
         return prompt -> {
             testChatModelState.record(prompt);
+            testChatModelState.awaitIfBlocked();
             return new ChatResponse(
                 List.of(new Generation(new AssistantMessage(prompt.getContents())))
             );
