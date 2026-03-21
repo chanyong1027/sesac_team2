@@ -19,6 +19,7 @@ import com.llm_ops.demo.rag.service.RagDocumentIngestService;
 import com.llm_ops.demo.rag.service.RagDocumentListService;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreDeleteService;
 import com.llm_ops.demo.rag.storage.S3ApiClient;
+import com.llm_ops.demo.support.RagHeavyTest;
 import com.llm_ops.demo.workspace.service.WorkspaceAccessService;
 import java.io.InputStream;
 import java.time.LocalDateTime;
@@ -41,6 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @TestPropertySource(properties = "storage.s3.enabled=true")
+@RagHeavyTest
 class DocumentControllerTest {
 
     @Autowired
