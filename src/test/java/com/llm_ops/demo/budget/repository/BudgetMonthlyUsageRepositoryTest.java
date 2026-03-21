@@ -188,7 +188,7 @@ class BudgetMonthlyUsageRepositoryTest {
             Future<Integer> first = executorService.submit(() -> reserveConcurrently(yearMonth, ready, start));
             Future<Integer> second = executorService.submit(() -> reserveConcurrently(yearMonth, ready, start));
 
-            ready.await(5, TimeUnit.SECONDS);
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
 
             // when
             start.countDown();

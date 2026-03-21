@@ -26,11 +26,8 @@ class BudgetReservationMigrationTest {
         try (Connection connection = DriverManager.getConnection(url, "sa", "")) {
             ScriptUtils.executeSqlScript(connection, new EncodedResource(new ClassPathResource("db/migration/V19__budget_policies_and_usage.sql")));
 
-            // when
-            ScriptUtils.executeSqlScript(connection, new EncodedResource(new ClassPathResource("db/migration/V33__budget_reservations.sql")));
-
             try (
-                PreparedStatement usageInsert = connection.prepareStatement(
+                PreparedStatement existingUsageInsert = connection.prepareStatement(
                     """
                         INSERT INTO budget_monthly_usage (
                             scope_type,
@@ -38,9 +35,43 @@ class BudgetReservationMigrationTest {
                             year_month,
                             cost_usd,
                             total_tokens,
-                            request_count,
-                            reserved_cost_usd
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            request_count
+                        ) VALUES (?, ?, ?, ?, ?, ?)
+                        """
+                )
+            ) {
+                existingUsageInsert.setString(1, "WORKSPACE");
+                existingUsageInsert.setLong(2, 7L);
+                existingUsageInsert.setInt(3, 202603);
+                existingUsageInsert.setBigDecimal(4, new java.math.BigDecimal("1.25"));
+                existingUsageInsert.setLong(5, 500L);
+                existingUsageInsert.setLong(6, 2L);
+                existingUsageInsert.executeUpdate();
+
+                // when
+                ScriptUtils.executeSqlScript(connection, new EncodedResource(new ClassPathResource("db/migration/V33__budget_reservations.sql")));
+
+                // then
+                try (PreparedStatement reservedQuery = connection.prepareStatement(
+                    "SELECT reserved_cost_usd FROM budget_monthly_usage WHERE scope_type = ? AND scope_id = ? AND year_month = ?"
+                )) {
+                    reservedQuery.setString(1, "WORKSPACE");
+                    reservedQuery.setLong(2, 7L);
+                    reservedQuery.setInt(3, 202603);
+
+                    try (ResultSet resultSet = reservedQuery.executeQuery()) {
+                        assertThat(resultSet.next()).isTrue();
+                        assertThat(resultSet.getBigDecimal(1)).isEqualByComparingTo("0");
+                    }
+                }
+            }
+
+            try (
+                PreparedStatement usageUpdate = connection.prepareStatement(
+                    """
+                        UPDATE budget_monthly_usage
+                        SET reserved_cost_usd = ?
+                        WHERE scope_type = ? AND scope_id = ? AND year_month = ?
                         """
                 );
                 PreparedStatement reservationInsert = connection.prepareStatement(
@@ -57,19 +88,13 @@ class BudgetReservationMigrationTest {
                             expires_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """
-                );
-                PreparedStatement reservedQuery = connection.prepareStatement(
-                    "SELECT reserved_cost_usd FROM budget_monthly_usage WHERE scope_type = ? AND scope_id = ? AND year_month = ?"
                 )
             ) {
-                usageInsert.setString(1, "WORKSPACE");
-                usageInsert.setLong(2, 7L);
-                usageInsert.setInt(3, 202603);
-                usageInsert.setBigDecimal(4, new java.math.BigDecimal("1.25"));
-                usageInsert.setLong(5, 500L);
-                usageInsert.setLong(6, 2L);
-                usageInsert.setBigDecimal(7, new java.math.BigDecimal("0.75"));
-                usageInsert.executeUpdate();
+                usageUpdate.setBigDecimal(1, new java.math.BigDecimal("0.75"));
+                usageUpdate.setString(2, "WORKSPACE");
+                usageUpdate.setLong(3, 7L);
+                usageUpdate.setInt(4, 202603);
+                usageUpdate.executeUpdate();
 
                 reservationInsert.setString(1, "trace-001");
                 reservationInsert.setString(2, "WORKSPACE");
@@ -81,16 +106,6 @@ class BudgetReservationMigrationTest {
                 reservationInsert.setString(8, "RESERVED");
                 reservationInsert.setObject(9, OffsetDateTime.now().plusMinutes(1));
                 reservationInsert.executeUpdate();
-
-                // then
-                reservedQuery.setString(1, "WORKSPACE");
-                reservedQuery.setLong(2, 7L);
-                reservedQuery.setInt(3, 202603);
-
-                try (ResultSet resultSet = reservedQuery.executeQuery()) {
-                    assertThat(resultSet.next()).isTrue();
-                    assertThat(resultSet.getBigDecimal(1)).isEqualByComparingTo("0.75");
-                }
             }
         }
     }
