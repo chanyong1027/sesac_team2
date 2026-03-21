@@ -21,6 +21,7 @@ import com.llm_ops.demo.prompt.repository.PromptVersionRepository;
 import com.llm_ops.demo.workspace.domain.Workspace;
 import com.llm_ops.demo.workspace.repository.WorkspaceRepository;
 import com.llm_ops.demo.keys.domain.ProviderType;
+import com.llm_ops.demo.support.RagHeavyTest;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +58,7 @@ import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppC
 })
 @DisplayName("Gateway-RAG 통합 테스트")
 @Transactional
+@RagHeavyTest
 class
 GatewayRagIntegrationTest {
 

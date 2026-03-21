@@ -9,6 +9,7 @@ import com.llm_ops.demo.rag.dto.ChunkDetailResponse;
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
 import com.llm_ops.demo.rag.facade.RagSearchFacade;
 import com.llm_ops.demo.rag.service.RagDocumentVectorStoreSaveService;
+import com.llm_ops.demo.support.RagHeavyTest;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 @TestPropertySource(properties = "rag.vectorstore.pgvector.enabled=true")
+@RagHeavyTest
 class RagControllerTest {
 
     @Autowired

@@ -7,6 +7,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.llm_ops.demo.config.TestVectorStoreConfig;
+import com.llm_ops.demo.support.RagHeavyTest;
+import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,13 +23,13 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import com.llm_ops.demo.workspace.service.WorkspaceRagSettingsService;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @TestPropertySource(properties = "rag.vectorstore.pgvector.enabled=true")
 @ImportAutoConfiguration(exclude = PgVectorStoreAutoConfiguration.class)
 @Import(TestVectorStoreConfig.class)
+@RagHeavyTest
 class RagDocumentIngestServiceTest {
 
     @Autowired

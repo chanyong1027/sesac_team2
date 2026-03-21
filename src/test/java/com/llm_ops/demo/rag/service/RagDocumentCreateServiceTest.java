@@ -4,6 +4,7 @@ import com.llm_ops.demo.global.error.BusinessException;
 import com.llm_ops.demo.global.error.ErrorCode;
 import com.llm_ops.demo.rag.domain.RagDocument;
 import com.llm_ops.demo.rag.repository.RagDocumentRepository;
+import com.llm_ops.demo.support.RagHeavyTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @ActiveProfiles("test")
 @TestPropertySource(properties = "spring.ai.vectorstore.pgvector.enabled=false")
 @ImportAutoConfiguration(exclude = PgVectorStoreAutoConfiguration.class)
+@RagHeavyTest
 class RagDocumentCreateServiceTest {
 
     @Autowired

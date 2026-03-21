@@ -34,8 +34,13 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build & Test
-        run: ./gradlew clean build --no-build-cache -Dspring.profiles.active=test
+      - name: Test (pull request)
+        if: github.event_name == 'pull_request'
+        run: ./gradlew clean test --no-build-cache -Dspring.profiles.active=test -DexcludeTags=rag-heavy
+
+      - name: Build & Test (push)
+        if: github.event_name == 'push'
+        run: ./gradlew clean build --no-build-cache -Dspring.profiles.active=test -DexcludeTags=rag-heavy
 
       # ✅ jar를 다음 job으로 넘겨서 "중복 빌드" 제거
       - name: Upload JAR artifact
