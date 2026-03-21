@@ -1,6 +1,7 @@
 package com.llm_ops.demo.rag.service;
 
 import com.llm_ops.demo.rag.dto.RagSearchResponse;
+import com.llm_ops.demo.support.RagHeavyTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 @EnabledIfEnvironmentVariable(named = "GEMINI_API_KEY", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "RAG_SEARCH_IT", matches = "true")
+@RagHeavyTest
 class RagSearchIntegrationTest {
 
     private static final Long WORKSPACE_ID = 1L;

@@ -68,7 +68,22 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	def includeTagsProp = System.getProperty('includeTags')
+	def excludeTagsProp = System.getProperty('excludeTags')
+
+	useJUnitPlatform {
+		if (includeTagsProp) {
+			includeTags includeTagsProp.split(',')*.trim().findAll { !it.isEmpty() } as String[]
+		}
+		if (excludeTagsProp) {
+			excludeTags excludeTagsProp.split(',')*.trim().findAll { !it.isEmpty() } as String[]
+		}
+	}
+
+	def includeTags = includeTagsProp ? includeTagsProp.split(',')*.trim().findAll { !it.isEmpty() } : []
+	if (includeTags.contains('rag-heavy')) {
+		maxHeapSize = '2g'
+	}
 }
 
 jar {

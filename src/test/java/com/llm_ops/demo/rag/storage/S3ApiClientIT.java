@@ -1,6 +1,7 @@
 package com.llm_ops.demo.rag.storage;
 
 import com.llm_ops.demo.rag.config.StorageS3Properties;
+import com.llm_ops.demo.support.RagHeavyTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @ActiveProfiles("local")
 @EnabledIfEnvironmentVariable(named = "RUN_MINIO_TESTS", matches = "true")
+@RagHeavyTest
 class S3ApiClientIT {
 
     @Autowired
