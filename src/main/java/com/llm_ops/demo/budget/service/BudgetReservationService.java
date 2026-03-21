@@ -31,7 +31,7 @@ public class BudgetReservationService {
 
     private final BudgetMonthlyUsageRepository budgetMonthlyUsageRepository;
     private final BudgetReservationRepository budgetReservationRepository;
-    private final BudgetUsageRowInitializer budgetUsageRowInitializer;
+    private final BudgetReservationCommandService budgetReservationCommandService;
     private final BudgetReservationMetrics budgetReservationMetrics;
     private final Clock clock = Clock.systemUTC();
 
@@ -62,46 +62,31 @@ public class BudgetReservationService {
             return Optional.empty();
         }
 
-        int yearMonthInt = BudgetUsageService.toYearMonthInt(yearMonth);
         try {
-            budgetUsageRowInitializer.ensureUsageRow(scopeType.name(), scopeId, yearMonthInt);
-        } catch (DataIntegrityViolationException ignored) {
-            // 동시 생성 경쟁으로 unique 충돌이 나도 다음 reserve 단계에서 동일 row를 사용하면 된다.
-        }
-
-        int reserved = budgetMonthlyUsageRepository.reserveCostIfWithinLimit(
-            scopeType.name(),
-            scopeId,
-            yearMonthInt,
-            normalizedReserveAmount,
-            monthLimitUsd
-        );
-        if (reserved <= 0) {
-            budgetReservationMetrics.incrementReserveFailed(scopeType, "LIMIT_EXCEEDED");
-            return Optional.empty();
-        }
-
-        BudgetReservation reservation = BudgetReservation.reserve(
-            requestLogId,
-            traceId,
-            scopeType,
-            scopeId,
-            yearMonthInt,
-            provider,
-            model,
-            normalizedReserveAmount,
-            reservedInputTokens,
-            reservedOutputTokens,
-            now().plus(resolveTtl(ttl))
-        );
-
-        try {
-            BudgetReservation saved = budgetReservationRepository.save(reservation);
-            budgetReservationMetrics.incrementReserve(scopeType);
-            return Optional.of(saved);
+            return budgetReservationCommandService.reserve(
+                requestLogId,
+                traceId,
+                scopeType,
+                scopeId,
+                BudgetUsageService.toYearMonthInt(yearMonth),
+                monthLimitUsd,
+                normalizedReserveAmount,
+                provider,
+                model,
+                reservedInputTokens,
+                reservedOutputTokens,
+                now().plus(resolveTtl(ttl))
+            );
         } catch (DataIntegrityViolationException exception) {
-            budgetMonthlyUsageRepository.releaseReservedCost(scopeType.name(), scopeId, yearMonthInt, normalizedReserveAmount);
-            return budgetReservationRepository.findByTraceIdAndScopeTypeAndScopeId(traceId, scopeType, scopeId);
+            Optional<BudgetReservation> existingReservation = budgetReservationRepository.findByTraceIdAndScopeTypeAndScopeId(
+                traceId,
+                scopeType,
+                scopeId
+            );
+            if (existingReservation.isPresent()) {
+                return existingReservation;
+            }
+            throw exception;
         }
     }
 

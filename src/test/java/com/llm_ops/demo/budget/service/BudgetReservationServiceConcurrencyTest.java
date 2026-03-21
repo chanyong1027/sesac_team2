@@ -55,10 +55,10 @@ class BudgetReservationServiceConcurrencyTest {
 
         try {
             Future<Optional<BudgetReservation>> first = executorService.submit(() ->
-                reserveConcurrently("trace-concurrency-1", yearMonth, ready, start)
+                reserveConcurrently("trace-concurrency-1", 21L, yearMonth, new BigDecimal("1.00"), ready, start)
             );
             Future<Optional<BudgetReservation>> second = executorService.submit(() ->
-                reserveConcurrently("trace-concurrency-2", yearMonth, ready, start)
+                reserveConcurrently("trace-concurrency-2", 21L, yearMonth, new BigDecimal("1.00"), ready, start)
             );
 
             ready.await(5, TimeUnit.SECONDS);
@@ -80,6 +80,47 @@ class BudgetReservationServiceConcurrencyTest {
                 202603
             )).isPresent().get()
                 .extracting(usage -> usage.getReservedCostUsd())
+                .isEqualTo(new BigDecimal("0.60000000"));
+        } finally {
+            executorService.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("동시에 같은 traceId reserve가 들어오면 기존 reservation을 재사용한다")
+    void 동시에_같은_traceId_reserve가_들어오면_기존_reservation을_재사용한다() throws Exception {
+        // given
+        YearMonth yearMonth = YearMonth.of(2026, 3);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Optional<BudgetReservation>> first = executorService.submit(() ->
+                reserveConcurrently("trace-duplicate", 22L, yearMonth, new BigDecimal("2.00"), ready, start)
+            );
+            Future<Optional<BudgetReservation>> second = executorService.submit(() ->
+                reserveConcurrently("trace-duplicate", 22L, yearMonth, new BigDecimal("2.00"), ready, start)
+            );
+
+            assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+
+            // when
+            start.countDown();
+            Optional<BudgetReservation> firstResult = first.get(5, TimeUnit.SECONDS);
+            Optional<BudgetReservation> secondResult = second.get(5, TimeUnit.SECONDS);
+
+            // then
+            assertThat(firstResult).isPresent();
+            assertThat(secondResult).isPresent();
+            assertThat(firstResult.get().getId()).isEqualTo(secondResult.get().getId());
+            assertThat(budgetReservationRepository.findAll()).hasSize(1);
+            assertThat(budgetMonthlyUsageRepository.findByScopeTypeAndScopeIdAndYearMonth(
+                BudgetScopeType.PROVIDER_CREDENTIAL,
+                22L,
+                202603
+            )).isPresent().get()
+                .extracting(BudgetMonthlyUsage::getReservedCostUsd)
                 .isEqualTo(new BigDecimal("0.60000000"));
         } finally {
             executorService.shutdownNow();
@@ -159,7 +200,9 @@ class BudgetReservationServiceConcurrencyTest {
 
     private Optional<BudgetReservation> reserveConcurrently(
         String traceId,
+        Long scopeId,
         YearMonth yearMonth,
+        BigDecimal monthLimitUsd,
         CountDownLatch ready,
         CountDownLatch start
     ) throws Exception {
@@ -169,9 +212,9 @@ class BudgetReservationServiceConcurrencyTest {
             UUID.randomUUID(),
             traceId,
             BudgetScopeType.PROVIDER_CREDENTIAL,
-            21L,
+            scopeId,
             yearMonth,
-            new BigDecimal("1.00"),
+            monthLimitUsd,
             new BigDecimal("0.60"),
             "openai",
             "gpt-4.1-mini",

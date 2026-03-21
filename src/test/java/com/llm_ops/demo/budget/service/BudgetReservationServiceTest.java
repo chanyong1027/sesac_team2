@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,10 +38,10 @@ class BudgetReservationServiceTest {
     private BudgetReservationRepository budgetReservationRepository;
 
     @Mock
-    private BudgetUsageRowInitializer budgetUsageRowInitializer;
+    private BudgetReservationMetrics budgetReservationMetrics;
 
     @Mock
-    private BudgetReservationMetrics budgetReservationMetrics;
+    private BudgetReservationCommandService budgetReservationCommandService;
 
     @InjectMocks
     private BudgetReservationService budgetReservationService;
@@ -55,15 +56,33 @@ class BudgetReservationServiceTest {
         BigDecimal monthLimitUsd = new BigDecimal("10.00");
         BigDecimal reserveAmount = new BigDecimal("0.80");
 
-        when(budgetMonthlyUsageRepository.reserveCostIfWithinLimit(
-            eq(BudgetScopeType.PROVIDER_CREDENTIAL.name()),
+        BudgetReservation savedReservation = BudgetReservation.reserve(
+            requestLogId,
+            traceId,
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            10L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            reserveAmount,
+            1200,
+            512,
+            LocalDateTime.now().plusSeconds(90)
+        );
+        when(budgetReservationCommandService.reserve(
+            eq(requestLogId),
+            eq(traceId),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
             eq(10L),
             eq(202603),
+            eq(monthLimitUsd),
             eq(reserveAmount),
-            eq(monthLimitUsd)
-        )).thenReturn(1);
-        when(budgetReservationRepository.save(any(BudgetReservation.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(1200),
+            eq(512),
+            any(LocalDateTime.class)
+        )).thenReturn(Optional.of(savedReservation));
 
         // when
         Optional<BudgetReservation> result = budgetReservationService.reserve(
@@ -86,21 +105,26 @@ class BudgetReservationServiceTest {
         assertThat(result.get().getTraceId()).isEqualTo(traceId);
         assertThat(result.get().getStatus()).isEqualTo(BudgetReservationStatus.RESERVED);
         assertThat(result.get().getReservedCostUsd()).isEqualByComparingTo(reserveAmount);
-        verify(budgetUsageRowInitializer).ensureUsageRow(BudgetScopeType.PROVIDER_CREDENTIAL.name(), 10L, 202603);
-        verify(budgetReservationMetrics).incrementReserve(BudgetScopeType.PROVIDER_CREDENTIAL);
     }
 
     @Test
     @DisplayName("예산 한도 초과이면 reservation을 생성하지 않는다")
     void 예산_한도_초과이면_reservation을_생성하지_않는다() {
         // given
-        when(budgetMonthlyUsageRepository.reserveCostIfWithinLimit(
-            eq(BudgetScopeType.WORKSPACE.name()),
+        when(budgetReservationCommandService.reserve(
+            any(),
+            eq("trace-2"),
+            eq(BudgetScopeType.WORKSPACE),
             eq(7L),
             eq(202603),
+            eq(new BigDecimal("5.00")),
             eq(new BigDecimal("1.50")),
-            eq(new BigDecimal("5.00"))
-        )).thenReturn(0);
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(1000),
+            eq(256),
+            any(LocalDateTime.class)
+        )).thenReturn(Optional.empty());
 
         // when
         Optional<BudgetReservation> result = budgetReservationService.reserve(
@@ -120,7 +144,104 @@ class BudgetReservationServiceTest {
 
         // then
         assertThat(result).isEmpty();
-        verify(budgetReservationMetrics).incrementReserveFailed(BudgetScopeType.WORKSPACE, "LIMIT_EXCEEDED");
+    }
+
+    @Test
+    @DisplayName("같은 traceId reservation이 이미 존재하면 기존 reservation을 재사용한다")
+    void 같은_traceId_reservation이_이미_존재하면_기존_reservation을_재사용한다() {
+        // given
+        BudgetReservation existingReservation = BudgetReservation.reserve(
+            UUID.randomUUID(),
+            "trace-duplicate",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            10L,
+            202603,
+            "openai",
+            "gpt-4.1-mini",
+            new BigDecimal("0.80"),
+            1200,
+            512,
+            LocalDateTime.now().plusSeconds(90)
+        );
+        when(budgetReservationCommandService.reserve(
+            any(),
+            eq("trace-duplicate"),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(10L),
+            eq(202603),
+            eq(new BigDecimal("10.00")),
+            eq(new BigDecimal("0.80")),
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(1200),
+            eq(512),
+            any(LocalDateTime.class)
+        )).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(budgetReservationRepository.findByTraceIdAndScopeTypeAndScopeId(
+            "trace-duplicate",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            10L
+        )).thenReturn(Optional.of(existingReservation));
+
+        // when
+        Optional<BudgetReservation> result = budgetReservationService.reserve(
+            UUID.randomUUID(),
+            "trace-duplicate",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            10L,
+            YearMonth.of(2026, 3),
+            new BigDecimal("10.00"),
+            new BigDecimal("0.80"),
+            "openai",
+            "gpt-4.1-mini",
+            1200,
+            512,
+            Duration.ofSeconds(90)
+        );
+
+        // then
+        assertThat(result).contains(existingReservation);
+    }
+
+    @Test
+    @DisplayName("같은 traceId reservation을 찾지 못하면 예외를 다시 던진다")
+    void 같은_traceId_reservation을_찾지_못하면_예외를_다시_던진다() {
+        // given
+        when(budgetReservationCommandService.reserve(
+            any(),
+            eq("trace-missing"),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(10L),
+            eq(202603),
+            eq(new BigDecimal("10.00")),
+            eq(new BigDecimal("0.80")),
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(1200),
+            eq(512),
+            any(LocalDateTime.class)
+        )).thenThrow(new DataIntegrityViolationException("duplicate"));
+        when(budgetReservationRepository.findByTraceIdAndScopeTypeAndScopeId(
+            "trace-missing",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            10L
+        )).thenReturn(Optional.empty());
+
+        // when // then
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> budgetReservationService.reserve(
+            UUID.randomUUID(),
+            "trace-missing",
+            BudgetScopeType.PROVIDER_CREDENTIAL,
+            10L,
+            YearMonth.of(2026, 3),
+            new BigDecimal("10.00"),
+            new BigDecimal("0.80"),
+            "openai",
+            "gpt-4.1-mini",
+            1200,
+            512,
+            Duration.ofSeconds(90)
+        )).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test
