@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -68,9 +69,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
@@ -1069,6 +1073,112 @@ class GatewayChatServiceUnitTest {
             any(),
             any()
         );
+    }
+
+    @Test
+    @DisplayName("Provider 성공 후 workspace accounting 예외가 나도 reservation을 release하지 않는다")
+    void provider_성공_후_workspace_accounting_예외가_나도_reservation을_release하지_않는다() {
+        // given
+        String apiKey = "lum_test";
+        Long organizationId = 1L;
+        Long workspaceId = 1L;
+        UUID requestId = UUID.randomUUID();
+
+        OrganizationApiKeyAuthService.AuthResult authResult =
+            new OrganizationApiKeyAuthService.AuthResult(organizationId, 99L, "lum_test");
+        when(organizationApiKeyAuthService.resolveAuthResult(apiKey)).thenReturn(authResult);
+        when(requestLogWriter.start(any())).thenReturn(requestId);
+
+        Workspace workspace = org.mockito.Mockito.mock(Workspace.class);
+        when(workspace.getId()).thenReturn(workspaceId);
+        when(workspaceRepository.findByIdAndOrganizationIdAndStatus(workspaceId, organizationId, WorkspaceStatus.ACTIVE))
+            .thenReturn(Optional.of(workspace));
+
+        com.llm_ops.demo.prompt.domain.Prompt promptEntity = org.mockito.Mockito.mock(com.llm_ops.demo.prompt.domain.Prompt.class);
+        when(promptEntity.getId()).thenReturn(100L);
+        when(promptRepository.findByWorkspaceAndPromptKeyAndStatus(eq(workspace), eq("hello"), eq(PromptStatus.ACTIVE)))
+            .thenReturn(Optional.of(promptEntity));
+
+        PromptVersion activeVersion = org.mockito.Mockito.mock(PromptVersion.class);
+        when(activeVersion.getUserTemplate()).thenReturn("hello");
+        when(activeVersion.getSystemPrompt()).thenReturn(null);
+        when(activeVersion.getProvider()).thenReturn(ProviderType.OPENAI);
+        when(activeVersion.getModel()).thenReturn("gpt-4.1-mini");
+
+        PromptRelease release = org.mockito.Mockito.mock(PromptRelease.class);
+        when(release.getActiveVersion()).thenReturn(activeVersion);
+        when(promptReleaseRepository.findWithActiveVersionByPromptId(100L)).thenReturn(Optional.of(release));
+
+        when(providerCredentialService.resolveApiKey(eq(organizationId), eq(ProviderType.OPENAI)))
+            .thenReturn(new ProviderCredentialService.ResolvedProviderApiKey(10L, ProviderType.OPENAI, "provider-key"));
+        when(budgetUsageService.currentUtcYearMonth()).thenReturn(YearMonth.of(2026, 2));
+        when(budgetGuardrailService.evaluateWorkspaceDegrade(eq(workspaceId), anyString())).thenReturn(BudgetDecision.allow());
+        when(budgetGuardrailService.evaluateProviderCredential(eq(10L))).thenReturn(BudgetDecision.allow());
+
+        BudgetPolicy policy = BudgetPolicy.createDefault(BudgetScopeType.PROVIDER_CREDENTIAL, 10L);
+        policy.update(new java.math.BigDecimal("10.00"), null, null, null, null, null, true);
+        when(budgetPolicyService.findPolicy(BudgetScopeType.PROVIDER_CREDENTIAL, 10L)).thenReturn(Optional.of(policy));
+        when(budgetReservationEstimator.estimate(eq("gpt-4.1-mini"), any(), any(), any()))
+            .thenReturn(BudgetReservationEstimate.reservable(
+                "gpt-4.1-mini",
+                120,
+                512,
+                new java.math.BigDecimal("0.50")
+            ));
+
+        com.llm_ops.demo.budget.domain.BudgetReservation reservation = org.mockito.Mockito.mock(com.llm_ops.demo.budget.domain.BudgetReservation.class);
+        when(reservation.getId()).thenReturn(33L);
+        when(budgetReservationService.reserve(
+            eq(requestId),
+            anyString(),
+            eq(BudgetScopeType.PROVIDER_CREDENTIAL),
+            eq(10L),
+            eq(YearMonth.of(2026, 2)),
+            eq(new java.math.BigDecimal("10.00")),
+            eq(new java.math.BigDecimal("0.50")),
+            eq("openai"),
+            eq("gpt-4.1-mini"),
+            eq(120),
+            eq(512),
+            any()
+        )).thenReturn(Optional.of(reservation));
+
+        ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+            .withModel("gpt-4.1-mini")
+            .withUsage(new DefaultUsage(100L, 50L, 150L))
+            .build();
+        ChatResponse chatResponse = new ChatResponse(List.of(new Generation(new AssistantMessage("ok"))), metadata);
+        when(llmCallService.callProvider(any(), anyString(), any(), anyString(), any())).thenReturn(chatResponse);
+        doThrow(new RuntimeException("workspace accounting failed"))
+            .when(budgetUsageService)
+            .recordUsage(
+                eq(BudgetScopeType.WORKSPACE),
+                eq(workspaceId),
+                eq(YearMonth.of(2026, 2)),
+                eq(com.llm_ops.demo.gateway.pricing.ModelPricing.calculateCost("gpt-4.1-mini", 100, 50)),
+                eq(150L)
+            );
+
+        GatewayChatRequest request = new GatewayChatRequest(workspaceId, "hello", Map.of(), false);
+
+        // when // then
+        assertThatThrownBy(() -> gatewayChatService.chat(apiKey, request))
+            .isInstanceOf(GatewayException.class);
+
+        InOrder inOrder = inOrder(budgetReservationService, budgetUsageService);
+        inOrder.verify(budgetReservationService).settle(
+            33L,
+            com.llm_ops.demo.gateway.pricing.ModelPricing.calculateCost("gpt-4.1-mini", 100, 50),
+            150L
+        );
+        inOrder.verify(budgetUsageService).recordUsage(
+            eq(BudgetScopeType.WORKSPACE),
+            eq(workspaceId),
+            eq(YearMonth.of(2026, 2)),
+            eq(com.llm_ops.demo.gateway.pricing.ModelPricing.calculateCost("gpt-4.1-mini", 100, 50)),
+            eq(150L)
+        );
+        verify(budgetReservationService, never()).release(33L, "RuntimeException");
     }
 
     @Test

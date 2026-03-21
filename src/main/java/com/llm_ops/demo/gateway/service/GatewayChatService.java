@@ -193,6 +193,7 @@ public class GatewayChatService {
         boolean failoverAttempted = false;
         Long usedProviderCredentialId = null;
         BudgetReservation activeReservation = null;
+        BudgetReservation settlementReservation = null;
         String budgetFailReason = null;
         GatewayFailureClassifier.GatewayFailure lastProviderFailure = null;
         Long promptId = null;
@@ -502,6 +503,9 @@ public class GatewayChatService {
                 }
             }
 
+            settlementReservation = activeReservation;
+            activeReservation = null;
+
             String answer = response.getResult().getOutput().getText();
             String usedModel = response.getMetadata() != null ? response.getMetadata().getModel() : null;
 
@@ -548,21 +552,13 @@ public class GatewayChatService {
                     totalTokens != null ? totalTokens.longValue() : null,
                     estimatedCost);
 
-            // 예산 집계는 로그 async에 의존하지 않고 요청 스레드에서 동기 기록합니다.
-            budgetUsageService.recordUsage(
-                    BudgetScopeType.WORKSPACE,
-                    request.workspaceId(),
-                    budgetMonth,
-                    estimatedCost,
-                    totalTokens != null ? totalTokens.longValue() : null
-            );
-            if (activeReservation != null) {
+            // provider accounting을 먼저 확정해 성공 응답이 후처리 catch에서 release되지 않게 합니다.
+            if (settlementReservation != null) {
                 budgetReservationService.settle(
-                    activeReservation.getId(),
+                    settlementReservation.getId(),
                     estimatedCost,
                     totalTokens != null ? totalTokens.longValue() : null
                 );
-                activeReservation = null;
             } else {
                 budgetUsageService.recordUsage(
                     BudgetScopeType.PROVIDER_CREDENTIAL,
@@ -572,6 +568,14 @@ public class GatewayChatService {
                     totalTokens != null ? totalTokens.longValue() : null
                 );
             }
+            // 예산 집계는 로그 async에 의존하지 않고 요청 스레드에서 동기 기록합니다.
+            budgetUsageService.recordUsage(
+                    BudgetScopeType.WORKSPACE,
+                    request.workspaceId(),
+                    budgetMonth,
+                    estimatedCost,
+                    totalTokens != null ? totalTokens.longValue() : null
+            );
 
             requestLogWriter.markSuccess(requestId, new RequestLogWriter.SuccessUpdate(
                     200,
